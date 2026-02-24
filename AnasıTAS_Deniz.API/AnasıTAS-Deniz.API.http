@@ -1,0 +1,6 @@
+@AnasıTAS_Deniz.API_HostAddress = http://localhost:5093
+
+GET {{AnasıTAS_Deniz.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
