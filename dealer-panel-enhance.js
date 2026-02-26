@@ -9,7 +9,9 @@
 (function(){
 'use strict';
 
-const API='https://api.baskentenerji.com/api/v1';
+const API = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
+  ? 'http://localhost:5093/api/v1'
+  : 'https://api.baskentenerji.com/api/v1';
 const QR_LIB='https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js';
 const SCOPED_ATTR='data-v-6cff5275';
 

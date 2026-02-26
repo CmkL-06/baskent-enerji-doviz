@@ -312,7 +312,11 @@ builder.Services.AddCors(options =>
              "https://localhost:5173",    
             "http://localhost:5174",            
             "http://localhost:5175",            
-            "http://localhost:5179",            
+            "http://localhost:5179",
+            "http://localhost:5093",
+            "https://localhost:7197",
+            "http://127.0.0.1:5093",
+            "http://127.0.0.1:5173",
             "http://baskentenerji.com",
             "https://baskentenerji.com",
             "http://old.baskentenerji.com",
@@ -339,8 +343,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
-// Enable HTTPS redirection in development
-if (app.Environment.IsDevelopment())
+// HTTPS redirection: skip in Development so http://localhost:5093 works without cert
+if (!app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
 }
