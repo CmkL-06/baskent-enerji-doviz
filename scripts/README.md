@@ -1,0 +1,20 @@
+# Scripts - Başkent Enerji Döviz
+
+Bu klasör, projeye ait otomasyon ve test scriptlerini içerir.
+
+## Script Dosyaları
+
+| Dosya | Açıklama |
+|-------|----------|
+| Baskentenerji_API_Test.ps1 | API test scripti |
+| Calistir-SeedUsers_SHA256.ps1 | SHA256 ile kullanıcı seed scripti |
+| IIS-API-AppPool-Optimize.ps1 | IIS App Pool optimizasyon scripti |
+| IIS-Kontrol.ps1 | IIS kontrol scripti |
+| SeedUsers_SHA256_Update.sql | Kullanıcı seed SQL güncellemesi |
+| Test-API-AfterDeploy.ps1 | Deploy sonrası API test |
+| baskent_test.py | Python test scripti |
+| login-body.example.json | Login body örnek JSON |
+
+## Kaynak
+
+Bu scriptler `baskentenerji-doviz-api/scripts` klasöründen birleştirilmiştir.
