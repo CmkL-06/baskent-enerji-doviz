@@ -1,0 +1,14 @@
+---
+description: SmileMedical – Web ve desktop erişimi (workspace QuantaQuokka açıkken)
+alwaysApply: false
+globs: ["SmileMedical/**"]
+---
+
+# SmileMedical – Yetkiler (Web & Desktop)
+
+SmileMedical klasöründe çalışırken aşağıdaki yetkileri **gerekli olduğunda** talep et.
+
+- **full_network:** npm, API, git remote, paket indirme, fetch.
+- **all:** Workspace dışı (Desktop, M:), sandbox engeli, sistem erişimi.
+
+Detay: `SmileMedical/.cursor/rules/permissions-access.mdc`

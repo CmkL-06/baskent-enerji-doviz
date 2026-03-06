@@ -1,0 +1,41 @@
+---
+description: SmileMedical – Web ve masaüstü erişimi, yetki optimizasyonu
+alwaysApply: true
+---
+
+# Yetkiler – Web ve Desktop Erişimi
+
+Bu projede çalışan yapay zeka **web** ve **masaüstü (desktop)** erişimine ihtiyaç duyabilir. Komut çalıştırırken aşağıdaki yetkileri **gerekli olduğunda** talep et.
+
+## Web erişimi (full_network)
+
+Aşağıdaki işlemlerde **`required_permissions: ["full_network"]`** kullan:
+
+- `npm install`, `npm run`, `pnpm`, `yarn`
+- API çağrıları, dış servisler (Swagger, auth, harici API)
+- `git clone`, `git push`, `git pull`, GitHub/remote erişimi
+- Paket indirme (NuGet, npm registry)
+- Web sayfası fetch, dokümantasyon indirme
+- Frontend proxy (Vite → API), canlı test
+
+## Masaüstü / tam dosya erişimi (all)
+
+Aşağıdaki işlemlerde **`required_permissions: ["all"]`** kullan:
+
+- Workspace dışına erişim: masaüstü (Desktop), M: sürücüsü, başka sürücüler
+- Dosya taşıma/kopyalama/silme workspace dışında
+- Sistem genelinde arama veya script çalıştırma
+- Sandbox’ın engellediği (izin hatası veren) komutlar
+- Cursor/IDE dışı uygulama başlatma, mount script’leri
+
+## Optimizasyon kuralları
+
+1. **Önce gerekli en düşük yetki:** Sadece network gerekiyorsa `full_network`; dosya dışı erişim gerekiyorsa `all`.
+2. **Gerekmeden talep etme:** Sadece workspace içi okuma/yazma ise ek yetki isteme.
+3. **Kullanıcı onayı:** CALISMA_PRENSIPLERI’e uy; geri alınamaz işlemlerde önce dry-run / onay al.
+
+Bu kural, proje klasöründe çalışan agent’ın web ve desktop erişimini güçlü ve gerektiği yerde kullanmasını sağlar.
+
+## Tam kontrol (Gemini + Cursor)
+
+- Bu projede **geliştirme**, **araştırma** ve **uygulama** Gemini destekli Antigravity ve Cursor'ın **tam kontrolündedir**. Yetkiler bu amaçla kullanılır; gerekli olduğunda **full_network** ve **all** talep etmekten çekinme. Detay: `antigravity/control-and-directions.md`

@@ -1,0 +1,43 @@
+---
+description: SmileMedical antigravity – sadece referans; süpervizör Cursor
+alwaysApply: true
+---
+
+# Antigravity – Referans (Süpervizör: Cursor)
+
+## Önemli
+
+- **Sistem süpervizörü Cursor’dur.** Bu workspace (D:\QuantaQuokka) Cursor tarafından yürütülür. Antigravity sistemi **çalıştırmaz** veya yönetmez.
+- **Antigravity sadece referans/bağlam:** `SmileMedical/antigravity/` altındaki dosyalar (task.md, implementation_plan, system_analysis, walkthrough) Cursor’un okuyup kullanabileceği dokümanlardır. Görev ilerletme ve karar Cursor’da.
+
+## Kapsam
+
+- **Sadece bu proje:** Kullanıcı projeyi **`SmileMedical_AI_Ac.ps1`** ile açtıysa workspace = SmileMedical. Süpervizör yine Cursor.
+
+## Nerede?
+
+- **Klasör:** `SmileMedical/antigravity/`
+- **Dosyalar:** `README.md`, `task.md`, `implementation_plan.md`, `system_analysis.md`, `walkthrough.md`, **`control-and-directions.md`** (tam kontrol ve yönler).
+- **Çalışma prensipleri:** `SmileMedical/CALISMA_PRENSIPLERI.md`
+
+## Cursor’un rolü (güçlü)
+
+- **Geliştirme:** Kod, test, refactor, API, frontend, migration — tam inisiyatif; öner ve uygula.
+- **Araştırma:** Doküman, web araması, paket/teknik inceleme — engellenmez; gerekirse `full_network` talep et.
+- **Uygulama:** Dosya değişikliği, komut çalıştırma, build/test/deploy rehberi — doğrudan yap (CALISMA_PRENSIPLERI’e uy: geri alınamaz işlerde dry-run ve onay).
+- "Antigravity'ye devam et", "birleştirme durumu", "proje bütünlüğünü doğrula" denildiğinde: `antigravity/task.md` ve `implementation_plan.md` oku; açık maddeleri listele veya uygula.
+- Görev durumunu `task.md` ve `implementation_plan.md` checkbox’ları ile güncelle.
+
+## Yetkiler (web ve desktop)
+
+- **full_network:** npm, API, git, paket indirme, araştırma.
+- **all:** Masaüstü, M:, workspace dışı, sandbox dışı.
+- Detay: `SmileMedical/.cursor/rules/permissions-access.mdc`
+
+## Yapay zeka kısayolu
+
+- **`SmileMedical_AI_Ac.ps1`** — Cursor yalnızca SmileMedical’i açar; AI bu proje ile sınırlı ve tam yetkili çalışır.
+
+## Tam kontrol referansı
+
+- **`antigravity/control-and-directions.md`** — Gemini + Cursor tam kontrol, geliştirme/araştırma/uygulama yönlerinin güçlü tanımı. Belirsizlik olduğunda bu dosyayı referans al.

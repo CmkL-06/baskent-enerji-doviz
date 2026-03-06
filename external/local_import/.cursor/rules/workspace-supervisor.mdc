@@ -1,0 +1,24 @@
+---
+description: D:\QuantaQuokka – Sistem süpervizörü Cursor
+alwaysApply: true
+---
+
+# Sistem süpervizörü: Cursor
+
+## Workspace kökü
+
+- **Kök dizin:** `D:\QuantaQuokka`
+- Bu workspace’te tüm geliştirme, karar ve uygulama **Cursor tarafından yürütülür**.
+
+## Süpervizör rolü
+
+- **Sistem süpervizörü Cursor’dur.** Bu klasörde çalışan birincil agent Cursor’dur.
+- **Antigravity sistem yürütmez.** Antigravity (Gemini) bu workspace’i çalıştırmaz veya yönetmez. `SmileMedical/antigravity/` altındaki dosyalar **sadece referans ve bağlam** içindir; Cursor isterse oradan okur, görev listesi ve analiz raporları orada tutulur.
+- Karar verme, kod yazma, script çalıştırma, görev ilerletme: **Cursor**.
+
+## Özet
+
+| Rol            | Araç      | Açıklama                                      |
+|----------------|-----------|-----------------------------------------------|
+| **Sistem süpervizörü** | **Cursor** | D:\QuantaQuokka kökünde çalışır, yürütür, karar verir. |
+| Referans/bağlam | Antigravity | antigravity/ dokümanları; Cursor referans alır, Antigravity “sistemi yürütmez”. |
