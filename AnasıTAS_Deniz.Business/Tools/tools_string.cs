@@ -47,8 +47,10 @@ namespace AnasıTAS_Deniz.Business.Tools
 
         public static string GetIpAddress(this HttpContext context)
         {
+            if (context?.Connection?.RemoteIpAddress == null)
+                return "";
             var ipAddress = context.Connection.RemoteIpAddress.ToString();
-            return ipAddress;
+            return ipAddress ?? "";
         }
     }
 }

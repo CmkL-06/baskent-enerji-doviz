@@ -27,6 +27,25 @@ namespace AnasıTAS_Deniz.Business.Exceptions
             {
                 await HandleApiExceptionAsync(httpContext, ex);
             }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unhandled exception: {Message}", ex.Message);
+                await HandleExceptionAsync(httpContext, ex);
+            }
+        }
+
+        private static Task HandleExceptionAsync(HttpContext context, Exception exception)
+        {
+            context.Response.ContentType = "application/json";
+            context.Response.StatusCode = 500;
+            var message = exception.InnerException?.Message ?? exception.Message ?? exception.ToString();
+            var response = new
+            {
+                StatusCode = 500,
+                Message = "An internal error occurred. Please try again later.",
+                Detail = message
+            };
+            return context.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(response));
         }
 
         private static Task HandleApiExceptionAsync(HttpContext context, ApiException exception)

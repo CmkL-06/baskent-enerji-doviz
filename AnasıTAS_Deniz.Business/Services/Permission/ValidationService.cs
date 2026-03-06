@@ -77,7 +77,7 @@ namespace AnasıTAS_Deniz.Business.Services.Permission
                     return false;
 
                 var dbUser = await _dbContext.Users.FindAsync(userId.Value);
-                return dbUser != null && dbUser.Rank >= Rank.Moderator;
+                return dbUser != null && dbUser.Rank >= Rank.Staff;
             }
             catch (Exception)
             {
