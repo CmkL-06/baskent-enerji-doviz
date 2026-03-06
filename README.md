@@ -18,7 +18,21 @@ AnasıTAS_Deniz.API/          → Web API katmanı (Controller'lar, HostService)
 AnasıTAS_Deniz.Business/     → İş mantığı (Servisler, Validasyon)
 AnasıTAS_Deniz.Data/         → Veritabanı (DbContext, Migration)
 AnasıTAS_Deniz.Entity/       → Entity modelleri, Enum'lar, DTO'lar
+docs/                        → Teknik dokümantasyon arşivi
+scripts/                     → Operasyon, test ve deploy scriptleri
+telegram-bot/                → Telegram bot entegrasyon servisleri
+cursor-agent/                → Cursor agent operasyon notları
 ```
+
+## Tek Depo Konsolidasyonu
+
+Bu repo, proje parçalarını tek yerde toplar:
+
+- Uygulama kaynak kodu (`AnasıTAS_Deniz.*`)
+- Operasyon ve test scriptleri (`scripts/`)
+- Teknik dokümantasyon (`docs/`)
+- Telegram bot bileşenleri (`telegram-bot/`)
+- Agent notları (`cursor-agent/`)
 
 ## Yetki Hiyerarşisi
 
