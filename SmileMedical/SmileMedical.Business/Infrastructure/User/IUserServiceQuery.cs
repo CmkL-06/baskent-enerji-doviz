@@ -1,0 +1,17 @@
+﻿using SmileMedical.Entity.Modals.RequestModals.User;
+using SmileMedical.Entity.Modals.ViewModals.User;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace SmileMedical.Business.Infrastructure.User
+{
+    public interface IUserServiceQuery
+    {
+        Task<vm_user> GetUser (rm_user_get FilterData);
+        Task<List<vm_user>> GetUsers (rm_user_get? FilterData);
+      
+    }
+}
