@@ -8,6 +8,7 @@ Bu klasör, projeye ait otomasyon ve test scriptlerini içerir.
 |-------|----------|
 | Baskentenerji_API_Test.ps1 | API test scripti |
 | Calistir-SeedUsers_SHA256.ps1 | SHA256 ile kullanıcı seed scripti |
+| Clean-SmileMedical-ExactHashDuplicates.ps1 | Hash bazlı nested kopya temizliği |
 | IIS-API-AppPool-Optimize.ps1 | IIS App Pool optimizasyon scripti |
 | IIS-Kontrol.ps1 | IIS kontrol scripti |
 | SeedUsers_SHA256_Update.sql | Kullanıcı seed SQL güncellemesi |
