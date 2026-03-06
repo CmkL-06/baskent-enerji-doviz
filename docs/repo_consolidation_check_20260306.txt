@@ -1,0 +1,28 @@
+=== gh repo list ===
+[{"name":"baskent-enerji-doviz","nameWithOwner":"CmkL-06/baskent-enerji-doviz","url":"https://github.com/CmkL-06/baskent-enerji-doviz"},{"name":"baskentenerji-doviz-api","nameWithOwner":"CmkL-06/baskentenerji-doviz-api","url":"https://github.com/CmkL-06/baskentenerji-doviz-api"}]
+
+=== branches/default ===
+  origin/BASKENT-DOVIZ
+  origin/HEAD -> origin/BASKENT-DOVIZ
+  origin/cursor/flaky-test-resolution-146b
+  origin/dependabot/nuget/AnasTAS_Deniz.Business/MimeKit-4.15.1
+{"defaultBranchRef":{"name":"BASKENT-DOVIZ"}}
+{"defaultBranchRef":{"name":"main"}}
+
+=== api parity check summary ===
+api_file_count 601
+missing_count 0
+different_count 13
+DIFF README.md => README.md
+DIFF deploy-api-to-canli.ps1 => deploy-api-to-canli.ps1
+DIFF .gitignore => .gitignore
+DIFF kaynak-kod/README.md => README.md
+DIFF kaynak-kod/AnasıTAS_Deniz.API/AnasıTAS_Deniz.API.csproj => AnasıTAS_Deniz.API/AnasıTAS_Deniz.API.csproj
+DIFF kaynak-kod/AnasıTAS_Deniz.API/Program.cs => AnasıTAS_Deniz.API/Program.cs
+DIFF kaynak-kod/AnasıTAS_Deniz.Entity/Enums.cs => AnasıTAS_Deniz.Entity/Enums.cs
+DIFF kaynak-kod/AnasıTAS_Deniz.Business/Exceptions/ExceptionHandlingMiddleware.cs => AnasıTAS_Deniz.Business/Exceptions/ExceptionHandlingMiddleware.cs
+DIFF kaynak-kod/AnasıTAS_Deniz.Business/Tools/tools_string.cs => AnasıTAS_Deniz.Business/Tools/tools_string.cs
+DIFF kaynak-kod/AnasıTAS_Deniz.Business/Services/User/UserServiceCommand.cs => AnasıTAS_Deniz.Business/Services/User/UserServiceCommand.cs
+DIFF kaynak-kod/AnasıTAS_Deniz.Business/Services/Permission/ValidationService.cs => AnasıTAS_Deniz.Business/Services/Permission/ValidationService.cs
+DIFF kaynak-kod/AnasıTAS_Deniz.Business/Services/ExchangeOffice/Office/ExchangeTransactionService.cs => AnasıTAS_Deniz.Business/Services/ExchangeOffice/Office/ExchangeTransactionService.cs
+DIFF kaynak-kod/AnasıTAS_Deniz.Business/Services/ExchangeOffice/Expense/ExpensePaymentService.cs => AnasıTAS_Deniz.Business/Services/ExchangeOffice/Expense/ExpensePaymentService.cs
