@@ -1,0 +1,28 @@
+﻿using Microsoft.EntityFrameworkCore.Migrations;
+
+#nullable disable
+
+namespace SmileMedical.Data.Migrations
+{
+    /// <inheritdoc />
+    public partial class AddCurrencySpecificMarginsToExchangeSettings : Migration
+    {
+        /// <inheritdoc />
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.AddColumn<string>(
+                name: "CurrencySpecificMargins",
+                table: "ExchangeSettings",
+                type: "nvarchar(max)",
+                nullable: true);
+        }
+
+        /// <inheritdoc />
+        protected override void Down(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.DropColumn(
+                name: "CurrencySpecificMargins",
+                table: "ExchangeSettings");
+        }
+    }
+}

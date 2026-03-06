@@ -1,0 +1,31 @@
+﻿**********************
+Windows PowerShell transcript start
+Start time: 20260220054610
+Username: MONSTER-OWNER\CmkL-Owner
+RunAs User: MONSTER-OWNER\CmkL-Owner
+Configuration Name: 
+Machine: MONSTER-OWNER (Microsoft Windows NT 10.0.26200.0)
+Host Application: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -ExecutionPolicy Bypass -File .\Install-Tools-And-Migrate.ps1
+Process ID: 25724
+PSVersion: 5.1.26100.7705
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.7705
+BuildVersion: 10.0.26100.7705
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+Transcript started, output file is c:\Users\CmkL-Owner\Desktop\QuantaQuokka_\SmileMedical\migration_log.txt
+Installing dotnet-ef globally...
+
+Verifying dotnet-ef...
+
+Running Migrations...
+
+
+FAILURE: DB Missing.
+**********************
+Windows PowerShell transcript end
+End time: 20260220054627
+**********************
