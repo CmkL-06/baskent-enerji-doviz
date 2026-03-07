@@ -1,0 +1,203 @@
+# ANTALYA BÖLGE ADLİYE MAHKEMESİ CUMHURİYET BAŞSAVCILIĞINA
+
+**İlgili Daire:** 14. Ceza Dairesi  
+**Konu:** 5271 sayılı CMK 308/A Uyarınca İtiraz Edilmesi Talebi
+
+---
+
+## TALEPTE BULUNAN
+
+| Alan | Değer |
+|------|--------|
+| **Adı Soyadı** | CEM EKİNCİ |
+| **T.C. Kimlik No** | 12028283792 |
+| **Adres** | *(Başvuru öncesi doldurulmalıdır; eksik bırakılması tebligat aksamasına yol açabilir.)* |
+| **Telefon** | *(Doldurulacak)* |
+| **Vekili** | *(Varsa) Av. …* |
+
+---
+
+## SÜRE VE YETKİ
+
+5271 sayılı CMK 308/A uyarınca itiraz, **kararın verildiği tarihten itibaren bir ay** içinde Cumhuriyet Başsavcılığı tarafından yapılabilir. Kesinleşen karar **26.02.2026** tarihlidir; bu dilekçe **…/…/2026** tarihinde sunulmuş olup **süre içinde** verilmektedir. *(Sunum tarihi mutlaka doldurulacaktır.)*
+
+---
+
+## DOSYA BİLGİLERİ
+
+| Bilgi | Değer |
+|-------|--------|
+| İlk derece mahkemesi | Alanya 2. Ağır Ceza Mahkemesi |
+| Esas / Karar | 2024/396 E. – 2025/796 K. |
+| İlk derece karar tarihi | 05.12.2025 |
+| BAM | Antalya Bölge Adliye Mahkemesi 14. Ceza Dairesi |
+| BAM dosya no | 2026/423 E. – 2026/529 K. |
+| Kesinleşme tarihi | 26.02.2026 |
+| Kanun yolu | CMK 286/2-a gereği temyize kapalı (resmi belgede sahtecilik) |
+| Verilen ceza (Cem Ekinci) | Nitelikli dolandırıcılık: 7 yıl hapis + 110.000 gün adlî para cezası (2.200.000 TL); Resmi belgede sahtecilik: 3 yıl hapis |
+
+---
+
+## KONU
+
+Alanya 2. Ağır Ceza Mahkemesinin **05.12.2025** tarihli, **2024/396 E.** ve **2025/796 K.** sayılı kararı ile tarafıma **resmi belgede sahtecilik** (TCK 209/2 delaletiyle 204/1) ve **nitelikli dolandırıcılık** (TCK 158) suçlarından mahkûmiyet hükmü kurulmuş; Antalya Bölge Adliye Mahkemesi 14. Ceza Dairesi nezdinde yapılan istinaf incelemesi sonucunda karar kesinleşmiştir.
+
+5271 sayılı Ceza Muhakemesi Kanununun **308/A** maddesi uyarınca, Antalya Bölge Adliye Mahkemesi 14. Ceza Dairesinin bu **kesin nitelikteki** kararına karşı **Cumhuriyet Başsavcılığı tarafından itiraz edilmesini** talep etmekteyim. Aşağıda itiraz talebimi güçlendiren hukuki gerekçeler sunulmaktadır.
+
+---
+
+## GEREKÇELİ AÇIKLAMALAR
+
+### I. KAST UNSURUNUN SOMUT DELİLLERLE İSPATLANMAMIŞ OLMASI
+
+Ceza hukukunun temel ilkeleri gereğince mahkûmiyet kararı verilebilmesi için, sanığın suç işlediğinin **kesin ve inandırıcı delillerle** ortaya konulması zorunludur. Kast, ceza sorumluluğunun **subjektif unsuru** olup, ancak **somut delillerle** sabit kılınabilir.
+
+Somut olayda tarafıma isnat edilen resmi belgede sahtecilik ve nitelikli dolandırıcılık suçları yönünden **kast unsurunu** ortaya koyan **doğrudan veya dolaylı somut bir delil** dosyada mevcut değildir. **Telefon görüşmesi**, **talimat ilişkisi**, **planlama faaliyeti**, **örgütsel bağlantı** veya senedin sahteliğine / postacı düzenine ilişkin **bilgi taşıdığıma dair herhangi bir iletişim kaydı** ortaya konulmamıştır. Dosyada **“postacı kılığındaki kişi”**nin kimliği **belirsiz** kalmış; bu kişinin **sanıklarla bağlantısı**, **HTS incelemesi**, **kamera kayıtları**, senedin **nerede ve kim tarafından hazırlandığı** ve **PTT kıyafetinin nereden temin edildiği** hususları soruşturmada **netleştirilmemiş**tir. Mahkeme, bu cevapsız sorulara rağmen yalnızca **çıkarımsal değerlendirmeler** ile – savunmaların “hayatın olağan akışına aykırı” sayılması ve “meçhul şahıs ile sanıkların fikir ve eylem birliği” kabulü – kastı sabit kabul etmiştir. Bu yaklaşım **masumiyet karinesi** (AİHS 6/2, Anayasa m.38) ve **in dubio pro reo** (şüpheden sanık yararlanır) ilkesi (CMK 223/2-e, 223/5) ile bağdaşmamakta; **açık hukuka aykırılık** teşkil etmektedir.
+
+### II. İŞTİRAK İLİŞKİSİNİN SOMUT OLARAK KURULAMAMASI
+
+İştirak halinde suç (TCK 37, 38) için sanığın **suçun işlenişine bilinçli ve iradi katkısı** ile **fail veya diğer iştirakçilerle fikir ve eylem birliği** somut delillerle ispatlanmalıdır.
+
+Dosyada yer alan kambiyo senedinin **hazırlanması**, **fiziki olarak bulundurulması** ve **icra takibine konu edilmesi** süreçlerinde tarafımın **fiili ve hukuki anlamda asli veya yardımcı fail rolü** bulunmamaktadır. Tarafım yalnızca çalıştığım hukuk bürosunda kendime yöneltilen talep üzerine senedin **arka yüzüne ciro amacıyla** imza atmış; senedi **fiziken teslim almamış**, ofiste bırakmış; adliyeye senedi **teslim eden kişi ben olmadığım** gibi kimin teslim ettiğini de bilmemekteyim. Senedin **kim tarafından icraya konulduğu** ve **icra sürecinin kim tarafından yönlendirildiği** hususları soruşturma ve kovuşturmada **yeterince araştırılmamış**; gerekçeli kararda **tartışılmamıştır**. Bu nedenle tarafımın **yalnızca senet üzerinde ciro imzası bulunması** nedeniyle **asli fail** gibi değerlendirilmesi, ceza hukukunda **fail – iştirakçi ayrımı** ve **somut delil ile ispat** ilkeleriyle bağdaşmamakta; **hukuka aykırı** bir nitelendirme oluşturmaktadır.
+
+### III. MÜŞTEKİ İLE SANIK ARASINDA TEMAS BULUNMAMASI
+
+Dolandırıcılık suçunun (TCK 157, 158) **maddi unsurları** arasında failin müştekiyi **aldatıcı davranışlarla** yanıltması ve bu suretle **menfaat sağlaması** yer alır. Bu da en azından **sanık ile müşteki arasında bir temas veya aldatma ilişkisi**nin varlığını gerektirir.
+
+**Müşteki Hasan Yalım** mahkeme huzurunda, gerekçeli karar ve duruşma tutanağında da yer aldığı üzere, “**Cem Ekinci’yi tanımıyorum**” ve “**Tanımadım efendim, getirseler Cem Ekinci kim deseler yine bilmem. Hiç görmedim.**” şeklinde beyanda bulunmuştur. **Postacı olayı** (kıraathaneye PTT görevlisi kıyafetli **kimliği belirsiz** bir kişinin gelmesi, vergi/belediyeden evrak denilerek imza aldırması) **18.05.2022** tarihinde müşteki tarafından savcılığa suç duyurusuna konu edilmiş; bu kişiyi gören tanıklar (Şevki Yalım, İbrahim Ant) **postacı olayını** doğrulamış ancak **tarafımı veya tarafımla bağlantıyı** tespit eden **hiçbir beyan** dosyada yer almamaktadır. Dosyada tarafım ile müşteki arasında **herhangi bir doğrudan temas**, **tanışıklık** veya **aldatma ilişkisi**ni gösteren **somut delil** mevcut değildir. Müştekinin bu beyanı, tarafımdan ileri sürülen “sadece isim/ciro için kullanıldım, borçluyu hiç tanımıyorum” savunmasıyla **tam uyum** içinde olup, mahkemece gerekçede **değerlendirilmemiş**; iştirak yalnızca çıkarımsal olarak kabul edilmiştir.
+
+### IV. İCRA TAKİBİNİN SANIK TARAFINDAN YÜRÜTÜLMEMESİ
+
+İcra takibi **tarafımdan başlatılmamış** ve **tarafımdan yürütülmemiştir**.
+
+Alanya İcra Dairesi **2022/18216** sayılı dosyada görülen kambiyo senedi takibi, takip talebinin **18.07.2022** tarihinde yapıldığı ve alacaklı sıfatıyla tarafım adına açıldığı icra kayıtlarında yer almakla birlikte, takibi **fiilen Av. Ayşegül Başkoçak Çiftçi** (Karatay/Konya) yürütmüştür. Bu avukat ile aramda **vekalet veya talimat ilişkisi** bulunmamaktadır. İcra sürecinin tarafımdan **planlandığı** veya **yürütüldüğü** iddiası **gerçeği yansıtmamakta**; bu olgu gerekçeli kararda **ayrıntılı tartışılmamıştır**.
+
+### V. SUÇTAN MENFAAT SAĞLANDIĞINA DAİR DELİL BULUNMAMASI
+
+Dolandırıcılık suçunda **menfaat** (maddi veya manevi yarar) unsuru, failin suç işlemek suretiyle **kendisine veya başkasına** bu yararı sağlaması ile tamamlanır. Tarafımdan **suçtan herhangi bir maddi menfaat elde edildiğini** gösteren **icra tahsilatına ilişkin ödeme belgesi**, **para akışı**, **vekalet ücreti** veya **başkaca somut delil** dosyada **mevcut değildir**. İcra dosyasında tahsilat yapıldığı belirtilmekle birlikte, bu tutarın **tarafıma intikal edip etmediği** araştırılmamış; gerekçeli kararda **tartışılmamıştır**. Bu dosya ve icra süreciyle ilgili olarak **hiçbir çekilde para almadığımı**, **hiçbir menfaat sağlamadığımı**, **hiçbir çıkarımın bulunmadığını** ve **hiçbir çıkar da gözetmediğimi** açıkça beyan ederim (TCK 157, 158 – menfaat unsuru).
+
+### VI. SAVUNMALARIN GEREKÇELİ KARARDA TARTIŞILMAMASI (CMK 230)
+
+Tarafımdan sunulan **yazılı savunma dilekçelerinde**;
+
+- çalıştığım ofisteki **işçi (sigortalı) konumum**,
+- senedin **fiziki olarak tarafımca kullanılmadığı** ve ofiste bırakıldığı,
+- müşteki ile **herhangi bir tanışıklığım** bulunmadığı,
+- icra sürecini **tarafımın yürütmediği** (Av. Ayşegül Başkoçak Çiftçi tarafından yürütüldüğü),
+
+hususları **açık şekilde** belirtilmiştir. Buna karşılık gerekçeli kararda bu **esaslı savunmalar** tek tek ve **ayrıntılı şekilde tartışılmamış**; yalnızca “savunmaların hayatın olağan akışına aykırı” ve “suçtan kurtulmaya yönelik” olduğu yönünde **genel ve toplu** bir değerlendirme yapılmıştır.
+
+**5271 sayılı CMK 230** maddesi uyarınca, hükmün gerekçesinde sanığın ileri sürdüğü **esaslı savunmaların açık şekilde değerlendirilmesi** zorunludur. Bu zorunluluğun yerine getirilmemesi, Yargıtay 3. Ceza Dairesi 2016/8543 E., 2016/13537 K. sayılı kararına göre **gerekçesiz veya eksik gerekçe** ve **bozma sebebi**dir. Bölge Adliye Mahkemesi incelemesinde bu noktanın **hiç tartışılmaması** veya aynı eksikliğin sürdürülmesi, CMK 308/A kapsamında itiraz konusu yapılmalıdır.
+
+### VII. ŞÜPHEDEN SANIK YARARLANIR İLKESİ
+
+Ceza hukukunun temel prensiplerinden biri olan **“şüpheden sanık yararlanır”** (in dubio pro reo) ilkesi (CMK 223/2-e, 223/5) gereğince, sanığın suç işlediğine dair **kesin ve kuşkuya yer bırakmayan deliller** bulunmadıkça mahkûmiyet kararı verilemez. Mevcut dosya kapsamında **kast** ve **iştirak** unsurları **kesin ve açık delillerle** ortaya konulmamıştır. Mahkeme, doğrudan delil yerine savunmaların “inandırıcı bulunmaması” ve “meçhul şahıs ile sanıklar” çıkarımına dayanmıştır. Bu ilkenin gözetilmemesi **açık hukuka aykırılık** oluşturmaktadır.
+
+### VIII. ADİL YARGILANMA HAKKI İHLALİ (AİHS 6/1, Anayasa m.36)
+
+Anayasa Mahkemesi ve Avrupa İnsan Hakları Mahkemesi içtihatlarına göre, mahkemelerin sanığın ileri sürdüğü **esaslı savunmaları tartışmadan** ve **gerekçeyi yeterince somutlaştırmadan** hüküm kurması **adil yargılanma hakkının** ihlali niteliğindedir. Dosyada ileri sürdüğüm savunmalar **yeterince değerlendirilmemiş**; gerekçe, hangi delile neden itibar edildiği ve savunmanın neden reddedildiği **açıkça** yazılmadan **kalıp ifadelerle** sonuçlandırılmıştır.
+
+### IX. BİLİRKİŞİ (ATK) RAPORUNUN SONUÇLARI
+
+İstanbul Adli Tıp Kurumu Başkanlığının **06.05.2025** tarihli raporunda aşağıdaki **somut tespitler** yer almaktadır: **(1)** Müşteki **Hasan Yalım’ın imzaları gerçek**tir; **(2)** Senedeki **diğer yazılar başka kişi tarafından yazılmış** olup **sanıklara ait değildir**; **(3)** Senet **bilgisayar ortamında hazırlanmış**tır ve **mutat senet formatında değildir**; **(4)** **İğfal kabiliyeti** konusu **mahkemeye bırakılmış**; **(5)** Senedin isim ve imzadan faydalanılarak **oluşturulup oluşturulmadığı** yönünde **ileri bir tespit yapılamadığı** belirtilmiştir. Bilirkişi raporu, tarafımın senedi **hazırlamadığını** veya senedeki metni **yazmadığını** (diğer yazılar sanıklara ait değil) destekler niteliktedir. Buna rağmen bu unsurlar gerekçede **açıkça tartışılmadan** mahkemenin resmi belgede sahtecilik ve dolandırıcılık hükmü kurması, **delil değerlendirmesi** ve **gerekçe yükümlülüğü** (CMK 230) açısından itiraz konusu yapılmalıdır; **şüpheden sanık yararlanır** ilkesi gereği bilirkişinin “ileri tespit yapılamadı” ve “diğer yazılar sanıklara ait değil” dediği noktada mahkemenin aksi yönde **açık gerekçe** ile karar vermesi gerekir.
+
+### X. KRİTİK USUL HATASI İHTİMALLERİ
+
+Aşağıdaki **usul hataları** veya **ciddi usul ihtimalleri**, CMK 308/A itirazının hukuki gerekçeleri olarak değerlendirilmelidir:
+
+1. **İstinaf başvurusunun usulden reddedilmesine rağmen kararın aynı gün kesinleşmesi:** Kanun yolu bildirimi ve tebligat sürelerinin usulüne uygun işleyip işlemediği konusunda **ciddi şüphe** doğurmaktadır.
+2. **Tebligat yapılmadan kesinleşme işlemi yapılmış olma ihtimali:** Karar veya kesinleşme **tebliğ edilmeden** veya tebliğin usulüne uygun tamamlandığı **belgelenmeden** kesinleşme işlemi yapılmış olması ihtimali, **TCK 53** kapsamındaki hak yoksunluklarının infaz/UYAP aşamasında **zamanında veya usulsüz** işlenmesi iddiasıyla birlikte **açık usul aykırılığı** olarak değerlendirilmelidir.
+3. **İstinaf mahkemesinin savunma ve delilleri tartışmadan kısa gerekçe ile karar vermiş olması:** Gerekçeli karar zorunluluğu (CMK 230, Anayasa m.141/3) ve adil yargılanma standartlarıyla bağdaşmayabilir.
+
+### XI. MAHKÛMİYETİN AİLE HAYATI VE İNSANCA YAŞAMA HAKKI ÜZERİNDEKİ ETKİSİ (AİHS 8, ANAYASA 17)
+
+Yukarıda özetlenen **hukuka aykırılıklar** (kast ve iştirakin somut delille sabit olmaması, savunma hakkının gerekçede karşılanmaması, şüpheden sanık yararlanır ilkesinin ihlali) yalnızca ceza muhakemesi hukuku açısından değil; **aile hayatına saygı hakkı** ve **insanca yaşama hakkı** açısından da sonuç doğurmaktadır.
+
+**AİHS 8** (aile hayatına saygı) ve **Anayasa m.17** (yaşama hakkı, maddi ve manevi varlığın bütünlüğü) ile **Anayasa m.20** (özel hayatın ve aile hayatının gizliliği) uyarınca, kişinin **aile birliği** içinde yaşaması ve **onurlu bir biçimde hayatını sürdürmesi** koruma altındadır. Tartışmalı ve somut delillerle desteklenmeyen bir mahkûmiyet nedeniyle **velayet hakkının kaybı** veya **aile birliğinin zedelenmesi**, **TCK 53** kapsamındaki hak yoksunluklarının infaz sürecinde işlenmesi ve **toplum içinde normal bir yaşam sürme imkânının** fiilen elinden alınması, bu hakların **orantısız biçimde ihlali** anlamına gelmektedir. Mahkûmiyetin **hukuka aykırı** olması halinde, aile yapısının bozulması ve insanca yaşama hakkının zarar görmesi **hukuk devleti** ve **insan onuru** ilkeleriyle bağdaşmaz. Bu nedenle itiraz incelemesinde, karardaki **hukuksuzluğun** yalnızca ceza hukuku boyutunda değil, **aile hayatı** ve **insanca yaşama hakkı** boyutunda da değerlendirilmesi gerektiğini saygıyla arz ederim.
+
+---
+
+## HUKUKİ NEDENLER
+
+- 5271 sayılı **CMK 308/A** (Bölge Adliye Mahkemesi Ceza Dairesi kesin kararlarına karşı Cumhuriyet Başsavcısınca itiraz)
+- 5271 sayılı **CMK 230** (Hükmün gerekçesi; esaslı savunmaların tartışılması)
+- 5271 sayılı **CMK 223/2-e, 223/5** (Şüpheden sanık yararlanır)
+- **AİHS 6/1** (Adil yargılanma hakkı)
+- **AİHS 6/2** (Masumiyet karinesi)
+- **Anayasa m.36** (Hak arama, adil yargılanma)
+- **Anayasa m.38** (Masumiyet karinesi)
+- **Anayasa m.141/3** (Gerekçeli karar)
+- **AİHS 8** (Aile hayatına saygı hakkı)
+- **Anayasa m.17** (Yaşama hakkı, maddi ve manevi varlığın bütünlüğü)
+- **Anayasa m.20** (Özel hayatın ve aile hayatının gizliliği)
+
+---
+
+## SONUÇ VE TALEP
+
+Yukarıda arz ve izah edilen gerekçeler, **kararı etkileyecek nitelikte esaslı bir hata** bulunduğunu göstermektedir: kast ve iştirakin somut delillerle ispatlanmamış olması, müşteki ile doğrudan temas bulunmaması, yalnızca ciro imzası nedeniyle asli fail gibi değerlendirilmesinin hukuka aykırılığı, icra takibinin sanık tarafından yürütülmemesi, suçtan menfaat elde edildiğine dair delil bulunmaması, savunmaların gerekçede ayrıntılı tartışılmaması ve CMK 230 ihlali, şüpheden sanık yararlanır ilkesinin uygulanması gerekliliği, adil yargılanma hakkı ihlali ile kritik usul hatası ihtimalleri. Bu **hukuksuzluk**, aynı zamanda **aile yapımın** ve **çocuklarımla ilişkimin** zedelenmesine, **velayet** ve **insanca yaşama hakkımın** fiilen elinden alınmasına yol açmış; AİHS 8 ve Anayasa’nın 17 ve 20’nci maddeleri kapsamında korunan haklarımın **orantısız biçimde ihlal edilmesi** sonucunu doğurmuştur.
+
+Bu nedenle **Antalya Bölge Adliye Mahkemesi 14. Ceza Dairesinin kesin nitelikteki kararına karşı CMK 308/A uyarınca Cumhuriyet Başsavcılığı tarafından itiraz edilmesini**; karardaki hukuka aykırılığın giderilmesi suretiyle hem ceza hukuku hem de **aile hayatı** ve **insanca yaşama hakkı**nın korunmasını saygılarımla arz ve talep ederim.
+
+---
+
+**Tarih:** …/…/2026  
+**İmza:** CEM EKİNCİ
+
+---
+
+## EKLER
+
+*Aşağıdaki belgeler itiraz iddialarının somut delille desteklenmesi için eklenmelidir; usul iddiaları (tebliğ, kesinleşme, BAM gerekçesi) için 3, 4 ve 5 numaralı ekler zorunludur.*
+
+| Sıra | Belge |
+|------|--------|
+| 1 | Kimlik fotokopisi |
+| 2 | Gerekçeli karar örneği (ilgili sayfalar) |
+| 3 | BAM istinaf kararı / kesinleşme şerhi |
+| 4 | Savunma dilekçeleri örnekleri |
+| 5 | Tebligat belgeleri (karar, kesinleşme, kanun yolu bildirimi) |
+| 6 | SGK hizmet dökümü (çalışan konumunun belgelenmesi) |
+| 7 | İcra dosyası örneği (vekâletname / vekil bilgisi – Av. Ayşegül Başkoçak Çiftçi) |
+
+---
+
+# EKSİK HUSUSLAR RAPORU
+
+Aşağıdaki hususlar dilekçenin sunulması öncesinde **mutlaka tamamlanmalı** veya **netleştirilmelidir**. Eksik bırakılması, başvurunun reddi, süre aşımı veya tebligat aksamasına yol açabilir.
+
+## A. DİLEKÇE METNİNDE DOLDURULACAK ALANLAR
+
+| Sıra | Eksik husus | Açıklama |
+|------|-------------|----------|
+| 1 | **Adres** | Tebligat için geçerli ve güncel adres yazılmalıdır. |
+| 2 | **Telefon** | İletişim için telefon numarası eklenmelidir. |
+| 3 | **Vekil** | Vekil kullanılacaksa adı, soyadı ve iletişim bilgileri yazılmalıdır. |
+| 4 | **Sunum tarihi** | Dilekçenin Başsavcılığa verildiği veya postalandığı tarih (…/…/2026) mutlaka yazılmalıdır; CMK 308/A’da **bir aylık süre** kesinleşme tarihinden itibaren işler. |
+
+## B. EKLENMESİ GEREKEN BELGELER
+
+| Sıra | Belge | Durum / Not |
+|------|--------|-------------|
+| 1 | Kimlik fotokopisi | Eklenmeli. |
+| 2 | Gerekçeli karar (ilgili sayfalar) | Eklenmeli. |
+| 3 | BAM istinaf kararı / kesinleşme şerhi | **Zorunlu**; usul iddiaları için elzem. |
+| 4 | Savunma dilekçeleri örnekleri | **Zorunlu**; CMK 230 (savunmaların tartışılmaması) iddiası için. |
+| 5 | Tebligat belgeleri (karar, kesinleşme, kanun yolu bildirimi) | **Zorunlu**; tebligat/usul iddiaları için. |
+| 6 | SGK hizmet dökümü | “Çalışan” konumunun belgelenmesi için eklenmesi faydalıdır. |
+| 7 | İcra dosyası örneği (vekâletname / vekil bilgisi) | İcra takibini “ben yürütmedim” savunması için eklenmesi faydalıdır. |
+
+## C. İÇERİK / HUKUKİ TUTARLILIK
+
+| Sıra | Husus | Açıklama |
+|------|--------|----------|
+| 1 | **Mahkûmiyet niteliği** | Dilekçede hem “resmi belgede sahtecilik” hem “nitelikli dolandırıcılık (TCK 158)” yazılmıştır. Kesinleşen kararda **hangi suçlardan** ve **ne kadar ceza** verildiği (örn. 3 yıl, 7 yıl ayrı ayrı) gerekçeli kararla **teyit edilmeli**; farklıysa metin buna göre düzeltilmelidir. |
+| 2 | **BAM karar tarihi** | İstinaf kararının **verildiği tarih** (kesinleşmeden önceki tarih) biliniyorsa metne eklenebilir; usul tartışmasında faydalı olur. |
+
+## D. VELAYET / AİLE HUZURU DAVALARI İÇİN (REFERANS)
+
+Velayet veya kişisel ilişki davasında kullanılacak **açıklama taslağı**, **AİHS 8 (aile hayatı)** argümanları ve **eksik belge listesi** için ayrıca **VELAYET_VE_AILE_HUZURU_DESTEK_DOKUMANI.md** dosyasına bakılmalıdır. O belgede özetlenen eksikler (velayet kararı, boşanma tarihi, SGK/vekalet kayıtları, tebligat mazbataları, 01.12.2025 savunma dilekçesi vb.) ceza tarafıyla paralel yürütülecek velayet stratejisi için tamamlanmalıdır.
+
+---
+
+*Bu birleşik dilekçe, CMK_308_A_TALEP_DILEKCESI_CEM_EKINCI.doc.md, CMK_308_A_ITIRAZ_TALEP_DILEKCESI_NIHAI.md ve VELAYET_VE_AILE_HUZURU_DESTEK_DOKUMANI.md belgeleri analiz edilerek derlenmiş ve standart dilekçe formatına getirilmiştir. Sunum öncesi bir avukatla gözden geçirilmesi önerilir.*

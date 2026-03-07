@@ -1,0 +1,113 @@
+================================================================================
+  GÖREV: 3 KLASÖR ARAÇLARINI DÜZELT / İYİLEŞTİR
+  Bu metni başka bir yapay zekâya veya geliştiriciye verin; aşağıdaki adımları
+  uygulayarak dosyaları okusun, düzeltsin ve kaydetsin.
+================================================================================
+
+KONUM
+-----
+Masaüstünde 3 klasör var:
+  1) DupeGuru_DigiKam_Analiz
+  2) Excel_Analiz_Klasoru
+  3) PDF_Analiz_Klasoru
+
+Bu üç klasördeki betikler (.ps1) ve başlatıcılar (.bat) bazen hata veriyor,
+Türkçe karakter bozuluyor veya eski/yanlış dosyaya yönleniyor. Görev: bunları
+düzeltmek ve tutarlı hale getirmek.
+
+
+========== 1. DupeGuru_DigiKam_Analiz ==========
+
+Klasör: Desktop\DupeGuru_DigiKam_Analiz
+
+Yapılacaklar:
+- DupeGuru_DigiKam_Analiz.ps1:
+  - Kök klasörü SABİT yol (C:\Users\...\Desktop\...) ile değil, betiğin bulunduğu
+    klasörle al: $AnalizRoot = $PSScriptRoot (ve boşsa Split-Path -Parent (Get-Location).Path).
+  - $ErrorActionPreference = "Stop" yerine "Continue" yap (bir hata tüm betiği durdurmasın).
+  - Log yazarken Add-Content yerine UTF-8 BOM ile [System.IO.File]::AppendAllText kullan;
+    rapor dosyası ilk açılışta da UTF-8 BOM ile [System.IO.File]::WriteAllText ile sıfırlansın.
+  - Kullanıcıya gösterilen tüm Türkçe metinleri doğru yaz: ö, ü, ş, ğ, ç, ı, İ
+    (ör: "kilavuz" -> "kılavuz", "acilir" -> "açılır", "Lutfen" -> "Lütfen").
+  - dupeGuru/digiKam başlatıcı yolunda PSScriptRoot yerine $AnalizRoot kullan.
+
+- Excel_YilAy_Baslat.bat:
+  - Bu klasördeki Excel_Tarama_Birlestir.ps1 ARTIK YOK (silindi). Bunun yerine
+    ..\Excel_Analiz_Klasoru\Excel_Tarama_YilAy.ps1 dosyasını çalıştırsın.
+  - PowerShell çağrısında UTF-8 kullan: -Command "& { $OutputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; & \"...\Excel_Tarama_YilAy.ps1\" }"
+  - Rapor ve çıktı yollarını ..\Excel_Analiz_Klasoru\Rapor.txt ve ..\Excel_Analiz_Klasoru\Cikti_YilAy\ olarak echo ile göstersin.
+
+- Tam_Analiz_Baslat.bat:
+  - Excel ve PDF betiklerini çağırırken de aynı UTF-8 Command sarmalayıcısını kullan.
+
+- dupeGuru_digiKam_Ac.bat:
+  - Echo metninde Türkçe karakter: "aciliyor" -> "açılıyor", "firsatta" -> "fırsatta".
+
+- Launch_dupeGuru_digiKam.ps1:
+  - [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 ekle.
+
+- README.txt:
+  - "Excel tarama" bölümünü güncelle: artık Excel_YilAy_Baslat, Excel_Analiz_Klasoru
+    içindeki Excel_Tarama_YilAy.ps1'i çalıştırıyor; çıktı Cikti_YilAy (yıl_banka, 13 sayfa).
+  - Tüm kısa Türkçe kelimeleri düzelt (firsatta->fırsatta, acilir->açılır, klasorunde->klasöründe, vb.).
+
+
+========== 2. Excel_Analiz_Klasoru ==========
+
+Klasör: Desktop\Excel_Analiz_Klasoru
+
+Yapılacaklar:
+- Excel_Tarama_YilAy.ps1:
+  - Betik dosyası UTF-8 BOM ile kaydedilmeli (Türkçe karakter için). Gerekirse
+    kaydettikten sonra bir kez: $c=[IO.File]::ReadAllText($path,[Text.Encoding]::UTF8);
+    [IO.File]::WriteAllText($path,$c,(New-Object System.Text.UTF8Encoding $true)).
+  - Rapor ve Excel hücrelerinde Türkçe kullanılıyor olmalı (Özet, gitmiş, gelmiş, Açıklama, satır, klasör, vb.).
+  - $ErrorActionPreference = "Continue" kalsın; hata durumunda Log ile yazıp devam etsin.
+
+- Analizi_Calistir.bat:
+  - PowerShell'de betiği çalıştırırken UTF-8 ayarlı Command kullan:
+    -Command "& { $OutputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; & \"...\Excel_Tarama_YilAy.ps1\" }"
+  - Echo metinlerinde Türkçe karakter doğru (klasör, Dışarıya, vb.).
+
+- README.txt:
+  - Çıktı yapısı: her yıl her banka için bir kitap (2024_Garanti.xlsx), 13 sayfa (12 ay + Toplam).
+  - Türkçe karakter notu: betik UTF-8 BOM ile kaydedilmeli.
+
+
+========== 3. PDF_Analiz_Klasoru ==========
+
+Klasör: Desktop\PDF_Analiz_Klasoru
+
+Yapılacaklar:
+- PDF_Tarama_Siniflandir.ps1:
+  - $ErrorActionPreference = "Stop" -> "Continue".
+  - Write-Log içinde dosyaya yazarken try/catch kullan; hata olursa betik düşmesin.
+  - Kullanıcı mesajlarında Türkçe karakter: "Siniflandirma" -> "Sınıflandırma", "klasoru" -> "klasörü",
+    "calistirin" -> "çalıştırın", "Taraniyor" -> "Taranıyor", "okunamadi" -> "okunamadı",
+    "sayildi" -> "sayıldı", "kopyalanmadi" -> "kopyalanamadı", "islendi" -> "işlendi", "acildi" -> "açıldı".
+
+- PDF_Siniflandir.bat:
+  - PowerShell çağrısında UTF-8 kullan: -Command "& { $OutputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; & \"...\PDF_Tarama_Siniflandir.ps1\" }".
+
+
+========== GENEL KURALLAR ==========
+
+- Tüm .ps1 rapor/çıktı dosyaları UTF-8 BOM ile yazılsın (Türkçe için).
+- Tüm .bat dosyalarında chcp 65001 ve PowerShell -Command ile UTF-8 ayarlı çağrı kullanılsın.
+- ErrorActionPreference "Continue" olsun; kritik bloklarda try/catch ile hata loglansın, betik kırılmasın.
+- Kullanıcıya görünen metinler (Log, Write-Host, echo, Excel hücreleri) doğru Türkçe karakterle yazılsın.
+- Klasör/dosya adları (Giris, Cikti_YilAy, Rapor.txt vb.) değiştirilmesin; sadece içerik ve davranış düzeltilsin.
+
+
+========== SİLİNMİŞ / KULLANILMAYAN ==========
+
+- DupeGuru_DigiKam_Analiz içinde Excel_Tarama_Birlestir.ps1 artık yok (silindi).
+  Hiçbir .bat bu dosyayı çağırmamalı; Excel işi sadece Excel_Analiz_Klasoru\Excel_Tarama_YilAy.ps1 ile yapılır.
+
+
+================================================================================
+  Bu görevi alan yapay zekâ veya geliştirici: yukarıdaki 3 klasördeki ilgili
+  dosyaları oku, değişiklikleri uygula ve kaydet. Test için .bat dosyalarına
+  çift tıklanarak çalıştırılabilir; Rapor.txt / Analiz_Raporu.txt / CSV
+  çıktılarında Türkçe karakter doğru görünmeli.
+================================================================================

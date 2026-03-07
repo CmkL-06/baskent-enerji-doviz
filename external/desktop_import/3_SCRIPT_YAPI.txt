@@ -1,0 +1,52 @@
+================================================================================
+  3 SCRIPT YAPISI – Mantık ve çalışma aynı, sadece özet
+================================================================================
+
+Masaüstündeki 3 klasörde toplam 3 ana script var. Her biri kendi klasöründe
+çalışır; dışarıya dokunmaz. Yapı ve mantık değiştirilmedi.
+
+--------------------------------------------------------------------------------
+  1) Resim / Belge + dupeGuru + digiKam
+--------------------------------------------------------------------------------
+  Klasör: DupeGuru_DigiKam_Analiz
+  Script: DupeGuru_DigiKam_Analiz.ps1
+
+  Ne yapar: Resimleri “Resimler”, belgeleri “Belgeler_Evraklar”a kopyalar;
+            isteğe bağlı hash ile kopyaları çöp kutusuna atar; dupeGuru ve
+            digiKam’ı açar.
+  Başlat:  Analizi_Baslat.bat
+
+--------------------------------------------------------------------------------
+  2) Excel – yıl / ay / banka, 13 sayfa (12 ay + Toplam)
+--------------------------------------------------------------------------------
+  Klasör: Excel_Analiz_Klasoru
+  Script: Excel_Tarama_YilAy.ps1
+
+  Ne yapar: “Giris”teki Excel dosyalarını tarar; banka hesap hareketi
+            sayfalarını yıl ve bankaya göre toplar. “Cikti_YilAy”a her yıl
+            her banka için bir kitap (örn. 2024_Garanti.xlsx), her kitapta
+            12 ay + 1 Toplam sayfası yazar.
+  Başlat:  Analizi_Calistir.bat
+  (DupeGuru klasöründen: Excel_YilAy_Baslat.bat da bunu çalıştırır.)
+
+--------------------------------------------------------------------------------
+  3) PDF – banka ve gelen/giden sınıflandırma
+--------------------------------------------------------------------------------
+  Klasör: PDF_Analiz_Klasoru
+  Script: PDF_Tarama_Siniflandir.ps1
+
+  Ne yapar: “Giris”teki PDF’leri tarar; banka ve yön (Gelen/Giden/HesapÖzeti)
+            tespit eder. “Cikti” altında Banka_Yon klasörlerine anlamlı isimle
+            kopyalar; CSV rapor yazar.
+  Başlat:  PDF_Siniflandir.bat
+
+--------------------------------------------------------------------------------
+  Hepsi birden
+--------------------------------------------------------------------------------
+  Tam_Analiz_Baslat.bat (DupeGuru_DigiKam_Analiz klasöründe)
+  → Sırayla: 1) DupeGuru_DigiKam_Analiz.ps1  2) Excel_Tarama_YilAy.ps1
+             3) PDF_Tarama_Siniflandir.ps1
+
+--------------------------------------------------------------------------------
+  Özet: 3 script = 3 iş. Çalışma yapısı ve mantık aynı bırakıldı.
+================================================================================

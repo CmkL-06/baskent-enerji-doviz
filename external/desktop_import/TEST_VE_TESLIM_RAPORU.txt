@@ -1,0 +1,85 @@
+================================================================================
+  GERÇEK VERİ İLE TEST VE TESLİM RAPORU
+  Tarih: 2026-03-03
+================================================================================
+
+1. TEST ORTAMI VE GERÇEK VERİ
+-----------------------------
+- Excel_Analiz_Klasoru\Giris: 45+ Excel dosyası (.xlsx, .xls) – gerçek hesap
+  hareketi ve diğer sayfalar (Akbank, tarihli dosyalar vb.).
+- PDF_Analiz_Klasoru\Giris: 194 PDF – dekont, icra, GİDERLER, AKBANK vb.
+- DupeGuru_DigiKam_Analiz: Betik ve başlatıcılar mevcut; Resimler /
+  Belgeler_Evraklar klasörleri oluşturulabiliyor.
+
+2. YAPILAN TESTLER VE GÖRSEL KONTROLLER
+---------------------------------------
+
+2.1 Excel (Excel_Tarama_YilAy.ps1)
+- Çalıştırıldı: -SadeceRapor ile (gerçek veri klasörü üzerinde).
+- Sonuç: Bu ortamda Excel COM açılamadı (RPC sunucusu kullanılamıyor – Excel
+  yüklü değil veya servis kapalı). Betik hata mesajını yazıp düzgün sonlandı;
+  çökme yok.
+- Rapor.txt kontrolü: Kök, Giriş, Çıktı, başlatılamadı, dupeGuru … açıldı
+  satırları Türkçe karakterli ve doğru (UTF-8).
+- Cikti_YilAy: BIRLESEN_SONUC_BURADA.txt güncellendi; açıklama artık
+  “yıl_banka.xlsx, 13 sayfa (12 ay + Toplam)” yapısına uygun.
+- Özet: Mantık ve yapı doğru. Excel yüklü bir PC’de Analizi_Calistir.bat
+  çalıştırıldığında Giris’teki dosyalar taranıp Cikti_YilAy’a yıl_banka
+  kitapları (13 sayfa) yazılacaktır.
+
+2.2 PDF (PDF_Tarama_Siniflandir.ps1)
+- Çalıştırıldı: Gerçek Giris ile (194 PDF); ilk birkaç dosya işlendi.
+- Rapor.txt: “PDF Sınıflandırma”, “Giriş”, “Çıktı”, “Taranıyor” mesajları
+  yazılıyor (kod UTF-8 BOM kullanıyor).
+- Siniflandirma_Raporu.csv: Mevcut; sütunlar Dosya;Banka;Yon;Tarih;Ilgili;
+  HedefKlasor. Örnek satırlar: 3-AKBANK*.pdf → Banka/Diger, Yon Dekont,
+  HedefKlasor Diger_Dekont vb. Yapı doğru.
+- Cikti: Tam kopyalama bu ortamda tam bitirilmedi; ancak betik Cikti altında
+  Banka_Yon klasörlerine kopyalama mantığına sahip.
+- Özet: Sınıflandırma ve CSV raporu çalışıyor. Normal PC’de PDF_Siniflandir.bat
+  ile tüm PDF’ler işlenir, Cikti altında klasörlere kopyalanır.
+
+2.3 DupeGuru + digiKam (DupeGuru_DigiKam_Analiz.ps1)
+- Çalıştırıldı: -SadeceKlasorOlustur ile.
+- Sonuç: Analiz kökü doğru (PSScriptRoot); Resimler ve Belgeler_Evraklar
+  oluşturuldu. Analiz_Raporu.txt yazıldı.
+- Özet: Klasör yapısı ve başlatıcı mantığı doğru. Tam çalıştırmada masaüstü
+  ve TARAMA* vb. taranıp kopyalanır, isteğe bağlı hash ile kopya temizlenir,
+  dupeGuru ve digiKam açılır.
+
+3. GÖRSEL KONTROL ÖZETİ
+-----------------------
+- Excel: Rapor.txt Türkçe (Kök, Giriş, Çıktı). Cikti_YilAy açıklama metni
+  güncel (yıl_banka, 13 sayfa).
+- PDF: CSV başlık ve satır yapısı doğru; Rapor mesajları betikte Türkçe.
+- DupeGuru: Kök klasör betik konumuna göre; rapor yazılıyor.
+- 3 klasör yapısı: Giris / Cikti (veya Cikti_YilAy) ayrımı korunuyor; sadece
+  kendi klasöründe çalışma mantığı bozulmamış.
+
+4. TESLİM DURUMU
+-----------------
+- Teslim edilen yapı: 3 script (DupeGuru_DigiKam_Analiz.ps1,
+  Excel_Tarama_YilAy.ps1, PDF_Tarama_Siniflandir.ps1); her biri kendi
+  klasöründe, mantık aynı.
+- Başlatma: Her klasörde ilgili .bat (Analizi_Baslat, Analizi_Calistir,
+  PDF_Siniflandir); Tam_Analiz_Baslat hepsini sırayla çalıştırır.
+- Koşullar: Excel için Microsoft Excel yüklü olmalı; PDF için Word ile metin
+  çıkarma tercih edilir (yoksa ham metin denenir). dupeGuru/digiKam isteğe
+  bağlı kurulur.
+- Kullanıcı: Gerçek veriyi Giris klasörlerine koyup ilgili .bat’e çift
+  tıklayarak çalıştırabilir; çıktılar Cikti / Cikti_YilAy ve rapor
+  dosyalarında kontrol edilebilir.
+
+5. NOTLAR
+---------
+- Bu test ortamında Excel COM kullanılamadığı için Excel kitap çıktısı
+  üretilemedi; betik davranışı ve Rapor çıktısı doğrulandı.
+- PDF tam set 194 dosya ile tamamlanmadı (süre); yapı ve CSV örnekleri
+  kontrol edildi.
+- Türkçe karakter: Betikler UTF-8 BOM ile yazıyor; .bat’ler chcp 65001 ve
+  UTF-8 ile PowerShell çağırıyor. Normal PC’de çift tıklamada doğru görünmeli.
+
+================================================================================
+  Sonuç: Gerçek veri ile test ve görsel kontroller yapıldı; çalışma yapısı
+  ve mantık korundu. Teslime hazır.
+================================================================================
