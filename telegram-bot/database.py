@@ -559,6 +559,170 @@ def get_operator_stats(operator_id):
         return {'today': 0, 'total': 0}
 
 
+def set_operator_access(operator_id, is_active=None, is_admin=None):
+    """Operatör yetkisini/aktifliğini güncelle"""
+    if is_active is None and is_admin is None:
+        return False
+    if int(operator_id) == int(Config.ADMIN_ID):
+        # Owner hesabı sistem tarafından yönetilir.
+        return False
+    try:
+        sets = []
+        vals = []
+        if is_active is not None:
+            sets.append("is_active = ?")
+            vals.append(1 if is_active else 0)
+        if is_admin is not None:
+            sets.append("is_admin = ?")
+            vals.append(1 if is_admin else 0)
+        vals.append(operator_id)
+
+        with get_conn() as conn:
+            c = conn.cursor()
+            c.execute(
+                f"UPDATE Operators SET {', '.join(sets)} WHERE operator_id = ?",
+                *vals
+            )
+            conn.commit()
+            return c.rowcount > 0
+    except Exception as e:
+        logger.error(f"Operatör erişim güncelleme hatası: {e}")
+        return False
+
+
+def get_all_operators(include_inactive=True, exclude_ids=None):
+    """Tüm operatörleri getir"""
+    try:
+        excluded = []
+        if exclude_ids:
+            for raw_id in exclude_ids:
+                try:
+                    excluded.append(int(raw_id))
+                except (TypeError, ValueError):
+                    continue
+
+        with get_conn() as conn:
+            c = conn.cursor()
+            if include_inactive:
+                c.execute("""
+                    SELECT operator_id, first_name, username, is_active, is_admin, created_at
+                    FROM Operators
+                    ORDER BY created_at DESC
+                """)
+            else:
+                c.execute("""
+                    SELECT operator_id, first_name, username, is_active, is_admin, created_at
+                    FROM Operators
+                    WHERE is_active = 1
+                    ORDER BY created_at DESC
+                """)
+            rows = c.fetchall()
+            cols = [d[0] for d in c.description]
+            data = [dict(zip(cols, r)) for r in rows]
+            if not excluded:
+                return data
+            return [
+                row for row in data
+                if int(row.get('operator_id') or 0) not in excluded
+            ]
+    except Exception as e:
+        logger.error(f"Operatör listeleme hatası: {e}")
+        return []
+
+
+def get_owner_conversations(limit=20, only_active=False):
+    """
+    Owner/Admin paneli için operatöre atanmış görüşmeleri getir.
+    Not: limit güvenli integer'a normalize edilir.
+    """
+    try:
+        top_n = max(1, min(int(limit), 100))
+        where = (
+            "WHERE t.assigned_operator_id IS NOT NULL "
+            "AND t.assigned_operator_id <> ?"
+        )
+        if only_active:
+            where += " AND t.status IN ('pending', 'in_progress', 'operator_chat', 'waiting_payment', 'payment_sent')"
+
+        sql = f"""
+            SELECT TOP {top_n}
+                t.transaction_id,
+                t.status,
+                t.currency,
+                t.amount,
+                t.created_at,
+                t.completed_at,
+                c.customer_id,
+                c.first_name AS customer_name,
+                o.operator_id,
+                o.first_name AS operator_name,
+                (
+                    SELECT MAX(m.created_at)
+                    FROM Messages m
+                    WHERE m.transaction_id = t.transaction_id
+                ) AS last_message_at,
+                (
+                    SELECT COUNT(*)
+                    FROM Messages m
+                    WHERE m.transaction_id = t.transaction_id
+                ) AS message_count
+            FROM Transactions t
+            LEFT JOIN Customers c ON c.customer_id = t.customer_id
+            LEFT JOIN Operators o ON o.operator_id = t.assigned_operator_id
+            {where}
+            ORDER BY
+                COALESCE((
+                    SELECT MAX(m.created_at)
+                    FROM Messages m
+                    WHERE m.transaction_id = t.transaction_id
+                ), t.created_at) DESC
+        """
+        with get_conn() as conn:
+            c = conn.cursor()
+            c.execute(sql, int(Config.ADMIN_ID))
+            rows = c.fetchall()
+            cols = [d[0] for d in c.description]
+            return [dict(zip(cols, r)) for r in rows]
+    except Exception as e:
+        logger.error(f"Owner görüşme listesi hatası: {e}")
+        return []
+
+
+def get_transaction_messages(transaction_id, limit=120):
+    """Bir işlemin mesaj geçmişini getir (eski -> yeni)."""
+    try:
+        top_n = max(1, min(int(limit), 500))
+        sql = f"""
+            SELECT TOP {top_n}
+                m.message_id,
+                m.transaction_id,
+                m.sender_id,
+                m.sender_type,
+                m.message_text,
+                m.file_url,
+                m.file_type,
+                m.created_at,
+                c.first_name AS customer_name,
+                o.first_name AS operator_name
+            FROM Messages m
+            LEFT JOIN Customers c
+                ON c.customer_id = m.sender_id AND m.sender_type = 'customer'
+            LEFT JOIN Operators o
+                ON o.operator_id = m.sender_id AND m.sender_type IN ('operator', 'bank_provider')
+            WHERE m.transaction_id = ?
+            ORDER BY m.created_at ASC
+        """
+        with get_conn() as conn:
+            c = conn.cursor()
+            c.execute(sql, transaction_id)
+            rows = c.fetchall()
+            cols = [d[0] for d in c.description]
+            return [dict(zip(cols, r)) for r in rows]
+    except Exception as e:
+        logger.error(f"İşlem mesajları getirme hatası: {e}")
+        return []
+
+
 # ═══════════════════════════════════════════════
 # DEALER İŞLEMLERİ
 # ═══════════════════════════════════════════════
