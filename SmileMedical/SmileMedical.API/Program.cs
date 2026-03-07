@@ -357,5 +357,3 @@ app.MapControllers();
 app.MapHub<CoinPriceHub>("/coinPriceHub");
 
 app.Run();
-
-public partial class Program { }
