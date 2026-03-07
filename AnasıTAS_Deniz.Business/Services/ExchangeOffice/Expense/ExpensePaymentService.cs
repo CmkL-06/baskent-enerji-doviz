@@ -12,6 +12,7 @@ using AnasıTAS_Deniz.Entity.Modals.ViewModals.ExchangeOFfice.Expense;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Threading.Tasks;
 
 namespace AnasıTAS_Deniz.Business.Services.ExchangeOffice.Expense
@@ -310,7 +311,7 @@ namespace AnasıTAS_Deniz.Business.Services.ExchangeOffice.Expense
         private string GeneratePaymentNumber()
         {
             var date = DateTime.UtcNow.ToString("yyyyMMdd");
-            var random = new Random().Next(10000, 99999);
+            var random = RandomNumberGenerator.GetInt32(10000, 100000);
             return $"EXP-{date}-{random}";
         }
 

@@ -18,6 +18,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using static System.Runtime.InteropServices.JavaScript.JSType;
@@ -489,7 +490,7 @@ namespace AnasıTAS_Deniz.Business.Services.ExchangeOffice.Office
         {
             // Format: EX-YYYYMMDD-XXXXXX
             var date = DateTime.UtcNow.ToString("yyyyMMdd");
-            var random = new Random().Next(100000, 999999);
+            var random = RandomNumberGenerator.GetInt32(100000, 1000000);
             return $"EX-{date}-{random}";
         }
 

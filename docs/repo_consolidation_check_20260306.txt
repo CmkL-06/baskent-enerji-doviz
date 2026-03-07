@@ -1,0 +1,16 @@
+=== repo parity check (after reconciliation) ===
+generated_at_utc 2026-03-06T20:58:23Z
+api_file_count 601
+missing_count 0
+different_count 6
+--- differences ---
+DIFF README.md => README.md
+DIFF deploy-api-to-canli.ps1 => deploy-api-to-canli.ps1
+DIFF .gitignore => .gitignore
+DIFF kaynak-kod/README.md => README.md
+DIFF kaynak-kod/AnasıTAS_Deniz.Business/Services/ExchangeOffice/Office/ExchangeTransactionService.cs => AnasıTAS_Deniz.Business/Services/ExchangeOffice/Office/ExchangeTransactionService.cs
+DIFF kaynak-kod/AnasıTAS_Deniz.Business/Services/ExchangeOffice/Expense/ExpensePaymentService.cs => AnasıTAS_Deniz.Business/Services/ExchangeOffice/Expense/ExpensePaymentService.cs
+--- expected remaining differences rationale ---
+README and .gitignore collide because API repo stores both root and kaynak-kod variants; monorepo keeps unified root files.
+deploy-api-to-canli.ps1 difference is whitespace-only formatting.
+ExchangeTransactionService.cs and ExpensePaymentService.cs differ due newer flaky-fix RNG hardening in monorepo.

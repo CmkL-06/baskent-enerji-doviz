@@ -21,6 +21,7 @@ namespace AnasıTAS_Deniz.Entity
         Banned,
         User,
         Customer,
+        Staff = 50,   // Personel / şube erişimi
         Author = 79,
         Moderator = 89,
         Admin = 99,

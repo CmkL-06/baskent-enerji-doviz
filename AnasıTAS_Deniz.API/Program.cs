@@ -343,9 +343,17 @@ if (app.Environment.IsDevelopment())
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
-// HTTPS redirection: skip in Development so http://localhost:5093 works without cert
+// Güvenlik başlıkları (canlıda)
 if (!app.Environment.IsDevelopment())
 {
+    app.Use(async (context, next) =>
+    {
+        context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        context.Response.Headers["X-Frame-Options"] = "SAMEORIGIN";
+        context.Response.Headers["X-XSS-Protection"] = "1; mode=block";
+        context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+        await next();
+    });
     app.UseHttpsRedirection();
 }
 
@@ -354,6 +362,9 @@ app.UseCors("AllowVueApp");
 app.UseAuthentication();
 
 app.UseAuthorization();
+
+// Sağlık kontrolü (canlı/deploy sonrası izleme; kimlik doğrulama gerekmez)
+app.MapGet("/health", () => Results.Ok(new { status = "ok", timestamp = DateTime.UtcNow })).AllowAnonymous();
 
 app.MapControllers();
 app.MapHub<CoinPriceHub>("/coinPriceHub");

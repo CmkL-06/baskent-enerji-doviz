@@ -48,6 +48,11 @@ namespace AnasıTAS_Deniz.Business.Services.User
 
         public async Task<rsp_user_login> Authenticate(rm_user_login requestData, HttpContext httpContext)
         {
+            if (requestData == null || string.IsNullOrWhiteSpace(requestData.Mail))
+                throw new ApiException(HttpStatusCode.BadRequest, "Mail veya kullanıcı adı gerekli.");
+            if (string.IsNullOrEmpty(requestData.Password))
+                throw new ApiException(HttpStatusCode.BadRequest, "Şifre gerekli.");
+
             var user = await _dbContext.Users
                 .FirstOrDefaultAsync(u => (u.Mail == requestData.Mail || u.Username == requestData.Mail) && u.Password == HashPassword(requestData.Password));
 
@@ -75,14 +80,14 @@ namespace AnasıTAS_Deniz.Business.Services.User
                 UserInfo = new vm_user_simple
                 {
                     Id = user.Id,
-                    Mail = user.Mail,
-                    FullName = $"{user.Firstname} {user.Lastname}",
+                    Mail = user.Mail ?? "",
+                    FullName = $"{user.Firstname ?? ""} {user.Lastname ?? ""}".Trim(),
                     CreatedDate = user.CreatedDate,
-                    Firstname = user.Firstname,
-                    Lastname = user.Lastname,
+                    Firstname = user.Firstname ?? "",
+                    Lastname = user.Lastname ?? "",
                     Gender = user.Gender,
                     Rank = user.Rank,
-                    Username = user.Username
+                    Username = user.Username ?? ""
                 }
             };
         }
@@ -197,6 +202,8 @@ namespace AnasıTAS_Deniz.Business.Services.User
 
         private string GenerateJwtToken(Entity.Entities.User.User user)
         {
+            if (string.IsNullOrEmpty(_jwtSecretKey))
+                throw new InvalidOperationException("JWT yapilandirmasi eksik (JwtSecretKey). appsettings.json kontrol edin.");
             var tokenHandler = new JwtSecurityTokenHandler();
             var key = Encoding.ASCII.GetBytes(_jwtSecretKey);
             var tokenDescriptor = new SecurityTokenDescriptor
@@ -205,7 +212,7 @@ namespace AnasıTAS_Deniz.Business.Services.User
                 {
                     new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                     new Claim("UserId", user.Id.ToString()), // Custom claim for middleware
-                    new Claim(ClaimTypes.Email, user.Mail),
+                    new Claim(ClaimTypes.Email, user.Mail ?? ""),
                     // new Claim(ClaimTypes.Role, user.Rank)
                 }),
                 Expires = DateTime.UtcNow.AddMonths(6),
