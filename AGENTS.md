@@ -2,6 +2,12 @@
 
 This file defines operating guidance for coding agents working in this repository.
 
+## Project identity
+
+- Canonical project/product reference is `BASKENT DOVIZ`.
+- In agent messages, docs, and summaries, prefer `BASKENT DOVIZ` name.
+- `SmileMedical` and `AnasıTAS_Deniz` labels are technical path names; do not use them as the primary project name in communication.
+
 ## Scope and priorities
 
 - Apply these instructions for the whole repository unless a deeper `AGENTS.md` overrides them.
@@ -51,13 +57,13 @@ This file defines operating guidance for coding agents working in this repositor
 - Restore/build root solution:
   - `dotnet restore AnasıTAS_Deniz.sln`
   - `dotnet build AnasıTAS_Deniz.sln -c Debug`
-- Restore/build SmileMedical solution:
+- Restore/build BASKENT DOVIZ solution (folder name: `SmileMedical`):
   - `dotnet restore SmileMedical/SmileMedical.sln`
   - `dotnet build SmileMedical/SmileMedical.sln -c Debug`
 
 ### Run APIs
 
-- SmileMedical API:
+- BASKENT DOVIZ API (folder name: `SmileMedical`):
   - `dotnet run --project SmileMedical/SmileMedical.API/SmileMedical.API.csproj`
 - AnasıTAS API:
   - `dotnet run --project AnasıTAS_Deniz.API/AnasıTAS_Deniz.API.csproj`
