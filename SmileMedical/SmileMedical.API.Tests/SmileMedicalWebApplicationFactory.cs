@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using SmileMedical.Data.Contexts;
+using SmileMedical.Entity;
 using SmileMedical.Entity.Entities.User;
 using SmileMedical.Entity.Entities.Site;
 

@@ -4,6 +4,7 @@ using SmileMedical.Entity.Modals.RequestModals.ExchangeService.Office;
 using SmileMedical.Entity.Modals.ViewModals.ExchangeOFfice.Office;
 using System;
 using System.Collections.Generic;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace SmileMedical.API.Controllers.ExchangeOffice
@@ -36,10 +37,10 @@ namespace SmileMedical.API.Controllers.ExchangeOffice
         {
             try
             {
-                // TODO: Get userId from authentication context
-                // For now, using a placeholder - you should replace this with actual user from JWT token
-                var userId = Guid.Parse("00000000-0000-0000-0000-000000000000");
-                // Example: var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (!TryGetAuthenticatedUserId(out var userId))
+                {
+                    return Unauthorized(new { error = "Authenticated user ID claim is missing or invalid." });
+                }
 
                 var result = await _snapshotService.CreateSnapshotAsync(request, userId);
                 _logger.LogInformation("Snapshot created successfully for office {OfficeId} by user {UserId}",
@@ -52,6 +53,17 @@ namespace SmileMedical.API.Controllers.ExchangeOffice
                 _logger.LogError(ex, "Error creating snapshot for office {OfficeId}", request.OfficeId);
                 return BadRequest(new { error = ex.Message });
             }
+        }
+
+        private bool TryGetAuthenticatedUserId(out Guid userId)
+        {
+            userId = Guid.Empty;
+
+            var userIdClaim =
+                User?.FindFirst("UserId")?.Value ??
+                User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            return Guid.TryParse(userIdClaim, out userId);
         }
 
         /// <summary>
