@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using AnasıTAS_Deniz.Business.Infrastructure.ExchangeOffice;
 using AnasıTAS_Deniz.Business.Infrastructure.ExchangeOffice.Expense;
@@ -27,6 +28,7 @@ namespace AnasıTAS_Deniz.API.Controllers.ExchangeOffice
 {
     [Route("api/v1/[controller]")]
     [ApiController]
+    [Authorize]
     public class ExchangeController : ControllerBase
     {
         private readonly IExchangeServiceCommand _command;

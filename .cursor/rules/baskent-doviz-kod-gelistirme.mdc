@@ -1,0 +1,23 @@
+---
+description: Başkent Enerji döviz projesi – kod geliştirme bağlamı
+globs: 
+alwaysApply: true
+---
+
+# Başkent Enerji Döviz – Kod Geliştirme
+
+## Proje
+- **İsim:** QuantaQuokka / Başkent Enerji Döviz Muhasebe Sistemi
+- **Backend:** AnasıTAS_Deniz (.NET 8, API/Business/Data/Entity/Tests). Ana çözüm: `AnasıTAS_Deniz.sln`
+- **DB:** SQL Server, veritabanı `mtt-moneyexchangeturkey`, şema `mtturkey_exchange`. Bağlantı: `appsettings.json` → `ConnectionStrings:SQL` (gitignore'da)
+- **Referanslar:** README.md, AGENTS.md, docs/REFERANS_VERITABANI_VE_YAPILANDIRMA.md, docs/CALISMA_PLANI_GUVENLIK_VE_DOVIZ_SURUM.md, docs/DURUM_ANALIZI_20260307.md
+
+## Geliştirme
+- Derleme: `dotnet build AnasıTAS_Deniz.sln -c Release` (kökteki .sln)
+- API port: 5093 (http). Localhost test: scripts/Baskentenerji_API_Test.ps1, scripts/baskent_test.py
+- Sıradaki görevler: Faz 1.4.1 [Authorize] (ExchangeController, ExchangeAutoRateController), Dependabot güvenlik güncellemeleri, weeklyProfit/userId TODO'ları
+
+## Kurallar
+- Hassas bilgi (şifre, connection string gerçek değer) repoya yazma; appsettings.json gitignore'da
+- Değişiklik öncesi ilgili doc (CALISMA_PLANI, DURUM_ANALIZI) ile uyum kontrol et
+- API endpoint'lerinde yetki: sadece login/register/public için [AllowAnonymous], diğerleri [Authorize]

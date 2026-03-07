@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using AnasıTAS_Deniz.Business.Services.ExchangeOffice.AutoRate;
@@ -13,6 +14,7 @@ namespace AnasıTAS_Deniz.API.Controllers.ExchangeOffice
 {
     [Route("api/v1/exchange/auto-rate")]
     [ApiController]
+    [Authorize]
     public class ExchangeAutoRateController : ControllerBase
     {
         private readonly AnasıTAS_DenizDbContext _context;
