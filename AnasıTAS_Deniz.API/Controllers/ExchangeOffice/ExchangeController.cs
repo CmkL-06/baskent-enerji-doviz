@@ -29,6 +29,7 @@ namespace AnasıTAS_Deniz.API.Controllers.ExchangeOffice
     [Route("api/v1/[controller]")]
     [ApiController]
     [Authorize]
+    [Authorize]
     public class ExchangeController : ControllerBase
     {
         private readonly IExchangeServiceCommand _command;
@@ -255,17 +256,17 @@ namespace AnasıTAS_Deniz.API.Controllers.ExchangeOffice
             {
                 var allVaults = await _vaultService.GetAllVaultSummariesAsync();
                 var officeVaults = allVaults.Where(v => v.OfficeId == officeId).ToList();
-                
+
                 if (!officeVaults.Any())
                     return Ok(new List<vm_vaultsummary>()); // Return empty list if no vaults found
-                
+
                 // Calculate total value in base currency for each vault
                 foreach (var vault in officeVaults)
                 {
                     vault.TotalValueInBaseCurrency = vault.Balances
                         .Sum(b => b.Balance * (b.CurrencyCode == "TRY" ? 1 : b.ExchangeRateToBase));
                 }
-                
+
                 return Ok(officeVaults);
             }
             catch (Exception ex)
@@ -439,7 +440,7 @@ namespace AnasıTAS_Deniz.API.Controllers.ExchangeOffice
         [HttpGet("rates/{officeId}/{sourceCurrencyId}/{targetCurrencyId}/history")]
         public async Task<ActionResult<List<vm_exchangerate>>> GetExchangeRateHistory(
             Guid officeId,
-            Guid sourceCurrencyId, 
+            Guid sourceCurrencyId,
             Guid targetCurrencyId,
             [FromQuery] int limit = 10)
         {
@@ -447,10 +448,10 @@ namespace AnasıTAS_Deniz.API.Controllers.ExchangeOffice
             {
                 var history = await _exchangeRateService.GetRateHistoryAsync(
                     officeId,
-                    sourceCurrencyId, 
-                    targetCurrencyId, 
+                    sourceCurrencyId,
+                    targetCurrencyId,
                     limit);
-                    
+
                 return Ok(history);
             }
             catch (Exception ex)
@@ -758,16 +759,16 @@ namespace AnasıTAS_Deniz.API.Controllers.ExchangeOffice
             {
                 // Get all offices summary
                 var offices = await _vaultService.GetOfficeSummariesAsync();
-                
+
                 // Filter by officeId if provided
                 if (officeId.HasValue)
                 {
                     offices = offices.Where(o => o.OfficeId == officeId.Value).ToList();
                 }
-                
+
                 // Get all vaults with detailed balances
                 var allVaults = await _vaultService.GetAllVaultSummariesAsync();
-                
+
                 // Filter vaults by officeId if provided
                 if (officeId.HasValue)
                 {
@@ -780,7 +781,7 @@ namespace AnasıTAS_Deniz.API.Controllers.ExchangeOffice
                 // Get today's transactions
                 var todayTransactions = await _transactionService.GetTransactionHistoryAsync(
                     null, DateTime.Today, DateTime.Today.AddDays(1).AddSeconds(-1));
-                
+
                 // Filter transactions by office if specified
                 if (officeId.HasValue && allVaults.Any())
                 {
@@ -793,7 +794,7 @@ namespace AnasıTAS_Deniz.API.Controllers.ExchangeOffice
 
                 // Weekly profit: daily * 7 approximation (avoids expensive 7-day query)
                 var weeklyProfit = todayProfit * 7;
-                
+
                 // Get party account balances
                 var partyAccountsQuery = _context.PartyAccounts
                     .AsNoTracking()
@@ -807,11 +808,11 @@ namespace AnasıTAS_Deniz.API.Controllers.ExchangeOffice
                 }
 
                 var partyAccounts = await partyAccountsQuery.ToListAsync();
-                
+
                 // Calculate party receivables and payables
                 var totalPartyReceivables = partyAccounts.Where(pa => pa.Balance > 0).Sum(pa => pa.Balance);
                 var totalPartyPayables = partyAccounts.Where(pa => pa.Balance < 0).Sum(pa => Math.Abs(pa.Balance));
-                
+
                 // Group party balances by currency (skip rows with null Currency to avoid LINQ null reference)
                 var partyBalancesByCurrency = partyAccounts
                     .Where(pa => pa.Currency != null)
@@ -827,7 +828,7 @@ namespace AnasıTAS_Deniz.API.Controllers.ExchangeOffice
                     .Where(pb => pb.netBalance != 0)
                     .OrderBy(pb => pb.currencyCode)
                     .ToList();
-                
+
                 // Get active exchange rates (filtered by office if specified)
                 List<vm_exchangerate> rates;
                 if (officeId.HasValue)
@@ -847,7 +848,7 @@ namespace AnasıTAS_Deniz.API.Controllers.ExchangeOffice
                         rates = new List<vm_exchangerate>();
                     }
                 }
-                
+
                 // Group currencies across all vaults (excluding base currency TRY)
                 var currencySummary = allVaults
                     .SelectMany(v => v.Balances)
@@ -863,7 +864,7 @@ namespace AnasıTAS_Deniz.API.Controllers.ExchangeOffice
                     })
                     .OrderByDescending(c => c.totalValueInBaseCurrency)
                     .ToList();
-                
+
                 // Calculate total foreign currency value
                 var totalForeignCurrencyValue = currencySummary.Sum(c => c.totalValueInBaseCurrency);
 
@@ -1077,7 +1078,7 @@ namespace AnasıTAS_Deniz.API.Controllers.ExchangeOffice
                 var party = await _partyService.GetPartyByIdAsync(partyId);
                 if (party == null)
                     return NotFound(new { error = "Party not found" });
-                
+
                 return Ok(party);
             }
             catch (Exception ex)
@@ -1249,9 +1250,9 @@ namespace AnasıTAS_Deniz.API.Controllers.ExchangeOffice
                 {
                     // Single currency statement
                     var statement = await _partyReportingService.GenerateStatementAsync(
-                        partyId, 
-                        currencyId.Value, 
-                        startDate ?? DateTime.Now.AddMonths(-1), 
+                        partyId,
+                        currencyId.Value,
+                        startDate ?? DateTime.Now.AddMonths(-1),
                         endDate ?? DateTime.Now);
                     return Ok(statement);
                 }
@@ -1264,23 +1265,23 @@ namespace AnasıTAS_Deniz.API.Controllers.ExchangeOffice
 
                     var accounts = await _partyAccountService.GetPartyAccountsAsync(partyId);
                     var statements = new List<vm_partystatement>();
-                    
+
                     foreach (var account in accounts.Where(a => a.Balance != 0 || a.TotalDebits > 0 || a.TotalCredits > 0))
                     {
                         var stmt = await _partyReportingService.GenerateStatementAsync(
-                            partyId, 
-                            account.CurrencyId, 
-                            startDate ?? DateTime.Now.AddMonths(-1), 
+                            partyId,
+                            account.CurrencyId,
+                            startDate ?? DateTime.Now.AddMonths(-1),
                             endDate ?? DateTime.Now);
                         statements.Add(stmt);
                     }
-                    
+
                     // Return a combined view or the first statement for now
                     if (statements.Any())
                         return Ok(statements);
                     else
-                        return Ok(new vm_partystatement 
-                        { 
+                        return Ok(new vm_partystatement
+                        {
                             PartyId = partyId,
                             PartyName = party.Name,
                             StatementDate = DateTime.Now,
@@ -1335,13 +1336,13 @@ namespace AnasıTAS_Deniz.API.Controllers.ExchangeOffice
                     // Get all offices and combine results
                     var allSummaries = new List<vm_partybalance>();
                     var offices = await _context.Offices.Where(o => o.IsActive).ToListAsync();
-                    
+
                     foreach (var office in offices)
                     {
                         var officeSummary = await _partyReportingService.GetPartyBalanceSummaryAsync(office.Id);
                         allSummaries.AddRange(officeSummary);
                     }
-                    
+
                     return Ok(allSummaries.OrderByDescending(p => p.NetBalance).ToList());
                 }
             }
@@ -1780,7 +1781,7 @@ namespace AnasıTAS_Deniz.API.Controllers.ExchangeOffice
             var userOffice = await _userOfficeService.GetUserOfficeAsync(userId, officeId);
             if (userOffice == null)
                 return NotFound(new { error = "User office association not found" });
-            
+
             return Ok(userOffice);
         }
         catch (Exception ex)
@@ -1816,7 +1817,7 @@ namespace AnasıTAS_Deniz.API.Controllers.ExchangeOffice
             var result = await _userOfficeService.RemoveOfficeFromUserAsync(userId, officeId);
             if (!result)
                 return NotFound(new { error = "User office association not found" });
-            
+
             return Ok(new { message = "Office removed from user successfully" });
         }
         catch (Exception ex)
@@ -1837,7 +1838,7 @@ namespace AnasıTAS_Deniz.API.Controllers.ExchangeOffice
             var result = await _userOfficeService.UpdateUserOfficesAsync(model.UserId, model.OfficeIds);
             if (!result)
                 return BadRequest(new { error = "Failed to update user offices" });
-            
+
             return Ok(new { message = "User offices updated successfully" });
         }
         catch (Exception ex)
@@ -1937,7 +1938,7 @@ namespace AnasıTAS_Deniz.API.Controllers.ExchangeOffice
                 var result = await _expenseDefinitionService.DeleteDefinitionAsync(id);
                 if (!result)
                     return NotFound(new { error = "Expense definition not found" });
-                
+
                 return Ok(new { message = "Expense definition deleted successfully" });
             }
             catch (Exception ex)
@@ -1958,7 +1959,7 @@ namespace AnasıTAS_Deniz.API.Controllers.ExchangeOffice
                 var result = await _expenseDefinitionService.GetDefinitionAsync(id);
                 if (result == null)
                     return NotFound(new { error = "Expense definition not found" });
-                
+
                 return Ok(result);
             }
             catch (Exception ex)
@@ -2041,7 +2042,7 @@ namespace AnasıTAS_Deniz.API.Controllers.ExchangeOffice
                 var result = await _expensePaymentService.GetPaymentAsync(id);
                 if (result == null)
                     return NotFound(new { error = "Expense payment not found" });
-                
+
                 return Ok(result);
             }
             catch (Exception ex)
@@ -2107,7 +2108,7 @@ namespace AnasıTAS_Deniz.API.Controllers.ExchangeOffice
                 var result = await _expensePaymentService.DeletePaymentAsync(id, request.Reason);
                 if (!result)
                     return NotFound(new { error = "Expense payment not found or already deleted" });
-                
+
                 return Ok(new { message = "Expense payment deleted successfully" });
             }
             catch (Exception ex)
@@ -2193,7 +2194,7 @@ namespace AnasıTAS_Deniz.API.Controllers.ExchangeOffice
             var result = await _vaultService.SubmitVaultCountAsync(request);
             if (result)
                 return Ok(new { success = true, message = "Vault count submitted successfully" });
-            
+
             return BadRequest(new { error = "Failed to submit vault count" });
         }
         catch (Exception ex)
@@ -2208,8 +2209,8 @@ namespace AnasıTAS_Deniz.API.Controllers.ExchangeOffice
         /// </summary>
         [HttpGet("vaults/{vaultId}/counts")]
         public async Task<ActionResult<List<vm_vaultcount>>> GetVaultCounts(
-        Guid vaultId, 
-        [FromQuery] DateTime? startDate = null, 
+        Guid vaultId,
+        [FromQuery] DateTime? startDate = null,
         [FromQuery] DateTime? endDate = null)
     {
         try
@@ -2235,7 +2236,7 @@ namespace AnasıTAS_Deniz.API.Controllers.ExchangeOffice
             var result = await _vaultService.ResetVaultCountStatusAsync(vaultId);
             if (result)
                 return Ok(new { success = true, message = "Vault count status reset successfully" });
-            
+
             return BadRequest(new { error = "Failed to reset vault count status" });
         }
         catch (Exception ex)
@@ -2256,7 +2257,7 @@ namespace AnasıTAS_Deniz.API.Controllers.ExchangeOffice
                 var result = await _vaultService.SetVaultShouldCountAsync(vaultId, shouldCount);
                 if (result)
                     return Ok(new { success = true, message = $"Vault count status set to {shouldCount}" });
-                
+
                 return BadRequest(new { error = "Failed to set vault count status" });
             }
             catch (Exception ex)
@@ -2287,4 +2288,3 @@ namespace AnasıTAS_Deniz.API.Controllers.ExchangeOffice
 
     #endregion
 }
-
