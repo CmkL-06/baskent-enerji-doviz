@@ -1,3 +1,29 @@
+# ============================================
+# AI / Cursor araçları - ASLA commit etme
+# ============================================
+.cursor/
+.cursorrules
+cursor-agent/
+.memory/
+BELLEK/
+AGENTS.md
+RECOMMENDATIONS.md
+WORKFLOW.md
+TODO.md
+Antigravity_ile_Ac.bat
+Antigravity_ile_Ac.ps1
+Cursor_ile_Ac.ps1
+Build_Output/
+_hash_index.txt
+_move_errors.txt
+_scan_*.txt
+_whatif_output.txt
+_project_candidates_report.txt
+_nested_conflict_review/
+_PROJE_ADAYLARI_OZET.txt
+TESPIT_RAPORU.txt
+MUHASEBE_PRO_OTURUM.md
+
 appsettings*.json
 firebaseConfig*.json
 ExchangeOffice_API_Documentation_Updated.md
