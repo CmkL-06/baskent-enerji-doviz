@@ -1,6 +1,0 @@
-﻿   1:7>D:\QuantaQuokka\SmileMedical\SmileMedical.Business\Infrastructure\ExchangeOffice\Office\IExchangeTransactionService.cs(1,25): error CS0234: 'Migrations' tÃ¼r veya ad alanÄ± adÄ± 'SmileMedical.Data' ad alanÄ±nda yok (bir derleme baÅŸvurunuz mu eksik?) [D:\QuantaQuokka\SmileMedical\SmileMedical.Business\SmileMedical.Business.csproj]
-       "Csc" gÃ¶revini yÃ¼rÃ¼tme tamamlandÄ± -- BAÅARISIZ OLDU.
-   1:7>"SmileMedical.Business.csproj" projesinde "CoreCompile" hedefini oluÅŸturma tamamlandÄ± -- BAÅARISIZ OLDU.
-   1:7>"D:\QuantaQuokka\SmileMedical\SmileMedical.Business\SmileMedical.Business.csproj" Projesini OluÅŸturma Ä°ÅŸlemi TamamlandÄ± (varsayÄ±lan hedefler) -- BAÅARISIZ OLDU.
-OluÅŸturma BAÅARISIZ OLDU.
-         D:\QuantaQuokka\SmileMedical\SmileMedical.Business\Infrastructure\ExchangeOffice\Office\IExchangeTransactionService.cs(1,25): error CS0234: 'Migrations' tÃ¼r veya ad alanÄ± adÄ± 'SmileMedical.Data' ad alanÄ±nda yok (bir derleme baÅŸvurunuz mu eksik?) [D:\QuantaQuokka\SmileMedical\SmileMedical.Business\SmileMedical.Business.csproj]
