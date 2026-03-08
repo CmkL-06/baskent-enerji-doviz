@@ -45,11 +45,11 @@ async function submit() {
   loading.value = true
   try {
     const { data } = await api.post('/api/v1/User/login', {
-      Mail: email.value,
-      Password: password.value,
+      email: email.value,
+      password: password.value,
     })
-    const token = data?.apiToken ?? data?.token ?? data?.accessToken ?? data?.jwt
-    const user = data?.userInfo ?? data?.user ?? { email: email.value, userName: data?.userName ?? email.value }
+    const token = data?.token ?? data?.accessToken ?? data?.jwt
+    const user = data?.user ?? { email: email.value, userName: data?.userName ?? email.value }
     if (token) {
       setAuth(token, user)
       success.value = true
