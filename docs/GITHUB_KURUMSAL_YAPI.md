@@ -26,7 +26,6 @@ baskent-proje/          # veya baskentenerji-doviz-api
 ├── docs/               # Tüm belgeler (Plesk, IIS, güvenlik, referans)
 ├── kaynak-kod/         # .NET çözümü (AnasıTAS_Deniz.*)
 ├── scripts/            # Seed, test, IIS, örnek config
-├── cursor-agent/       # Cursor agent yapılandırması
 └── telegram-bot/       # Bot kodları
 ```
 

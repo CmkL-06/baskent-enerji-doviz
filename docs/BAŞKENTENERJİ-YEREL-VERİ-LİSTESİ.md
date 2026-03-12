@@ -4,14 +4,9 @@ Bu belge, yerel bilgisayarda (workspace) **baskentenerji** / **Başkent Enerji**
 
 ---
 
-## 1. Cursor Agent (Başkent Enerji – Döviz Muhasebesi)
+## 1. Yerel tarama kapsamı
 
-| Özellik | Değer |
-|--------|--------|
-| **Dosya** | `C:\Users\Administrator\.cursor\agents\baskent-enerji-doviz-muhasebesi.md` |
-| **Amaç** | Başkent Enerji Döviz Muhasebesi projesi için full-stack asistan; Claude Web–Cursor senkronu ve tarayıcı komutları dahil |
-| **Tarayıcı komutu** | "siteyi aç" / "baskentenerji.com'u aç" → `https://baskentenerji.com` |
-| **İçerik özeti** | Genel kurallar, proje yapısı, kod standartları, web/güvenlik/hata yönetimi, Claude senkron ipuçları, döviz muhasebesi bağlamı |
+Bu listedeki kayıtlar, yerel makinede Başkent Enerji döviz sistemiyle doğrudan ilişkili teknik dosyaları ve operasyon referanslarını kapsar.
 
 ---
 
@@ -131,16 +126,15 @@ Bu workspace’te **Exchange Office / döviz** ile ilgili kod bu çözümde de g
 
 ---
 
-## 7. Özet tablo – Tüm Başkent Enerji ile ilgili dosyalar
+## 7. Özet tablo – Başlıca teknik dosyalar
 
 | # | Tam yol | Tür |
 |---|--------|-----|
-| 1 | `C:\Users\Administrator\.cursor\agents\baskent-enerji-doviz-muhasebesi.md` | Cursor agent |
-| 2 | `C:\Users\Administrator\Desktop\Baskentenerji_API_Test.ps1` | PowerShell test |
-| 3 | `C:\Users\Administrator\Desktop\yeni_bot\baskent_api.py` | Python API client |
-| 4 | `C:\Users\Administrator\Desktop\yeni_bot\config.py` | Config (BASKENT_* env) |
-| 5 | `C:\Users\Administrator\Documents\Scriptler\baskent_test.py` | Python login test |
-| 6 | `C:\Users\Administrator\publish_api_baskent\appsettings.json` | API/JWT/Email/Domain ayarları |
+| 1 | `C:\Users\Administrator\Desktop\Baskentenerji_API_Test.ps1` | PowerShell test |
+| 2 | `C:\Users\Administrator\Desktop\yeni_bot\baskent_api.py` | Python API client |
+| 3 | `C:\Users\Administrator\Desktop\yeni_bot\config.py` | Config (BASKENT_* env) |
+| 4 | `C:\Users\Administrator\Documents\Scriptler\baskent_test.py` | Python login test |
+| 5 | `C:\Users\Administrator\publish_api_baskent\appsettings.json` | API/JWT/Email/Domain ayarları |
 
 ---
 

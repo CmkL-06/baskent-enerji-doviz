@@ -14,7 +14,7 @@
 | **Staged değişiklik** | 1 dosya silindi: `D_DERIN_TARAMA_VE_MUHASEBE_DISINDA_KALANLAR_RAPORU.md` |
 | **Untracked** | (görünür yok; external/desktop_import vb. .gitignore’da olabilir) |
 
-**Branches:** BASKENT-DOVIZ (aktif), main, dependabot/nuget/..., cursor/flaky-test-resolution-146b.
+**Branches:** BASKENT-DOVIZ (aktif), main, dependabot/nuget/...
 
 ---
 
@@ -67,7 +67,7 @@ Ana uygulama (AnasıTAS_Deniz) derlenebilir durumda; deploy için `dotnet publis
 ## 6. Proje yapısı (kısa)
 
 - **Backend:** AnasıTAS_Deniz.API, .Business, .Data, .Entity, .Tests.
-- **Diğer:** SmileMedical/ (ikinci backend + Vue frontend), docs/, scripts/, telegram-bot/, cursor-agent/, external/ (desktop_import, local_import).
+- **Diğer:** SmileMedical/ (ikinci backend + Vue frontend), docs/, scripts/, telegram-bot/, external/ (desktop_import, local_import).
 - **Canlı:** api.baskentenerji.com, baskentenerji.com/ihtiyar; DB mtt-moneyexchangeturkey.
 
 ---
@@ -81,4 +81,4 @@ Ana uygulama (AnasıTAS_Deniz) derlenebilir durumda; deploy için `dotnet publis
 
 ---
 
-*Bu dosya otomatik üretilmiş durum özetidir; güncel karar için CALISMA_PLANI_GUVENLIK_VE_DOVIZ_SURUM.md ve BELLEK-V4.md esas alınmalıdır.*
+*Bu dosya otomatik üretilmiş durum özetidir; güncel karar için CALISMA_PLANI_GUVENLIK_VE_DOVIZ_SURUM.md ve TEK_PROJE_STRATEJISI.md esas alınmalıdır.*

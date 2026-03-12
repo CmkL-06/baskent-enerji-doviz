@@ -23,7 +23,6 @@ BASKENT_PROJE/
 ├── docs/              # Tüm belgeler (bu dosya dahil)
 ├── kaynak-kod/        # .NET API (AnasıTAS_Deniz.*) – tek kaynak
 ├── scripts/
-├── cursor-agent/
 ├── telegram-bot/
 └── publish-api/       # Build çıktısı (git’e eklenmez)
 ```

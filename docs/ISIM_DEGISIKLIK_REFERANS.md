@@ -34,7 +34,7 @@
 
 ---
 
-## 4. Dokümandaki giriş bilgileri (BELLEK-V4)
+## 4. Dokümandaki giriş bilgileri (Seed referansı)
 
 | Rol     | Username | Şifre     | Açıklama        |
 |---------|----------|-----------|------------------|

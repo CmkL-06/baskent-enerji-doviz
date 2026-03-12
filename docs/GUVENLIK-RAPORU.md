@@ -466,5 +466,5 @@ Bu sunucu **ciddi güvenlik açıkları** barındırıyor. Özellikle:
 
 ---
 
-*Rapor: Cursor AI Penetration Test Suite*  
+*Rapor: İç güvenlik denetim çıktısı*  
 *Test Tarihi: 2026-02-23*

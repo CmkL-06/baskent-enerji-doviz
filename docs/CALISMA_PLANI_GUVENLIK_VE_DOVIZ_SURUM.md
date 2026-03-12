@@ -3,7 +3,7 @@
 **Tarih:** 2026-02-24  
 **Amaç:** Mevcut yapıyı güvenlik ve işlevsellik açısından geliştirmek; son sürüme yükseltilen döviz sistemine göre yenilemek ve optimize etmek.
 
-**Referanslar:** BELLEK-V4, GUVENLIK-RAPORU.md, YAPILANDIRMA_AUDIT.md, PLESK_MONEYTRANSFERTURKEY_TG_PROTOCOL.md
+**Referanslar:** TEK_PROJE_STRATEJISI.md, GUVENLIK-RAPORU.md, YAPILANDIRMA_AUDIT.md, PLESK_MONEYTRANSFERTURKEY_TG_PROTOCOL.md
 
 ---
 
@@ -125,7 +125,7 @@ Hedef: API, panel ve tg/botların son sürüm döviz modeli (Exchange, Vault, De
 |---|--------|--------|-----|
 | 3.1.1 | Tüm domain/site’lar tek referans dokümanda (Plesk bütün optimizasyon) toplansın; document root, SSL, reverse proxy net | ☐ | PLESK_MONEYTRANSFERTURKEY_TG_PROTOCOL + baskentenerji özeti |
 | 3.1.2 | GitHub ↔ local ↔ Plesk akışı: commit → push → (isteğe bağlı) deploy script; canlı appsettings/web.config hiç üzerine yazılmasın | ☑ | deploy-api-to-canli.ps1 |
-| 3.1.3 | İhtiyar paneli deploy: Build çıktısı httpdocs\ihtiyar’a kopyalama adımı dokümante veya script’lensin | ☐ | BELLEK’te path var, tek komut önerilir |
+| 3.1.3 | İhtiyar paneli deploy: Build çıktısı httpdocs\ihtiyar’a kopyalama adımı dokümante veya script’lensin | ☐ | Deploy adımı tek komutla standardize edilsin |
 
 ### 3.2 İzleme ve log
 
