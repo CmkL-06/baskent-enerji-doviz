@@ -15,7 +15,12 @@ Bu klasör, projeye ait otomasyon ve test scriptlerini içerir.
 | Test-API-AfterDeploy.ps1 | Deploy sonrası API test |
 | baskent_test.py | Python test scripti |
 | login-body.example.json | Login body örnek JSON |
+| package_single_project.sh | Kanonik proje paketleme scripti |
+| single_project_audit.py | Yapısal/güvenlik drift kontrol scripti |
 
-## Kaynak
+## Kullanım
 
-Bu scriptler `baskentenerji-doviz-api/scripts` klasöründen birleştirilmiştir.
+- Repo sağlık kontrolü:
+  - `python3 scripts/single_project_audit.py`
+- Kanonik release paketi:
+  - `bash scripts/package_single_project.sh`

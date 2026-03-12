@@ -7,53 +7,51 @@ Döviz alış-satış, kasa yönetimi, cari hesap takibi ve raporlama platformu.
 | Katman | Teknoloji |
 |--------|-----------|
 | Backend | .NET 8, ASP.NET Core Web API, Entity Framework Core |
-| Frontend | Vue 3, Pinia, Vue Router, Tailwind CSS |
-| Veritabanı | SQL Server Express |
+| Veritabanı | SQL Server |
 | Sunucu | IIS / Plesk Panel |
+| Yardımcı Servis | Telegram bot entegrasyonu |
 
-## Proje Yapısı
+## Proje Yapısı (Kanonik)
 
 ```
-AnasıTAS_Deniz.API/          → Web API katmanı (Controller'lar, HostService)
-AnasıTAS_Deniz.Business/     → İş mantığı (Servisler, Validasyon)
-AnasıTAS_Deniz.Data/         → Veritabanı (DbContext, Migration)
-AnasıTAS_Deniz.Entity/       → Entity modelleri, Enum'lar, DTO'lar
-docs/                        → Teknik dokümantasyon arşivi
-scripts/                     → Operasyon, test ve deploy scriptleri
-telegram-bot/                → Telegram bot entegrasyon servisleri
-cursor-agent/                → Cursor agent operasyon notları
+BaskentEnerji.API/           → Web API katmanı (Controller, middleware, host)
+BaskentEnerji.Business/      → İş kuralları ve servisler
+BaskentEnerji.Data/          → DbContext, migration, repository erişimi
+BaskentEnerji.Entity/        → Entity, DTO, enum, request/response modelleri
+BaskentEnerji.Tests/         → Test projeleri
+BaskentEnerji.sln            → Ana çözüm dosyası
+MoneyTransferTurkey/         → Legacy referans ağacı (yeni geliştirme hedefi değil)
+docs/                        → Dokümantasyon
+scripts/                     → Operasyon, test ve paketleme scriptleri
+telegram-bot/                → Telegram entegrasyon kodları
+external/README.md           → Repo dışı veri politikası notu
 ```
 
-## Tek Depo Konsolidasyonu
+## Tek ve Güçlü Proje Kararı
 
-Bu repo, proje parçalarını tek yerde toplar:
+- **Kanonik backend:** `BaskentEnerji.*`
+- **Legacy backend:** `MoneyTransferTurkey/` (sadece referans)
+- **Repo politikası:** Proje dışı kişisel/harici veri Git altında tutulmaz.
 
-- Uygulama kaynak kodu (`AnasıTAS_Deniz.*`)
-- Operasyon ve test scriptleri (`scripts/`)
-- Teknik dokümantasyon (`docs/`)
-- Telegram bot bileşenleri (`telegram-bot/`)
-- Agent notları (`cursor-agent/`)
+Detaylı strateji: `docs/TEK_PROJE_STRATEJISI.md`
 
-## Yetki Hiyerarşisi
+## Güvenlik ve Yetkilendirme Prensibi
 
-| Rank | Rol | Yetki |
-|------|-----|-------|
-| 100 | Owner | Tam yetki (kullanıcı/şube CRUD dahil) |
-| 99 | Admin | Döviz işlemleri, raporlar, cari (kullanıcı/şube CRUD hariç) |
-| 2 | Operatör | Kendi şubesindeki döviz işlemleri |
-| 1 | Müşteri | Sınırlı erişim |
-| 0 | Banned | Engelli |
+- Login/register/public endpoint dışındaki API endpoint'leri `[Authorize]` ile korunur.
+- Public endpoint'ler açıkça `[AllowAnonymous]` ile işaretlenir.
+- Secret değerler (`appsettings*.json`, firebase config vb.) repoya eklenmez.
 
-## API
-
-Base URL: `https://api.baskentenerji.com/api/v1`
-
-## Kurulum
+## Hızlı Başlangıç
 
 ```bash
-dotnet restore
-dotnet build -c Release
-dotnet publish -c Release -o ./output
+dotnet restore BaskentEnerji.sln
+dotnet build BaskentEnerji.sln -c Release
+dotnet test BaskentEnerji.sln -c Release --no-build
 ```
 
-> `appsettings.json` dosyası git dışında tutulur. Sunucuda manuel yapılandırılmalıdır.
+## Repo Sağlık Komutları
+
+```bash
+python3 scripts/single_project_audit.py
+bash scripts/package_single_project.sh
+```

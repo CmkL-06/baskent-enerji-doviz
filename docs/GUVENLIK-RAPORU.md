@@ -192,7 +192,7 @@
 | Alan | Değer |
 |------|-------|
 | **Ciddiyet** | YÜKSEK |
-| **Konum** | api.baskentenerji.com/api/v1/user/login |
+| **Konum** | api.baskentenerji.com/api/v1/User/login |
 | **Etki** | Brute-force şifre kırma, credential stuffing |
 
 **Test:** 10 ardışık başarısız login denemesi → hiçbiri engellenmedi (hepsi 400).

@@ -55,8 +55,8 @@ Hedef: GUVENLIK-RAPORU.md’deki kritik ve yüksek bulguları gidermek.
 
 | # | Görev | Durum | Not |
 |---|--------|--------|-----|
-| 1.4.1 | Exchange controller’lar (Exchange, Vault, Office, Dealer, Party, Expense, AutoRate, VaultSnapshot) üzerinde `[Authorize]` zorunlu olsun | ☐ | Sadece login/register/public endpoint’ler AllowAnonymous |
-| 1.4.2 | Site/Blog controller: Auth gerektiren aksiyonlara `[Authorize]` ekle; public sayfalar için açıkça `[AllowAnonymous]` kullan | ☐ | |
+| 1.4.1 | Exchange controller’lar (Exchange, Vault, Office, Dealer, Party, Expense, AutoRate, VaultSnapshot) üzerinde `[Authorize]` zorunlu olsun | ☑ | Sadece login/register/public endpoint’ler AllowAnonymous |
+| 1.4.2 | Site/Blog controller: Auth gerektiren aksiyonlara `[Authorize]` ekle; public sayfalar için açıkça `[AllowAnonymous]` kullan | ☑ | |
 | 1.4.3 | Rol tabanlı yetkilendirme (Owner/Admin/Personel) policy’leri netleştir; şube filtreleme (User_Office) korunsun | ☑ | ValidationService, EnsureOfficeAccessAsync mevcut |
 
 ### 1.5 Kimlik doğrulama ve parola

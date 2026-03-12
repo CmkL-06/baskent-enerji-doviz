@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace BaskentEnerji.API.Controllers.Site
@@ -113,15 +114,11 @@ namespace BaskentEnerji.API.Controllers.Site
                 // Get image dimensions if it's an image
                 int? width = null;
                 int? height = null;
-                // TODO: Add System.Drawing.Common package to get image dimensions
-                // if (fileType == "image")
-                // {
-                //     using (var image = System.Drawing.Image.FromFile(filePath))
-                //     {
-                //         width = image.Width;
-                //         height = image.Height;
-                //     }
-                // }
+                if (fileType == "image" && TryGetImageDimensions(filePath, extension, out var detectedWidth, out var detectedHeight))
+                {
+                    width = detectedWidth;
+                    height = detectedHeight;
+                }
 
                 var uploadedBy = GetCurrentUserId();
 
@@ -304,12 +301,213 @@ namespace BaskentEnerji.API.Controllers.Site
             };
         }
 
-        private int GetCurrentUserId()
+        private int? GetCurrentUserId()
         {
-            var userIdClaim = User.FindFirst("UserId")?.Value;
-            if (int.TryParse(userIdClaim, out var userId))
-                return userId;
-            return 0;
+            var userIdClaim = User.FindFirst("UserId")?.Value
+                ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            return int.TryParse(userIdClaim, out var userId) ? userId : null;
+        }
+
+        private static bool TryGetImageDimensions(string filePath, string extension, out int? width, out int? height)
+        {
+            width = null;
+            height = null;
+
+            try
+            {
+                using var stream = File.OpenRead(filePath);
+                return extension.ToLowerInvariant() switch
+                {
+                    ".png" => TryReadPngDimensions(stream, out width, out height),
+                    ".gif" => TryReadGifDimensions(stream, out width, out height),
+                    ".jpg" or ".jpeg" => TryReadJpegDimensions(stream, out width, out height),
+                    ".webp" => TryReadWebpDimensions(stream, out width, out height),
+                    _ => false
+                };
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool TryReadPngDimensions(Stream stream, out int? width, out int? height)
+        {
+            width = null;
+            height = null;
+
+            var buffer = new byte[24];
+            if (!TryReadExactly(stream, buffer, buffer.Length))
+            {
+                return false;
+            }
+
+            if (buffer[0] != 0x89 || buffer[1] != 0x50 || buffer[2] != 0x4E || buffer[3] != 0x47)
+            {
+                return false;
+            }
+
+            width = (buffer[16] << 24) | (buffer[17] << 16) | (buffer[18] << 8) | buffer[19];
+            height = (buffer[20] << 24) | (buffer[21] << 16) | (buffer[22] << 8) | buffer[23];
+            return true;
+        }
+
+        private static bool TryReadGifDimensions(Stream stream, out int? width, out int? height)
+        {
+            width = null;
+            height = null;
+
+            var buffer = new byte[10];
+            if (!TryReadExactly(stream, buffer, buffer.Length))
+            {
+                return false;
+            }
+
+            if (buffer[0] != 0x47 || buffer[1] != 0x49 || buffer[2] != 0x46)
+            {
+                return false;
+            }
+
+            width = buffer[6] | (buffer[7] << 8);
+            height = buffer[8] | (buffer[9] << 8);
+            return true;
+        }
+
+        private static bool TryReadWebpDimensions(Stream stream, out int? width, out int? height)
+        {
+            width = null;
+            height = null;
+
+            var header = new byte[30];
+            if (!TryReadExactly(stream, header, header.Length))
+            {
+                return false;
+            }
+
+            if (header[0] != 0x52 || header[1] != 0x49 || header[2] != 0x46 || header[3] != 0x46 ||
+                header[8] != 0x57 || header[9] != 0x45 || header[10] != 0x42 || header[11] != 0x50)
+            {
+                return false;
+            }
+
+            var chunk = System.Text.Encoding.ASCII.GetString(header, 12, 4);
+            if (chunk == "VP8X")
+            {
+                width = 1 + (header[24] | (header[25] << 8) | (header[26] << 16));
+                height = 1 + (header[27] | (header[28] << 8) | (header[29] << 16));
+                return true;
+            }
+
+            if (chunk == "VP8 ")
+            {
+                width = header[26] | ((header[27] & 0x3F) << 8);
+                height = header[28] | ((header[29] & 0x3F) << 8);
+                return true;
+            }
+
+            if (chunk == "VP8L")
+            {
+                var b0 = header[21];
+                var b1 = header[22];
+                var b2 = header[23];
+                var b3 = header[24];
+                width = 1 + (((b1 & 0x3F) << 8) | b0);
+                height = 1 + (((b3 & 0x0F) << 10) | (b2 << 2) | ((b1 & 0xC0) >> 6));
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryReadJpegDimensions(Stream stream, out int? width, out int? height)
+        {
+            width = null;
+            height = null;
+
+            if (stream.ReadByte() != 0xFF || stream.ReadByte() != 0xD8)
+            {
+                return false;
+            }
+
+            while (stream.Position < stream.Length)
+            {
+                var markerStart = stream.ReadByte();
+                if (markerStart != 0xFF)
+                {
+                    continue;
+                }
+
+                var marker = stream.ReadByte();
+                while (marker == 0xFF)
+                {
+                    marker = stream.ReadByte();
+                }
+
+                if (marker == -1)
+                {
+                    return false;
+                }
+
+                if (marker is 0xD8 or 0xD9)
+                {
+                    continue;
+                }
+
+                var lh = stream.ReadByte();
+                var ll = stream.ReadByte();
+                if (lh == -1 || ll == -1)
+                {
+                    return false;
+                }
+
+                var segmentLength = (lh << 8) + ll;
+                if (segmentLength < 2)
+                {
+                    return false;
+                }
+
+                if (marker is 0xC0 or 0xC1 or 0xC2 or 0xC3 or 0xC5 or 0xC6 or 0xC7 or 0xC9 or 0xCA or 0xCB or 0xCD or 0xCE or 0xCF)
+                {
+                    if (stream.ReadByte() == -1)
+                    {
+                        return false;
+                    }
+
+                    var h1 = stream.ReadByte();
+                    var h2 = stream.ReadByte();
+                    var w1 = stream.ReadByte();
+                    var w2 = stream.ReadByte();
+                    if (h1 == -1 || h2 == -1 || w1 == -1 || w2 == -1)
+                    {
+                        return false;
+                    }
+
+                    height = (h1 << 8) + h2;
+                    width = (w1 << 8) + w2;
+                    return true;
+                }
+
+                stream.Seek(segmentLength - 2, SeekOrigin.Current);
+            }
+
+            return false;
+        }
+
+        private static bool TryReadExactly(Stream stream, byte[] buffer, int count)
+        {
+            var totalRead = 0;
+            while (totalRead < count)
+            {
+                var read = stream.Read(buffer, totalRead, count - totalRead);
+                if (read == 0)
+                {
+                    return false;
+                }
+
+                totalRead += read;
+            }
+
+            return true;
         }
 
         private async Task<MediaFileDto> UploadSingleFile(IFormFile file)
@@ -333,16 +531,12 @@ namespace BaskentEnerji.API.Controllers.Site
             var fileType = GetFileType(extension);
             int? width = null;
             int? height = null;
-            
-            // TODO: Add System.Drawing.Common package to get image dimensions
-            // if (fileType == "image")
-            // {
-            //     using (var image = System.Drawing.Image.FromFile(filePath))
-            //     {
-            //         width = image.Width;
-            //         height = image.Height;
-            //     }
-            // }
+
+            if (fileType == "image" && TryGetImageDimensions(filePath, extension, out var detectedWidth, out var detectedHeight))
+            {
+                width = detectedWidth;
+                height = detectedHeight;
+            }
 
             var mediaFile = new MediaFile
             {
