@@ -47,7 +47,7 @@ Bu belge, yerel bilgisayarda (workspace) **baskentenerji** / **Başkent Enerji**
 
 **Önemli fonksiyonlar:**
 
-- `login()` – API’ye giriş, token alma (`/user/login`, mail + password)
+- `login()` – API’ye giriş, token alma (`/User/login`, mail + password)
 - `send_exchange(...)` – Döviz işlemi gönderimi (vaultId, currency, amount, is_buy, rate, notes)
 - `send_exchange_for_transaction(transaction_id)` – DB’den işlem okuyup API’ye gönderme
 
@@ -82,7 +82,7 @@ Bu belge, yerel bilgisayarda (workspace) **baskentenerji** / **Başkent Enerji**
 |-------|----------|
 | `C:\Users\Administrator\Documents\Scriptler\baskent_test.py` | Basit login testi: `BASKENT_API_URL` + `/auth/login`, `BASKENT_USERNAME` / `BASKENT_PASSWORD` ile POST (`.env` kullanıyor) |
 
-**Not:** Bu script’te endpoint `/auth/login`; `baskent_api.py` ise `/user/login` kullanıyor. Farklı API sürümleri veya farklı auth yolları olabilir.
+**Not:** Bu script’te endpoint `/auth/login`; `baskent_api.py` endpoint’i `/User/login` olarak güncellendi. Auth yolu tekilleştirilmeli.
 
 ---
 

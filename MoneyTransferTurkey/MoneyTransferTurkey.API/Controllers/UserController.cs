@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MoneyTransferTurkey.Business.Exceptions;
 using MoneyTransferTurkey.Business.Infrastructure.User;
@@ -94,7 +94,6 @@ namespace MoneyTransferTurkey.API.Controllers
         }
 
         [HttpPost("update")]
-        [AllowAnonymous]
         public async Task UpdateUser(rm_user_update userData)
         {
             if (!await _validationService.HasPermissionAsync(userData.Id))

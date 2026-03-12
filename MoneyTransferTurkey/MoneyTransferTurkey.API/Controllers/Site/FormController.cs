@@ -1,4 +1,5 @@
-﻿using AutoMapper;
+using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MoneyTransferTurkey.Business.Services.Permission;
@@ -13,6 +14,7 @@ namespace MoneyTransferTurkey.API.Controllers.Site
 {
     [Route("api/v1/[controller]")]
     [ApiController]
+    [Authorize]
     public class FormController : ControllerBase
     {
         private readonly MoneyTransferTurkeyDbContext _dbContext;
@@ -68,6 +70,7 @@ namespace MoneyTransferTurkey.API.Controllers.Site
         }
 
         [HttpGet("Id")]
+        [AllowAnonymous]
         public async Task<ActionResult<Form>> GetForm([FromQuery]Guid id)
         {
             var form = await _dbContext.Forms.FindAsync(id);
@@ -79,12 +82,14 @@ namespace MoneyTransferTurkey.API.Controllers.Site
         }
 
         [HttpGet]
+        [AllowAnonymous]
         public async Task<ActionResult<List<Form>>> GetForms()
         {
             return await _dbContext.Forms.ToListAsync();
         }
 
         [HttpPost("submit")]
+        [AllowAnonymous]
         public async Task<IActionResult> SubmitForm([FromBody] rm_form_submit data)
         {
             if (data == null)
@@ -138,6 +143,7 @@ namespace MoneyTransferTurkey.API.Controllers.Site
         }
 
         [HttpGet("check")]
+        [AllowAnonymous]
         public async Task<IActionResult> CheckSubmit([FromQuery, Required] Guid formId)
         {
             string visitorIp = tools_string.GetIpAddress(HttpContext);

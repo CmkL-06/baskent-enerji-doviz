@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MoneyTransferTurkey.Business.Infrastructure.Site;
 using MoneyTransferTurkey.Entity.Entities.Site;
@@ -10,6 +11,7 @@ namespace MoneyTransferTurkey.API.Controllers.Site
 {
     [Route("api/v1/[controller]")]
     [ApiController]
+    [Authorize]
     public class AnalyticsController : ControllerBase
     {
         private readonly IAnalyticsService _analyticsService;
@@ -20,6 +22,7 @@ namespace MoneyTransferTurkey.API.Controllers.Site
         }
 
         [HttpPost("track")]
+        [AllowAnonymous]
         public async Task<IActionResult> TrackPageView([FromBody] TrackingDto tracking)
         {
             try

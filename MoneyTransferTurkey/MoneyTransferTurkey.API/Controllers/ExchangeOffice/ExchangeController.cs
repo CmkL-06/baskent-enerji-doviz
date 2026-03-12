@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MoneyTransferTurkey.Business.Infrastructure.ExchangeOffice;
 using MoneyTransferTurkey.Business.Infrastructure.ExchangeOffice.Expense;
@@ -27,6 +28,7 @@ namespace MoneyTransferTurkey.API.Controllers.ExchangeOffice
 {
     [Route("api/v1/[controller]")]
     [ApiController]
+    [Authorize]
     public class ExchangeController : ControllerBase
     {
         private readonly IExchangeServiceCommand _command;

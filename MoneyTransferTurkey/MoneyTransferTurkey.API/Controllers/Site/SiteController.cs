@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using MoneyTransferTurkey.Business.Infrastructure.Site.General;
 using MoneyTransferTurkey.Business.Infrastructure.Site.Language;
@@ -10,6 +11,7 @@ namespace MoneyTransferTurkey.API.Controllers.Site
 {
     [Route("api/v1/[controller]")]
     [ApiController]
+    [Authorize]
     public class SiteController : ControllerBase
     {
         private readonly ILanguageServiceQuery _languageServiceQuery;
@@ -26,18 +28,21 @@ namespace MoneyTransferTurkey.API.Controllers.Site
         }
 
         [HttpGet("Languages")]
+        [AllowAnonymous]
         public List<Entity.Entities.Site.Language> getLanguages()
         {
             return _languageServiceQuery.GetLanguages();
         }
 
         [HttpGet("Language")]
+        [AllowAnonymous]
         public Entity.Entities.Site.Language getLanguageById([FromQuery] Guid Id)
         {
             return _languageServiceQuery.GetLanguageById(Id);
         }
 
         [HttpGet("Language/Default")]
+        [AllowAnonymous]
         public Entity.Entities.Site.Language getDefaultLanguage()
         {
             return _languageServiceQuery.GetDefaultLanguage();
@@ -56,6 +61,7 @@ namespace MoneyTransferTurkey.API.Controllers.Site
         }
 
         [HttpGet ("Settings")]
+        [AllowAnonymous]
         public vm_settings getSiteSettings()
         {
             return _settingsServiceQuery.GetSiteSettings();

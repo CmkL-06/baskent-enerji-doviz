@@ -7,7 +7,7 @@ namespace BaskentEnerji.API.Controllers
 {
     [Route("api/v1/[controller]")]
     [ApiController]
-    [AllowAnonymous]
+    [Authorize]
     public class DiagnosticsController : ControllerBase
     {
         private readonly BaskentEnerjiDbContext _db;

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MoneyTransferTurkey.Business.Infrastructure.Site;
 using MoneyTransferTurkey.Business.Infrastructure.Site.Page;
@@ -12,6 +13,7 @@ namespace MoneyTransferTurkey.API.Controllers.Site
 {
     [Route("api/v1/[controller]")]
     [ApiController]
+    [Authorize]
     public class SeoController : ControllerBase
     {
         private readonly ISeoService _seoService;
@@ -130,6 +132,7 @@ namespace MoneyTransferTurkey.API.Controllers.Site
         }
 
         [HttpGet("sitemap.xml")]
+        [AllowAnonymous]
         public async Task<IActionResult> GenerateSitemap()
         {
             try
@@ -161,6 +164,7 @@ namespace MoneyTransferTurkey.API.Controllers.Site
         }
 
         [HttpGet("robots.txt")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetRobotsTxt()
         {
             try

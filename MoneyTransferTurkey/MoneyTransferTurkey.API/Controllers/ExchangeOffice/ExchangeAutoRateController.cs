@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MoneyTransferTurkey.Business.Services.ExchangeOffice.AutoRate;
@@ -13,6 +14,7 @@ namespace MoneyTransferTurkey.API.Controllers.ExchangeOffice
 {
     [Route("api/v1/exchange/auto-rate")]
     [ApiController]
+    [Authorize]
     public class ExchangeAutoRateController : ControllerBase
     {
         private readonly MoneyTransferTurkeyDbContext _context;

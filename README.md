@@ -14,25 +14,26 @@ Döviz alış-satış, kasa yönetimi, cari hesap takibi ve raporlama platformu.
 ## Proje Yapısı
 
 ```
-AnasıTAS_Deniz.API/          → Web API katmanı (Controller'lar, HostService)
-AnasıTAS_Deniz.Business/     → İş mantığı (Servisler, Validasyon)
-AnasıTAS_Deniz.Data/         → Veritabanı (DbContext, Migration)
-AnasıTAS_Deniz.Entity/       → Entity modelleri, Enum'lar, DTO'lar
+BaskentEnerji.API/           → Web API katmanı (Controller'lar, HostService)
+BaskentEnerji.Business/      → İş mantığı (Servisler, Validasyon)
+BaskentEnerji.Data/          → Veritabanı (DbContext, Migration)
+BaskentEnerji.Entity/        → Entity modelleri, Enum'lar, DTO'lar
+MoneyTransferTurkey/         → Eşlenik backend çözümü
 docs/                        → Teknik dokümantasyon arşivi
 scripts/                     → Operasyon, test ve deploy scriptleri
 telegram-bot/                → Telegram bot entegrasyon servisleri
-cursor-agent/                → Cursor agent operasyon notları
+external/                    → Çekirdek proje dışı arşiv/veri klasörleri
 ```
 
 ## Tek Depo Konsolidasyonu
 
 Bu repo, proje parçalarını tek yerde toplar:
 
-- Uygulama kaynak kodu (`AnasıTAS_Deniz.*`)
+- Uygulama kaynak kodu (`BaskentEnerji.*`, `MoneyTransferTurkey/*`)
 - Operasyon ve test scriptleri (`scripts/`)
 - Teknik dokümantasyon (`docs/`)
 - Telegram bot bileşenleri (`telegram-bot/`)
-- Agent notları (`cursor-agent/`)
+- Harici arşiv verileri (`external/`) – çekirdek dağıtım paketine dahil edilmemeli
 
 ## Yetki Hiyerarşisi
 

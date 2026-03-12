@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using MoneyTransferTurkey.Business.Infrastructure.Site;
@@ -13,13 +14,14 @@ namespace MoneyTransferTurkey.API.Controllers.Site
 {
     [Route("api/v1/[controller]")]
     [ApiController]
+    [Authorize]
     public class MediaController : ControllerBase
     {
         private readonly IMediaService _mediaService;
         private readonly IWebHostEnvironment _environment;
         private readonly string _uploadPath;
 
-        public MediaController(IMediaService mediaService, IWebHostEnvironment environment)
+        public MediaController(IMediaService mediaService, IWebHostEnvironment environment, IConfiguration configuration)
         {
             _mediaService = mediaService;
             _environment = environment;
@@ -32,8 +34,8 @@ namespace MoneyTransferTurkey.API.Controllers.Site
                 webRoot = Directory.GetCurrentDirectory();
             }
             
-            // Save to frontend's public/uploads directory instead of backend
-            _uploadPath = @"C:\Users\rhaid\Desktop\CmsQQ\nuxt-web-builder\public\uploads";
+            _uploadPath = configuration["MediaSettings:UploadPath"]
+                ?? Path.Combine(webRoot, "wwwroot", "uploads");
             
             if (!Directory.Exists(_uploadPath))
             {

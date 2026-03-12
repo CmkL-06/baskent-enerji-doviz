@@ -29,7 +29,6 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
     [Route("api/v1/[controller]")]
     [ApiController]
     [Authorize]
-    [Authorize]
     public class ExchangeController : ControllerBase
     {
         private readonly IExchangeServiceCommand _command;
