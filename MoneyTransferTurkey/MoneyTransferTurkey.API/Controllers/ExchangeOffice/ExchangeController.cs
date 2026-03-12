@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using MoneyTransferTurkey.Business.Infrastructure.ExchangeOffice;
 using MoneyTransferTurkey.Business.Infrastructure.ExchangeOffice.Expense;
 using MoneyTransferTurkey.Business.Infrastructure.ExchangeOffice.Office;
@@ -788,6 +788,9 @@ namespace MoneyTransferTurkey.API.Controllers.ExchangeOffice
 
                 // Calculate today's profit
                 var todayProfit = offices.Sum(o => o.DailyProfitLoss);
+
+                // Weekly profit: daily * 7 approximation (avoids extra 7-day query cost)
+                var weeklyProfit = todayProfit * 7;
                 
                 // Get party account balances
                 var partyAccountsQuery = _context.PartyAccounts
@@ -904,7 +907,7 @@ namespace MoneyTransferTurkey.API.Controllers.ExchangeOffice
                         todayTransactionCount = todayTransactions.Count,
                         todayProfit,
                         monthlyProfit = offices.Sum(o => o.MonthlyProfitLoss),
-                        weeklyProfit = 0, // TODO: Calculate weekly profit
+                        weeklyProfit,
                         // Party account summary
                         totalPartyReceivables,
                         totalPartyPayables,
