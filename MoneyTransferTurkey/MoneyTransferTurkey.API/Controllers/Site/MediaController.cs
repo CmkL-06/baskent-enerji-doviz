@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace MoneyTransferTurkey.API.Controllers.Site
@@ -129,6 +130,8 @@ namespace MoneyTransferTurkey.API.Controllers.Site
                 //     }
                 // }
 
+                var uploadedBy = GetCurrentUserId();
+
                 // Save to database
                 var mediaFile = new MediaFile
                 {
@@ -146,7 +149,7 @@ namespace MoneyTransferTurkey.API.Controllers.Site
                     Title = Path.GetFileNameWithoutExtension(file.FileName),
                     Description = "",
                     Tags = "",
-                    UploadedBy = 1, // TODO: Get from current user
+                    UploadedBy = uploadedBy,
                     UploadedAt = DateTime.UtcNow,
                     LastModified = DateTime.UtcNow,
                     IsActive = true
@@ -309,6 +312,14 @@ namespace MoneyTransferTurkey.API.Controllers.Site
             };
         }
 
+        private int? GetCurrentUserId()
+        {
+            // Try legacy numeric claim first, then common JWT identifiers.
+            var userIdClaim = User.FindFirst("UserId")?.Value
+                ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            return int.TryParse(userIdClaim, out var userId) ? userId : null;
+        }
+
         private async Task<MediaFileDto> UploadSingleFile(IFormFile file)
         {
             var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".pdf", ".doc", ".docx", ".xls", ".xlsx" };
@@ -357,7 +368,7 @@ namespace MoneyTransferTurkey.API.Controllers.Site
                 Title = Path.GetFileNameWithoutExtension(file.FileName),
                 Description = "",
                 Tags = "",
-                UploadedBy = 1,
+                UploadedBy = GetCurrentUserId(),
                 UploadedAt = DateTime.UtcNow,
                 LastModified = DateTime.UtcNow,
                 IsActive = true
