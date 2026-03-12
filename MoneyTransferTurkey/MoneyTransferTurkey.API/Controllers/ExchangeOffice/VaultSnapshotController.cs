@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MoneyTransferTurkey.Business.Infrastructure.ExchangeOffice.Office;
 using MoneyTransferTurkey.Entity.Modals.RequestModals.ExchangeService.Office;
 using MoneyTransferTurkey.Entity.Modals.ViewModals.ExchangeOFfice.Office;
 using System;
 using System.Collections.Generic;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace MoneyTransferTurkey.API.Controllers.ExchangeOffice
@@ -14,6 +16,7 @@ namespace MoneyTransferTurkey.API.Controllers.ExchangeOffice
     /// </summary>
     [Route("api/v1/exchange/vault-snapshots")]
     [ApiController]
+    [Authorize]
     public class VaultSnapshotController : ControllerBase
     {
         private readonly IVaultSnapshotService _snapshotService;
@@ -36,10 +39,12 @@ namespace MoneyTransferTurkey.API.Controllers.ExchangeOffice
         {
             try
             {
-                // TODO: Get userId from authentication context
-                // For now, using a placeholder - you should replace this with actual user from JWT token
-                var userId = Guid.Parse("00000000-0000-0000-0000-000000000000");
-                // Example: var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var userIdClaim = User.FindFirst("UserId")?.Value
+                    ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+                {
+                    return Unauthorized(new { error = "Invalid or missing user identity" });
+                }
 
                 var result = await _snapshotService.CreateSnapshotAsync(request, userId);
                 _logger.LogInformation("Snapshot created successfully for office {OfficeId} by user {UserId}",
