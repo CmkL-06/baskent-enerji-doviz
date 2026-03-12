@@ -14,6 +14,8 @@ Bu klasör, projeye ait otomasyon ve test scriptlerini içerir.
 | SeedUsers_SHA256_Update.sql | Kullanıcı seed SQL güncellemesi |
 | Test-API-AfterDeploy.ps1 | Deploy sonrası API test |
 | baskent_test.py | Python test scripti |
+| single_project_audit.py | Kanonik proje güvenlik/yapı audit scripti |
+| package_single_project.sh | Legacy/external hariç tek proje paketleyici |
 | login-body.example.json | Login body örnek JSON |
 
 ## Kaynak
