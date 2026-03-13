@@ -7,6 +7,7 @@ Bu depoda benzer iki backend ağacı bulunduğu için operasyonel belirsizliği 
 - **Kanonik proje:** `BaskentEnerji.*`
 - **Legacy referans:** `MoneyTransferTurkey/`
 - **Release kapsamı dışında veri:** Proje dışı arşiv/kişisel içerikler
+- **Eski sunucu verisi:** Silinmez; yalnızca read-only referans olarak tutulur.
 
 ## Uygulama Kuralları
 

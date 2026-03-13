@@ -7,6 +7,7 @@ Bu belge, projenin tek kaynaklı final yapısını ve bileşen entegrasyon sın�
 - **Kanonik backend:** `BaskentEnerji.*`
 - **Kanonik çözüm:** `BaskentEnerji.sln`
 - **Legacy referans:** `MoneyTransferTurkey/` (karşılaştırma/geri dönüş amaçlı)
+- **Eski sunucu verisi:** Silinmez; karşılaştırma ve bilgi çıkarımı için read-only tutulur
 
 ## 2) Bileşen entegrasyonu
 
@@ -34,6 +35,7 @@ Bu belge, projenin tek kaynaklı final yapısını ve bileşen entegrasyon sın�
 3. Health endpoint `200` döner.
 4. Yetki modeli: public endpoint’ler dışında `[Authorize]` korunumu sürer.
 5. Secret değerler repo içinde düz metin tutulmaz.
+6. Eski sunucu verisi sadece referanslanır; temizlikte otomatik silinmez.
 
 ## 4) Doğrulama komutları
 
