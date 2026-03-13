@@ -40,7 +40,7 @@
       <div class="panel">
         <div class="panel-head">
           <h3>Son işlemler</h3>
-          <router-link to="/exchange" class="panel-link">Tümü →</router-link>
+          <router-link :to="{ name: 'Exchange' }" class="panel-link">Tümü →</router-link>
         </div>
         <div class="panel-body">
           <table class="table" v-if="recentTransactions.length">
@@ -63,7 +63,7 @@
           </table>
           <div v-else class="empty-state">
             <p>Henüz işlem yok veya API bağlı değil.</p>
-            <router-link to="/exchange">Döviz / Ofis</router-link> sayfasından işlem açabilirsiniz.
+            <router-link :to="{ name: 'Exchange' }">Döviz / Ofis</router-link> sayfasından işlem açabilirsiniz.
           </div>
         </div>
       </div>
@@ -73,19 +73,19 @@
           <h3>Hızlı işlemler</h3>
         </div>
         <div class="panel-body quick-actions">
-          <router-link to="/exchange" class="quick-action">
+          <router-link :to="{ name: 'Exchange' }" class="quick-action">
             <span class="quick-action-icon">↔</span>
             <span>Yeni döviz işlemi</span>
           </router-link>
-          <router-link to="/vault" class="quick-action">
+          <router-link :to="{ name: 'Vault' }" class="quick-action">
             <span class="quick-action-icon">₺</span>
             <span>Kasa özeti</span>
           </router-link>
-          <router-link to="/party" class="quick-action">
+          <router-link :to="{ name: 'Party' }" class="quick-action">
             <span class="quick-action-icon">👥</span>
             <span>Taraflar</span>
           </router-link>
-          <router-link to="/rates" class="quick-action">
+          <router-link :to="{ name: 'Rates' }" class="quick-action">
             <span class="quick-action-icon">📈</span>
             <span>Kurlar</span>
           </router-link>
@@ -96,7 +96,7 @@
     <section class="panel">
       <div class="panel-head">
         <h3>Kur özeti (örnek)</h3>
-        <router-link to="/rates" class="panel-link">Kur yönetimi →</router-link>
+        <router-link :to="{ name: 'Rates' }" class="panel-link">Kur yönetimi →</router-link>
       </div>
       <div class="panel-body">
         <div class="rates-grid">

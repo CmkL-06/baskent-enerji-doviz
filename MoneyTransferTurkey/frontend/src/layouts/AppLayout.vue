@@ -5,25 +5,25 @@
       <nav class="sidebar-nav">
         <div class="nav-section">
           <div class="nav-section-title">Genel</div>
-          <router-link to="/" class="nav-item" active-class="active">
+          <router-link :to="{ name: 'Dashboard' }" class="nav-item" active-class="active">
             <span class="nav-icon">▣</span> Gösterge Paneli
           </router-link>
-          <router-link to="/user" class="nav-item" active-class="active">
+          <router-link :to="{ name: 'User' }" class="nav-item" active-class="active">
             <span class="nav-icon">👤</span> Kullanıcı
           </router-link>
         </div>
         <div class="nav-section">
           <div class="nav-section-title">Döviz Bürosu</div>
-          <router-link to="/exchange" class="nav-item" active-class="active">▣ Döviz / Ofis</router-link>
-          <router-link to="/vault" class="nav-item" active-class="active">▣ Kasa</router-link>
-          <router-link to="/party" class="nav-item" active-class="active">▣ Taraflar</router-link>
-          <router-link to="/rates" class="nav-item" active-class="active">▣ Kur</router-link>
+          <router-link :to="{ name: 'Exchange' }" class="nav-item" active-class="active">▣ Döviz / Ofis</router-link>
+          <router-link :to="{ name: 'Vault' }" class="nav-item" active-class="active">▣ Kasa</router-link>
+          <router-link :to="{ name: 'Party' }" class="nav-item" active-class="active">▣ Taraflar</router-link>
+          <router-link :to="{ name: 'Rates' }" class="nav-item" active-class="active">▣ Kur</router-link>
         </div>
         <div class="nav-section">
           <div class="nav-section-title">Site & İçerik</div>
-          <router-link to="/site" class="nav-item" active-class="active">▣ Site</router-link>
-          <router-link to="/blog" class="nav-item" active-class="active">▣ Blog</router-link>
-          <router-link to="/coin" class="nav-item" active-class="active">▣ Coin</router-link>
+          <router-link :to="{ name: 'Site' }" class="nav-item" active-class="active">▣ Site</router-link>
+          <router-link :to="{ name: 'Blog' }" class="nav-item" active-class="active">▣ Blog</router-link>
+          <router-link :to="{ name: 'Coin' }" class="nav-item" active-class="active">▣ Coin</router-link>
         </div>
       </nav>
     </aside>
@@ -52,7 +52,7 @@ const router = useRouter()
 const { user, logout: doLogout } = useAuth()
 
 const titles = {
-  Dashboard: 'Dashboard',
+  Dashboard: 'Gösterge Paneli',
   User: 'Kullanıcı',
   Exchange: 'Döviz / Ofis',
   Vault: 'Kasa',
