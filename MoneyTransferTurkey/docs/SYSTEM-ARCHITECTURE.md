@@ -1,26 +1,26 @@
-# SmileMedical — Sistem Mimarisi
+# MoneyTransferTurkey (Legacy) — Sistem Mimarisi
 
 ## Katmanlı yapı
 
 ```mermaid
 flowchart TB
-  subgraph API["SmileMedical.API"]
+  subgraph API["MoneyTransferTurkey.API"]
     C[Controllers]
     H[Hosted Services]
   end
 
-  subgraph Business["SmileMedical.Business"]
+  subgraph Business["MoneyTransferTurkey.Business"]
     U[User Services]
     E[ExchangeOffice Services]
     S[Site Services]
     B[Blog / Coin / Cache]
   end
 
-  subgraph Data["SmileMedical.Data"]
-    DBctx[SmileMedicalDbContext]
+  subgraph Data["MoneyTransferTurkey.Data"]
+    DBctx[MoneyTransferTurkeyDbContext]
   end
 
-  subgraph Entity["SmileMedical.Entity"]
+  subgraph Entity["MoneyTransferTurkey.Entity"]
     Ent[Entities]
   end
 
@@ -86,10 +86,10 @@ sequenceDiagram
 
 | Proje | Bağımlılıklar |
 |-------|----------------|
-| SmileMedical.API | Business, Data, Entity |
-| SmileMedical.Business | Data, Entity |
-| SmileMedical.Data | Entity |
-| SmileMedical.Entity | — |
+| MoneyTransferTurkey.API | Business, Data, Entity |
+| MoneyTransferTurkey.Business | Data, Entity |
+| MoneyTransferTurkey.Data | Entity |
+| MoneyTransferTurkey.Entity | — |
 
 ## Frontend
 
@@ -98,7 +98,7 @@ Admin arayüzü ayrı bir Vue 3 + Vite projesidir (`frontend/`). API’ye CORS i
 ```mermaid
 flowchart LR
   User[Kullanıcı] --> Vue[Vue 3 + Vite]
-  Vue -->|REST + JWT| API[SmileMedical.API]
+  Vue -->|REST + JWT| API[MoneyTransferTurkey.API]
   Vue -->|SignalR| Hub[/coinPriceHub]
 ```
 

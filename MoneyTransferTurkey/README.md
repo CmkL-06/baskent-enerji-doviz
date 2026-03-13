@@ -1,15 +1,15 @@
-# SmileMedical
+# MoneyTransferTurkey (Legacy)
 
 Döviz bürosu, site yönetimi, blog ve coin modüllerini kapsayan .NET 8 API + Vue 3 frontend projesi.
 
 ## Proje yapısı
 
 ```
-SmileMedical/
-├── SmileMedical.API/          # Web API (Controllers, Swagger, JWT, SignalR)
-├── SmileMedical.Business/     # İş mantığı (Services)
-├── SmileMedical.Data/         # EF Core, DbContext, Migrations
-├── SmileMedical.Entity/       # Entity ve DTO modelleri
+MoneyTransferTurkey/
+├── MoneyTransferTurkey.API/          # Web API (Controllers, Swagger, JWT, SignalR)
+├── MoneyTransferTurkey.Business/     # İş mantığı (Services)
+├── MoneyTransferTurkey.Data/         # EF Core, DbContext, Migrations
+├── MoneyTransferTurkey.Entity/       # Entity ve DTO modelleri
 ├── frontend/                  # Vue 3 + Vite admin arayüzü
 ├── docs/                      # Dokümantasyon ve görselleştirmeler
 └── README.md                  # Bu dosya
@@ -23,10 +23,10 @@ SmileMedical/
 ## Backend (API) çalıştırma
 
 1. `appsettings.json` içinde `ConnectionStrings:SQL` değerini kendi veritabanı bağlantınıza göre ayarlayın.
-2. Çözümü Visual Studio ile açıp SmileMedical.API’yi başlatın veya:
+2. Çözümü Visual Studio ile açıp MoneyTransferTurkey.API’yi başlatın veya:
 
    ```bash
-   cd SmileMedical.API
+   cd MoneyTransferTurkey.API
    dotnet run
    ```
 
@@ -70,9 +70,9 @@ VITE_API_BASE_URL=http://localhost:5000
 
 ## Testler
 
-- **API (entegrasyon):** `SmileMedical.API.Tests` — xUnit, WebApplicationFactory, in-memory DB.
+- **API (entegrasyon):** `MoneyTransferTurkey.API.Tests` — xUnit, WebApplicationFactory, in-memory DB.
   - Login (geçerli/geçersiz kimlik bilgileri), GET Theme (AllowAnonymous).
-  - Çalıştırma: `dotnet test SmileMedical.API.Tests/SmileMedical.API.Tests.csproj`
+  - Çalıştırma: `dotnet test MoneyTransferTurkey.API.Tests/MoneyTransferTurkey.API.Tests.csproj`
 - **Frontend:** Vitest (birim), Playwright (E2E). Bkz. [frontend/README.md](frontend/README.md#testler).
 
 ## Teknoloji özeti

@@ -110,7 +110,7 @@
 | Alan | Değer |
 |------|-------|
 | **Ciddiyet** | KRİTİK |
-| **Konum** | Kaynak kod (AnasıBerdus-Deniz) |
+| **Konum** | Kaynak kod (BaskentEnerji) |
 | **Etki** | Saldırgan kaynak koda ulaşırsa tüm sistemlere erişim |
 
 **İfşa olan bilgiler:**

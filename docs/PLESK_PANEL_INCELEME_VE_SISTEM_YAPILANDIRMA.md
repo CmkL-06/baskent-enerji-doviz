@@ -54,7 +54,7 @@
 ### 3.3 Dosya ve İzinler
 
 - [ ] **httpdocs:** index.html, ihtiyar\index.html, web.config mevcut mu?
-- [ ] **api.baskentenerji.com:** web.config, AnasıTAS-Deniz.API.dll (veya güncel API DLL) mevcut mu?
+- [ ] **api.baskentenerji.com:** web.config, BaskentEnerji.API.dll (veya güncel API DLL) mevcut mu?
 - [ ] **Klasör izinleri:** IIS_IUSRS ve App Pool kimliği ilgili klasörlerde okuma (ve API’de çalıştırma) yetkisi var mı?
 
 ### 3.4 Yaygın Hatalar ve Düzeltmeler
@@ -108,7 +108,7 @@ $api = "C:\Inetpub\vhosts\baskentenerji.com\api.baskentenerji.com"
 Test-Path "$httpdocs\index.html"           # True
 Test-Path "$httpdocs\ihtiyar\index.html"   # True
 Test-Path "$api\web.config"                 # True
-Test-Path "$api\AnasıTAS-Deniz.API.dll"    # True (veya güncel DLL adı)
+Test-Path "$api\BaskentEnerji.API.dll"    # True (veya güncel DLL adı)
 ```
 
 ---

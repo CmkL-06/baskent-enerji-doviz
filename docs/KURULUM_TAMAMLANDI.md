@@ -31,7 +31,7 @@
 ## Günlük Kullanım
 
 1. **Kod değişikliği → GitHub:**  
-   `C:\Users\Administrator\AnasıBerdus-Deniz` → `git add -A` → `git commit -m "..."` → `git push origin main`
+   `C:\Users\Administrator\Desktop\BASKENT_PROJE` → `git add -A` → `git commit -m "..."` → `git push origin main`
 
 2. **Canlıya alma:**  
    `C:\Users\Administrator\Desktop\BASKENT_PROJE\deploy-api-to-canli.ps1`  

@@ -81,11 +81,11 @@ Bu listedeki kayıtlar, yerel makinede Başkent Enerji döviz sistemiyle doğrud
 
 ---
 
-## 5. publish_api_baskent (Yayınlanmış API / AnasıTAS_Deniz)
+## 5. publish_api_baskent (Yayınlanmış API / BaskentEnerji)
 
 **Klasör:** `C:\Users\Administrator\publish_api_baskent\`
 
-Bu klasör, **AnasıTAS_Deniz.API** projesinin publish çıktısı gibi görünüyor; Başkent Enerji ile ilgili yapılandırma içeriyor.
+Bu klasör, **BaskentEnerji.API** projesinin publish çıktısı gibi görünüyor; Başkent Enerji ile ilgili yapılandırma içeriyor.
 
 ### 5.1 appsettings.json (Başkent ile ilgili alanlar)
 
@@ -102,7 +102,7 @@ Bu klasör, **AnasıTAS_Deniz.API** projesinin publish çıktısı gibi görün�
 
 ### 5.2 Klasör yapısı (özet)
 
-- `AnasıTAS_Deniz.API.exe` / `.dll` – Ana uygulama
+- `BaskentEnerji.API.exe` / `.dll` – Ana uygulama
 - `appsettings.json` – Yukarıdaki ayarlar
 - `web.config` – IIS/hosting
 - `wwwroot\wwwroot\uploads\` – Yüklenen dosyalar (ör. PNG’ler)
@@ -117,10 +117,10 @@ Bu klasör, **AnasıTAS_Deniz.API** projesinin publish çıktısı gibi görün�
 
 Bu workspace’te **Exchange Office / döviz** ile ilgili kod bu çözümde de geçiyor; doğrudan “baskentenerji” metni sınırlı. İlgili dosyalar (referans amaçlı):
 
-- `AnasıTAS_Deniz.API\Controllers\ExchangeOffice\ExchangeController.cs`
-- `AnasıTAS_Deniz.Business\Services\ExchangeOffice\` (ör. DovizComProvider.cs)
-- `AnasıTAS_Deniz.API\appsettings.json`, `Program.cs`
-- `AnasıTAS_Deniz.Business\Services\Email\EmailSender.cs`, `Coin\CoinPriceService.cs`
+- `BaskentEnerji.API\Controllers\ExchangeOffice\ExchangeController.cs`
+- `BaskentEnerji.Business\Services\ExchangeOffice\` (ör. DovizComProvider.cs)
+- `BaskentEnerji.API\appsettings.json`, `Program.cs`
+- `BaskentEnerji.Business\Services\Email\EmailSender.cs`, `Coin\CoinPriceService.cs`
 
 *(Bu proje, publish_api_baskent’in kaynak projesi olabilir; Başkent Enerji domain’i appsettings’te baskentenerji.com / JWT issuer olarak kullanılıyor.)*
 

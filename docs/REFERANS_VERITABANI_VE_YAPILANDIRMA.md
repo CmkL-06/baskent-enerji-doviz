@@ -11,13 +11,13 @@
 |-----|----------------|
 | Veritabanı adı | **mtt-moneyexchangeturkey** |
 | SQL Login | mtturkey_exchange |
-| Şifre (SQL) | *cc_pPMmHu79ka7q |
+| Şifre (SQL) | **ENV/Secret Manager üzerinden yönetilir (repo'da tutulmaz)** |
 | Instance | localhost\SQLEXPRESS |
 | Şema | mtturkey_exchange |
 
 **Tek geçerli veri kaynağı:** Aşağıdaki §1–2 ve canlı `api.baskentenerji.com\appsettings.json`. Başka dosyalarda farklı DB adı veya `Database=mtturkey_exchange` görürseniz hatalıdır; **Initial Catalog=mtt-moneyexchangeturkey** ile güncelleyin.
 
-**Güncellenen hatalı kaynak:** `Yedekler\eskiveri\api-publish\appsettings.json` — Database=mtturkey_exchange kaldırıldı, Initial Catalog=mtt-moneyexchangeturkey yapıldı.
+**Not:** Eski arşiv kaynaklarında farklı DB adı geçebilir; aktif çalışma için bu belgedeki değerler esas alınır.
 
 ---
 
@@ -37,10 +37,10 @@
 ## 2. Connection string (standart)
 
 ```
-Server=localhost\SQLEXPRESS;Initial Catalog=mtt-moneyexchangeturkey;TrustServerCertificate=True;User Id=mtturkey_exchange;Password=*cc_pPMmHu79ka7q;Connection Timeout=60;Max Pool Size=200;Min Pool Size=10;Connection Lifetime=300;MultipleActiveResultSets=true
+Server=localhost\SQLEXPRESS;Initial Catalog=mtt-moneyexchangeturkey;TrustServerCertificate=True;User Id=mtturkey_exchange;Password=<ENV_SQL_PASSWORD>;Connection Timeout=60;Max Pool Size=200;Min Pool Size=10;Connection Lifetime=300;MultipleActiveResultSets=true
 ```
 
-**Kullanıldığı yerler:** Canlı API (Inetpub), kaynak-kod (AnasıTAS_Deniz.API, AnasıTAS_Deniz.Data), Seed betikleri, publish-api.
+**Kullanıldığı yerler:** Canlı API (Inetpub), kaynak-kod (`BaskentEnerji.API`, `BaskentEnerji.Data`), Seed betikleri, publish-api.
 
 ---
 
@@ -67,8 +67,8 @@ Server=localhost\SQLEXPRESS;Initial Catalog=mtt-moneyexchangeturkey;TrustServerC
 |---------|-----------|
 | **Canlı API appsettings** | C:\Inetpub\vhosts\baskentenerji.com\api.baskentenerji.com\appsettings.json |
 | **API login** | POST https://api.baskentenerji.com/api/v1/User/login |
-| **Kaynak (API)** | BASKENT_PROJE\kaynak-kod\AnasıTAS_Deniz.API\appsettings.json |
-| **Kaynak (Data)** | BASKENT_PROJE\kaynak-kod\AnasıTAS_Deniz.Data\appsettings.json |
+| **Kaynak (API)** | BASKENT_PROJE\kaynak-kod\BaskentEnerji.API\appsettings.json |
+| **Kaynak (Data)** | BASKENT_PROJE\kaynak-kod\BaskentEnerji.Data\appsettings.json |
 | **Seed SQL** | BASKENT_PROJE\scripts\SeedUsers_SHA256_Update.sql |
 | **Seed PowerShell** | BASKENT_PROJE\scripts\Calistir-SeedUsers_SHA256.ps1 |
 

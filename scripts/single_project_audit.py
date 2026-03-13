@@ -25,6 +25,24 @@ FORBIDDEN_EXTERNAL_FILES = {
     "local_import",
 }
 
+ACTIVE_REFERENCE_FILES = [
+    ROOT / "README.md",
+    ROOT / "docs" / "TEK_PROJE_STRATEJISI.md",
+    ROOT / "docs" / "CALISMA_PLANI_GUVENLIK_VE_DOVIZ_SURUM.md",
+    ROOT / "docs" / "DURUM_ANALIZI_20260307.md",
+    ROOT / "docs" / "REFERANS_VERITABANI_VE_YAPILANDIRMA.md",
+    ROOT / "docs" / "LOCALHOST.md",
+    ROOT / "scripts" / "README.md",
+]
+
+FORBIDDEN_LEGACY_TERMS = [
+    "AnasıBerdus",
+    "AnasiBerdus",
+    "AnasıTAS_Deniz",
+    "AnasiTAS_Deniz",
+    "SmileMedical",
+]
+
 MUTATING_HTTP_ATTR_RE = re.compile(r"\[Http(Post|Put|Delete|Patch)\b", re.IGNORECASE)
 CLASS_AUTHORIZE_RE = re.compile(
     r"\[Authorize(?:\([^\)]*\))?\]\s*(?:\r?\n\s*)*(?:public\s+)?class\s+\w+",
@@ -90,6 +108,18 @@ def scan() -> tuple[list[str], list[str]]:
     if not strategy_doc.exists():
         errors.append("docs/TEK_PROJE_STRATEJISI.md missing")
 
+    for reference_file in ACTIVE_REFERENCE_FILES:
+        if not reference_file.exists():
+            warnings.append(f"{reference_file.relative_to(ROOT)} missing in active reference set")
+            continue
+
+        text = reference_file.read_text(encoding="utf-8", errors="ignore")
+        for term in FORBIDDEN_LEGACY_TERMS:
+            if term in text:
+                errors.append(
+                    f"{reference_file.relative_to(ROOT)}: forbidden legacy term found -> '{term}'"
+                )
+
     external_dir = ROOT / "external"
     if external_dir.exists():
         children = {p.name for p in external_dir.iterdir()}
@@ -98,6 +128,16 @@ def scan() -> tuple[list[str], list[str]]:
             errors.append(
                 "external/: forbidden project-external content still present: "
                 + ", ".join(sorted(forbidden_hits))
+            )
+
+    legacy_named_files = [
+        ROOT / "BaskentEnerji.Data" / "Contexts" / "AnasıTAS-DenizDbContext.cs",
+        ROOT / "BaskentEnerji.Data" / "Migrations" / "AnasıTAS-DenizDbContextModelSnapshot.cs",
+    ]
+    for legacy_file in legacy_named_files:
+        if legacy_file.exists():
+            warnings.append(
+                f"{legacy_file.relative_to(ROOT)}: legacy filename remains (class is canonical, rename recommended)"
             )
 
     return errors, warnings

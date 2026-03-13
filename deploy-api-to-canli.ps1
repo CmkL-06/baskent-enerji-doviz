@@ -1,4 +1,4 @@
-# api.baskentenerji.com - AnasiTAS-Deniz API deploy
+# api.baskentenerji.com - BaskentEnerji API deploy
 # Kullanim: .\deploy-api-to-canli.ps1
 # Oncesinde: dotnet publish ... -o publish-api (zaten yapildi)
 
@@ -41,15 +41,17 @@ if (Test-Path $webConfigBackup) {
     Copy-Item $webConfigBackup (Join-Path $target "web.config") -Force
 }
 
-# 4) Sadece eski SmileMedical artiklarini sil (mevcut API'nin deps/runtimeconfig silinmez)
-@(
-    "SmileMedical.API.deps.json",
-    "SmileMedical.API.runtimeconfig.json"
-) | ForEach-Object {
-    $f = Join-Path $target $_
-    if (Test-Path $f) {
-        Remove-Item $f -Force
-        Write-Host "Silindi: $_"
+# 4) Eski API adlarından kalan deps/runtimeconfig artiklarini sil
+Get-ChildItem -LiteralPath $target -File -Filter "*.API.*config*.json" -ErrorAction SilentlyContinue | ForEach-Object {
+    if ($_.Name -notmatch "^BaskentEnerji\.API\.(deps|runtimeconfig)\.json$") {
+        Remove-Item $_.FullName -Force
+        Write-Host "Silindi: $($_.Name)"
+    }
+}
+Get-ChildItem -LiteralPath $target -File -Filter "*.API.deps.json" -ErrorAction SilentlyContinue | ForEach-Object {
+    if ($_.Name -ne "BaskentEnerji.API.deps.json") {
+        Remove-Item $_.FullName -Force
+        Write-Host "Silindi: $($_.Name)"
     }
 }
 

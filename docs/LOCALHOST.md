@@ -7,7 +7,7 @@
 ## 1. API’yi localhost’ta çalıştırma
 
 ```powershell
-cd C:\Users\Administrator\Desktop\BASKENT_PROJE\kaynak-kod\AnasıTAS_Deniz.API
+cd C:\Users\Administrator\Desktop\BASKENT_PROJE\kaynak-kod\BaskentEnerji.API
 dotnet run
 ```
 

@@ -1,6 +1,6 @@
-# SmileMedical — Dokümantasyon
+# MoneyTransferTurkey (Legacy) — Dokümantasyon
 
-Bu klasör proje dokümantasyonu ve görselleştirme dosyalarını içerir.
+Bu klasör legacy proje dokümantasyonu ve görselleştirme dosyalarını içerir.
 
 ## İçindekiler
 

@@ -64,7 +64,7 @@ Get-ChildItem $b -Name              # index.html, ihtiyar, web.config vb. gorunm
 
 ### 3.4 API (api.baskentenerji.com)
 
-- 404 bu sitede ise: vdir physicalPath `...\api.baskentenerji.com` olmalı; içinde `web.config` ve `AnasıTAS-Deniz.API.dll` olmalı.
+- 404 bu sitede ise: vdir physicalPath `...\api.baskentenerji.com` olmalı; içinde `web.config` ve `BaskentEnerji.API.dll` olmalı.
 - **Swagger:** `https://api.baskentenerji.com/swagger` → 404 ise Swagger devre dışı veya yol farklı olabilir (yan etki).
 
 ### 3.5 tg.moneytransferturkey.com
@@ -81,7 +81,7 @@ Get-ChildItem $b -Name              # index.html, ihtiyar, web.config vb. gorunm
 | **IIS – api.baskentenerji.com** | Site Started, vdir = api.baskentenerji.com, App Pool “Yönetilen Kod Yok” | Evet |
 | **IIS – tg** | Site Started, vdir = tg...\public veya tg..., web.config rewrite var | Evet |
 | **Dosya – httpdocs** | index.html, ihtiyar\index.html, ihtiyar\assets\*, web.config | Hepsi mevcut |
-| **Dosya – API** | AnasıTAS-Deniz.API.dll, appsettings.json, web.config | Mevcut |
+| **Dosya – API** | BaskentEnerji.API.dll, appsettings.json, web.config | Mevcut |
 | **URL Rewrite** | Modül yüklü (IIS’te “URL Rewrite” ikonu) | Yüklü |
 | **ARR (tg için)** | Application Request Routing → Proxy enabled | Etkin |
 | **Varsayılan belge** | httpdocs için index.html | Tanımlı (web.config’te) |

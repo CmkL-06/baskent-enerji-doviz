@@ -9,7 +9,7 @@
 
 | Eski / diğer ad | Konum (birleştirme öncesi) | Durum |
 |-----------------|----------------------------|--------|
-| **AnasıBerdus-Deniz** (baskentenerji / Deniz projesi) | `C:\Users\Administrator\AnasıBerdus-Deniz` | Kaynak kod **BASKENT_PROJE\kaynak-kod** ile aynı proje (isim: AnasıTAS_Deniz). Eski klasör yedeklendi; tek kaynak bu repo. |
+| **Eski proje klasörü** | `C:\Users\Administrator\...` | Kaynak kod tek standarda çekildi: `BaskentEnerji.*`. Eski klasör yalnızca tarihsel referanstır. |
 | **Baskent Enerji / BASKENT_PROJE** | `C:\Users\Administrator\Desktop\BASKENT_PROJE` | **Tek proje klasörü.** Tüm belgeler, API, bot, script’ler burada. |
 
 ---
@@ -21,18 +21,18 @@ BASKENT_PROJE/
 ├── README.md
 ├── deploy-api-to-canli.ps1
 ├── docs/              # Tüm belgeler (bu dosya dahil)
-├── kaynak-kod/        # .NET API (AnasıTAS_Deniz.*) – tek kaynak
+├── kaynak-kod/        # .NET API (`BaskentEnerji.*`) – tek kaynak
 ├── scripts/
 ├── telegram-bot/
 └── publish-api/       # Build çıktısı (git’e eklenmez)
 ```
 
-**Eski AnasıBerdus-Deniz klasörü** (`C:\Users\Administrator\AnasıBerdus-Deniz`) 2026-02-26’da yedekle hash %100 doğrulanıp silindi. Yedek: `Desktop\Yedekler\AnasiBerdus-Deniz_birlesik_20260226` (1079 dosya, SHA256 uyumlu).
+**Eski proje klasörü** 2026-02-26’da yedekle hash %100 doğrulanıp silindi. Yedek klasör adı tarihsel kayıtlarda tutulur.
 
 ---
 
 ## Özet
 
 - **Baskentenerji** ve **Baskent Enerji** ile ilgili tek proje klasörü: **BASKENT_PROJE**.
-- Kaynak kod: **kaynak-kod/** (AnasıTAS_Deniz.API, .Business, .Data, .Entity).
+- Kaynak kod: **kaynak-kod/** (`BaskentEnerji.API`, `.Business`, `.Data`, `.Entity`).
 - Deploy ve belgeler: bu klasör üzerinden yürütülür.

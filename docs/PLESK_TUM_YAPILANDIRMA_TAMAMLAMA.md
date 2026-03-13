@@ -60,7 +60,7 @@
 - **Uygulama Havuzu** veya **IIS Ayarları** (Plesk’te “IIS” / “Application Pool” varsa):
   - **.NET CLR sürümü:** **Yönetilen Kod Yok** (ASP.NET Core için).
   - Uygulama havuzu adı: örn. `api.baskentenerji.com(domain)(pool)`.
-- API klasöründe `web.config` ve `AnasıTAS-Deniz.API.dll` (veya güncel API DLL’i) mevcut olmalı.
+- API klasöründe `web.config` ve `BaskentEnerji.API.dll` (veya güncel API DLL’i) mevcut olmalı.
 
 ### 2.4 SSL/TLS
 

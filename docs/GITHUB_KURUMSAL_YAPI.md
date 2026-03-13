@@ -24,7 +24,7 @@ baskent-proje/          # veya baskentenerji-doviz-api
 ├── .gitignore          # appsettings*, publish-api/, secrets, build çıktıları
 ├── deploy-api-to-canli.ps1
 ├── docs/               # Tüm belgeler (Plesk, IIS, güvenlik, referans)
-├── kaynak-kod/         # .NET çözümü (AnasıTAS_Deniz.*)
+├── kaynak-kod/         # .NET çözümü (BaskentEnerji.*)
 ├── scripts/            # Seed, test, IIS, örnek config
 └── telegram-bot/       # Bot kodları
 ```

@@ -7,6 +7,7 @@ Bu klasör proje dokümanlarını içerir.
 | Dosya | Amaç |
 |-------|------|
 | `TEK_PROJE_STRATEJISI.md` | Kanonik proje sınırı ve release kapsamı |
+| `FINAL_KANONIK_YAPI.md` | Final güçlü yapı ve bileşen entegrasyon standardı |
 | `CALISMA_PLANI_GUVENLIK_VE_DOVIZ_SURUM.md` | Güvenlik ve operasyon yol haritası |
 | `DURUM_ANALIZI_20260307.md` | En güncel durum özeti |
 | `REFERANS_VERITABANI_VE_YAPILANDIRMA.md` | Veritabanı ve yapılandırma referansı |
