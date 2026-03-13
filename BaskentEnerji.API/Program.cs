@@ -364,7 +364,50 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 // Sağlık kontrolü (canlı/deploy sonrası izleme; kimlik doğrulama gerekmez)
-app.MapGet("/health", () => Results.Ok(new { status = "ok", timestamp = DateTime.UtcNow })).AllowAnonymous();
+app.MapGet("/health/live", () => Results.Ok(new
+{
+    status = "alive",
+    timestamp = DateTime.UtcNow
+})).AllowAnonymous();
+
+app.MapGet("/health/ready", async (IServiceProvider serviceProvider) =>
+{
+    try
+    {
+        using var scope = serviceProvider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<BaskentEnerjiDbContext>();
+        var canConnect = await db.Database.CanConnectAsync();
+
+        if (!canConnect)
+        {
+            return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+        }
+
+        return Results.Ok(new
+        {
+            status = "ready",
+            db = "ok",
+            timestamp = DateTime.UtcNow
+        });
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new
+        {
+            status = "not-ready",
+            db = "error",
+            error = ex.Message,
+            timestamp = DateTime.UtcNow
+        }, statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+}).AllowAnonymous();
+
+app.MapGet("/health", () => Results.Ok(new
+{
+    status = "ok",
+    endpoints = new[] { "/health/live", "/health/ready", "/api/v1/Diagnostics/ping" },
+    timestamp = DateTime.UtcNow
+})).AllowAnonymous();
 
 app.MapControllers();
 app.MapHub<CoinPriceHub>("/coinPriceHub");

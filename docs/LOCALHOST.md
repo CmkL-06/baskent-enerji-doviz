@@ -86,3 +86,23 @@ Sonra: `python baskent_test.py`
 2. `dotnet run` ile API http://localhost:5093’te açılıyor mu?  
 3. Giriş: `POST http://localhost:5093/api/v1/User/login` → Body: `{"Mail":"ihtiyar","Password":"owner1"}` → 200 + token.  
 4. Panel localhost’ta ise tarayıcıda sayfa adresi localhost/127.0.0.1 olmalı ki dealer-panel local API’yi kullansın.
+
+---
+
+## 7. Gelişmiş araç desteği (tooling)
+
+API üzerinde operasyonel izleme için aşağıdaki endpoint’ler kullanılabilir:
+
+- `GET /health`
+- `GET /health/live`
+- `GET /health/ready`
+- `GET /api/v1/Diagnostics/ping`
+- `GET /api/v1/Diagnostics/version`
+- `GET /api/v1/Diagnostics/system`
+- `GET /api/v1/Diagnostics/db`
+
+Tek komut smoke testi:
+
+```bash
+bash scripts/api_tooling_smoke.sh
+```

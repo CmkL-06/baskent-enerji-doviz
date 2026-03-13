@@ -15,6 +15,7 @@ Bu klasör, projeye ait otomasyon ve test scriptlerini içerir.
 | Test-API-AfterDeploy.ps1 | Deploy sonrası API test |
 | baskent_test.py | Python test scripti |
 | login-body.example.json | Login body örnek JSON |
+| api_tooling_smoke.sh | Health/diagnostics ve kritik route smoke testi |
 | package_single_project.sh | Kanonik proje paketleme scripti |
 | single_project_audit.py | Yapısal/güvenlik drift kontrol scripti |
 
@@ -22,5 +23,7 @@ Bu klasör, projeye ait otomasyon ve test scriptlerini içerir.
 
 - Repo sağlık kontrolü:
   - `python3 scripts/single_project_audit.py`
+- API araç desteği smoke testi:
+  - `bash scripts/api_tooling_smoke.sh`
 - Kanonik release paketi:
   - `bash scripts/package_single_project.sh`
