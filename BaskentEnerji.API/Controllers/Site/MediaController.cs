@@ -315,7 +315,7 @@ namespace BaskentEnerji.API.Controllers.Site
 
             try
             {
-                using var stream = File.OpenRead(filePath);
+                using var stream = System.IO.File.OpenRead(filePath);
                 return extension.ToLowerInvariant() switch
                 {
                     ".png" => TryReadPngDimensions(stream, out width, out height),

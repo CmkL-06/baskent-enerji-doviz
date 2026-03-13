@@ -1,9 +1,8 @@
-using MailKit.Net.Smtp;
-using MailKit.Security;
 using Microsoft.Extensions.Configuration;
-using MimeKit;
 using BaskentEnerji.Business.Exceptions;
 using BaskentEnerji.Business.Infrastructure.Email;
+using System.Net;
+using System.Net.Mail;
 using System.Threading.Tasks;
 
 namespace BaskentEnerji.Business.Services.Email
@@ -23,36 +22,41 @@ namespace BaskentEnerji.Business.Services.Email
             if (string.IsNullOrEmpty(enableMail) || !bool.TryParse(enableMail, out var enabled) || !enabled)
                 return;
 
-            var emailMessage = new MimeMessage();
-            emailMessage.From.Add(new MailboxAddress("Baskentenerji", _configuration["EmailSettings:From"]));
-            emailMessage.To.Add(new MailboxAddress("Activation", email));
-            emailMessage.Subject = subject;
-            string test = _configuration["EmailSettings:SmtpServer"];
-            string test2 = _configuration["EmailSettings:Port"];
-
-            var bodyBuilder = new BodyBuilder
+            try
             {
-                HtmlBody = htmlMessage
-            };
-            emailMessage.Body = bodyBuilder.ToMessageBody();
+                var smtpServer = _configuration["EmailSettings:SmtpServer"];
+                var fromAddress = _configuration["EmailSettings:From"];
+                var username = _configuration["EmailSettings:Username"];
+                var password = _configuration["EmailSettings:Password"];
 
-            using (var client = new SmtpClient())
+                if (string.IsNullOrWhiteSpace(smtpServer) || string.IsNullOrWhiteSpace(fromAddress))
+                {
+                    throw new ApiException(System.Net.HttpStatusCode.InternalServerError, "Email settings are incomplete");
+                }
+
+                var portRaw = _configuration["EmailSettings:Port"];
+                var port = int.TryParse(portRaw, out var parsedPort) ? parsedPort : 587;
+
+                using var message = new MailMessage(fromAddress, email)
+                {
+                    Subject = subject,
+                    Body = htmlMessage,
+                    IsBodyHtml = true
+                };
+
+                using var client = new SmtpClient(smtpServer, port)
+                {
+                    EnableSsl = true,
+                    Credentials = string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password)
+                        ? CredentialCache.DefaultNetworkCredentials
+                        : new NetworkCredential(username, password)
+                };
+
+                await client.SendMailAsync(message);
+            }
+            catch (Exception ex)
             {
-                try
-                {
-                    await client.ConnectAsync(_configuration["EmailSettings:SmtpServer"], int.Parse(_configuration["EmailSettings:Port"]), SecureSocketOptions.StartTls);
-                    await client.AuthenticateAsync(_configuration["EmailSettings:Username"], _configuration["EmailSettings:Password"]);
-                    await client.SendAsync(emailMessage);
-                }
-                catch (Exception ex)
-                {
-                    // Log the exception or handle it as needed
-                    throw new ApiException(System.Net.HttpStatusCode.InternalServerError, "Email sending failed" +  ex);
-                }
-                finally
-                {
-                    await client.DisconnectAsync(true);
-                }
+                throw new ApiException(System.Net.HttpStatusCode.InternalServerError, "Email sending failed: " + ex.Message);
             }
         }
     }

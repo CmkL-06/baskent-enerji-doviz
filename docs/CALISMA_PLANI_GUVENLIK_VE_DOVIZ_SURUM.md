@@ -84,7 +84,7 @@ Hedef: API, panel ve tg/botların son sürüm döviz modeli (Exchange, Vault, De
 
 | # | Görev | Durum | Not |
 |---|--------|--------|-----|
-| 2.1.1 | Exchange endpoint’lerinin route ve response modelleri dokümante edilsin; Swagger açıklamaları güncellensin | ☐ | /api/v1/ExchangeOffice/Exchange, Vaults, Offices, Dealers vb. |
+| 2.1.1 | Exchange endpoint’lerinin route ve response modelleri dokümante edilsin; Swagger açıklamaları güncellensin | ☐ | /api/v1/Exchange/exchange, Vaults, Offices, Dealers vb. |
 | 2.1.2 | Bot/Flask’ın kullandığı exchange gönderim endpoint’i (POST exchange) ile API controller path’i birebir eşleşsin | ☑ | /User/login büyük U ile düzeltildi; exchange path kontrolü |
 | 2.1.3 | CORS: Sadece gerekli origin’ler (baskentenerji.com, tg.moneytransferturkey.com, moneytransferturkey.com, localhost dev) listelensin | ☑ | Program.cs güncel |
 | 2.1.4 | API sürümleme: /api/v1 sabit; ileride v2 gerekirse route prefix ile ayrılsın | ☐ | Dokümantasyon |

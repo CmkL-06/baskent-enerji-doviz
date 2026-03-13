@@ -110,7 +110,7 @@ Hedef klasör: `C:\Inetpub\vhosts\moneytransferturkey.com\tg.moneytransferturkey
 | Amaç | URL | Yöntem |
 |------|-----|--------|
 | Login | `https://api.baskentenerji.com/api/v1/User/login` | POST (Mail, Password) |
-| Exchange gönderme | `https://api.baskentenerji.com/api/v1/ExchangeOffice/Exchange/...` | POST (Bearer token) |
+| Exchange gönderme | `https://api.baskentenerji.com/api/v1/Exchange/exchange` | POST (Bearer token) |
 
 ### 4.2 Ortam değişkenleri (.env – bot / Flask paneli)
 
