@@ -13,7 +13,8 @@ const routes = [
     component: () => import('../layouts/AppLayout.vue'),
     meta: { requiresAuth: true },
     children: [
-      { path: '', name: 'Dashboard', component: () => import('../views/DashboardView.vue') },
+      { path: '', redirect: { name: 'Dashboard' } },
+      { path: 'dashboard', name: 'Dashboard', component: () => import('../views/DashboardView.vue') },
       { path: 'user', name: 'User', component: () => import('../views/UserView.vue') },
       { path: 'exchange', name: 'Exchange', component: () => import('../views/ExchangeView.vue') },
       { path: 'vault', name: 'Vault', component: () => import('../views/VaultView.vue') },
@@ -27,7 +28,7 @@ const routes = [
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes,
 })
 

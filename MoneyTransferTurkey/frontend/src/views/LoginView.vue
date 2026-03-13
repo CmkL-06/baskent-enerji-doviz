@@ -53,12 +53,13 @@ async function submit() {
     if (token) {
       setAuth(token, user)
       success.value = true
-      const redirect = route.query.redirect || '/'
+      const redirect = route.query.redirect || { name: 'Dashboard' }
       setTimeout(() => router.push(redirect), 500)
     } else {
       setAuth(JSON.stringify(data), user)
       success.value = true
-      setTimeout(() => router.push('/'), 500)
+      const redirect = route.query.redirect || { name: 'Dashboard' }
+      setTimeout(() => router.push(redirect), 500)
     }
   } catch (e) {
     error.value = e.response?.data?.message || e.message || 'Giriş başarısız. API çalışıyor mu?'
@@ -69,7 +70,7 @@ async function submit() {
 
 function demoLogin() {
   setAuth('demo-token', { email: email.value || 'demo@test.com', userName: 'Demo' })
-  router.push(route.query.redirect || '/')
+  router.push(route.query.redirect || { name: 'Dashboard' })
 }
 </script>
 
