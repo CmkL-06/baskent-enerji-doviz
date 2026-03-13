@@ -1,12 +1,12 @@
 <template>
   <div class="app-layout">
     <aside class="sidebar">
-      <div class="sidebar-logo">SmileMedical</div>
+      <div class="sidebar-logo">Başkent Enerji Döviz</div>
       <nav class="sidebar-nav">
         <div class="nav-section">
           <div class="nav-section-title">Genel</div>
           <router-link to="/" class="nav-item" active-class="active">
-            <span class="nav-icon">▣</span> Dashboard
+            <span class="nav-icon">▣</span> Gösterge Paneli
           </router-link>
           <router-link to="/user" class="nav-item" active-class="active">
             <span class="nav-icon">👤</span> Kullanıcı
@@ -63,7 +63,7 @@ const titles = {
   Coin: 'Coin',
 }
 
-const pageTitle = computed(() => titles[route.name] || 'SmileMedical')
+const pageTitle = computed(() => titles[route.name] || 'Başkent Enerji Döviz')
 
 function logout() {
   doLogout()

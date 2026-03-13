@@ -1,11 +1,11 @@
-# SmileMedical Frontend
+# Başkent Enerji Döviz Frontend
 
-Vue 3 + Vite ile SmileMedical API için admin arayüzü.
+Vue 3 + Vite ile Başkent Enerji Döviz API için admin arayüzü.
 
 ## Gereksinimler
 
 - Node.js 18+
-- SmileMedical.API çalışır durumda (opsiyonel; API yoksa "Demo giriş" ile layout görüntülenir)
+- BaskentEnerji.API çalışır durumda (opsiyonel; API yoksa "Demo giriş" ile layout görüntülenir)
 
 ## Kurulum
 

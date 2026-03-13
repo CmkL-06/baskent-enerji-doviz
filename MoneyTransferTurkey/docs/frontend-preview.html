@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SmileMedical — Frontend Önizleme</title>
+  <title>Başkent Enerji Döviz — Frontend Önizleme</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -113,13 +113,13 @@
 </head>
 <body>
   <aside class="sidebar">
-    <div class="sidebar-logo">SmileMedical</div>
+    <div class="sidebar-logo">Başkent Enerji Döviz</div>
     <nav class="sidebar-nav">
       <div class="nav-section">
         <div class="nav-section-title">Genel</div>
         <div class="nav-item" data-page="dashboard">
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2z"/></svg>
-          Dashboard
+          Gösterge Paneli
         </div>
         <div class="nav-item" data-page="user">
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
@@ -165,7 +165,7 @@
 
   <main class="main">
     <header class="header">
-      <h1 id="page-title">Dashboard</h1>
+      <h1 id="page-title">Gösterge Paneli</h1>
       <div class="header-user">
         <span>Admin Kullanıcı</span>
         <small>API: api/v1/User</small>
@@ -331,15 +331,15 @@
 
     <div class="content" style="padding-top: 0;">
       <div class="api-note">
-        <strong>Frontend bu repoda yok</strong>
-        API, CORS ile <strong>Vue uygulaması</strong> bekliyor (localhost:5173, 5174, 5175 — Vite). Gerçek arayüzü görmek için Vue/React projesini aynı makinede çalıştırıp API base URL’ini bu backend’e yönlendirmeniz gerekir. Bu sayfa yalnızca <strong>ekranların ve API eşlemesinin önizlemesidir</strong>.
+        <strong>Önizleme modu</strong>
+        Bu sayfa, Başkent Enerji Döviz panelinin statik bir gösterimidir. Dinamik veriler için `MoneyTransferTurkey/frontend` içindeki Vue uygulamasını çalıştırıp API base URL’ini bu backend’e yönlendirmeniz gerekir.
       </div>
     </div>
   </main>
 
   <script>
     var titles = {
-      dashboard: 'Dashboard',
+      dashboard: 'Gösterge Paneli',
       user: 'Kullanıcı (api/v1/User)',
       exchange: 'Döviz / Ofis (api/v1/Exchange)',
       vault: 'Kasa / Vault',

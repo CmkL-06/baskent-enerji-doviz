@@ -1,7 +1,7 @@
 <template>
   <div class="login-page">
     <div class="login-card">
-      <h1>SmileMedical</h1>
+      <h1>Başkent Enerji Döviz</h1>
       <p class="subtitle">API: api/v1/User/login</p>
       <form @submit.prevent="submit" class="form">
         <div class="field">

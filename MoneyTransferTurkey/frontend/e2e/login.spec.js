@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test'
 test.describe('Login ve token akışı', () => {
   test('login sayfası açılır ve başlık görünür', async ({ page }) => {
     await page.goto('/login')
-    await expect(page.getByRole('heading', { name: /SmileMedical/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /Başkent Enerji Döviz/i })).toBeVisible()
     await expect(page.getByPlaceholder(/e-posta|email|ornek/i)).toBeVisible()
     await expect(page.getByPlaceholder(/şifre|password/i)).toBeVisible()
   })
