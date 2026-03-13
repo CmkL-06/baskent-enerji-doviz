@@ -51,7 +51,7 @@ npm run preview   # build çıktısını önizleme
 | Yol      | Açıklama        | API (özet)           |
 |----------|------------------|----------------------|
 | /login   | Giriş            | POST User/login      |
-| /        | Dashboard        | Exchange/offices vb. |
+| /dashboard | Dashboard      | Exchange/offices vb. |
 | /user    | Kullanıcı        | User/*               |
 | /exchange| Döviz / Ofis     | Exchange             |
 | /vault   | Kasa             | VaultSnapshot        |
