@@ -1,9 +1,8 @@
 # ============================================
-# AI / Cursor araçları - ASLA commit etme
+# Yerel yardımcı araç artıkları
 # ============================================
 .cursor/
 .cursorrules
-cursor-agent/
 .memory/
 BELLEK/
 AGENTS.md
@@ -12,7 +11,6 @@ WORKFLOW.md
 TODO.md
 Antigravity_ile_Ac.bat
 Antigravity_ile_Ac.ps1
-Cursor_ile_Ac.ps1
 Build_Output/
 _hash_index.txt
 _move_errors.txt
@@ -27,9 +25,6 @@ MUHASEBE_PRO_OTURUM.md
 appsettings*.json
 firebaseConfig*.json
 ExchangeOffice_API_Documentation_Updated.md
-.claude
-claude*
-CLAUDE.md
 output/
 external/desktop_import/
 external/local_import/
