@@ -22,6 +22,9 @@ _PROJE_ADAYLARI_OZET.txt
 TESPIT_RAPORU.txt
 MUHASEBE_PRO_OTURUM.md
 
+.env
+.env.*
+!.env.example
 appsettings*.json
 firebaseConfig*.json
 ExchangeOffice_API_Documentation_Updated.md
