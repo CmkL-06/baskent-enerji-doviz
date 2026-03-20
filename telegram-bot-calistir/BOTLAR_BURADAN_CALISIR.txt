@@ -1,0 +1,25 @@
+================================================================================
+  BASKENT TELEGRAM BOTLARI - CALISTIRMA KONUMU
+================================================================================
+
+Botlarin calismasi gereken yer: BU KLASOR
+  C:\Users\CmkL-Owner\Documents\Projeler\BASKENT_TELEGRAM_BOT
+
+BASLATMAK ICIN:
+  1) START_BOTLAR.bat  (cift tikla)
+  veya
+  2) START_BOTLAR.ps1  (PowerShell'de calistir)
+  veya
+  3) Bu klasorde terminal acip:  python run_all.py
+
+GEREKSINIMLER:
+  - Python 3.x
+  - pip install -r requirements.txt  (ilk kez)
+
+SUNUCUYA TASIMAK ICIN:
+  Bu klasoru oldugu gibi sunucuya (ornegin Netcup) kopyalayin.
+  Sunucuda .env icindeki DB_SERVER zaten 159.195.55.1 - ayni agda veya
+  erisilebilir olmali. Sonra sunucuda python run_all.py veya
+  systemd/pm2 ile surekli calistirin.
+
+================================================================================
