@@ -1,57 +1,25 @@
-# Başkent Enerji - Döviz Muhasebe Sistemi
+# BASKENT Proje — Birleşik Klasör
 
-Döviz alış-satış, kasa yönetimi, cari hesap takibi ve raporlama platformu.
+Tek kaynak: Baskent Enerji / Döviz projesi, Telegram bot ve yedekler burada toplanır.
 
-## Teknoloji
+---
 
-| Katman | Teknoloji |
-|--------|-----------|
-| Backend | .NET 8, ASP.NET Core Web API, Entity Framework Core |
-| Veritabanı | SQL Server |
-| Sunucu | IIS / Plesk Panel |
-| Yardımcı Servis | Telegram bot entegrasyonu |
+## Yapı
 
-## Proje Yapısı (Kanonik)
+| Klasör | Açıklama |
+|--------|----------|
+| **ana-repo** | Ana kaynak kod (GitHub ile senkron: `origin/BASKENT-DOVIZ`) |
+| **telegram-bot-calistir** | Bot çalıştırma ortamı (.env, scriptler) |
+| **_yedekler** | Arşiv yedekleri (baskent-enerji, telegram-bot, MoneyTransferTurkey) |
+| **dokumanlar** | Ortak dokümanlar (PAT rehberi, raporlar, TARAMA listesi) |
 
-```
-BaskentEnerji.API/           → Web API katmanı (Controller, middleware, host)
-BaskentEnerji.Business/      → İş kuralları ve servisler
-BaskentEnerji.Data/          → DbContext, migration, repository erişimi
-BaskentEnerji.Entity/        → Entity, DTO, enum, request/response modelleri
-BaskentEnerji.Tests/         → Test projeleri
-BaskentEnerji.sln            → Ana çözüm dosyası
-MoneyTransferTurkey/         → Legacy referans ağacı (yeni geliştirme hedefi değil)
-docs/                        → Dokümantasyon
-scripts/                     → Operasyon, test ve paketleme scriptleri
-telegram-bot/                → Telegram entegrasyon kodları
-external/README.md           → Repo dışı veri politikası notu
-```
+---
 
-## Tek ve Güçlü Proje Kararı
+## Hızlı bağlantılar
 
-- **Kanonik backend:** `BaskentEnerji.*`
-- **Legacy backend:** `MoneyTransferTurkey/` (sadece referans)
-- **Repo politikası:** Proje dışı kişisel/harici veri Git altında tutulmaz.
+- **[ONERILER.md](ONERILER.md)** — Çalışma düzeni, GitHub, güvenlik önerileri  
+- **[RAPOR_Birlesik_GitHub_Karsilastirma.md](RAPOR_Birlesik_GitHub_Karsilastirma.md)** — Yerel ↔ GitHub karşılaştırma raporu  
 
-Detaylı strateji: `docs/TEK_PROJE_STRATEJISI.md`
+---
 
-## Güvenlik ve Yetkilendirme Prensibi
-
-- Login/register/public endpoint dışındaki API endpoint'leri `[Authorize]` ile korunur.
-- Public endpoint'ler açıkça `[AllowAnonymous]` ile işaretlenir.
-- Secret değerler (`appsettings*.json`, firebase config vb.) repoya eklenmez.
-
-## Hızlı Başlangıç
-
-```bash
-dotnet restore BaskentEnerji.sln
-dotnet build BaskentEnerji.sln -c Release
-dotnet test BaskentEnerji.sln -c Release --no-build
-```
-
-## Repo Sağlık Komutları
-
-```bash
-python3 scripts/single_project_audit.py
-bash scripts/package_single_project.sh
-```
+**Çalışma:** Tüm geliştirmeyi `ana-repo` içinde yapın; değişiklikleri `git push origin BASKENT-DOVIZ` ile GitHub’a gönderin.
