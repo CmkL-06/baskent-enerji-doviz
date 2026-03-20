@@ -16,7 +16,7 @@ def login():
     global _token
     try:
         resp = requests.post(
-            f"{Config.BASKENT_API_URL}/User/login",
+            f"{Config.BASKENT_API_URL}/user/login",
             json={
                 "mail": Config.BASKENT_USERNAME,
                 "password": Config.BASKENT_PASSWORD

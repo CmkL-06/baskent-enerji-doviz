@@ -1,25 +1,52 @@
-# BASKENT Proje — Birleşik Klasör
+# Başkent Enerji & Money Transfer Turkey - Master Project Repository
 
-Tek kaynak: Baskent Enerji / Döviz projesi, Telegram bot ve yedekler burada toplanır.
+Bu depo, Başkent Enerji ve Money Transfer Turkey projelerinin tüm kaynak kodlarını, canlı sistem yedeklerini, otomasyon araçlarını ve teknik dokümantasyonunu tek bir çatıda birleştiren ana merkezdir.
 
----
+## 🚀 Proje Genel Bakış
+Sistem, finansal veri takibi, döviz kurları yönetimi ve Telegram botları aracılığıyla operasyonel yönetim sağlayan entegre bir yapıdır.
 
-## Yapı
-
-| Klasör | Açıklama |
-|--------|----------|
-| **ana-repo** | Ana kaynak kod (GitHub ile senkron: `origin/BASKENT-DOVIZ`) |
-| **telegram-bot-calistir** | Bot çalıştırma ortamı (.env, scriptler) |
-| **_yedekler** | Arşiv yedekleri (baskent-enerji, telegram-bot, MoneyTransferTurkey) |
-| **dokumanlar** | Ortak dokümanlar (PAT rehberi, raporlar, TARAMA listesi) |
+- **Frontend:** Kurumsal Dashboard ve İşlem Panelleri.
+- **Backend:** .NET Web API tabanlı merkezi iş mantığı katmanı.
+- **Veritabanı:** MSSQL Server (Canlı ve Yedek Veriler).
+- **Botlar:** Operatör, Ruble kurları ve genel bilgilendirme için Python tabanlı Telegram botları.
 
 ---
 
-## Hızlı bağlantılar
+## 📁 Klasör Yapısı ve İçerik
 
-- **[ONERILER.md](ONERILER.md)** — Çalışma düzeni, GitHub, güvenlik önerileri  
-- **[RAPOR_Birlesik_GitHub_Karsilastirma.md](RAPOR_Birlesik_GitHub_Karsilastirma.md)** — Yerel ↔ GitHub karşılaştırma raporu  
+### 💻 Yazılım Kaynak Kodları (Core)
+*   `BaskentEnerji.API/`: Ana Web API projesi (.NET).
+*   `BaskentEnerji.Business/` & `.Data/` & `.Entity/`: Katmanlı mimari bileşenleri.
+*   `MoneyTransferTurkey/`: Para transferi platformunun kaynak kodları.
+*   `telegram-bot/`: Python tabanlı botların ana dizini ve operasyonel scriptler.
+
+### 📦 Yayın ve Dağıtım (Deploy)
+*   `deploy/`: Canlı sunucuya (Linux/Windows) gönderilmeye hazır derlenmiş (publish) paketler.
+    *   `deploy-api-to-canli.ps1`: Otomatik canlı sunucu dağıtım scripti.
+
+### 💾 Yedekler ve Veriler (Backups)
+*   `backups/`: SQL Server veritabanı yedekleri (`.bak`, `.sql`, `.dump`).
+    *   `fresh_backups_20260320.zip`: 20 Mart 2026 tarihli en güncel canlı sistem yedeği.
+    *   `mtt_user-data_...zip.part1/2`: Parçalanmış büyük boyutlu kullanıcı veri yedekleri.
+
+### 📚 Dokümantasyon
+*   `docs/reports/`: Sistem analizleri, güvenlik raporları, karşılaştırma raporları ve kurulum rehberleri.
+*   `BASKENT_PROJE.code-workspace`: VS Code için birleşik çalışma alanı (workspace) ayarları.
 
 ---
 
-**Çalışma:** Tüm geliştirmeyi `ana-repo` içinde yapın; değişiklikleri `git push origin BASKENT-DOVIZ` ile GitHub’a gönderin.
+## 🛠️ Kurulum ve Çalıştırma
+
+### **Telegram Botlarını Başlatma** (Yerel veya Sunucu)
+1. `telegram-bot/` dizinine gidin.
+2. `.env` dosyasındaki API tokenlarını kontrol edin.
+3. `START_BOTLAR.bat` (Windows) veya `python run_all.py` (Linux) komutunu çalıştırın.
+
+---
+
+## 🛡️ Güvenlik ve Gizlilik
+Bu depo hassas veriler (API keyler, DB bağlantıları) içerir. Sadece yetkili personel tarafından erişilmeli ve `.env` dosyaları gizli tutulmalıdır.
+
+---
+
+*Son Güncelleme: 20 Mart 2026*
