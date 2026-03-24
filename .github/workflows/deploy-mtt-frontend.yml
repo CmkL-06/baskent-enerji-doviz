@@ -19,8 +19,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: MoneyTransferTurkey/frontend
-        run: npm ci
-
+      run: npm install
       - name: Build
         working-directory: MoneyTransferTurkey/frontend
         env:
