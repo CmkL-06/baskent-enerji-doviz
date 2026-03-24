@@ -12,23 +12,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+
       - name: Install dependencies
         working-directory: MoneyTransferTurkey/frontend
-        run: npm install
+        run: npm ci
+
       - name: Build
         working-directory: MoneyTransferTurkey/frontend
         env:
           VITE_API_BASE_URL: https://api.baskentenerji.com
         run: npm run build
-      - name: Deploy to GoDaddy via FTP
+
+      - name: Deploy via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: MoneyTransferTurkey/frontend/dist/
-          server-dir: /public_html/moneytransferturkey.com/
-          dangerous-clean-slate: true
+          server-dir: /
+          dangerous-clean-slate: false
