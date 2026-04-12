@@ -1,0 +1,46 @@
+name: .NET Tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["BASKENT-DOVIZ", "main"]
+  pull_request:
+    branches: ["BASKENT-DOVIZ", "main"]
+  schedule:
+    - cron: '0 6 * * 1'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore BaskentEnerji.sln
+
+      - name: Build
+        run: dotnet build BaskentEnerji.sln --no-restore --configuration Release
+
+      - name: Run tests
+        run: |
+          dotnet test BaskentEnerji.Tests/BaskentEnerji.Tests.csproj \
+            --no-build \
+            --configuration Release \
+            --verbosity normal \
+            --logger "trx;LogFileName=test-results.trx" \
+            --collect:"XPlat Code Coverage"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: BaskentEnerji.Tests/TestResults/
+          retention-days: 30
