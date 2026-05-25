@@ -12,38 +12,33 @@ using System;
 namespace BaskentEnerji.Data.Contexts
 {
     public class BaskentEnerjiDbContext : DbContext
-    {
-        public BaskentEnerjiDbContext(DbContextOptions<BaskentEnerjiDbContext> options) : base(options)
         {
-        }
+                public BaskentEnerjiDbContext(DbContextOptions<BaskentEnerjiDbContext> options) : base(options)
+                        {
+                                }
 
-        protected override void OnModelCreating(ModelBuilder modelBuilder)
-        {
-            base.OnModelCreating(modelBuilder);
-            modelBuilder.HasDefaultSchema("mtturkey_exchange");
-        }
+                                        protected override void OnModelCreating(ModelBuilder modelBuilder)
+                                                {
+                                                            base.OnModelCreating(modelBuilder);
+                                                                        modelBuilder.HasDefaultSchema("mtturkey_exchange");
+                                                                                }
 
-        // User
-        public DbSet<User> Users { get; set; }
+                                                                                        // User
+                                                                                                public DbSet<User> Users { get; set; }
 
-        // Blog
-        public DbSet<Article> Articles { get; set; }
-        public DbSet<Category> Categories { get; set; }
-        public DbSet<Comment> Comments { get; set; }
-
-        // Coin
-        public DbSet<Coin> Coins { get; set; }
-
-        // ExchangeOffice
-        public DbSet<Currency> Currencies { get; set; }
-        public DbSet<ExchangeRate> ExchangeRates { get; set; }
-        public DbSet<ExchangeRateHistory> ExchangeRateHistories { get; set; }
-        public DbSet<ExchangeSettings> ExchangeSettings { get; set; }
-        public DbSet<ExternalDataSource> ExternalDataSources { get; set; }
-        public DbSet<ExternalRateCache> ExternalRateCaches { get; set; }
-        public DbSet<PendingRateApproval> PendingRateApprovals { get; set; }
-        public DbSet<Expense> Expenses { get; set; }
-        public DbSet<Office> Offices { get; set; }
-        public DbSet<Party> Parties { get; set; }
-    }
-}
+                                                                                                        // Coin
+                                                                                                                public DbSet<Coin> Coins { get; set; }
+                                                                                                                
+                                                                                                                        // ExchangeOffice
+                                                                                                                                public DbSet<Currency> Currencies { get; set; }
+                                                                                                                                        public DbSet<ExchangeRate> ExchangeRates { get; set; }
+                                                                                                                                                public DbSet<ExchangeRateHistory> ExchangeRateHistories { get; set; }
+                                                                                                                                                        public DbSet<ExchangeSettings> ExchangeSettings { get; set; }
+                                                                                                                                                                public DbSet<ExternalDataSource> ExternalDataSources { get; set; }
+                                                                                                                                                                        public DbSet<ExternalRateCache> ExternalRateCaches { get; set; }
+                                                                                                                                                                                public DbSet<PendingRateApproval> PendingRateApprovals { get; set; }
+                                                                                                                                                                                        public DbSet<Expense> Expenses { get; set; }
+                                                                                                                                                                                                public DbSet<Office> Offices { get; set; }
+                                                                                                                                                                                                        public DbSet<Party> Parties { get; set; }
+                                                                                                                                                                                                            }
+                                                                                                                                                                                                            }
