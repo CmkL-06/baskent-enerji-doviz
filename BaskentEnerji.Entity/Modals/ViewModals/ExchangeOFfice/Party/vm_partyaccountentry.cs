@@ -29,19 +29,19 @@ namespace BaskentEnerji.Entity.Modals.ViewModals.ExchangeOffice.Party
         public PaymentStatus PaymentStatus { get; set; }
         public string PaymentStatusName { get; set; }
         public DateTime? PaymentDate { get; set; }
-        public string PaymentReference { get; set; }
+        public string? PaymentReference { get; set; }
         public bool IsReconciled { get; set; }
         public DateTime? ReconciledDate { get; set; }
-        public string ReconciledByUserName { get; set; }
+        public string? ReconciledByUserName { get; set; }
         public DateTime CreatedDate { get; set; }
         //public string CreatedByUserName { get; set; }
         public bool IsReversed { get; set; }
         public Guid? ReversalEntryId { get; set; }
-        public string ReversalEntryNumber { get; set; }
+        public string? ReversalEntryNumber { get; set; }
 
         // Orijinal döviz bilgileri
         public Guid? OriginalCurrencyId { get; set; }
-        public string OriginalCurrencyCode { get; set; }
+        public string? OriginalCurrencyCode { get; set; }
         public decimal? OriginalAmount { get; set; }
         public decimal? ExchangeRate { get; set; }
         public bool IsCustomRate { get; set; }
