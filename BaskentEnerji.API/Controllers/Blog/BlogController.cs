@@ -7,7 +7,6 @@ using BaskentEnerji.Business.Services.Blog;
 using BaskentEnerji.Entity.Modals.RequestModals.Blog;
 using BaskentEnerji.Entity.Modals.RequestModals.General;
 using BaskentEnerji.Entity.Modals.ResponseModals.Blog;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace BaskentEnerji.API.Controllers.Blog
 {
@@ -20,7 +19,6 @@ namespace BaskentEnerji.API.Controllers.Blog
         private readonly IBlog_CategoryServiceQuery _blog_CategoryServiceQuery;
         private readonly IBlog_ArticleServiceCommand _blog_ArticleServiceCommand;
         private readonly IBlog_ArticleServiceQuery _blog_ArticleServiceQuery;
-        private readonly HttpContext _httpContext;
 
         public BlogController(IBlog_CategoryServiceCommand blog_CategoryServiceCommand, IBlog_CategoryServiceQuery blog_CategoryServiceQuery,
             IBlog_ArticleServiceCommand blog_ArticleServiceCommand,
@@ -34,22 +32,57 @@ namespace BaskentEnerji.API.Controllers.Blog
         }
 
         [HttpPost("admin/category")]
-        public async Task Blog_SaveCategory(rm_savecategory data)
+        public async Task<IActionResult> Blog_SaveCategory(rm_savecategory data)
         {
-            await _blog_CategoryServiceCommand.SaveCategory(data);
+            try
+            {
+                await _blog_CategoryServiceCommand.SaveCategory(data);
+                return Ok(new { success = true, message = "Kategori başarıyla kaydedildi" });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "İç sunucu hatası", error = ex.Message });
+            }
         }
 
-
         [HttpPost("admin/category/delete")]
-        public async Task Blog_DeleteCategory([FromBody] Guid Id)
+        public async Task<IActionResult> Blog_DeleteCategory([FromBody] Guid Id)
         {
-            await _blog_CategoryServiceCommand.DeleteCategory(Id);
+            try
+            {
+                await _blog_CategoryServiceCommand.DeleteCategory(Id);
+                return Ok(new { success = true, message = "Kategori başarıyla silindi" });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "İç sunucu hatası", error = ex.Message });
+            }
         }
 
         [HttpPost("admin/category/setparent")]
-        public async Task Blog_SetParentCategory(rm_sourcetarget data)
+        public async Task<IActionResult> Blog_SetParentCategory(rm_sourcetarget data)
         {
-            await _blog_CategoryServiceCommand.SetParentcategory(data);
+            try
+            {
+                await _blog_CategoryServiceCommand.SetParentcategory(data);
+                return Ok(new { success = true, message = "Üst kategori başarıyla ayarlandı" });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "İç sunucu hatası", error = ex.Message });
+            }
         }
 
         [HttpGet("admin/categorynames")]
@@ -78,19 +111,57 @@ namespace BaskentEnerji.API.Controllers.Blog
         }
 
         [HttpPost("admin/article")]
-        public async Task SaveArticle(rm_savearticle data)
+        public async Task<IActionResult> SaveArticle(rm_savearticle data)
         {
-            await _blog_ArticleServiceCommand.SaveArticle(data);
+            try
+            {
+                await _blog_ArticleServiceCommand.SaveArticle(data);
+                return Ok(new { success = true, message = "Makale başarıyla kaydedildi" });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "İç sunucu hatası", error = ex.Message });
+            }
         }
+
         [HttpPost("admin/article/addcategory")]
-        public async Task AddCategory(List<rm_article_addcategory> data)
+        public async Task<IActionResult> AddCategory(List<rm_article_addcategory> data)
         {
-            await _blog_ArticleServiceCommand.AddCategory(data);
+            try
+            {
+                await _blog_ArticleServiceCommand.AddCategory(data);
+                return Ok(new { success = true, message = "Kategori başarıyla eklendi" });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "İç sunucu hatası", error = ex.Message });
+            }
         }
+
         [HttpPost("admin/article/delete")]
-        public async Task DeleteArticle([FromBody] Guid articleId)
+        public async Task<IActionResult> DeleteArticle([FromBody] Guid articleId)
         {
-            await _blog_ArticleServiceCommand.DeleteArticle(articleId);
+            try
+            {
+                await _blog_ArticleServiceCommand.DeleteArticle(articleId);
+                return Ok(new { success = true, message = "Makale başarıyla silindi" });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "İç sunucu hatası", error = ex.Message });
+            }
         }
 
         [HttpGet("admin/article")]
@@ -98,28 +169,44 @@ namespace BaskentEnerji.API.Controllers.Blog
         {
             return _blog_ArticleServiceQuery.GetArticle(Id);
         }
+
         [HttpGet("admin/articles")]
         public List<rsp_article> GetArticles([FromQuery] rm_article data)
         {
             return _blog_ArticleServiceQuery.GetArticles(data);
         }
+
         [HttpGet("articles")]
         [AllowAnonymous]
         public List<rsp_article_guest> GetArticles_Guest([FromQuery] rm_article_guest data)
         {
             return _blog_ArticleServiceQuery.GetArticles_Guest(data);
         }
+
         [HttpGet("article")]
         [AllowAnonymous]
         public rsp_article_guest GetArticle_Guest(string link)
         {
             return _blog_ArticleServiceQuery.GetArticle_Guest(link, HttpContext);
         }
+
         [HttpPost("article/comment")]
         [AllowAnonymous]
-        public async Task PostComment(rm_article_comment data)
+        public async Task<IActionResult> PostComment(rm_article_comment data)
         {
-            await _blog_ArticleServiceCommand.AddComment(data, HttpContext);
+            try
+            {
+                await _blog_ArticleServiceCommand.AddComment(data, HttpContext);
+                return Ok(new { success = true, message = "Yorum başarıyla eklendi" });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "İç sunucu hatası", error = ex.Message });
+            }
         }
     }
 }
