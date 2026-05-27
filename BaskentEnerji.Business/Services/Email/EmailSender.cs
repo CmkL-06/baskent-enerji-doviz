@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using BaskentEnerji.Business.Exceptions;
 using BaskentEnerji.Business.Infrastructure.Email;
 using System.Net;
@@ -10,10 +11,13 @@ namespace BaskentEnerji.Business.Services.Email
     public class EmailSender : IEmailSender
     {
         private readonly IConfiguration _configuration;
+        private readonly ILogger<EmailSender> _logger;
 
-        public EmailSender(IConfiguration configuration)
+        public EmailSender(IConfiguration configuration, ILogger<EmailSender> logger)
         {
             _configuration = configuration;
+            _logger = logger;
+            _logger = logger;
         }
 
         public async Task SendEmailAsync(string email, string subject, string htmlMessage)
@@ -56,6 +60,7 @@ namespace BaskentEnerji.Business.Services.Email
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Email sending failed to {Email}", email);
                 throw new ApiException(System.Net.HttpStatusCode.InternalServerError, "Email sending failed: " + ex.Message);
             }
         }
