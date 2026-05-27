@@ -1036,9 +1036,12 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 ClearVaultCaches();
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
-                await transaction.RollbackAsync();
+                if (transaction.GetDbTransaction().Connection != null)
+                {
+                    await transaction.RollbackAsync();
+                }
                 throw;
             }
         }
