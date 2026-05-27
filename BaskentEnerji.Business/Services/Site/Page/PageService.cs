@@ -240,10 +240,8 @@ namespace BaskentEnerji.Business.Services.Site.Page
                 // Handle IsHomePage - unset other home pages if needed
                 if (request.IsHomePage.HasValue && request.IsHomePage.Value)
                 {
-                    await _dbContext.Database.ExecuteSqlRawAsync(
-                        "UPDATE Pages SET IsHomePage = 0 WHERE Id != {0} AND LanguageCode = {1} AND IsHomePage = 1",
-                        id, request.LanguageCode ?? "en");
-                }
+                    await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+                        $"UPDATE Pages SET IsHomePage = 0 WHERE Id != {id} AND LanguageCode = {request.LanguageCode ?? \"en\"} AND SiteId = {request.SiteId}");
 
                 // Update page properties using raw SQL to avoid tracking
                 var sql = @"
@@ -264,7 +262,7 @@ namespace BaskentEnerji.Business.Services.Site.Page
                         BackgroundColor = @p13
                     WHERE Id = @p14";
 
-                await _dbContext.Database.ExecuteSqlRawAsync(sql,
+                await _dbContext.Database.ExecuteSqlInterpolatedAsync(sql,
                     string.IsNullOrEmpty(request.Slug) ? DBNull.Value : request.Slug,
                     string.IsNullOrEmpty(request.Title) ? DBNull.Value : request.Title,
                     request.Description,
@@ -287,7 +285,7 @@ namespace BaskentEnerji.Business.Services.Site.Page
                 if (request.Components != null)
                 {
                     // Delete all existing components for this page
-                    await _dbContext.Database.ExecuteSqlRawAsync(
+                    await _dbContext.Database.ExecuteSqlInterpolatedAsync(
                         "DELETE FROM BuilderComponents WHERE PageId = {0}", id);
                     
                     // Add new components if any
