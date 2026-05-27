@@ -137,7 +137,8 @@ namespace BaskentEnerji.API
                         Order = 0
                     };
 
-                            nPage.Components.Add(nComponent);
+                        nPage.Components ??= new List<Entity.Entities.Site.Page.BuilderComponent>();
+                        nPage.Components.Add(nComponent);
 
                             await dbContext.Pages.AddAsync(nPage, cancellationToken);
                             await dbContext.SaveChangesAsync(cancellationToken);
@@ -158,7 +159,7 @@ namespace BaskentEnerji.API
                             if (cancellationToken.IsCancellationRequested)
                                 break;
 
-                            string coinName = coin.Name.ToLower();
+                            string coinName = (coin.Name ?? "unknown").ToLower();
                             coinName = coinName.Replace("ı", "i").Replace("İ", "i").Replace("I", "i");
                             await _coinPriceService.StartTrackingCoin(coinName + "usdt", coin.Exchange ?? "binance");
                         }
