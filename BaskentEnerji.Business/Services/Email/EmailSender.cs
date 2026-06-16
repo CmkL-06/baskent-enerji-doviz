@@ -2,8 +2,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using BaskentEnerji.Business.Exceptions;
 using BaskentEnerji.Business.Infrastructure.Email;
-using System.Net;
-using System.Net.Mail;
+using System.Net.Http;
+using System.Net.Http.Json;
 using System.Threading.Tasks;
 
 namespace BaskentEnerji.Business.Services.Email
@@ -12,11 +12,11 @@ namespace BaskentEnerji.Business.Services.Email
     {
         private readonly IConfiguration _configuration;
         private readonly ILogger<EmailSender> _logger;
+        private static readonly HttpClient _http = new HttpClient();
 
         public EmailSender(IConfiguration configuration, ILogger<EmailSender> logger)
         {
             _configuration = configuration;
-            _logger = logger;
             _logger = logger;
         }
 
@@ -28,35 +28,41 @@ namespace BaskentEnerji.Business.Services.Email
 
             try
             {
-                var smtpServer = _configuration["Smtp:Host"];
+                var apiKey = _configuration["Smtp:ApiKey"];
                 var fromAddress = _configuration["Smtp:From"];
-                var username = _configuration["Smtp:Username"];
-                var password = _configuration["Smtp:Password"];
+                var fromName = _configuration["Smtp:FromName"] ?? "Baskent Enerji";
 
-                if (string.IsNullOrWhiteSpace(smtpServer) || string.IsNullOrWhiteSpace(fromAddress))
+                if (string.IsNullOrWhiteSpace(apiKey))
+                    throw new ApiException(System.Net.HttpStatusCode.InternalServerError, "Smtp:ApiKey is not configured");
+
+                if (string.IsNullOrWhiteSpace(fromAddress))
+                    throw new ApiException(System.Net.HttpStatusCode.InternalServerError, "Smtp:From is not configured");
+
+                var payload = new
                 {
-                    throw new ApiException(System.Net.HttpStatusCode.InternalServerError, "Email settings are incomplete");
+                    sender = new { email = fromAddress, name = fromName },
+                    to = new[] { new { email = email } },
+                    subject = subject,
+                    htmlContent = htmlMessage
+                };
+
+                var request = new HttpRequestMessage(HttpMethod.Post, "https://api.brevo.com/v3/smtp/email");
+                request.Headers.Add("api-key", apiKey);
+                request.Content = JsonContent.Create(payload);
+
+                var response = await _http.SendAsync(request);
+                if (!response.IsSuccessStatusCode)
+                {
+                    var body = await response.Content.ReadAsStringAsync();
+                    _logger.LogError("Brevo API error {StatusCode}: {Body}", (int)response.StatusCode, body);
+                    throw new ApiException(System.Net.HttpStatusCode.InternalServerError, $"Brevo API error {(int)response.StatusCode}: {body}");
                 }
 
-                var portRaw = _configuration["Smtp:Port"];
-                var port = int.TryParse(portRaw, out var parsedPort) ? parsedPort : 465;
-
-                using var message = new MailMessage(fromAddress, email)
-                {
-                    Subject = subject,
-                    Body = htmlMessage,
-                    IsBodyHtml = true
-                };
-
-                using var client = new SmtpClient(smtpServer, port)
-                {
-                    EnableSsl = true,
-                    Credentials = string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password)
-                        ? CredentialCache.DefaultNetworkCredentials
-                        : new NetworkCredential(username, password)
-                };
-
-                await client.SendMailAsync(message);
+                _logger.LogInformation("Email sent via Brevo API to {Email}", email);
+            }
+            catch (ApiException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
