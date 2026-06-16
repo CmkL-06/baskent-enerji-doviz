@@ -166,14 +166,19 @@ foreach ($domain in @("baskentenerji.com", "api.baskentenerji.com", "tg.moneytra
         $req = [System.Net.HttpWebRequest]::Create("https://$domain")
         $req.Timeout = 5000
         $req.AllowAutoRedirect = $false
-        $resp = $req.GetResponse()
+        try { $resp = $req.GetResponse(); $resp.Close() } catch [System.Net.WebException] {
+            # 404/redirect gibi HTTP hatalari SSL'den degil — sertifika yine de okunabilir
+        }
         $cert = $req.ServicePoint.Certificate
-        $expiry = [DateTime]::Parse($cert.GetExpirationDateString())
-        $days = ($expiry - (Get-Date)).Days
-        if ($days -gt 30)    { OK "$domain SSL -> $days gun kaldi ($expiry)" }
-        elseif ($days -gt 0) { WARN "$domain SSL -> $days gun kaldi - YENILE!" }
-        else                 { ERR "$domain SSL SURESI DOLMUS!" }
-        $resp.Close()
+        if ($cert) {
+            $expiry = [DateTime]::Parse($cert.GetExpirationDateString())
+            $days = ($expiry - (Get-Date)).Days
+            if ($days -gt 30)    { OK "$domain SSL -> $days gun kaldi ($expiry)" }
+            elseif ($days -gt 0) { WARN "$domain SSL -> $days gun kaldi - YENILE!" }
+            else                 { ERR "$domain SSL SURESI DOLMUS!" }
+        } else {
+            WARN "$domain SSL sertifikasi okunamadi"
+        }
     } catch {
         WARN "$domain SSL kontrol edilemedi: $($_.Exception.Message)"
     }

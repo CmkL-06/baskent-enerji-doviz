@@ -30,10 +30,22 @@ npm-cache/
 .DS_Store
 Thumbs.db
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+*.egg-info/
+
 # Logs
 logs/
 *.log
+scripts/CALISTIR-TUMU-LOG.txt
 
 # Backups
 backups/
 *.bak
+
+# Deploy artifacts
+deploy/publish-api/
