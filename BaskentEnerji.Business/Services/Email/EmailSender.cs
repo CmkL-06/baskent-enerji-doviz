@@ -22,24 +22,24 @@ namespace BaskentEnerji.Business.Services.Email
 
         public async Task SendEmailAsync(string email, string subject, string htmlMessage)
         {
-            var enableMail = _configuration["EmailSettings:EnableMail"];
+            var enableMail = _configuration["Smtp:EnableMail"];
             if (string.IsNullOrEmpty(enableMail) || !bool.TryParse(enableMail, out var enabled) || !enabled)
                 return;
 
             try
             {
-                var smtpServer = _configuration["EmailSettings:SmtpServer"];
-                var fromAddress = _configuration["EmailSettings:From"];
-                var username = _configuration["EmailSettings:Username"];
-                var password = _configuration["EmailSettings:Password"];
+                var smtpServer = _configuration["Smtp:Host"];
+                var fromAddress = _configuration["Smtp:From"];
+                var username = _configuration["Smtp:Username"];
+                var password = _configuration["Smtp:Password"];
 
                 if (string.IsNullOrWhiteSpace(smtpServer) || string.IsNullOrWhiteSpace(fromAddress))
                 {
                     throw new ApiException(System.Net.HttpStatusCode.InternalServerError, "Email settings are incomplete");
                 }
 
-                var portRaw = _configuration["EmailSettings:Port"];
-                var port = int.TryParse(portRaw, out var parsedPort) ? parsedPort : 587;
+                var portRaw = _configuration["Smtp:Port"];
+                var port = int.TryParse(portRaw, out var parsedPort) ? parsedPort : 465;
 
                 using var message = new MailMessage(fromAddress, email)
                 {
