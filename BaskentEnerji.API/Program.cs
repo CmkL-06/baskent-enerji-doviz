@@ -125,7 +125,7 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
-    options.RequireHttpsMetadata = false;
+    options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
     options.SaveToken = true;
     options.TokenValidationParameters = new TokenValidationParameters
     {
@@ -293,36 +293,20 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowVueApp", builder =>
     {
         builder.WithOrigins(
-            "http://localhost:3000",            
-            "http://localhost:3001",            
-            "http://localhost:3002",            
-            "http://localhost:3003",            
-            "http://localhost:3004",            
-            "http://localhost:3005",            
-            "http://localhost:3006",            
-            "http://localhost:3007",            
-            "http://localhost:3008",            
-            "http://localhost:3009",            
-            "http://localhost:3010",            
-            "http://localhost:3011",            
-            "http://localhost:3012",            
-            "http://localhost:5175",            
-            "http://localhost:5174",            
-            "http://localhost:5173",
-             "https://localhost:5173",    
-            "http://localhost:5174",            
-            "http://localhost:5175",            
-            "http://localhost:5179",
-            "http://localhost:5093",
-            "https://localhost:7197",
-            "http://127.0.0.1:5093",
-            "http://127.0.0.1:5173",
-            "http://baskentenerji.com",
+            // Production domainler (sadece HTTPS)
             "https://baskentenerji.com",
-            "http://old.baskentenerji.com",
-            "https://old.baskentenerji.com",
-               "https://moneytransferturkey.com",
-               "http://moneytransferturkey.com"
+            "https://www.baskentenerji.com",
+            "https://api.baskentenerji.com",
+            "https://oldapi.baskentenerji.com",
+            "https://tg.moneytransferturkey.com",
+            "https://moneytransferturkey.com",
+            "https://www.moneytransferturkey.com",
+            // Gelistirme ortami
+            "http://localhost:5173",
+            "https://localhost:5173",
+            "http://localhost:5093",
+            "http://127.0.0.1:5173",
+            "http://127.0.0.1:5093"
         )
         .AllowAnyMethod()
         .AllowAnyHeader()
@@ -335,11 +319,20 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 app.Logger.LogInformation("Application has started.");
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+// Swagger sadece yerel ve admin IP'lerden erisime acik
+app.UseWhen(ctx => {
+    var ip = ctx.Connection.RemoteIpAddress?.ToString() ?? "";
+    var path = ctx.Request.Path.Value ?? "";
+    if (!path.StartsWith("/swagger")) return true;
+    return ip == "127.0.0.1" || ip == "::1" || ip.StartsWith("159.195.") || ip.StartsWith("192.168.");
+}, a => {
+    a.UseSwagger();
+    a.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Başkent Enerji API v1");
+        c.RoutePrefix = "swagger";
+    });
+});
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 

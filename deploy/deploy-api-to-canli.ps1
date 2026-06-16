@@ -1,11 +1,14 @@
 # api.baskentenerji.com - BaskentEnerji API deploy
 # Kullanim: .\deploy-api-to-canli.ps1
-# Oncesinde: dotnet publish ... -o publish-api (zaten yapildi)
+# Oncesinde: dotnet publish BaskentEnerji.API -c Release -r win-x64 --no-self-contained -o deploy\publish-api
+# NOT: Eski Plesk sunucusu (45.84.191.180) iptal edildi. Aktif sunucu: WIN-RF5UU12C449 (159.195.55.1)
 
 $ErrorActionPreference = "Stop"
-$source = "C:\Users\Administrator\Desktop\BASKENT_PROJE\publish-api"
-$target = "C:\Inetpub\vhosts\baskentenerji.com\api.baskentenerji.com"
-$appPoolName = "api.baskentenerji.com(domain)(pool)"
+$repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+if (-not $repoRoot) { $repoRoot = "C:\inetpub\baskent-enerji-doviz" }
+$source = Join-Path $repoRoot "deploy\publish-api"
+$target = "C:\inetpub\wwwroot\api"
+$appPoolName = "BaskentEnerji-API"
 $appcmd = "$env:windir\system32\inetsrv\appcmd.exe"
 
 # 0) App Pool'u durdur (DLL kilitli olmasin)

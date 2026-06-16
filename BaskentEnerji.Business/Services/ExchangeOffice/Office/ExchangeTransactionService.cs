@@ -1,4 +1,4 @@
-using AutoMapper;
+﻿using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Identity.Client;
@@ -441,7 +441,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
             var mappedTransactions = _mapper.Map<List<vm_transaction>>(transactions);
 
-            // PERFORMANCE FIX: Create dictionary for O(1) lookup instead of O(n²)
+            // PERFORMANCE FIX: Create dictionary for O(1) lookup instead of O(nÂ²)
             var transactionDict = transactions.ToDictionary(t => t.Id);
 
             // Load deleted by usernames for transactions that were deleted
@@ -605,7 +605,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 User = user
             };
 
-            _context.Logs.Add(acLog);
+            // _context.Logs.Add(acLog); // ActionLog entity henuz tanimlanmadi
 
             // Restore vault balances
             var dbHistories = _context.VaultBalanceHistories

@@ -5,8 +5,7 @@ using BaskentEnerji.Data.Contexts;
 using BaskentEnerji.Entity.Entities.Site;
 using BaskentEnerji.Entity.Entities.User;
 using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
+using BCrypt.Net;
 using System.Text.Json;
 
 namespace BaskentEnerji.API
@@ -64,17 +63,7 @@ namespace BaskentEnerji.API
                     string username = "admin";
                     string password = "123456asD!";
                     string mail = "admin@quanta.com";
-                    string hashedPassword;
-                    using (var sha256 = SHA256.Create())
-                    {
-                        var bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
-                        var builder = new StringBuilder();
-                        foreach (var b in bytes)
-                        {
-                            builder.Append(b.ToString("x2"));
-                        }
-                        hashedPassword = builder.ToString();
-                    }
+                    string hashedPassword = BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12);
 
                     User nUser = new User
                     {

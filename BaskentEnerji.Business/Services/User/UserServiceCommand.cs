@@ -54,11 +54,16 @@ namespace BaskentEnerji.Business.Services.User
                 throw new ApiException(HttpStatusCode.BadRequest, "Şifre gerekli.");
 
             var user = await _dbContext.Users
-                .FirstOrDefaultAsync(u => (u.Mail == requestData.Mail || u.Username == requestData.Mail) && u.Password == HashPassword(requestData.Password));
+                .FirstOrDefaultAsync(u => u.Mail == requestData.Mail || u.Username == requestData.Mail);
 
-            if (user == null)
-            {
+            if (user == null || !VerifyPassword(requestData.Password, user.Password))
                 throw new ApiException(HttpStatusCode.Unauthorized, "User credentials are wrong");
+
+            // Auto-migrate legacy SHA-256 hash to BCrypt on successful login
+            if (!user.Password.StartsWith("$2"))
+            {
+                user.Password = HashPassword(requestData.Password);
+                await _dbContext.SaveChangesAsync();
             }
 
             if (user.Rank == Entity.Rank.Banned)
@@ -188,16 +193,21 @@ namespace BaskentEnerji.Business.Services.User
 
         private string HashPassword(string password)
         {
-            using (var sha256 = SHA256.Create())
+            return BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12);
+        }
+
+        private bool VerifyPassword(string password, string storedHash)
+        {
+            // Legacy SHA-256 (no $2 prefix): migrate transparently on next login
+            if (!storedHash.StartsWith("$2"))
             {
+                using var sha256 = SHA256.Create();
                 var bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
-                var builder = new StringBuilder();
-                foreach (var b in bytes)
-                {
-                    builder.Append(b.ToString("x2"));
-                }
-                return builder.ToString();
+                var sb = new StringBuilder();
+                foreach (var b in bytes) sb.Append(b.ToString("x2"));
+                return sb.ToString() == storedHash;
             }
+            return BCrypt.Net.BCrypt.Verify(password, storedHash);
         }
 
         private string GenerateJwtToken(Entity.Entities.User.User user)
@@ -215,7 +225,7 @@ namespace BaskentEnerji.Business.Services.User
                     new Claim(ClaimTypes.Email, user.Mail ?? ""),
                     // new Claim(ClaimTypes.Role, user.Rank)
                 }),
-                Expires = DateTime.UtcNow.AddMonths(6),
+                Expires = DateTime.UtcNow.AddHours(24),
                 Issuer = _jwtIssuer,
                 Audience = _jwtAudience,
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
@@ -236,6 +246,8 @@ namespace BaskentEnerji.Business.Services.User
                     new Claim(ClaimTypes.Email, user.Mail)
                 }),
                 Expires = DateTime.UtcNow.AddHours(1),
+                Issuer = _jwtIssuer,
+                Audience = _jwtAudience,
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
             };
             var token = tokenHandler.CreateToken(tokenDescriptor);

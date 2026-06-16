@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
@@ -241,7 +241,8 @@ namespace BaskentEnerji.Business.Services.Site.Page
                 if (request.IsHomePage.HasValue && request.IsHomePage.Value)
                 {
                     await _dbContext.Database.ExecuteSqlInterpolatedAsync(
-                        $"UPDATE Pages SET IsHomePage = 0 WHERE Id != {id} AND LanguageCode = {request.LanguageCode ?? \"en\"} AND SiteId = {request.SiteId}");
+                        $"UPDATE Pages SET IsHomePage = 0 WHERE Id != {id} AND LanguageCode = {request.LanguageCode ?? "en"} ");
+                }
 
                 // Update page properties using raw SQL to avoid tracking
                 var sql = @"
@@ -262,7 +263,7 @@ namespace BaskentEnerji.Business.Services.Site.Page
                         BackgroundColor = @p13
                     WHERE Id = @p14";
 
-                await _dbContext.Database.ExecuteSqlInterpolatedAsync(sql,
+                await _dbContext.Database.ExecuteSqlRawAsync(sql,
                     string.IsNullOrEmpty(request.Slug) ? DBNull.Value : request.Slug,
                     string.IsNullOrEmpty(request.Title) ? DBNull.Value : request.Title,
                     request.Description,
@@ -286,7 +287,7 @@ namespace BaskentEnerji.Business.Services.Site.Page
                 {
                     // Delete all existing components for this page
                     await _dbContext.Database.ExecuteSqlInterpolatedAsync(
-                        "DELETE FROM BuilderComponents WHERE PageId = {0}", id);
+                        $"DELETE FROM BuilderComponents WHERE PageId = {id}");
                     
                     // Add new components if any
                     if (request.Components.Any())
@@ -516,3 +517,4 @@ namespace BaskentEnerji.Business.Services.Site.Page
         }
     }
 }
+

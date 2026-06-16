@@ -1,5 +1,6 @@
-using AutoMapper;
+﻿using AutoMapper;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Caching.Memory;
 using BaskentEnerji.Business.Infrastructure.ExchangeOffice.Office;
 using BaskentEnerji.Business.Services.Permission;
@@ -519,7 +520,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 if (data.isEntireBalance)
                 {
                     iType = TransactionType.Adjustment;
-                    data.description = $"{balance.Currency.CurrencyName} elle düzeltildi {currentBalance:0.00} -> {balance.Balance:0.00} ({balance.Balance - currentBalance:0.00}) ";
+                    data.description = $"{balance.Currency.CurrencyName} elle dÃ¼zeltildi {currentBalance:0.00} -> {balance.Balance:0.00} ({balance.Balance - currentBalance:0.00}) ";
                 }
                 else if (data.amount > 0)
                 {
@@ -999,7 +1000,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                             .Select(c => c.CurrencyCode)
                             .FirstOrDefaultAsync();
                         
-                        discrepancyDetails.Add($"{currency}: Beklenen {systemBalance:F2}, Sayılan {detail.ActualAmount:F2}, Fark {discrepancy:F2}");
+                        discrepancyDetails.Add($"{currency}: Beklenen {systemBalance:F2}, SayÄ±lan {detail.ActualAmount:F2}, Fark {discrepancy:F2}");
                     }
 
                     var countDetail = new VaultCountDetail
@@ -1029,19 +1030,15 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 vault.LastCountDate = DateTime.Now;
 
                 _context.VaultCounts.Add(vaultCount);
-                _context.VaultCountDetails.AddRange(vaultCount.CountDetails);
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
                 ClearVaultCaches();
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                if (transaction.GetDbTransaction().Connection != null)
-                {
-                    await transaction.RollbackAsync();
-                }
+                await transaction.RollbackAsync();
                 throw;
             }
         }
@@ -1131,3 +1128,4 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
         }
     }
 }
+

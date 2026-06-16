@@ -32,7 +32,7 @@ foreach ($name in "baskentenerji.com", "api.baskentenerji.com") {
 }
 
 # URL Rewrite - web.config'te rewrite varsa modul gerekli
-$webConfig = "C:\Inetpub\vhosts\baskentenerji.com\httpdocs\web.config"
+$webConfig = "C:\inetpub\wwwroot\api\web.config"
 if (Test-Path $webConfig) {
     $hasRewrite = Select-String -Path $webConfig -Pattern "<rewrite>" -Quiet
     if ($hasRewrite) {
