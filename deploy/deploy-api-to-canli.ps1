@@ -4,7 +4,7 @@
 # NOT: Eski Plesk sunucusu (45.84.191.180) iptal edildi. Aktif sunucu: WIN-RF5UU12C449 (159.195.55.1)
 
 $ErrorActionPreference = "Stop"
-$repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+$repoRoot = Split-Path $PSScriptRoot -Parent
 if (-not $repoRoot) { $repoRoot = "C:\inetpub\baskent-enerji-doviz" }
 $source = Join-Path $repoRoot "deploy\publish-api"
 $target = "C:\inetpub\wwwroot\api"
