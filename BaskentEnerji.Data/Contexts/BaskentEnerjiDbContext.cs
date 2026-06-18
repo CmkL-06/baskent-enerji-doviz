@@ -25,7 +25,8 @@ namespace BaskentEnerji.Data.Contexts
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
-            modelBuilder.HasDefaultSchema("mtturkey_exchange");
+            // HasDefaultSchema kaldirildi — tablolar dbo schemasi altinda
+            // modelBuilder.HasDefaultSchema("mtturkey_exchange");
 
             // Currency <-> ExchangeRate cok-yonlu iliski
             modelBuilder.Entity<ExchangeRate>()
