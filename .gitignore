@@ -49,3 +49,5 @@ backups/
 
 # Deploy artifacts
 deploy/publish-api/
+_publish_output/ 
+ 
