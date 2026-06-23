@@ -12,6 +12,9 @@ class Config:
     """Uygulama konfigürasyonu"""
 
     # ── Telegram Bot Token'ları ──
+    # @MoneyExchangeTurkeyBot  → main_bot.py
+    # @MTTOperatorBot          → operator_bot.py
+    # @MoneyExchangeRubleBot   → ruble_bot.py
     MAIN_BOT_TOKEN = os.getenv('MAIN_BOT_TOKEN', '')
     OPERATOR_BOT_TOKEN = os.getenv('OPERATOR_BOT_TOKEN', '')
     RUBLE_BOT_TOKEN = os.getenv('RUBLE_BOT_TOKEN', '')

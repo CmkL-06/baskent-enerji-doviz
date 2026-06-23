@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Money Transfer Turkey – Panel Girişi</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --mtt-primary: #1a3c5e;
+      --mtt-accent:  #2e86c1;
+      --mtt-gold:    #f0a500;
+      --mtt-bg:      #0d1b2a;
+    }
+    body {
+      background: var(--mtt-bg);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Segoe UI', sans-serif;
+    }
+    .login-card {
+      background: linear-gradient(145deg, #1a3c5e, #0d2a45);
+      border: 1px solid rgba(46,134,193,0.3);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 420px;
+      padding: 40px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    .logo-area {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .logo-area .logo-icon {
+      width: 64px;
+      height: 64px;
+      background: var(--mtt-gold);
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      color: var(--mtt-primary);
+      margin-bottom: 12px;
+    }
+    .logo-area h1 {
+      color: #fff;
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin: 0;
+      letter-spacing: 0.5px;
+    }
+    .logo-area .subtitle {
+      color: rgba(255,255,255,0.5);
+      font-size: 0.85rem;
+      margin-top: 4px;
+    }
+    .panel-toggle {
+      display: flex;
+      background: rgba(0,0,0,0.3);
+      border-radius: 8px;
+      padding: 4px;
+      margin-bottom: 28px;
+    }
+    .panel-toggle .toggle-btn {
+      flex: 1;
+      padding: 8px;
+      border: none;
+      background: transparent;
+      color: rgba(255,255,255,0.5);
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .panel-toggle .toggle-btn.active {
+      background: var(--mtt-accent);
+      color: #fff;
+    }
+    .form-label {
+      color: rgba(255,255,255,0.7);
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+    .form-control {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(46,134,193,0.3);
+      color: #fff;
+      border-radius: 8px;
+      padding: 10px 14px;
+    }
+    .form-control:focus {
+      background: rgba(0,0,0,0.4);
+      border-color: var(--mtt-accent);
+      color: #fff;
+      box-shadow: 0 0 0 3px rgba(46,134,193,0.2);
+    }
+    .form-control::placeholder { color: rgba(255,255,255,0.3); }
+    .form-check-label { color: rgba(255,255,255,0.6); font-size: 0.85rem; }
+    .form-check-input {
+      background-color: rgba(0,0,0,0.3);
+      border-color: rgba(46,134,193,0.4);
+    }
+    .form-check-input:checked { background-color: var(--mtt-accent); border-color: var(--mtt-accent); }
+    .btn-login {
+      background: linear-gradient(135deg, var(--mtt-accent), #1a5f8a);
+      border: none;
+      color: #fff;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      width: 100%;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      letter-spacing: 0.5px;
+    }
+    .btn-login:hover { opacity: 0.9; }
+    .alert-danger {
+      background: rgba(220,53,69,0.15);
+      border: 1px solid rgba(220,53,69,0.3);
+      color: #ff6b6b;
+      border-radius: 8px;
+      font-size: 0.85rem;
+    }
+    .panel-type-badge {
+      text-align: center;
+      margin-bottom: 16px;
+    }
+    .panel-type-badge span {
+      background: rgba(240,165,0,0.15);
+      color: var(--mtt-gold);
+      border: 1px solid rgba(240,165,0,0.3);
+      border-radius: 20px;
+      padding: 4px 16px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .input-icon {
+      position: relative;
+    }
+    .input-icon i {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: rgba(255,255,255,0.3);
+      cursor: pointer;
+    }
+    .spinner-border-sm { width: 1rem; height: 1rem; }
+  </style>
+</head>
+<body>
+
+<div class="login-card">
+  <div class="logo-area">
+    <div class="logo-icon">
+      <i class="fa-solid fa-money-bill-transfer"></i>
+    </div>
+    <h1>Money Transfer Turkey</h1>
+    <p class="subtitle">Güvenli para transferi platformu</p>
+  </div>
+
+  <!-- Panel type toggle (hidden for dealer-direct links, shown for operator) -->
+  <div class="panel-toggle" id="panelToggle">
+    <button class="toggle-btn active" id="btnOperator" onclick="switchPanel('operator')">
+      <i class="fa-solid fa-headset me-1"></i> Operatör
+    </button>
+    <button class="toggle-btn" id="btnDealer" onclick="switchPanel('dealer')">
+      <i class="fa-solid fa-store me-1"></i> Bayi
+    </button>
+  </div>
+
+  <div class="panel-type-badge">
+    <span id="panelBadge">OPERATÖR PANELİ</span>
+  </div>
+
+  <form id="loginForm" onsubmit="doLogin(event)">
+    <div class="mb-3">
+      <label class="form-label">Kullanıcı Adı</label>
+      <div class="input-icon">
+        <input type="text" class="form-control" id="username" name="username"
+               placeholder="Kullanıcı adınız" autocomplete="username" required>
+        <i class="fa-solid fa-user"></i>
+      </div>
+    </div>
+    <div class="mb-4">
+      <label class="form-label">Şifre</label>
+      <div class="input-icon">
+        <input type="password" class="form-control" id="password" name="password"
+               placeholder="••••••••" autocomplete="current-password" required>
+        <i class="fa-solid fa-eye" id="togglePwd" onclick="togglePassword()"></i>
+      </div>
+    </div>
+    <div class="d-flex align-items-center justify-content-between mb-4">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="rememberMe" name="remember">
+        <label class="form-check-label" for="rememberMe">Beni hatırla</label>
+      </div>
+    </div>
+    <div id="loginError" class="alert alert-danger d-none mb-3">
+      <i class="fa-solid fa-circle-exclamation me-2"></i>
+      <span id="loginErrorMsg">Kullanıcı adı veya şifre hatalı.</span>
+    </div>
+    <button type="submit" class="btn-login" id="loginBtn">
+      <span id="loginBtnText"><i class="fa-solid fa-right-to-bracket me-2"></i>Giriş Yap</span>
+      <span id="loginBtnSpinner" class="d-none">
+        <span class="spinner-border spinner-border-sm me-2"></span>Doğrulanıyor...
+      </span>
+    </button>
+  </form>
+
+  <p class="text-center mt-4" style="color:rgba(255,255,255,0.25);font-size:0.75rem;">
+    © 2024 Money Transfer Turkey &nbsp;·&nbsp; v2.0
+  </p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+<script>
+  let currentPanel = 'operator';
+
+  function switchPanel(type) {
+    currentPanel = type;
+    document.getElementById('btnOperator').classList.toggle('active', type === 'operator');
+    document.getElementById('btnDealer').classList.toggle('active', type === 'dealer');
+    document.getElementById('panelBadge').textContent =
+      type === 'dealer' ? 'BAYİ PANELİ' : 'OPERATÖR PANELİ';
+  }
+
+  function togglePassword() {
+    const pwd = document.getElementById('password');
+    const icon = document.getElementById('togglePwd');
+    if (pwd.type === 'password') {
+      pwd.type = 'text';
+      icon.className = 'fa-solid fa-eye-slash';
+    } else {
+      pwd.type = 'password';
+      icon.className = 'fa-solid fa-eye';
+    }
+  }
+
+  function doLogin(e) {
+    e.preventDefault();
+    const btn = document.getElementById('loginBtn');
+    document.getElementById('loginBtnText').classList.add('d-none');
+    document.getElementById('loginBtnSpinner').classList.remove('d-none');
+    document.getElementById('loginError').classList.add('d-none');
+    btn.disabled = true;
+
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+
+    fetch('https://api.moneytransferturkey.com/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password, panelType: currentPanel })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success && data.token) {
+        localStorage.setItem('mtt_token', data.token);
+        localStorage.setItem('mtt_panel_type', data.role);
+        localStorage.setItem('mtt_user', JSON.stringify(data.user));
+        // Redirect based on role
+        if (data.role === 'admin') window.location.href = '/admin';
+        else if (data.role === 'operator') window.location.href = '/operator';
+        else window.location.href = '/dealer';
+      } else {
+        showError(data.message || 'Kullanıcı adı veya şifre hatalı.');
+      }
+    })
+    .catch(() => {
+      showError('Sunucuya bağlanılamadı. Lütfen tekrar deneyin.');
+    })
+    .finally(() => {
+      document.getElementById('loginBtnText').classList.remove('d-none');
+      document.getElementById('loginBtnSpinner').classList.add('d-none');
+      btn.disabled = false;
+    });
+  }
+
+  function showError(msg) {
+    document.getElementById('loginErrorMsg').textContent = msg;
+    document.getElementById('loginError').classList.remove('d-none');
+  }
+
+  // Read ?type= from URL to pre-select panel
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('type') === 'dealer') switchPanel('dealer');
+
+  // Restore remembered username
+  const savedUser = localStorage.getItem('mtt_remember_user');
+  if (savedUser) {
+    document.getElementById('username').value = savedUser;
+    document.getElementById('rememberMe').checked = true;
+  }
+</script>
+</body>
+</html>

@@ -8,7 +8,8 @@ namespace BaskentEnerji.Entity.Modals.RequestModals.User
 {
     public class rm_user_login
     {
-        public string Mail { get; set; }
-        public string Password { get; set; }
+        /// <summary>Email veya kullanici adi — ikisi de kabul edilir</summary>
+        public string? Mail { get; set; }
+        public string? Password { get; set; }
     }
 }

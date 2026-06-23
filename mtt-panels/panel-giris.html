@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Başkent Enerji – Operatör Girişi</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --be-primary: #1a3c5e;
+      --be-accent:  #2e6da4;
+      --be-gold:    #c8960c;
+      --be-bg:      #f4f6f9;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--be-bg);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    /* Top bar */
+    .top-bar {
+      background: var(--be-primary);
+      color: #fff;
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .top-bar .logo-text { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.5px; }
+    .top-bar .logo-sub  { font-size: 0.75rem; opacity: 0.6; margin-left: 4px; }
+
+    /* Content area */
+    .content {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 16px;
+    }
+
+    /* Login card */
+    .login-card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+      width: 100%;
+      max-width: 400px;
+      padding: 40px 36px;
+    }
+    .card-header-area {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .card-icon {
+      width: 56px; height: 56px;
+      background: var(--be-primary);
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 22px;
+      margin-bottom: 14px;
+    }
+    .card-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--be-primary);
+    }
+    .card-subtitle {
+      font-size: 0.82rem;
+      color: #888;
+      margin-top: 4px;
+    }
+
+    /* Panel seçici */
+    .panel-selector {
+      display: flex;
+      background: #f0f4f8;
+      border-radius: 8px;
+      padding: 3px;
+      margin-bottom: 22px;
+      gap: 3px;
+    }
+    .panel-selector button {
+      flex: 1;
+      border: none;
+      background: transparent;
+      color: #666;
+      padding: 7px 6px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.18s;
+    }
+    .panel-selector button.active {
+      background: var(--be-primary);
+      color: #fff;
+      box-shadow: 0 2px 6px rgba(26,60,94,0.25);
+    }
+
+    /* Form */
+    .form-label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #444;
+      margin-bottom: 5px;
+    }
+    .form-control {
+      border: 1.5px solid #dde2ea;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 0.9rem;
+      transition: border-color 0.15s;
+    }
+    .form-control:focus {
+      border-color: var(--be-accent);
+      box-shadow: 0 0 0 3px rgba(46,109,164,0.15);
+    }
+    .input-wrapper { position: relative; }
+    .input-wrapper .icon {
+      position: absolute; right: 11px; top: 50%;
+      transform: translateY(-50%);
+      color: #aaa; cursor: pointer; font-size: 0.9rem;
+    }
+    .btn-giris {
+      width: 100%;
+      background: var(--be-primary);
+      color: #fff;
+      border: none;
+      padding: 11px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      cursor: pointer;
+      transition: background 0.18s;
+      margin-top: 6px;
+    }
+    .btn-giris:hover { background: #15304f; }
+    .btn-giris:disabled { opacity: 0.7; cursor: not-allowed; }
+    .error-box {
+      background: #fff5f5;
+      border: 1px solid #fca5a5;
+      color: #dc2626;
+      border-radius: 7px;
+      padding: 9px 13px;
+      font-size: 0.82rem;
+      margin-bottom: 14px;
+      display: none;
+    }
+    .footer-note {
+      text-align: center;
+      font-size: 0.75rem;
+      color: #bbb;
+      margin-top: 22px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="top-bar">
+  <i class="fa-solid fa-building-columns fa-lg"></i>
+  <span class="logo-text">Başkent Enerji Döviz</span>
+  <span class="logo-sub">| Operatör Portalı</span>
+</div>
+
+<div class="content">
+  <div class="login-card">
+    <div class="card-header-area">
+      <div class="card-icon">
+        <i class="fa-solid fa-right-to-bracket"></i>
+      </div>
+      <div class="card-title">Panel Girişi</div>
+      <div class="card-subtitle">Money Transfer Turkey yönetim paneli</div>
+    </div>
+
+    <!-- Panel tipi seçimi -->
+    <div class="panel-selector">
+      <button class="active" id="btnAdmin"    onclick="setPanel('admin')">
+        <i class="fa-solid fa-shield-halved me-1"></i> Admin
+      </button>
+      <button id="btnOperator" onclick="setPanel('operator')">
+        <i class="fa-solid fa-headset me-1"></i> Operatör
+      </button>
+      <button id="btnDealer"   onclick="setPanel('dealer')">
+        <i class="fa-solid fa-store me-1"></i> Bayi
+      </button>
+    </div>
+
+    <form id="loginForm" onsubmit="doLogin(event)">
+      <div class="mb-3">
+        <label class="form-label">Kullanıcı Adı</label>
+        <div class="input-wrapper">
+          <input type="text" class="form-control" id="username"
+                 placeholder="kullanici.adi" autocomplete="username" required>
+          <i class="fa-solid fa-user icon"></i>
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Şifre</label>
+        <div class="input-wrapper">
+          <input type="password" class="form-control" id="password"
+                 placeholder="••••••••" autocomplete="current-password" required>
+          <i class="fa-solid fa-eye icon" id="eyeIcon" onclick="togglePwd()"></i>
+        </div>
+      </div>
+
+      <div id="errorBox" class="error-box">
+        <i class="fa-solid fa-circle-exclamation me-1"></i>
+        <span id="errorMsg">Kullanıcı adı veya şifre hatalı.</span>
+      </div>
+
+      <button type="submit" class="btn-giris" id="submitBtn">
+        <span id="btnText"><i class="fa-solid fa-right-to-bracket me-2"></i>Giriş Yap</span>
+        <span id="btnSpinner" style="display:none;">
+          <span class="spinner-border spinner-border-sm me-2" role="status"></span>Doğrulanıyor...
+        </span>
+      </button>
+    </form>
+
+    <div class="footer-note">© Başkent Enerji Döviz &nbsp;·&nbsp; Yetkisiz erişim yasaktır.</div>
+  </div>
+</div>
+
+<script>
+  const MTT_API = 'https://api.moneytransferturkey.com';
+  const TG_BASE = 'https://tg.moneytransferturkey.com';
+
+  let currentPanel = 'admin';
+
+  function setPanel(type) {
+    currentPanel = type;
+    ['admin','operator','dealer'].forEach(p => {
+      document.getElementById('btn' + p.charAt(0).toUpperCase() + p.slice(1))
+        .classList.toggle('active', p === type);
+    });
+  }
+
+  function togglePwd() {
+    const p = document.getElementById('password');
+    const i = document.getElementById('eyeIcon');
+    if (p.type === 'password') { p.type = 'text'; i.className = 'fa-solid fa-eye-slash icon'; }
+    else                       { p.type = 'password'; i.className = 'fa-solid fa-eye icon'; }
+  }
+
+  function showError(msg) {
+    const box = document.getElementById('errorBox');
+    document.getElementById('errorMsg').textContent = msg;
+    box.style.display = 'block';
+  }
+  function hideError() { document.getElementById('errorBox').style.display = 'none'; }
+
+  function setLoading(on) {
+    document.getElementById('submitBtn').disabled = on;
+    document.getElementById('btnText').style.display    = on ? 'none'   : '';
+    document.getElementById('btnSpinner').style.display = on ? ''       : 'none';
+  }
+
+  async function doLogin(e) {
+    e.preventDefault();
+    hideError();
+    setLoading(true);
+
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+
+    try {
+      const res = await fetch(`${MTT_API}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, panelType: currentPanel })
+      });
+      const data = await res.json();
+
+      if (data.success && data.token) {
+        // Panele yönlendir — token URL'de gönderilir, panel localStorage'a yazar
+        const role = data.role || currentPanel;
+        let path = '/login';
+        if (role === 'admin')    path = '/admin';
+        else if (role === 'operator') path = '/operator';
+        else if (role === 'dealer')   path = '/dealer';
+
+        const redirectUrl = `${TG_BASE}${path}?token=${encodeURIComponent(data.token)}&role=${role}`;
+        window.location.href = redirectUrl;
+      } else {
+        showError(data.message || 'Kullanıcı adı veya şifre hatalı.');
+      }
+    } catch (err) {
+      showError('Sunucuya bağlanılamadı. Lütfen tekrar deneyin.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Kayıtlı kullanıcı adı
+  const saved = localStorage.getItem('mtt_remember_user');
+  if (saved) document.getElementById('username').value = saved;
+</script>
+</body>
+</html>

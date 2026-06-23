@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Operatör Paneli – Money Transfer Turkey</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --mtt-primary: #1a3c5e;
+      --mtt-accent:  #2e86c1;
+      --mtt-gold:    #f0a500;
+      --mtt-bg:      #0d1b2a;
+      --mtt-card:    #132840;
+      --mtt-border:  rgba(46,134,193,0.2);
+      --mtt-green:   #27ae60;
+      --mtt-red:     #e74c3c;
+    }
+    * { box-sizing: border-box; }
+    body { background: var(--mtt-bg); color: #e0e8f0; font-family: 'Segoe UI', sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* Topbar */
+    .topbar {
+      background: linear-gradient(90deg, #0d2a45, #1a3c5e);
+      border-bottom: 1px solid var(--mtt-border);
+      padding: 10px 20px;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .topbar .brand { display: flex; align-items: center; gap: 10px; }
+    .topbar .brand .icon { width: 32px; height: 32px; background: var(--mtt-gold); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #0d2a45; font-size: 14px; }
+    .topbar .brand h2 { margin: 0; font-size: 0.95rem; font-weight: 700; color: #fff; }
+    .topbar-right { display: flex; align-items: center; gap: 10px; }
+    .op-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--mtt-accent); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; color: #fff; }
+    .op-name { color: #fff; font-size: 0.88rem; font-weight: 600; }
+    .online-dot { width: 8px; height: 8px; background: #2ecc71; border-radius: 50%; display: inline-block; margin-right: 4px; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    .op-status { color: #2ecc71; font-size: 0.78rem; }
+    .btn-sm-action {
+      padding: 5px 12px; border-radius: 6px; font-size: 0.78rem; cursor: pointer; border: 1px solid;
+    }
+    .btn-admin { background: rgba(240,165,0,0.1); border-color: rgba(240,165,0,0.3); color: var(--mtt-gold); }
+    .btn-admin:hover { background: rgba(240,165,0,0.2); }
+    .btn-logout { background: rgba(220,53,69,0.1); border-color: rgba(220,53,69,0.3); color: #ff6b6b; }
+    .btn-logout:hover { background: rgba(220,53,69,0.2); }
+
+    /* Main layout: sidebar + chat */
+    .main-layout { display: flex; flex: 1; overflow: hidden; }
+
+    /* Sidebar */
+    .sidebar {
+      width: 300px; flex-shrink: 0;
+      background: #0e2035;
+      border-right: 1px solid var(--mtt-border);
+      display: flex; flex-direction: column;
+    }
+    .sidebar-tabs { display: flex; border-bottom: 1px solid var(--mtt-border); }
+    .sidebar-tab {
+      flex: 1; padding: 10px; text-align: center; font-size: 0.78rem;
+      color: rgba(255,255,255,0.4); cursor: pointer; border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .sidebar-tab.active { color: var(--mtt-accent); border-bottom-color: var(--mtt-accent); }
+    .sidebar-search { padding: 10px; border-bottom: 1px solid var(--mtt-border); }
+    .sidebar-search input {
+      width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--mtt-border);
+      color: #fff; border-radius: 6px; padding: 7px 12px; font-size: 0.82rem;
+    }
+    .sidebar-search input::placeholder { color: rgba(255,255,255,0.3); }
+    .sidebar-search input:focus { outline: none; border-color: var(--mtt-accent); }
+
+    .tx-list { flex: 1; overflow-y: auto; }
+    .tx-item {
+      padding: 12px 14px; border-bottom: 1px solid rgba(46,134,193,0.08);
+      cursor: pointer; transition: background 0.15s;
+    }
+    .tx-item:hover { background: rgba(46,134,193,0.08); }
+    .tx-item.active { background: rgba(46,134,193,0.15); border-left: 3px solid var(--mtt-accent); }
+    .tx-item .tx-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .tx-item .tx-customer { font-weight: 600; font-size: 0.88rem; color: #fff; }
+    .tx-item .tx-time { font-size: 0.72rem; color: rgba(255,255,255,0.35); }
+    .tx-item .tx-preview { font-size: 0.78rem; color: rgba(255,255,255,0.45); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tx-item .tx-amount { font-size: 0.82rem; color: var(--mtt-gold); font-weight: 600; }
+    .dot-bekliyor { width:7px;height:7px;border-radius:50%;background:#f1c40f;display:inline-block;margin-right:5px; }
+    .dot-islemde  { width:7px;height:7px;border-radius:50%;background:#3498db;display:inline-block;margin-right:5px; }
+
+    /* Chat area */
+    .chat-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .chat-header {
+      padding: 14px 20px; border-bottom: 1px solid var(--mtt-border);
+      background: rgba(0,0,0,0.15);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .chat-header .cust-info h5 { margin: 0; font-size: 0.95rem; font-weight: 700; color: #fff; }
+    .chat-header .cust-info small { color: rgba(255,255,255,0.4); font-size: 0.78rem; }
+    .chat-messages { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+
+    .msg { display: flex; gap: 8px; max-width: 70%; }
+    .msg.from-customer { align-self: flex-start; }
+    .msg.from-operator { align-self: flex-end; flex-direction: row-reverse; }
+    .msg .bubble {
+      padding: 10px 14px; border-radius: 12px; font-size: 0.88rem; line-height: 1.5;
+    }
+    .msg.from-customer .bubble { background: rgba(46,134,193,0.15); border: 1px solid var(--mtt-border); color: #dceef8; border-top-left-radius: 2px; }
+    .msg.from-operator .bubble { background: var(--mtt-accent); color: #fff; border-top-right-radius: 2px; }
+    .msg .msg-time { font-size: 0.7rem; color: rgba(255,255,255,0.3); align-self: flex-end; }
+
+    /* İşlem Detayları panel */
+    .detail-panel {
+      width: 280px; flex-shrink: 0;
+      background: #0e2035;
+      border-left: 1px solid var(--mtt-border);
+      overflow-y: auto; padding: 16px;
+    }
+    .detail-panel h6 { color: rgba(255,255,255,0.5); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 14px; }
+    .detail-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 0.83rem; }
+    .detail-row .dk { color: rgba(255,255,255,0.45); }
+    .detail-row .dv { color: #fff; font-weight: 600; text-align: right; }
+    .divider { border-top: 1px solid var(--mtt-border); margin: 14px 0; }
+    .action-btns { display: flex; flex-direction: column; gap: 8px; }
+    .btn-action {
+      padding: 9px; border-radius: 8px; font-size: 0.85rem; font-weight: 600;
+      cursor: pointer; border: 1px solid; text-align: center; transition: all 0.15s;
+    }
+    .btn-kabul    { background: rgba(39,174,96,0.15); border-color: rgba(39,174,96,0.4); color: #2ecc71; }
+    .btn-kabul:hover { background: rgba(39,174,96,0.25); }
+    .btn-tamam    { background: rgba(46,134,193,0.15); border-color: rgba(46,134,193,0.4); color: #3498db; }
+    .btn-tamam:hover { background: rgba(46,134,193,0.25); }
+    .btn-reddet   { background: rgba(220,53,69,0.1); border-color: rgba(220,53,69,0.3); color: #ff6b6b; }
+    .btn-reddet:hover { background: rgba(220,53,69,0.2); }
+    .btn-iptal    { background: rgba(127,140,141,0.1); border-color: rgba(127,140,141,0.3); color: #95a5a6; }
+    .btn-iptal:hover  { background: rgba(127,140,141,0.2); }
+
+    /* Chat input */
+    .chat-input-area { padding: 12px 20px; border-top: 1px solid var(--mtt-border); display: flex; gap: 8px; background: rgba(0,0,0,0.1); }
+    .chat-input-area textarea {
+      flex: 1; background: rgba(0,0,0,0.3); border: 1px solid var(--mtt-border);
+      color: #fff; border-radius: 8px; padding: 9px 14px; font-size: 0.88rem; resize: none; height: 40px;
+    }
+    .chat-input-area textarea:focus { outline: none; border-color: var(--mtt-accent); }
+    .chat-input-area textarea::placeholder { color: rgba(255,255,255,0.3); }
+    .btn-send { background: var(--mtt-accent); border: none; color: #fff; border-radius: 8px; width: 40px; cursor: pointer; }
+    .btn-send:hover { opacity: 0.85; }
+
+    .empty-chat { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; color: rgba(255,255,255,0.2); gap: 12px; }
+    .empty-chat i { font-size: 48px; }
+    .tx-code { font-family: monospace; color: var(--mtt-gold); }
+
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(46,134,193,0.3); border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+<!-- Topbar -->
+<div class="topbar">
+  <div class="brand">
+    <div class="icon"><i class="fa-solid fa-money-bill-transfer"></i></div>
+    <div>
+      <h2>Money Transfer Turkey &nbsp;<span style="color:rgba(255,255,255,0.35);font-weight:400">/ Operatör Paneli</span></h2>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div class="op-avatar" id="opAvatar">OP</div>
+    <div>
+      <div class="op-name" id="opName">Yükleniyor...</div>
+      <div class="op-status"><span class="online-dot"></span>Çevrimiçi</div>
+    </div>
+    <button class="btn-sm-action btn-admin d-none" id="btnAdmin" onclick="window.location.href='/admin'">
+      <i class="fa-solid fa-shield-halved me-1"></i>Admin Panel
+    </button>
+    <button class="btn-sm-action btn-logout" onclick="logout()">
+      <i class="fa-solid fa-right-from-bracket me-1"></i>Çıkış Yap
+    </button>
+  </div>
+</div>
+
+<!-- Main Layout -->
+<div class="main-layout">
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-tabs">
+      <div class="sidebar-tab active" onclick="switchTab('active',this)">
+        <i class="fa-solid fa-bolt me-1"></i>Aktif İşlemler
+        <span class="badge bg-danger ms-1" id="activeCount" style="font-size:0.7rem">0</span>
+      </div>
+      <div class="sidebar-tab" onclick="switchTab('completed',this)">
+        <i class="fa-solid fa-check me-1"></i>Tamamlananlar
+      </div>
+    </div>
+    <div class="sidebar-search">
+      <input type="text" placeholder="Müşteri veya işlem kodu ara..." id="sidebarSearch" oninput="searchTx()">
+    </div>
+    <div class="tx-list" id="txList">
+      <div style="padding:24px;text-align:center;color:rgba(255,255,255,0.3)">
+        <i class="fa-solid fa-spinner fa-spin me-2"></i>Yükleniyor...
+      </div>
+    </div>
+  </div>
+
+  <!-- Chat Area -->
+  <div class="chat-area" id="chatArea">
+    <div class="empty-chat" id="emptyChat">
+      <i class="fa-solid fa-comments"></i>
+      <p>Bir işlem seçin</p>
+    </div>
+
+    <!-- Active chat (hidden until selection) -->
+    <div id="chatView" class="d-none" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+      <div class="chat-header">
+        <div class="cust-info">
+          <h5 id="chatCustomerName">—</h5>
+          <small id="chatTxCode">—</small>
+        </div>
+        <div style="color:rgba(255,255,255,0.4);font-size:0.82rem" id="chatDealer">—</div>
+      </div>
+      <div class="chat-messages" id="chatMessages"></div>
+      <div class="chat-input-area">
+        <textarea id="chatInput" placeholder="Mesaj yaz..." onkeydown="handleKey(event)"></textarea>
+        <button class="btn-send" onclick="sendMessage()"><i class="fa-solid fa-paper-plane"></i></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail Panel -->
+  <div class="detail-panel" id="detailPanel">
+    <h6><i class="fa-solid fa-circle-info me-1"></i>İşlem Detayları</h6>
+    <div id="detailContent" style="color:rgba(255,255,255,0.25);font-size:0.82rem;text-align:center;padding:20px 0">
+      İşlem seçilmedi
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+<script>
+  // baskentenerji.com'dan yönlendirme — URL'den token al
+  const _urlParams = new URLSearchParams(window.location.search);
+  const _urlToken  = _urlParams.get('token');
+  if (_urlToken) {
+    localStorage.setItem('mtt_token', _urlToken);
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+
+  const TOKEN = localStorage.getItem('mtt_token');
+  const USER  = JSON.parse(localStorage.getItem('mtt_user') || '{}');
+  if (!TOKEN) window.location.href = 'https://baskentenerji.com/mtt-panel';
+
+  let allTx = [], currentTab = 'active', selectedTxId = null;
+
+  function logout() {
+    localStorage.clear(); window.location.href = 'https://baskentenerji.com/mtt-panel';
+  }
+
+  function initOperator() {
+    const name = USER.name || 'Operatör';
+    document.getElementById('opName').textContent = name;
+    document.getElementById('opAvatar').textContent = name.slice(0,2).toUpperCase();
+    if (USER.is_admin) document.getElementById('btnAdmin').classList.remove('d-none');
+  }
+
+  function fmt(n, dec=2) { return Number(n||0).toLocaleString('tr-TR',{minimumFractionDigits:dec,maximumFractionDigits:dec}); }
+
+  function relTime(dt) {
+    const diff = (Date.now() - new Date(dt)) / 1000;
+    if (diff < 60) return 'Az önce';
+    if (diff < 3600) return Math.floor(diff/60) + ' dk önce';
+    if (diff < 86400) return Math.floor(diff/3600) + ' sa önce';
+    return new Date(dt).toLocaleDateString('tr-TR');
+  }
+
+  function switchTab(tab, el) {
+    currentTab = tab;
+    document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    renderSidebar();
+  }
+
+  function renderSidebar() {
+    const filtered = currentTab === 'active'
+      ? allTx.filter(t => ['pending','processing','bekliyor','islemde'].includes(t.status?.toLowerCase()))
+      : allTx.filter(t => ['completed','cancelled','tamamlandi','iptal'].includes(t.status?.toLowerCase()));
+
+    const search = document.getElementById('sidebarSearch').value.toLowerCase();
+    const shown = search ? filtered.filter(t =>
+      (t.customer_name||'').toLowerCase().includes(search) ||
+      (t.code||'').toLowerCase().includes(search)
+    ) : filtered;
+
+    document.getElementById('activeCount').textContent =
+      allTx.filter(t => ['pending','processing','bekliyor','islemde'].includes(t.status?.toLowerCase())).length;
+
+    if (!shown.length) {
+      document.getElementById('txList').innerHTML = '<div style="padding:24px;text-align:center;color:rgba(255,255,255,0.3);font-size:0.82rem">İşlem bulunamadı</div>';
+      return;
+    }
+
+    document.getElementById('txList').innerHTML = shown.map(tx => `
+      <div class="tx-item ${selectedTxId === tx.id ? 'active' : ''}" onclick="selectTx(${tx.id})">
+        <div class="tx-header">
+          <span class="tx-customer">
+            <span class="${tx.status==='pending'||tx.status==='bekliyor' ? 'dot-bekliyor' : 'dot-islemde'}"></span>
+            ${tx.customer_name || 'Müşteri'}
+          </span>
+          <span class="tx-time">${relTime(tx.created_at)}</span>
+        </div>
+        <div class="d-flex justify-content-between">
+          <span class="tx-preview">${tx.currency||'USDT'} → TL &nbsp;·&nbsp; ${tx.dealer_name||''}</span>
+          <span class="tx-amount">${fmt(tx.amount)} ${tx.currency||'USDT'}</span>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function searchTx() { renderSidebar(); }
+
+  function selectTx(id) {
+    selectedTxId = id;
+    const tx = allTx.find(t => t.id === id);
+    if (!tx) return;
+
+    renderSidebar(); // re-render to highlight
+
+    // Show chat
+    document.getElementById('emptyChat').classList.add('d-none');
+    const cv = document.getElementById('chatView');
+    cv.classList.remove('d-none');
+    cv.style.display = 'flex';
+
+    document.getElementById('chatCustomerName').textContent = tx.customer_name || 'Müşteri';
+    document.getElementById('chatTxCode').textContent = 'İşlem Kodu: ' + (tx.code||'—');
+    document.getElementById('chatDealer').textContent = 'Bayi: ' + (tx.dealer_name||'—');
+
+    loadChat(id);
+    loadDetail(tx);
+  }
+
+  function loadChat(txId) {
+    const container = document.getElementById('chatMessages');
+    container.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,0.3);padding:20px"><i class="fa-solid fa-spinner fa-spin"></i></div>';
+
+    fetch(`/api/operator/chat/${txId}`, { headers: {'Authorization':'Bearer '+TOKEN} })
+    .then(r => r.json())
+    .then(data => {
+      if (!data.messages?.length) {
+        container.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,0.25);padding:40px;font-size:0.83rem">Henüz mesaj yok</div>';
+        return;
+      }
+      container.innerHTML = data.messages.map(m => `
+        <div class="msg ${m.sender_type==='customer' ? 'from-customer' : 'from-operator'}">
+          <div class="bubble">${m.message}</div>
+          <span class="msg-time">${new Date(m.created_at).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})}</span>
+        </div>
+      `).join('');
+      container.scrollTop = container.scrollHeight;
+    })
+    .catch(() => {
+      container.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,0.25);padding:20px;font-size:0.82rem">Mesajlar yüklenemedi.</div>';
+    });
+  }
+
+  function loadDetail(tx) {
+    const currency = tx.currency || 'USDT';
+    document.getElementById('detailContent').innerHTML = `
+      <div class="detail-row"><span class="dk">Müşteri</span><span class="dv">${tx.customer_name||'—'}</span></div>
+      <div class="detail-row"><span class="dk">Tutar</span><span class="dv tx-code">${fmt(tx.amount)} ${currency}</span></div>
+      <div class="detail-row"><span class="dk">Verilecek TL</span><span class="dv">${fmt(tx.tl_amount)} ₺</span></div>
+      <div class="detail-row"><span class="dk">Kur</span><span class="dv">${fmt(tx.rate)}</span></div>
+      <div class="detail-row"><span class="dk">Bayi</span><span class="dv">${tx.dealer_name||'—'}</span></div>
+      <div class="detail-row"><span class="dk">İşlem Kodu</span><span class="dv tx-code">${tx.code||'—'}</span></div>
+      <div class="detail-row"><span class="dk">Tarih</span><span class="dv">${new Date(tx.created_at).toLocaleString('tr-TR')}</span></div>
+      <div class="divider"></div>
+      <div class="action-btns">
+        <button class="btn-action btn-kabul" onclick="txAction(${tx.id},'accept')">
+          <i class="fa-solid fa-check me-1"></i>Kabul Et
+        </button>
+        <button class="btn-action btn-tamam" onclick="txAction(${tx.id},'complete')">
+          <i class="fa-solid fa-flag-checkered me-1"></i>Tamamla
+        </button>
+        <button class="btn-action btn-reddet" onclick="txAction(${tx.id},'reject')">
+          <i class="fa-solid fa-xmark me-1"></i>Reddet
+        </button>
+        <button class="btn-action btn-iptal" onclick="txAction(${tx.id},'cancel')">
+          <i class="fa-solid fa-ban me-1"></i>İptal Et
+        </button>
+      </div>
+    `;
+  }
+
+  function txAction(txId, action) {
+    if (!confirm({accept:'Kabul',complete:'Tamamla',reject:'Reddet',cancel:'İptal'}[action] + ' işlemi onaylıyor musunuz?')) return;
+    fetch(`/api/operator/transaction/${txId}/${action}`, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer '+TOKEN, 'Content-Type': 'application/json' }
+    })
+    .then(r => r.json())
+    .then(d => {
+      if (d.success) { loadOperatorData(); alert('İşlem güncellendi.'); }
+      else alert('Hata: ' + (d.message||'Bilinmeyen hata'));
+    })
+    .catch(() => alert('Sunucu hatası.'));
+  }
+
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  }
+
+  function sendMessage() {
+    const input = document.getElementById('chatInput');
+    const msg = input.value.trim();
+    if (!msg || !selectedTxId) return;
+
+    fetch(`/api/operator/chat/${selectedTxId}`, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer '+TOKEN, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg })
+    })
+    .then(r => r.json())
+    .then(d => { if (d.success) { input.value = ''; loadChat(selectedTxId); } })
+    .catch(() => {});
+  }
+
+  function loadOperatorData() {
+    fetch('/api/operator/transactions', { headers: {'Authorization':'Bearer '+TOKEN} })
+    .then(r => { if(r.status===401){logout();throw 0;} return r.json(); })
+    .then(data => {
+      allTx = data.transactions || [];
+      renderSidebar();
+      if (selectedTxId) {
+        const updated = allTx.find(t => t.id === selectedTxId);
+        if (updated) loadDetail(updated);
+      }
+    })
+    .catch(() => {});
+  }
+
+  initOperator();
+  loadOperatorData();
+  setInterval(loadOperatorData, 15000); // refresh every 15s
+  setInterval(() => { if (selectedTxId) loadChat(selectedTxId); }, 10000); // poll chat
+</script>
+</body>
+</html>
