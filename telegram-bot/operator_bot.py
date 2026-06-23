@@ -5,6 +5,7 @@ python-telegram-bot 20.6 (async)
 """
 
 import asyncio
+import html
 import logging
 from datetime import datetime
 
@@ -129,12 +130,12 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if is_owner and not operator:
         await update.message.reply_text(
             (
-                f"👑 **{user.first_name}**\n\n"
+                f"👑 <b>{html.escape(user.first_name)}</b>\n\n"
                 "Owner paneli aktif.\n"
                 "👇 Menüden işlem seçin."
             ),
             reply_markup=_main_menu_kb(show_owner_panel=True, show_admin_panel=True),
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
         return
 
@@ -180,7 +181,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ── Aktif operatör — ana menü ──
     await update.message.reply_text(
         (
-            f"✅ **{user.first_name}**\n\n"
+            f"✅ <b>{html.escape(user.first_name)}</b>\n\n"
             f"📋 Operatör paneli aktif.\n"
             f"🔔 Yeni müşteri geldiğinde bildirim alırsınız.\n"
             f"👇 Menüden işlem seçin."
@@ -189,7 +190,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             show_owner_panel=is_owner,
             show_admin_panel=(is_owner or is_admin)
         ),
-        parse_mode="Markdown"
+        parse_mode="HTML"
     )
 
 
@@ -548,10 +549,27 @@ async def _show_stats(query, operator_id: int):
 
 async def _show_owner_panel(message, user_id: int):
     convs = db.get_owner_conversations(limit=15, only_active=False)
+    all_ops = db.get_all_operators(include_inactive=True, exclude_ids=[Config.ADMIN_ID])
+    active_ops = [o for o in all_ops if o.get('is_active')]
+    pending_ops = [o for o in all_ops if not o.get('is_active')]
     if not convs:
-        await message.reply_text("ℹ️ Owner paneli için görüntülenecek operatör görüşmesi bulunamadı.")
+        await message.reply_text(
+            f"👑 <b>OWNER PANEL</b>\n\n"
+            f"🟢 Aktif operatör: {len(active_ops)}\n"
+            f"🟡 Onay bekleyen: {len(pending_ops)}\n\n"
+            f"ℹ️ Henüz operatöre atanmış müşteri görüşmesi yok.\n"
+            f"Müşteriler işlem başlattığında burada görünecek.",
+            parse_mode="HTML"
+        )
+        await _send_menu(
+            Bot(token=Config.OPERATOR_BOT_TOKEN),
+            user_id,
+            text="👑 Owner menü",
+            show_owner_panel=True,
+            show_admin_panel=True
+        )
         return
-    await message.reply_text("👑 **OWNER PANEL**\nOperatöre atanmış son görüşmeler:", parse_mode="Markdown")
+    await message.reply_text("👑 <b>OWNER PANEL</b>\nOperatöre atanmış son görüşmeler:", parse_mode="HTML")
     for item in convs:
         tid = item.get('transaction_id')
         status = item.get('status') or "-"

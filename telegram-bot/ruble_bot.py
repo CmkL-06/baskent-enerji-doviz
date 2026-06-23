@@ -6,6 +6,7 @@ python-telegram-bot 20.6 (async)
 """
 
 import asyncio
+import html
 import re
 import random
 import logging
@@ -93,15 +94,15 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if _is_bank_provider(user_id):
         await update.message.reply_text(
-            "🏦 **Ruble İşlem Botu**\n\n"
+            "🏦 <b>Ruble İşlem Botu</b>\n\n"
             "Hoş geldiniz! Siz yetkili banka hesabı sağlayıcısısınız.\n\n"
             "📌 Kanalda yeni işlemler görünecek\n"
             "💳 İşlem mesajına reply atarak banka hesabı bilgisi gönderin\n"
             "✅ Dekont geldiğinde onaylama yapabilirsiniz\n\n"
-            "📝 **Komutlar:**\n"
+            "📝 <b>Komutlar:</b>\n"
             "/getid — Kendi ID'nizi öğrenin\n"
             "/list_providers — Tüm sağlayıcıları listele",
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
     else:
         await update.message.reply_text(
@@ -119,17 +120,17 @@ async def cmd_getid(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_provider = "✅ Evet" if _is_bank_provider(user.id) else "❌ Hayır"
 
     msg = (
-        f"👤 **Bilgileriniz:**\n\n"
-        f"🆔 ID: `{user.id}`\n"
-        f"📝 Ad: {user.first_name}\n"
-        f"📱 Username: @{user.username or 'Yok'}\n"
+        f"👤 <b>Bilgileriniz:</b>\n\n"
+        f"🆔 ID: <code>{user.id}</code>\n"
+        f"📝 Ad: {html.escape(user.first_name)}\n"
+        f"📱 Username: @{html.escape(user.username or 'Yok')}\n"
         f"🏦 Banka Sağlayıcısı: {is_provider}"
     )
 
     if not _is_bank_provider(user.id):
-        msg += f"\n\n💡 Banka sağlayıcısı olmak için bu ID'yi yöneticiye bildirin: `{user.id}`"
+        msg += f"\n\n💡 Banka sağlayıcısı olmak için bu ID'yi yöneticiye bildirin: <code>{user.id}</code>"
 
-    await update.message.reply_text(msg, parse_mode="Markdown")
+    await update.message.reply_text(msg, parse_mode="HTML")
 
 
 # ═══════════════════════════════════════════════
@@ -193,14 +194,14 @@ async def cmd_list_providers(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text("⛔ Bu komutu kullanma yetkiniz yok!")
         return
 
-    msg = "🏦 **Aktif Banka Hesabı Sağlayıcıları:**\n\n"
+    msg = "🏦 <b>Aktif Banka Hesabı Sağlayıcıları:</b>\n\n"
     for i, pid in enumerate(Config.BANK_PROVIDERS, 1):
         admin_tag = " 👑 (Admin)" if pid == Config.ADMIN_ID else ""
         you_tag = " 👤 (Siz)" if pid == user_id else ""
-        msg += f"{i}. `{pid}`{admin_tag}{you_tag}\n"
+        msg += f"{i}. <code>{pid}</code>{admin_tag}{you_tag}\n"
     msg += f"\n📊 Toplam: {len(Config.BANK_PROVIDERS)} sağlayıcı"
 
-    await update.message.reply_text(msg, parse_mode="Markdown")
+    await update.message.reply_text(msg, parse_mode="HTML")
 
 
 # ═══════════════════════════════════════════════
@@ -272,25 +273,25 @@ async def _approve_payment(query, tid: int, provider_id: int):
     try:
         await query.edit_message_caption(
             caption=(
-                f"✅ **İŞLEM TAMAMLANDI**\n"
+                f"✅ <b>İŞLEM TAMAMLANDI</b>\n"
                 f"━━━━━━━━━━━━━━━\n"
                 f"🔖 İşlem ID: #{tid}\n"
                 f"✔️ Ödeme onaylandı\n"
-                f"👤 Onaylayan: {query.from_user.first_name}\n"
+                f"👤 Onaylayan: {html.escape(query.from_user.first_name)}\n"
                 f"⏰ {datetime.now().strftime('%H:%M')}"
             ),
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
     except Exception:
         try:
             await query.edit_message_text(
-                f"✅ **İŞLEM TAMAMLANDI**\n"
+                f"✅ <b>İŞLEM TAMAMLANDI</b>\n"
                 f"━━━━━━━━━━━━━━━\n"
                 f"🔖 İşlem ID: #{tid}\n"
                 f"✔️ Ödeme onaylandı\n"
-                f"👤 Onaylayan: {query.from_user.first_name}\n"
+                f"👤 Onaylayan: {html.escape(query.from_user.first_name)}\n"
                 f"⏰ {datetime.now().strftime('%H:%M')}",
-                parse_mode="Markdown"
+                parse_mode="HTML"
             )
         except Exception as e:
             logger.error(f"Kanal mesajı güncelleme hatası: {e}")
@@ -309,17 +310,17 @@ async def _approve_payment(query, tid: int, provider_id: int):
                 chat_id=customer_id,
                 text=(
                     f"{t('ruble_transaction_completed', lang)}\n\n"
-                    f"🎯 **{t('completion_code_label', lang, code=completion_code)}**\n\n"
+                    f"🎯 <b>{html.escape(t('completion_code_label', lang, code=completion_code))}</b>\n\n"
                     f"{t('transaction_details_header', lang)}\n"
                     f"• {t('transaction_id_label', lang, tid=tid)}\n"
                     f"• {t('ruble_amount_label', lang, amount=f'{ruble_amount:,.2f}')}\n"
                     f"• {t('try_amount_label', lang, amount=f'{try_amount_val:,.2f}')}\n"
                     f"• {t('exchange_rate_label', lang, rate=f'{exchange_rate:.4f}')}\n"
                     f"• {t('status_approved', lang)}\n\n"
-                    f"⚠️ **{t('show_code_to_dealer', lang)}**\n\n"
+                    f"⚠️ <b>{html.escape(t('show_code_to_dealer', lang))}</b>\n\n"
                     f"{t('thank_you', lang)}"
                 ),
-                parse_mode="Markdown"
+                parse_mode="HTML"
             )
         except Exception as e:
             logger.error(f"Müşteriye tamamlama bildirimi hatası: {e}")
@@ -354,25 +355,25 @@ async def _reject_payment(query, tid: int, provider_id: int):
     try:
         await query.edit_message_caption(
             caption=(
-                f"❌ **ÖDEME REDDEDİLDİ**\n"
+                f"❌ <b>ÖDEME REDDEDİLDİ</b>\n"
                 f"━━━━━━━━━━━━━━━\n"
                 f"🔖 İşlem ID: #{tid}\n"
                 f"❌ Ödeme reddedildi\n"
-                f"👤 Reddeden: {query.from_user.first_name}\n"
+                f"👤 Reddeden: {html.escape(query.from_user.first_name)}\n"
                 f"⏰ {datetime.now().strftime('%H:%M')}"
             ),
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
     except Exception:
         try:
             await query.edit_message_text(
-                f"❌ **ÖDEME REDDEDİLDİ**\n"
+                f"❌ <b>ÖDEME REDDEDİLDİ</b>\n"
                 f"━━━━━━━━━━━━━━━\n"
                 f"🔖 İşlem ID: #{tid}\n"
                 f"❌ Ödeme reddedildi\n"
-                f"👤 Reddeden: {query.from_user.first_name}\n"
+                f"👤 Reddeden: {html.escape(query.from_user.first_name)}\n"
                 f"⏰ {datetime.now().strftime('%H:%M')}",
-                parse_mode="Markdown"
+                parse_mode="HTML"
             )
         except Exception as e:
             logger.error(f"Kanal mesajı güncelleme hatası: {e}")
@@ -386,12 +387,12 @@ async def _reject_payment(query, tid: int, provider_id: int):
             await main_bot.send_message(
                 chat_id=customer_id,
                 text=(
-                    f"❌ **{t('payment_rejected', lang)}**\n"
+                    f"❌ <b>{html.escape(t('payment_rejected', lang))}</b>\n"
                     f"━━━━━━━━━━━━━━━\n"
                     f"{t('transaction_id_label', lang, tid=tid)}\n\n"
                     f"{t('payment_rejected_detail', lang)}"
                 ),
-                parse_mode="Markdown"
+                parse_mode="HTML"
             )
         except Exception as e:
             logger.error(f"Müşteriye red bildirimi hatası: {e}")
@@ -423,9 +424,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Reply to message kontrolü
     if not update.message.reply_to_message:
         await update.message.reply_text(
-            "💡 **Kullanım:**\n"
+            "💡 <b>Kullanım:</b>\n"
             "İşlem mesajına reply atarak banka hesabı bilgilerini gönderin.",
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
         return
 
@@ -474,12 +475,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"━━━━━━━━━━━━━━━\n\n"
                 f"{t('bank_info_header', lang)}\n"
                 f"━━━━━━━━━━━━━━━\n\n"
-                f"```\n{text}\n```\n\n"
+                f"<pre>{html.escape(text)}</pre>\n\n"
                 f"━━━━━━━━━━━━━━━\n"
                 f"{t('copy_instruction', lang)}\n\n"
                 f"{t('send_pdf_receipt', lang)}"
             ),
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
 
         # Cache güncelle

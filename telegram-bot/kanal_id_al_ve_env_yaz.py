@@ -1,6 +1,6 @@
 """
 Kanal ID'sini getUpdates ile alir, .env'ye yazar.
-1) Ruble botu (@MTTOperatorBot) kanala admin ekleyin
+1) Ruble botu (@MoneyExchangeRubleBot) kanala admin ekleyin
 2) Kanala bir mesaj atin
 3) Bu scripti calistirin: python kanal_id_al_ve_env_yaz.py
 """
