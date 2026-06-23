@@ -22,8 +22,6 @@ namespace BaskentEnerji.Entity
         User,
         Customer,
         Staff = 50,   // Personel / şube erişimi
-        Author = 79,
-        Moderator = 89,
         Admin = 99,
         Owner = 100,
     }

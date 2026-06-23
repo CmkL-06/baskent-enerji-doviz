@@ -48,8 +48,8 @@ namespace BaskentEnerji.API.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> ForgotPassword([FromBody] rm_forgot_password requestData)
         {
-            var token = await _userServiceCommand.GeneratePasswordResetToken(requestData.Email);
-            return Ok(new { Token = token });
+            await _userServiceCommand.GeneratePasswordResetToken(requestData.Email);
+            return Ok(new { Message = "If this email exists, a reset link has been sent." });
         }
 
         [HttpPost("reset-password")]
@@ -65,26 +65,14 @@ namespace BaskentEnerji.API.Controllers
         }
 
         [HttpPost("activate-email")]
-        [AllowAnonymous]
+        [Authorize]
         public async Task<IActionResult> ActivateEmail([FromBody] rm_activate_email requestData)
         {
+            if (!await _validationService.IsAdminAsync())
+                throw new ApiException(System.Net.HttpStatusCode.Forbidden, "Bu işlem için Admin yetkisi gereklidir.");
             var result = await _userServiceCommand.ActivateEmail(requestData.Email, requestData.Token);
             if (result)
-            {
                 return Ok(new { Message = "Email activated successfully" });
-            }
-            return BadRequest(new { Message = "Invalid token or email" });
-        }
-
-        [HttpGet("activate-email")]
-        [AllowAnonymous]
-        public async Task<IActionResult> ActivateEmail([FromQuery] string token, [FromQuery] string email)
-        {
-            var result = await _userServiceCommand.ActivateEmail(email, token);
-            if (result)
-            {
-                return Ok(new { Message = "Email activated successfully" });
-            }
             return BadRequest(new { Message = "Invalid token or email" });
         }
 

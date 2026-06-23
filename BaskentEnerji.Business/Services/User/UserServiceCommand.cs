@@ -90,7 +90,6 @@ namespace BaskentEnerji.Business.Services.User
                     CreatedDate = user.CreatedDate,
                     Firstname = user.Firstname ?? "",
                     Lastname = user.Lastname ?? "",
-                    Gender = user.Gender,
                     Rank = user.Rank,
                     Username = user.Username ?? ""
                 }
@@ -117,12 +116,9 @@ namespace BaskentEnerji.Business.Services.User
                 Password = passwordHash,
                 Firstname = requestData.Firstname,
                 Lastname = requestData.Lastname,
-                Gender = requestData.Gender,
-                IsEmailVerified = false,
                 Rank = Entity.Rank.User,
                 FirstIp = tools_string.GetIpAddress(httpContext),
                 LastIp = tools_string.GetIpAddress(httpContext),
-                
             };
 
             _dbContext.Users.Add(user);
@@ -147,7 +143,6 @@ namespace BaskentEnerji.Business.Services.User
                     Firstname = user.Firstname,
                     Lastname = user.Lastname,
                     Rank = user.Rank,
-                    Gender = user.Gender
                 }
             };
         }

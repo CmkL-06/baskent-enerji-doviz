@@ -15,8 +15,5 @@ namespace BaskentEnerji.Entity.Modals.ViewModals.User
         public string Lastname { get; set; }
         public string FullName { get; set; }
         public Rank Rank { get; set; }
-        public Gender Gender { get; set; }
-        public string LanguageCode { get; set; }
-            
     }
 }
