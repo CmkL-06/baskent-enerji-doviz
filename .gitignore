@@ -17,7 +17,6 @@ publish-temp/
 
 # Package managers
 node_modules/
-package-lock.json
 npm-cache/
 
 # IDE
