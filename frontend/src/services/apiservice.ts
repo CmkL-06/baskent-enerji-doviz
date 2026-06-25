@@ -1,9 +1,10 @@
 import axios from 'axios'
 
-const BASE_URL = (typeof window !== 'undefined' &&
-  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
-  ? 'http://localhost:5093/api/v1'
-  : 'https://api.baskentenerji.com/api/v1'
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ??
+  ((typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
+    ? 'http://localhost:5093/api/v1'
+    : 'https://api.baskentenerji.com/api/v1')
 
 const apiClient = axios.create({ baseURL: BASE_URL })
 

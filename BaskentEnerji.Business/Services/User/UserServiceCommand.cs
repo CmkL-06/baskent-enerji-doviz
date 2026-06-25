@@ -30,6 +30,7 @@ namespace BaskentEnerji.Business.Services.User
         private readonly string _jwtSecretKey;
         private readonly string _jwtIssuer;
         private readonly string _jwtAudience;
+        private readonly int _jwtExpiryHours;
         private readonly IEmailSender _emailSender;
         private readonly ValidationService _validationService;
         private readonly IMapper mapper;
@@ -41,6 +42,7 @@ namespace BaskentEnerji.Business.Services.User
             _jwtSecretKey = configuration["JwtSecretKey"];
             _jwtIssuer = configuration["JwtIssuer"];
             _jwtAudience = configuration["JwtAudience"];
+            _jwtExpiryHours = int.TryParse(configuration["JwtExpiryHours"], out var h) ? h : 8;
             _emailSender = emailSender;
             _validationService = validationService;
             this.mapper = mapper;
@@ -216,11 +218,13 @@ namespace BaskentEnerji.Business.Services.User
                 Subject = new ClaimsIdentity(new Claim[]
                 {
                     new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                    new Claim("UserId", user.Id.ToString()), // Custom claim for middleware
+                    new Claim("UserId", user.Id.ToString()),
                     new Claim(ClaimTypes.Email, user.Mail ?? ""),
-                    // new Claim(ClaimTypes.Role, user.Rank)
+                    new Claim(ClaimTypes.Role, user.Rank.ToString()),
+                    new Claim("Rank", ((int)user.Rank).ToString()),
+                    new Claim(ClaimTypes.Name, user.Username ?? ""),
                 }),
-                Expires = DateTime.UtcNow.AddHours(24),
+                Expires = DateTime.UtcNow.AddHours(_jwtExpiryHours),
                 Issuer = _jwtIssuer,
                 Audience = _jwtAudience,
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
@@ -326,8 +330,8 @@ namespace BaskentEnerji.Business.Services.User
 
         public async Task<bool> ChangeUserPassword(rm_change_user_password requestData)
         {
-            if (!await _validationService.IsOwnerAsync())
-                throw new ApiException(HttpStatusCode.Forbidden, "Bu işlem için Owner yetkisi gereklidir.");
+            if (!await _validationService.IsOwnerAsync() && !await _validationService.IsAdminAsync())
+                throw new ApiException(HttpStatusCode.Forbidden, "Bu işlem için Admin veya Owner yetkisi gereklidir.");
 
             var user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == requestData.UserId);
             if (user == null)

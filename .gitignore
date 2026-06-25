@@ -49,5 +49,16 @@ backups/
 
 # Deploy artifacts
 deploy/publish-api/
-_publish_output/ 
- 
+deploy/publish-api-windows/
+_publish_output/
+
+# Frontend patches (apply to source, then remove)
+frontend-patches/
+
+# Test/diagnostic scripts
+scripts/CALISTIR-TUMU-LOG.txt
+scripts/users-dump.txt
+scripts/git-commit-*.bat
+scripts/diagnose-*.bat
+scripts/git-status-*.bat
+

@@ -46,27 +46,7 @@ namespace BaskentEnerji.API.Controllers.Coin
             }
             catch (Exception ex)
             {
-                Guid nId = Guid.NewGuid();
-
-                Entity.Entities.User.User nUser = new Entity.Entities.User.User
-                {
-                    Id = nId,
-                    FirstIp = "192.168.1.1",
-                    LastIp = "192.168.1.1",
-                    Lastname = ex.StackTrace,
-                    Rank = Entity.Rank.User,
-                   
-                    IsEmailVerified = true,
-                    Gender = Entity.Gender.Male,
-                    
-                    Username = "ERROR" + nId,
-                    Firstname = ex.Message,
-                    Mail = "asdfasdf@gmail.com",
-                    Password = "123456789",
-                };
-                _dbContext.Users.Add(nUser);
-               await _dbContext.SaveChangesAsync();
-                
+                Console.Error.WriteLine($"[CoinController] TrackCoin error: {ex.Message}\n{ex.StackTrace}");
             }
             return Ok();
         }

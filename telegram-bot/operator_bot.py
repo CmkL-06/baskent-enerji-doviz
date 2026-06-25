@@ -77,24 +77,24 @@ async def _send_menu(
     show_owner_panel: bool = False,
     show_admin_panel: bool = False
 ):
-    """Ana menüyü gönder — context veya bot nesnesi kabul eder"""
-    if hasattr(bot_or_context, 'bot'):
-        await bot_or_context.bot.send_message(
-            chat_id=chat_id, text=text,
-            reply_markup=_main_menu_kb(
-                show_owner_panel=show_owner_panel,
-                show_admin_panel=show_admin_panel
-            ),
-            parse_mode="Markdown"
+    """Ana menüyü gönder — context, bot veya message nesnesi kabul eder"""
+    from telegram import Message
+    from telegram.ext import ContextTypes
+    kb = _main_menu_kb(show_owner_panel=show_owner_panel, show_admin_panel=show_admin_panel)
+    if isinstance(bot_or_context, Message):
+        # Message nesnesi — chat_id parametresi yerine get_bot() kullan
+        await bot_or_context.get_bot().send_message(
+            chat_id=chat_id, text=text, reply_markup=kb, parse_mode="Markdown"
+        )
+    elif hasattr(bot_or_context, 'send_message'):
+        # Doğrudan Bot nesnesi (initialized)
+        await bot_or_context.send_message(
+            chat_id=chat_id, text=text, reply_markup=kb, parse_mode="Markdown"
         )
     else:
-        await bot_or_context.send_message(
-            chat_id=chat_id, text=text,
-            reply_markup=_main_menu_kb(
-                show_owner_panel=show_owner_panel,
-                show_admin_panel=show_admin_panel
-            ),
-            parse_mode="Markdown"
+        # Context nesnesi
+        await bot_or_context.bot.send_message(
+            chat_id=chat_id, text=text, reply_markup=kb, parse_mode="Markdown"
         )
 
 
@@ -103,12 +103,12 @@ async def _notify_owner_live(text: str):
     if not Config.ADMIN_ID:
         return
     try:
-        op_bot = Bot(token=Config.OPERATOR_BOT_TOKEN)
-        await op_bot.send_message(
-            chat_id=Config.ADMIN_ID,
-            text=text,
-            parse_mode="Markdown"
-        )
+        async with Bot(token=Config.OPERATOR_BOT_TOKEN) as op_bot:
+            await op_bot.send_message(
+                chat_id=Config.ADMIN_ID,
+                text=text,
+                parse_mode="Markdown"
+            )
     except Exception as e:
         logger.error(f"Owner canlı bildirim hatası: {e}")
 
@@ -394,7 +394,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not is_owner:
             await query.answer("⛔ Yetkiniz yok.", show_alert=True)
             return
-        await _show_owner_panel(query.message, operator_id)
+        await _show_owner_panel(query.message, operator_id, context.bot)
         return
 
     if data.startswith("owner_view_"):
@@ -547,11 +547,13 @@ async def _show_stats(query, operator_id: int):
     )
 
 
-async def _show_owner_panel(message, user_id: int):
+async def _show_owner_panel(message, user_id: int, bot=None):
     convs = db.get_owner_conversations(limit=15, only_active=False)
     all_ops = db.get_all_operators(include_inactive=True, exclude_ids=[Config.ADMIN_ID])
     active_ops = [o for o in all_ops if o.get('is_active')]
     pending_ops = [o for o in all_ops if not o.get('is_active')]
+    # bot parametresi yoksa message'dan al
+    resolved_bot = bot or message.get_bot()
     if not convs:
         await message.reply_text(
             f"👑 <b>OWNER PANEL</b>\n\n"
@@ -562,7 +564,7 @@ async def _show_owner_panel(message, user_id: int):
             parse_mode="HTML"
         )
         await _send_menu(
-            Bot(token=Config.OPERATOR_BOT_TOKEN),
+            resolved_bot,
             user_id,
             text="👑 Owner menü",
             show_owner_panel=True,
@@ -573,22 +575,22 @@ async def _show_owner_panel(message, user_id: int):
     for item in convs:
         tid = item.get('transaction_id')
         status = item.get('status') or "-"
-        cname = item.get('customer_name') or "Müşteri"
-        oname = item.get('operator_name') or "Atanmamış"
+        cname = html.escape(item.get('customer_name') or "Müşteri")
+        oname = html.escape(item.get('operator_name') or "Atanmamış")
         count = item.get('message_count') or 0
         kb = [[InlineKeyboardButton("👁 Görüşmeyi Aç", callback_data=f"owner_view_{tid}")]]
         await message.reply_text(
             (
-                f"🔖 **#{tid}** | `{status}`\n"
+                f"🔖 <b>#{tid}</b> | <code>{html.escape(status)}</code>\n"
                 f"👤 Müşteri: {cname}\n"
                 f"🧑‍💼 Operatör: {oname}\n"
                 f"💬 Mesaj: {count}"
             ),
             reply_markup=InlineKeyboardMarkup(kb),
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
     await _send_menu(
-        Bot(token=Config.OPERATOR_BOT_TOKEN),
+        resolved_bot,
         user_id,
         text="👑 Owner menü",
         show_owner_panel=True,
@@ -658,10 +660,10 @@ async def _send_chat_transcript(message, transaction_id: int):
         lines.append(f"{who}: {text}")
 
     payload = "\n".join(lines)
-    # Telegram mesaj limiti için parçalayıp gönder.
+    # Telegram mesaj limiti için parçalayıp gönder — ham içerik, parse_mode yok
     chunk_size = 3500
     for i in range(0, len(payload), chunk_size):
-        await message.reply_text(payload[i:i + chunk_size], parse_mode="Markdown")
+        await message.reply_text(payload[i:i + chunk_size])
 
 
 # ═══════════════════════════════════════════════

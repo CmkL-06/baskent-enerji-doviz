@@ -607,24 +607,26 @@ async def _start_usdt_flow(update, context, user_id, tid, amount, try_amount,
 async def _start_ruble_flow(update, context, user_id, tid, amount, try_amount, lang):
     # Ruble kanalına bildirim gönder
     try:
-        ruble_bot = Bot(token=Config.RUBLE_BOT_TOKEN)
-        await ruble_bot.send_message(
-            chat_id=Config.RUBLE_CHANNEL_ID,
-            text=(
-                f"🟢🟢🟢 **YENİ MÜŞTERİ** 🟢🟢🟢\n"
-                f"━━━━━━━━━━━━━━━\n"
-                f"🆕 **YENİ RUBLE İŞLEMİ**\n"
-                f"━━━━━━━━━━━━━━━\n"
-                f"👤 Müşteri: {update.message.from_user.first_name}\n"
-                f"💰 Miktar: {amount:,.2f} RUB\n"
-                f"🔖 İşlem ID: #{tid}\n"
-                f"⏰ Saat: {datetime.now().strftime('%H:%M')}\n"
-                f"━━━━━━━━━━━━━━━\n"
-                f"⚡ **HEMEN CEVAP VERİN!**\n"
-                f"💡 **Bu mesaja reply atarak banka hesabı bilgilerini gönderin**"
-            ),
-            parse_mode="Markdown"
-        )
+        import html as _html
+        customer_name = _html.escape(update.message.from_user.first_name or "Müşteri")
+        async with Bot(token=Config.RUBLE_BOT_TOKEN) as ruble_bot:
+            await ruble_bot.send_message(
+                chat_id=Config.RUBLE_CHANNEL_ID,
+                text=(
+                    f"🟢🟢🟢 <b>YENİ MÜŞTERİ</b> 🟢🟢🟢\n"
+                    f"━━━━━━━━━━━━━━━\n"
+                    f"🆕 <b>YENİ RUBLE İŞLEMİ</b>\n"
+                    f"━━━━━━━━━━━━━━━\n"
+                    f"👤 Müşteri: {customer_name}\n"
+                    f"💰 Miktar: {amount:,.2f} RUB\n"
+                    f"🔖 İşlem ID: #{tid}\n"
+                    f"⏰ Saat: {datetime.now().strftime('%H:%M')}\n"
+                    f"━━━━━━━━━━━━━━━\n"
+                    f"⚡ <b>HEMEN CEVAP VERİN!</b>\n"
+                    f"💡 <b>Bu mesaja reply atarak banka hesabı bilgilerini gönderin</b>"
+                ),
+                parse_mode="HTML"
+            )
     except Exception as e:
         logger.error(f"Ruble kanalına bildirim hatası: {e}")
 

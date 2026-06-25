@@ -145,6 +145,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.AutoRate
                 if (p.SourceKey == "TCMB") return settings.UseTcmb;
                 if (p.SourceKey.StartsWith("DOVIZ_COM")) return settings.UseDovizCom;
                 if (p.SourceKey == "BINANCE") return settings.UseBinance;
+                if (p.SourceKey == "OPEN_ER") return true; // CZK/BGN/KGS — her zaman aktif
                 return false;
             }).ToList();
 

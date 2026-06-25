@@ -305,23 +305,23 @@ async def _approve_payment(query, tid: int, provider_id: int):
         try_amount_val = float(try_amount) if try_amount else 0
 
         try:
-            main_bot = Bot(token=Config.MAIN_BOT_TOKEN)
-            await main_bot.send_message(
-                chat_id=customer_id,
-                text=(
-                    f"{t('ruble_transaction_completed', lang)}\n\n"
-                    f"🎯 <b>{html.escape(t('completion_code_label', lang, code=completion_code))}</b>\n\n"
-                    f"{t('transaction_details_header', lang)}\n"
-                    f"• {t('transaction_id_label', lang, tid=tid)}\n"
-                    f"• {t('ruble_amount_label', lang, amount=f'{ruble_amount:,.2f}')}\n"
-                    f"• {t('try_amount_label', lang, amount=f'{try_amount_val:,.2f}')}\n"
-                    f"• {t('exchange_rate_label', lang, rate=f'{exchange_rate:.4f}')}\n"
-                    f"• {t('status_approved', lang)}\n\n"
-                    f"⚠️ <b>{html.escape(t('show_code_to_dealer', lang))}</b>\n\n"
-                    f"{t('thank_you', lang)}"
-                ),
-                parse_mode="HTML"
-            )
+            async with Bot(token=Config.MAIN_BOT_TOKEN) as main_bot:
+                await main_bot.send_message(
+                    chat_id=customer_id,
+                    text=(
+                        f"{t('ruble_transaction_completed', lang)}\n\n"
+                        f"🎯 <b>{html.escape(t('completion_code_label', lang, code=completion_code))}</b>\n\n"
+                        f"{t('transaction_details_header', lang)}\n"
+                        f"• {t('transaction_id_label', lang, tid=tid)}\n"
+                        f"• {t('ruble_amount_label', lang, amount=f'{ruble_amount:,.2f}')}\n"
+                        f"• {t('try_amount_label', lang, amount=f'{try_amount_val:,.2f}')}\n"
+                        f"• {t('exchange_rate_label', lang, rate=f'{exchange_rate:.4f}')}\n"
+                        f"• {t('status_approved', lang)}\n\n"
+                        f"⚠️ <b>{html.escape(t('show_code_to_dealer', lang))}</b>\n\n"
+                        f"{t('thank_you', lang)}"
+                    ),
+                    parse_mode="HTML"
+                )
         except Exception as e:
             logger.error(f"Müşteriye tamamlama bildirimi hatası: {e}")
 
@@ -383,17 +383,17 @@ async def _reject_payment(query, tid: int, provider_id: int):
     if customer_id:
         lang = _get_customer_lang(customer_id)
         try:
-            main_bot = Bot(token=Config.MAIN_BOT_TOKEN)
-            await main_bot.send_message(
-                chat_id=customer_id,
-                text=(
-                    f"❌ <b>{html.escape(t('payment_rejected', lang))}</b>\n"
-                    f"━━━━━━━━━━━━━━━\n"
-                    f"{t('transaction_id_label', lang, tid=tid)}\n\n"
-                    f"{t('payment_rejected_detail', lang)}"
-                ),
-                parse_mode="HTML"
-            )
+            async with Bot(token=Config.MAIN_BOT_TOKEN) as main_bot:
+                await main_bot.send_message(
+                    chat_id=customer_id,
+                    text=(
+                        f"❌ <b>{html.escape(t('payment_rejected', lang))}</b>\n"
+                        f"━━━━━━━━━━━━━━━\n"
+                        f"{t('transaction_id_label', lang, tid=tid)}\n\n"
+                        f"{t('payment_rejected_detail', lang)}"
+                    ),
+                    parse_mode="HTML"
+                )
         except Exception as e:
             logger.error(f"Müşteriye red bildirimi hatası: {e}")
 
@@ -466,22 +466,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Müşteriye banka hesabı bilgilerini gönder (main bot üzerinden)
     lang = _get_customer_lang(customer_id)
     try:
-        main_bot = Bot(token=Config.MAIN_BOT_TOKEN)
-
-        await main_bot.send_message(
-            chat_id=customer_id,
-            text=(
-                f"{t('bank_warning', lang)}\n"
-                f"━━━━━━━━━━━━━━━\n\n"
-                f"{t('bank_info_header', lang)}\n"
-                f"━━━━━━━━━━━━━━━\n\n"
-                f"<pre>{html.escape(text)}</pre>\n\n"
-                f"━━━━━━━━━━━━━━━\n"
-                f"{t('copy_instruction', lang)}\n\n"
-                f"{t('send_pdf_receipt', lang)}"
-            ),
-            parse_mode="HTML"
-        )
+        async with Bot(token=Config.MAIN_BOT_TOKEN) as main_bot:
+            await main_bot.send_message(
+                chat_id=customer_id,
+                text=(
+                    f"{t('bank_warning', lang)}\n"
+                    f"━━━━━━━━━━━━━━━\n\n"
+                    f"{t('bank_info_header', lang)}\n"
+                    f"━━━━━━━━━━━━━━━\n\n"
+                    f"<pre>{html.escape(text)}</pre>\n\n"
+                    f"━━━━━━━━━━━━━━━\n"
+                    f"{t('copy_instruction', lang)}\n\n"
+                    f"{t('send_pdf_receipt', lang)}"
+                ),
+                parse_mode="HTML"
+            )
 
         # Cache güncelle
         if trans_id in active_ruble_transactions:

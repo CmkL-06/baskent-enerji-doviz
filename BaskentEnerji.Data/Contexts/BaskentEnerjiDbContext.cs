@@ -53,6 +53,38 @@ namespace BaskentEnerji.Data.Contexts
                 .WithMany()
                 .HasForeignKey(p => p.ModifiedByUserId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // Office self-referential hiyerarşi
+            modelBuilder.Entity<Office>()
+                .HasOne(o => o.ParentOffice)
+                .WithMany(o => o.ChildOffices)
+                .HasForeignKey(o => o.ParentOfficeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // OfficeTransfer — kaynak ve hedef vault FK çakışmasını önle
+            modelBuilder.Entity<OfficeTransfer>()
+                .HasOne(t => t.SourceVault)
+                .WithMany()
+                .HasForeignKey(t => t.SourceVaultId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<OfficeTransfer>()
+                .HasOne(t => t.TargetVault)
+                .WithMany()
+                .HasForeignKey(t => t.TargetVaultId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<OfficeTransfer>()
+                .HasOne(t => t.RequestedBy)
+                .WithMany()
+                .HasForeignKey(t => t.RequestedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<OfficeTransfer>()
+                .HasOne(t => t.ApprovedBy)
+                .WithMany()
+                .HasForeignKey(t => t.ApprovedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
         }
 
         // User
@@ -87,6 +119,7 @@ namespace BaskentEnerji.Data.Contexts
         // ExchangeOffice — Office
         public DbSet<Office> Offices { get; set; } = null!;
         public DbSet<User_Office> User_Offices { get; set; } = null!;
+        public DbSet<OfficeTransfer> OfficeTransfers { get; set; } = null!;
         public DbSet<Transaction> Transactions { get; set; } = null!;
         public DbSet<TransactionDetail> TransactionDetails { get; set; } = null!;
         public DbSet<CurrencySale> CurrencySales { get; set; } = null!;

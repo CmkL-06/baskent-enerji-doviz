@@ -224,6 +224,10 @@ builder.Services.AddScoped<IExchangeReportingService, ExchangeReportingService>(
 builder.Services.AddScoped<IZReportService, ZReportService>();
 builder.Services.AddScoped<IOfficeServiceCommand, OfficeServiceCommand>();
 
+// Office Hierarchy & Transfer Services
+builder.Services.AddScoped<IOfficeHierarchyService, OfficeHierarchyService>();
+builder.Services.AddScoped<IOfficeTransferService, OfficeTransferService>();
+
 // Party Account Services
 builder.Services.AddScoped<IPartyService, PartyService>();
 builder.Services.AddScoped<IGhostPartyService, GhostPartyService>();
@@ -281,6 +285,13 @@ builder.Services.AddScoped<IExternalRateProvider>(sp =>
 {
     var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
     return new DovizComProvider(httpClientFactory.CreateClient(), "kapali-carsi", "Kapalıçarşı");
+});
+
+// OpenErProvider — CZK, BGN, KGS (TCMB'de bulunmuyor)
+builder.Services.AddScoped<IExternalRateProvider>(sp =>
+{
+    var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
+    return new OpenErProvider(httpClientFactory.CreateClient());
 });
 
 builder.Services.AddScoped<RateCalculationService>();

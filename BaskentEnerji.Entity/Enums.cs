@@ -42,4 +42,27 @@ namespace BaskentEnerji.Entity
         Transaction,
         Deposit,
     }
+
+    public enum OfficeType
+    {
+        Merkez = 1,  // Ana kasa — transfer gönderme yetkisi var
+        Sube   = 2,  // Şube — transfer talep eder, merkez onaylar
+        Bayi   = 3,  // Bayi — kendi kasasıyla çalışır, işlem limiti var
+    }
+
+    public enum OfficeRole
+    {
+        Manager = 1,  // Şube/bayi müdürü — kendi birimini yönetir
+        Cashier = 2,  // Kasa görevlisi — işlem girebilir
+        Viewer  = 3,  // Salt okunur erişim
+    }
+
+    public enum TransferStatus
+    {
+        Pending   = 0,
+        Approved  = 1,
+        Rejected  = 2,
+        Completed = 3,
+        Cancelled = 4,
+    }
 }

@@ -12,7 +12,7 @@ namespace BaskentEnerji.API.Controllers.Blog
 {
     [Route("api/v1/[controller]")]
     [ApiController]
-   // [Authorize]
+    [Authorize]
     public class BlogController : ControllerBase
     {
         private readonly IBlog_CategoryServiceCommand _blog_CategoryServiceCommand;

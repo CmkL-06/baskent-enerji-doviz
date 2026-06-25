@@ -81,7 +81,7 @@ namespace BaskentEnerji.API.Controllers
         public async Task UpdateUser(rm_user_update userData)
         {
             if (!await _validationService.HasPermissionAsync(userData.Id))
-                throw new ApiException(HttpStatusCode.NoContent, "You have no permission to do this.");
+                throw new ApiException(HttpStatusCode.Forbidden, "You have no permission to do this.");
 
             await _userServiceCommand.UpdateUser(userData);
         }
@@ -104,6 +104,7 @@ namespace BaskentEnerji.API.Controllers
         }
 
         [HttpPost("change-password")]
+        [Authorize]
         public async Task<IActionResult> ChangeUserPassword([FromBody] rm_change_user_password requestData)
         {
             var result = await _userServiceCommand.ChangeUserPassword(requestData);
@@ -119,6 +120,7 @@ namespace BaskentEnerji.API.Controllers
         }
 
         [HttpPost("logout-all")]
+        [Authorize]
         public async Task<IActionResult> LogoutAllUsers()
         {
             var result = await _userServiceCommand.LogoutAllUsers();

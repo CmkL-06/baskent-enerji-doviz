@@ -9,6 +9,8 @@ namespace BaskentEnerji.Entity.Modals.ViewModals.ExchangeOFfice.Office
         public Guid OfficeId { get; set; }
         public User.vm_user User { get; set; }
         public vm_office Office { get; set; }
+        public string Role { get; set; }
+        public bool IsActive { get; set; }
         public DateTime CreatedDate { get; set; }
         public DateTime? UpdatedDate { get; set; }
     }

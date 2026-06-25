@@ -4,6 +4,7 @@ import { useExchangeStore } from '@/stores/exchange'
 import type { Transaction, TransactionType, TransactionStatus } from '@/types/api'
 import EditTransactionModal from '@/components/EditTransactionModal.vue'
 import DeleteConfirmModal from '@/components/DeleteConfirmModal.vue'
+import apiService from '@/services/apiservice'
 
 const exchangeStore = useExchangeStore()
 
@@ -104,14 +105,21 @@ const deleteTransaction = (transaction: any) => {
   showDeleteModal.value = true
 }
 
-const handleEditSave = (data: any) => {
-  console.log('Saving transaction:', data)
-  // Update transaction logic here
+const handleEditSave = async (_data: any) => {
+  showEditModal.value = false
+  await loadTransactions()
 }
 
-const handleDeleteConfirm = (reason: string) => {
-  console.log('Deleting transaction with reason:', reason)
-  // Delete transaction logic here
+const handleDeleteConfirm = async (reason: string) => {
+  if (!selectedTransaction.value) return
+  try {
+    const id = selectedTransaction.value.transactionId ?? selectedTransaction.value.id
+    await apiService.removeTransaction(id)
+    showDeleteModal.value = false
+    await loadTransactions()
+  } catch (error) {
+    console.error('İşlem silinemedi:', error)
+  }
 }
 
 // Load offices and initialize
