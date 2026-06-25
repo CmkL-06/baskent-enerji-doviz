@@ -1,0 +1,179 @@
+{
+  "navbar": {
+    "dashboard": "Kontrol Paneli",
+    "zReport": "Z-Raporu",
+    "zReportV2": "Z-Raporu v2",
+    "exchange": "Döviz İşlemleri",
+    "parties": "Cariler",
+    "ghostParty": "Hayalet Cari",
+    "expenses": "Giderler",
+    "vaults": "Kasalar",
+    "users": "Kullanıcılar",
+    "settings": "Ayarlar",
+    "logout": "Çıkış"
+  },
+  "common": {
+    "save": "Kaydet",
+    "cancel": "İptal",
+    "delete": "Sil",
+    "edit": "Düzenle",
+    "add": "Ekle",
+    "search": "Ara",
+    "loading": "Yükleniyor...",
+    "noData": "Veri bulunamadı",
+    "confirm": "Onayla",
+    "success": "Başarılı",
+    "error": "Hata",
+    "warning": "Uyarı",
+    "info": "Bilgi",
+    "yes": "Evet",
+    "no": "Hayır",
+    "date": "Tarih",
+    "amount": "Tutar",
+    "currency": "Para Birimi",
+    "rate": "Kur",
+    "notes": "Notlar",
+    "status": "Durum",
+    "actions": "İşlemler",
+    "close": "Kapat",
+    "refresh": "Yenile",
+    "allOffices": "Tüm Ofisler",
+    "allStatuses": "Tüm Durumlar",
+    "active": "Aktif",
+    "inactive": "Pasif"
+  },
+  "auth": {
+    "username": "Kullanıcı adı",
+    "password": "Şifre",
+    "login": "Giriş Yap",
+    "loginError": "Kullanıcı adı veya şifre hatalı",
+    "rememberMe": "Beni hatırla"
+  },
+  "exchange": {
+    "buy": "Alış",
+    "sell": "Satış",
+    "amount": "Miktar",
+    "rate": "Kur",
+    "total": "Toplam",
+    "newTransaction": "Yeni İşlem",
+    "history": "İşlem Geçmişi",
+    "from": "Veren",
+    "to": "Alan",
+    "vault": "Kasa",
+    "transactionType": {
+      "selectTitle": "İşlem Türü Seçin",
+      "buy": "Alış",
+      "buyDesc": "Müşteriden döviz satın al",
+      "sell": "Satış",
+      "sellDesc": "Müşteriye döviz sat"
+    },
+    "officeVault": {
+      "warningTitle": "Ofis ve Kasa Seçimi",
+      "warningOffice": "Lütfen bir ofis seçiniz",
+      "warningVault": "Lütfen bir kasa seçiniz"
+    },
+    "quickSelect": {
+      "title": "Hızlı Seçim"
+    },
+    "operations": {
+      "title": "İşlemler",
+      "addButton": "İşlem Ekle",
+      "transactionNumber": "İşlem No",
+      "receivedCurrency": "Alınan Para Birimi",
+      "fromCustomer": "Müşteriden",
+      "toVault": "Kasaya",
+      "selectCurrency": "Para Birimi Seçin",
+      "givenCurrency": "Verilen Para Birimi",
+      "fromVault": "Kasadan",
+      "toCustomer": "Müşteriye",
+      "amount": "Miktar",
+      "rate": "Kur",
+      "customRate": "Özel Kur"
+    },
+    "notes": {
+      "label": "Notlar",
+      "placeholder": "İşlem notu ekleyin (opsiyonel)"
+    },
+    "summary": {
+      "title": "İşlem Özeti",
+      "vaultBalance": "Kasa Bakiyesi",
+      "insufficient": "Yetersiz Bakiye",
+      "available": "Mevcut",
+      "required": "Gerekli",
+      "details": "Detaylar",
+      "receivedFromCustomer": "Müşteriden Alınan",
+      "exchangeRate": "Döviz Kuru",
+      "givenFromVault": "Kasadan Verilen",
+      "givenToCustomer": "Müşteriye Verilen",
+      "paymentAmount": "Ödeme Tutarı",
+      "noTransaction": "Henüz işlem eklenmedi",
+      "processing": "İşleniyor...",
+      "submit": "İşlemi Tamamla"
+    },
+    "messages": {
+      "transactionSuccess": "İşlem başarıyla tamamlandı",
+      "transactionFailed": "İşlem başarısız oldu",
+      "unknownError": "Bilinmeyen hata oluştu",
+      "printWindowFailed": "Yazdırma penceresi açılamadı",
+      "loadingData": "Veriler yükleniyor..."
+    },
+    "receipt": {
+      "buyTitle": "ALIŞ FİŞİ",
+      "sellTitle": "SATIŞ FİŞİ"
+    }
+  },
+  "sidebar": {
+    "expenses": "Giderler",
+    "exchangeRates": "Döviz Kurları",
+    "usdtPayments": "USDT Ödemeleri",
+    "newPaymentMethod": "Yeni Ödeme Yöntemi",
+    "expenseCategories": "Gider Kategorileri",
+    "expenseReports": "Gider Raporları"
+  },
+  "transactionHistory": {
+    "title": "İşlem Geçmişi",
+    "type": "Tür",
+    "date": "Tarih",
+    "vault": "Kasa",
+    "rate": "Kur",
+    "status": "Durum",
+    "actions": "İşlemler",
+    "viewDetails": "Detayları Gör",
+    "loadingTransactions": "İşlemler yükleniyor...",
+    "buy": "Alış",
+    "sell": "Satış",
+    "pending": "Beklemede",
+    "completed": "Tamamlandı",
+    "cancelled": "İptal Edildi",
+    "notes": "Notlar"
+  },
+  "vault": {
+    "balance": "Bakiye",
+    "deposit": "Para Yatır",
+    "withdraw": "Para Çek",
+    "transfer": "Transfer"
+  },
+  "vaults": {
+    "title": "Kasalar",
+    "subtitle": "Kasa yönetimi ve bakiye takibi",
+    "addVault": "Kasa Ekle",
+    "transfer": "Transfer",
+    "totalBalances": "Toplam Bakiyeler",
+    "vaultsCount": "Kasa Sayısı",
+    "totalTRYValue": "Toplam TRY Değeri",
+    "filterByOffice": "Ofise Göre Filtrele",
+    "searchPlaceholder": "Kasa ara..."
+  },
+  "usdt": {
+    "title": "USDT Ödemeleri"
+  },
+  "parties": {
+    "pleaseSelectOffice": "Lütfen bir ofis seçiniz"
+  },
+  "refresh": "Yenile",
+  "close": "Kapat",
+  "save": "Kaydet",
+  "confirm": "Onayla",
+  "complete": "Tamamla",
+  "saved": "Kaydedildi"
+}

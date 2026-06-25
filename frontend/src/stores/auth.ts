@@ -1,0 +1,60 @@
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
+import apiService from '@/services/apiservice'
+
+export const useAuthStore = defineStore('auth', () => {
+  const router = useRouter()
+
+  const token      = ref<string | null>(localStorage.getItem('token'))
+  const user       = ref<any | null>(JSON.parse(localStorage.getItem('user') || 'null'))
+  const isLoading  = ref(false)
+  const error      = ref<string | null>(null)
+  const userOffices = ref<any[]>([])
+
+  const isAuthenticated = computed(() => !!token.value)
+  const isAdmin = computed(() => {
+    const rank = user.value?.rank
+    return rank >= 99 || rank === 'Admin' || rank === 'Owner' || user.value?.isAdmin === true
+  })
+
+  async function login(credentials: { mail: string; password: string }) {
+    isLoading.value = true
+    error.value = null
+    try {
+      const res = await apiService.login(credentials)
+      const jwt  = res.apiToken ?? res.token
+      const info = res.userInfo ?? res.user
+      token.value = jwt
+      user.value  = info
+      localStorage.setItem('token', jwt)
+      localStorage.setItem('user', JSON.stringify(info))
+      localStorage.setItem('uiStyle', 'modern')
+      await router.push('/ihtiyar/dashboard')
+    } catch (err: any) {
+      error.value = err.response?.data?.message || err.message || 'Giriş başarısız'
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  function logout() {
+    token.value = null
+    user.value  = null
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    router.push('/login')
+  }
+
+  function initialize() {
+    const t = localStorage.getItem('token')
+    const u = localStorage.getItem('user')
+    if (t && u) {
+      token.value = t
+      user.value  = JSON.parse(u)
+    }
+  }
+
+  return { token, user, isLoading, error, isAuthenticated, isAdmin, userOffices, login, logout, initialize }
+})

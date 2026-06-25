@@ -1,0 +1,36 @@
+{
+  "name": "exchange-office",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:check": "vue-tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@types/crypto-js": "^4.2.2",
+    "@vueuse/core": "^13.5.0",
+    "axios": "^1.11.0",
+    "crypto-js": "^4.2.0",
+    "cryptocurrency-icons": "^0.18.1",
+    "flag-icons": "^7.5.0",
+    "pinia": "^3.0.3",
+    "vue": "^3.5.17",
+    "vue-i18n": "^9.14.5",
+    "vue-router": "^4.5.1"
+  },
+  "devDependencies": {
+    "@tsconfig/node20": "^20.1.9",
+    "@vitejs/plugin-vue": "^6.0.0",
+    "@vue/tsconfig": "^0.7.0",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "sass-embedded": "^1.93.2",
+    "tailwindcss": "^3.4.17",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.4",
+    "vue-tsc": "^2.2.12"
+  }
+}
