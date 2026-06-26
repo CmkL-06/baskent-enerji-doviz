@@ -37,5 +37,17 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: frontend/dist/
-          server-dir: ./ihtiyar/
+          server-dir: /
           dangerous-clean-slate: false
+          exclude: |
+            **/index.html
+
+      - name: Force upload index.html via curl
+        run: |
+          curl --ftp-create-dirs -T frontend/dist/index.html \
+            "ftp://${{ secrets.FTP_SERVER }}/index.html" \
+            --user "${{ secrets.FTP_USERNAME }}:${{ secrets.FTP_PASSWORD }}" \
+            --ftp-ssl-reqd || \
+          curl --ftp-create-dirs -T frontend/dist/index.html \
+            "ftp://${{ secrets.FTP_SERVER }}/index.html" \
+            --user "${{ secrets.FTP_USERNAME }}:${{ secrets.FTP_PASSWORD }}"
