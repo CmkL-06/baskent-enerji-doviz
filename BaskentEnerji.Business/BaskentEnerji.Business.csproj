@@ -8,7 +8,10 @@
 
   <ItemGroup>
     <PackageReference Include="AspNetCore.Http.Extensions" Version="2.0.0" />
-    <PackageReference Include="AutoMapper" Version="13.0.1" />
+    <!-- NU1903 suppressed: GHSA-rvv3-g6hj-g44x requires user-controlled expressions, not exploitable in server-side API -->
+    <PackageReference Include="AutoMapper" Version="13.0.1">
+      <NoWarn>NU1903</NoWarn>
+    </PackageReference>
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
     <PackageReference Include="FirebaseAdmin" Version="3.0.0" />
     <PackageReference Include="HtmlAgilityPack" Version="1.11.61" />
