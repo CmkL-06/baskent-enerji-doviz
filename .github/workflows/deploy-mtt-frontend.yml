@@ -39,44 +39,4 @@ jobs:
           local-dir: frontend/dist/
           server-dir: /
           dangerous-clean-slate: false
-name: Deploy MTT Frontend to GoDaddy
 
-on:
-  push:
-    branches: [ BASKENT-DOVIZ ]
-    paths:
-      - 'MoneyTransferTurkey/frontend/**'
-  workflow_dispatch:
-
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4.2.2
-
-      - uses: actions/setup-node@v4.4.0
-        with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: MoneyTransferTurkey/frontend/package.json
-
-      - name: Install dependencies
-        working-directory: MoneyTransferTurkey/frontend
-        run: npm ci || npm install
-
-      - name: Build
-        working-directory: MoneyTransferTurkey/frontend
-        env:
-          VITE_API_BASE_URL: https://api.baskentenerji.com
-        run: npm run build
-
-      - name: Deploy via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: MoneyTransferTurkey/frontend/dist/
-          server-dir: /
-          dangerous-clean-slate: false
