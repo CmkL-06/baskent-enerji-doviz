@@ -30,6 +30,10 @@ jobs:
           VITE_API_BASE_URL: https://api.baskentenerji.com/api/v1
         run: npm run build
 
+      - name: Inject enhance scripts into index.html
+        run: |
+          sed -i 's|</body>|    <script src="/assets/office-pages.js"></script>\n    <script src="/assets/dashboard-enhance.js"></script>\n  </body>|' frontend/dist/index.html
+
       - name: Deploy via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
@@ -41,7 +45,6 @@ jobs:
           dangerous-clean-slate: false
           exclude: |
             **/index.html
-
       - name: Force upload index.html via curl
         run: |
           curl --ftp-create-dirs -T frontend/dist/index.html \
