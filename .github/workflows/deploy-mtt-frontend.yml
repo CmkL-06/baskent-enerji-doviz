@@ -37,6 +37,5 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: frontend/dist/
-          server-dir: /
+          server-dir: ./ihtiyar/
           dangerous-clean-slate: false
-
