@@ -82,7 +82,16 @@ namespace BaskentEnerji.API.HostedServices
                 // Check working days
                 if (!string.IsNullOrEmpty(settings.WorkDays))
                 {
-                    var workDays = System.Text.Json.JsonSerializer.Deserialize<List<string>>(settings.WorkDays);
+                    List<string>? workDays = null;
+                    try
+                    {
+                        workDays = System.Text.Json.JsonSerializer.Deserialize<List<string>>(settings.WorkDays);
+                    }
+                    catch
+                    {
+                        // Legacy comma-separated format: "1,2,3,4,5,6,7" — treat as all days active
+                        workDays = null;
+                    }
                     var todayName = currentDay.ToString().ToLower();
 
                     if (workDays != null && !workDays.Contains(todayName))
