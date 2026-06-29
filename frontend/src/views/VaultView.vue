@@ -1006,7 +1006,7 @@ const refresh = () => {
 }
 
 const goBack = () => {
-  router.push({ name: 'vault-management' })
+  router.push({ name: 'VaultManagement' })
 }
 
 const editVault = () => {
@@ -1069,7 +1069,7 @@ const deleteVault = async () => {
     const vaultId = vault.value.vaultId || vault.value.id
     await apiService.deleteVault(vaultId)
     notification.success('Kasa başarıyla silindi')
-    router.push({ name: 'vault-management' })
+    router.push({ name: 'VaultManagement' })
   } catch (error) {
     notification.error('Kasa silinemedi')
   }
@@ -1253,6 +1253,7 @@ onMounted(async () => {
       const allVaults = vaultsData.data || vaultsData
       if (allVaults && allVaults.length > 0) {
         const firstId = allVaults[0].vaultId || allVaults[0].id
+        if (!firstId) return
         router.replace(`/ihtiyar/vaults/${firstId}`)
         await loadVaultData(firstId)
       }

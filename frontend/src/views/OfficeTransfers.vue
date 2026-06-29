@@ -42,7 +42,7 @@ const createForm = ref({
 
 // ── Load ───────────────────────────────────────────
 onMounted(async () => {
-  if (!authStore.isAdmin && !authStore.isAuthenticated) { router.push('/ihtiyar/dashboard'); return }
+  if (!authStore.isAdmin) { router.push('/ihtiyar/dashboard'); return }
   await Promise.all([loadPending(), loadVaultsCurrencies()])
 })
 

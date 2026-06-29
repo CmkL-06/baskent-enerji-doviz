@@ -358,7 +358,7 @@ const handlePrintReport = async () => {
 
 const handleCreateVault = () => {
   // Navigate to vault management page with create query param
-  router.push({ name: 'vault-management', query: { create: 'true' } })
+  router.push({ name: 'VaultManagement', query: { create: 'true' } })
 }
 
 // Party-related methods
