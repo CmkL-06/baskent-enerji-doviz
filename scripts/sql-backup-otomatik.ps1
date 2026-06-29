@@ -12,7 +12,7 @@ param(
     [int]$RetainDays      = 7
 )
 
-$Databases = @("mtt-moneyexchangeturkey", "mtturkey_exchange")
+$Databases = @("mtturkey_exchange", "mtturkey_mtt", "mtturkey_telegram")
 $DateStamp = Get-Date -Format "yyyyMMdd_HHmm"
 $LogFile   = "$BackupRoot\backup-log.txt"
 
