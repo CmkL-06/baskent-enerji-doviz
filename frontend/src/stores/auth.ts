@@ -15,11 +15,11 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuthenticated = computed(() => !!token.value)
   const isAdmin = computed(() => {
     const rank = user.value?.rank
-    return rank >= 99 || rank === 'Admin' || rank === 'Owner' || user.value?.isAdmin === true
+    return rank >= 99 || user.value?.isAdmin === true
   })
   const isModerator = computed(() => {
     const rank = user.value?.rank
-    return rank >= 50 || rank === 'Moderator' || rank === 'Moderatör'
+    return rank >= 50
   })
 
   async function login(credentials: { mail: string; password: string }) {

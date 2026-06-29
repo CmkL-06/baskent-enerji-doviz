@@ -124,7 +124,11 @@ const saveChanges = async () => {
     })
     
     // Refresh vault data in store
-    await exchangeStore.loadVaults(editForm.value.officeId || '')
+    if (editForm.value.officeId) {
+      await exchangeStore.loadVaults(editForm.value.officeId)
+    } else {
+      await exchangeStore.fetchVaults()
+    }
     
     emit('saved', updatedVault)
     emit('close')

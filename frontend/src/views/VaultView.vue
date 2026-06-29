@@ -463,12 +463,12 @@
                     @click.stop="withdrawDropdownOpen = !withdrawDropdownOpen"
                   >
                     <div v-if="withdrawForm.currencyId" class="selected-currency">
-                      <template v-if="availableBalances.find(b => b.currencyId === withdrawForm.currencyId)">
-                        <i v-if="getCurrencyCountryCode(availableBalances.find(b => b.currencyId === withdrawForm.currencyId)?.currencyCode)" :class="`fi fi-${getCurrencyCountryCode(availableBalances.find(b => b.currencyId === withdrawForm.currencyId)?.currencyCode)}`"></i>
-                        <span v-else-if="availableBalances.find(b => b.currencyId === withdrawForm.currencyId)?.currencyCode === 'USDT'" class="currency-badge usdt">₮</span>
-                        <span v-else class="currency-badge">{{ availableBalances.find(b => b.currencyId === withdrawForm.currencyId)?.currencyCode?.substring(0, 2) }}</span>
+                      <template v-if="selectedWithdrawBalance">
+                        <i v-if="getCurrencyCountryCode(selectedWithdrawBalance.currencyCode)" :class="`fi fi-${getCurrencyCountryCode(selectedWithdrawBalance.currencyCode)}`"></i>
+                        <span v-else-if="selectedWithdrawBalance.currencyCode === 'USDT'" class="currency-badge usdt">₮</span>
+                        <span v-else class="currency-badge">{{ selectedWithdrawBalance.currencyCode?.substring(0, 2) }}</span>
                       </template>
-                      <span>{{ availableBalances.find(b => b.currencyId === withdrawForm.currencyId)?.currencyCode }} - Kullanılabilir: {{ formatAmount(availableBalances.find(b => b.currencyId === withdrawForm.currencyId)?.availableBalance || 0) }}</span>
+                      <span>{{ selectedWithdrawBalance?.currencyCode }} - Kullanılabilir: {{ formatAmount(selectedWithdrawBalance?.availableBalance || 0) }}</span>
                     </div>
                     <span v-else class="placeholder">Para birimi seçin</span>
                     <span class="material-symbols-outlined">{{ withdrawDropdownOpen ? 'expand_less' : 'expand_more' }}</span>
@@ -633,12 +633,12 @@
                     @click.stop="transferDropdownOpen = !transferDropdownOpen"
                   >
                     <div v-if="transferForm.currencyId" class="selected-currency">
-                      <template v-if="availableBalances.find(b => b.currencyId === transferForm.currencyId)">
-                        <i v-if="getCurrencyCountryCode(availableBalances.find(b => b.currencyId === transferForm.currencyId)?.currencyCode)" :class="`fi fi-${getCurrencyCountryCode(availableBalances.find(b => b.currencyId === transferForm.currencyId)?.currencyCode)}`"></i>
-                        <span v-else-if="availableBalances.find(b => b.currencyId === transferForm.currencyId)?.currencyCode === 'USDT'" class="currency-badge usdt">₮</span>
-                        <span v-else class="currency-badge">{{ availableBalances.find(b => b.currencyId === transferForm.currencyId)?.currencyCode?.substring(0, 2) }}</span>
+                      <template v-if="selectedTransferBalance">
+                        <i v-if="getCurrencyCountryCode(selectedTransferBalance.currencyCode)" :class="`fi fi-${getCurrencyCountryCode(selectedTransferBalance.currencyCode)}`"></i>
+                        <span v-else-if="selectedTransferBalance.currencyCode === 'USDT'" class="currency-badge usdt">₮</span>
+                        <span v-else class="currency-badge">{{ selectedTransferBalance.currencyCode?.substring(0, 2) }}</span>
                       </template>
-                      <span>{{ availableBalances.find(b => b.currencyId === transferForm.currencyId)?.currencyCode }} - Kullanılabilir: {{ formatAmount(availableBalances.find(b => b.currencyId === transferForm.currencyId)?.availableBalance || 0) }}</span>
+                      <span>{{ selectedTransferBalance?.currencyCode }} - Kullanılabilir: {{ formatAmount(selectedTransferBalance?.availableBalance || 0) }}</span>
                     </div>
                     <span v-else class="placeholder">Para birimi seçin</span>
                     <span class="material-symbols-outlined">{{ transferDropdownOpen ? 'expand_less' : 'expand_more' }}</span>
@@ -842,6 +842,14 @@ const availableBalances = computed(() => {
   if (!vault.value?.balances) return []
   return vault.value.balances.filter(b => (b.availableBalance || b.balance) > 0)
 })
+
+const selectedWithdrawBalance = computed(() =>
+  availableBalances.value.find(b => b.currencyId === withdrawForm.value.currencyId) ?? null
+)
+
+const selectedTransferBalance = computed(() =>
+  availableBalances.value.find(b => b.currencyId === transferForm.value.currencyId) ?? null
+)
 
 const filteredBalanceHistory = computed(() => {
   if (!vault.value?.balanceHistories) return []

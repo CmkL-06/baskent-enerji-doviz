@@ -86,7 +86,7 @@ export const useDesktopStore = defineStore('desktop', () => {
 
   function openDepositWindow(vaultId?: string | number, data?: any) {
     openWindow({
-      id: 'deposit-' + (vaultId || Date.now()),
+      id: 'deposit-' + (vaultId != null ? vaultId : Date.now()),
       title: 'Para Yatır',
       type: 'deposit',
       position: { x: 200, y: 100 },
@@ -99,7 +99,7 @@ export const useDesktopStore = defineStore('desktop', () => {
 
   function openWithdrawWindow(vaultId?: string | number, data?: any) {
     openWindow({
-      id: 'withdraw-' + (vaultId || Date.now()),
+      id: 'withdraw-' + (vaultId != null ? vaultId : Date.now()),
       title: 'Para Çek',
       type: 'withdraw',
       position: { x: 200, y: 100 },
