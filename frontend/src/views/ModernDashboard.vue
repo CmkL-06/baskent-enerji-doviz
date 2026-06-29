@@ -196,7 +196,8 @@ onUnmounted(() => clearInterval(timer))
                   <td><span :style="{color:txStatus[tx.status]?.color,fontWeight:'600'}">{{ txStatus[tx.status]?.text??tx.status }}</span></td>
                   <td :class="['profit',{pos:tx.profit>0}]">{{ tx.profit>0?'+':'' }}{{ fmt(tx.profit) }} ₺</td>
                   <td class="detail-cell">
-                    <span v-for="d in tx.details" :key="d.currencyCode" class="chip">{{ d.side===2?'↑':'↓' }} {{ (d.amount??0).toLocaleString('tr-TR',{minimumFractionDigits:2}) }} {{ d.currencyCode }}</span>
+                    <span v-for="d in (tx.details ?? [])" :key="d.currencyCode" class="chip">{{ d.side===2?'↑':'↓' }} {{ (d.amount??0).toLocaleString('tr-TR',{minimumFractionDigits:2}) }} {{ d.currencyCode }}</span>
+                    <span v-if="!tx.details?.length" class="chip chip-none">—</span>
                   </td>
                 </tr>
               </tbody>
