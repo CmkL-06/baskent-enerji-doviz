@@ -12,14 +12,16 @@ const search  = ref('')
 
 const selected    = ref<any>(null)
 const panelOpen   = ref(false)
+const panelMode   = ref<'edit' | 'create'>('edit')
 const activeTab   = ref<'info' | 'password'>('info')
 
 const saving    = ref(false)
 const saveError = ref('')
 const saveOk    = ref(false)
 
-const editForm = ref({ username: '', mail: '', firstname: '', lastname: '', rank: 1 })
-const pwForm   = ref({ newPassword: '', confirm: '' })
+const editForm   = ref({ username: '', mail: '', firstname: '', lastname: '', rank: 1 })
+const pwForm     = ref({ newPassword: '', confirm: '' })
+const createForm = ref({ username: '', mail: '', password: '', firstname: '', lastname: '' })
 
 const RANKS = [
   { value: 0,   label: 'Yasaklı',   color: '#ef4444', bg: '#fef2f2', ring: '#fca5a5' },
@@ -76,7 +78,18 @@ function openPanel(user: any) {
   panelOpen.value = true
 }
 
-function closePanel() { panelOpen.value = false; setTimeout(() => selected.value = null, 300) }
+function openCreatePanel() {
+  selected.value = null
+  panelMode.value = 'create'
+  saveError.value = ''; saveOk.value = false
+  createForm.value = { username: '', mail: '', password: '', firstname: '', lastname: '' }
+  panelOpen.value = true
+}
+
+function closePanel() {
+  panelOpen.value = false
+  setTimeout(() => { selected.value = null; panelMode.value = 'edit' }, 300)
+}
 
 function switchTab(tab: 'info' | 'password') {
   activeTab.value = tab
@@ -93,6 +106,21 @@ async function saveInfo() {
     if (updated) selected.value = updated
   } catch (e: any) {
     saveError.value = e.response?.data?.message || 'Kaydedilemedi'
+  } finally { saving.value = false }
+}
+
+async function createUser() {
+  saveError.value = ''; saveOk.value = false
+  const f = createForm.value
+  if (!f.username || !f.mail || !f.password) { saveError.value = 'Kullanıcı adı, e-posta ve şifre zorunludur.'; return }
+  saving.value = true
+  try {
+    await apiService.registerUser(f)
+    saveOk.value = true
+    await load()
+    setTimeout(closePanel, 1200)
+  } catch (e: any) {
+    saveError.value = e.response?.data?.message || 'Kullanıcı oluşturulamadı'
   } finally { saving.value = false }
 }
 
@@ -127,6 +155,9 @@ onMounted(load)
           <span class="material-symbols-outlined um-si">search</span>
           <input v-model="search" class="um-search" placeholder="Ara..." />
         </div>
+        <button v-if="authStore.isOwner" class="um-create-btn" @click="openCreatePanel">
+          <span class="material-symbols-outlined">person_add</span> Yeni Kullanıcı
+        </button>
         <button class="um-refresh" @click="load" :disabled="loading">
           <span class="material-symbols-outlined" :class="{ spin: loading }">refresh</span>
         </button>
@@ -177,7 +208,55 @@ onMounted(load)
 
     <!-- Detail Panel -->
     <div class="um-panel" :class="{ 'um-panel-open': panelOpen }">
-      <template v-if="selected">
+
+      <!-- CREATE MODE -->
+      <template v-if="panelMode === 'create'">
+        <div class="um-panel-header">
+          <div class="um-panel-avatar" style="background:#6366f1">
+            <span class="material-symbols-outlined" style="font-size:22px">person_add</span>
+          </div>
+          <div class="um-panel-identity">
+            <div class="um-panel-name">Yeni Kullanıcı</div>
+            <div class="um-panel-uname">Owner işlemi</div>
+          </div>
+          <button class="um-panel-close" @click="closePanel">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="um-panel-body" style="margin-top:16px">
+          <div class="um-field-row">
+            <div class="um-field">
+              <label>Ad</label>
+              <input v-model="createForm.firstname" class="um-input" placeholder="Ad" />
+            </div>
+            <div class="um-field">
+              <label>Soyad</label>
+              <input v-model="createForm.lastname" class="um-input" placeholder="Soyad" />
+            </div>
+          </div>
+          <div class="um-field">
+            <label>Kullanıcı Adı *</label>
+            <input v-model="createForm.username" class="um-input" placeholder="kullanici_adi" />
+          </div>
+          <div class="um-field">
+            <label>E-posta *</label>
+            <input v-model="createForm.mail" type="email" class="um-input" placeholder="ornek@email.com" />
+          </div>
+          <div class="um-field">
+            <label>Şifre *</label>
+            <input v-model="createForm.password" type="password" class="um-input" placeholder="••••••••" />
+          </div>
+          <div v-if="saveOk" class="um-ok">Kullanıcı oluşturuldu ✓</div>
+          <div v-if="saveError" class="um-err">{{ saveError }}</div>
+          <button class="um-save-btn" @click="createUser" :disabled="saving">
+            <span v-if="saving" class="material-symbols-outlined spin">progress_activity</span>
+            {{ saving ? 'Oluşturuluyor...' : 'Kullanıcı Oluştur' }}
+          </button>
+        </div>
+      </template>
+
+      <!-- EDIT MODE -->
+      <template v-if="panelMode === 'edit' && selected">
 
         <!-- Panel Header -->
         <div class="um-panel-header">
@@ -298,6 +377,9 @@ onMounted(load)
 .um-search:focus { border-color: #6366f1; }
 .um-refresh { display: flex; align-items: center; padding: 8px; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; cursor: pointer; color: #6b7280; transition: all .15s; }
 .um-refresh:hover { background: #f3f4f6; }
+.um-create-btn { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border: none; border-radius: 10px; background: #6366f1; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; transition: background .15s; }
+.um-create-btn:hover { background: #4f46e5; }
+.um-create-btn .material-symbols-outlined { font-size: 17px; }
 .um-error { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; border-radius: 10px; padding: 12px 16px; font-size: 14px; margin-bottom: 16px; }
 
 .um-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
