@@ -34,7 +34,7 @@ const form = ref({
 
 // ── Load ───────────────────────────────────────────
 onMounted(async () => {
-  if (!authStore.isAdmin) { router.push('/ihtiyar/dashboard'); return }
+  if (!authStore.isOwner) { router.push('/ihtiyar/dashboard'); return }
   await load()
 })
 

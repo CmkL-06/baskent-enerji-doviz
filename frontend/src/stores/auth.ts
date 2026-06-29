@@ -13,6 +13,10 @@ export const useAuthStore = defineStore('auth', () => {
   const userOffices = ref<any[]>([])
 
   const isAuthenticated = computed(() => !!token.value)
+  const isOwner = computed(() => {
+    const rank = user.value?.rank
+    return rank >= 100
+  })
   const isAdmin = computed(() => {
     const rank = user.value?.rank
     return rank >= 99 || user.value?.isAdmin === true
@@ -60,5 +64,5 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { token, user, isLoading, error, isAuthenticated, isAdmin, isModerator, userOffices, login, logout, initialize }
+  return { token, user, isLoading, error, isAuthenticated, isOwner, isAdmin, isModerator, userOffices, login, logout, initialize }
 })

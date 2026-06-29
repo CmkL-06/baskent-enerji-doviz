@@ -43,9 +43,9 @@ const allNavItems = computed(() => [
   { id: 'auto-rate-management', icon: 'currency_exchange', label: 'Otomatik Kur Yönetimi', category: 'YÖNETİM', path: '/ihtiyar/auto-rate-management', adminOnly: true },
   { id: 'currencies', icon: 'payments', label: 'Para Birimleri', category: 'YÖNETİM', path: '/ihtiyar/currencies', adminOnly: true },
   { id: 'settings', icon: 'tune', label: t('navbar.settings'), category: 'YÖNETİM', path: '/ihtiyar/settings', adminOnly: false },
-  { id: 'owner-panel',       icon: 'crown',           label: 'Owner Panel',        category: 'YÖNETİM', path: '/ihtiyar/owner-panel',       adminOnly: true },
-  { id: 'office-hierarchy', icon: 'account_tree',    label: 'Ofis Hiyerarşisi',   category: 'YÖNETİM', path: '/ihtiyar/office-hierarchy',  adminOnly: true },
-  { id: 'office-transfers', icon: 'swap_horiz',      label: 'Ofislerarası Transfer', category: 'YÖNETİM', path: '/ihtiyar/office-transfers', adminOnly: true },
+  { id: 'owner-panel',       icon: 'crown',           label: 'Owner Panel',        category: 'OWNER', path: '/ihtiyar/owner-panel',       adminOnly: false, ownerOnly: true },
+  { id: 'office-hierarchy', icon: 'account_tree',    label: 'Ofis Hiyerarşisi',   category: 'OWNER', path: '/ihtiyar/office-hierarchy',  adminOnly: false, ownerOnly: true },
+  { id: 'office-transfers', icon: 'swap_horiz',      label: 'Ofislerarası Transfer', category: 'YÖNETİM', path: '/ihtiyar/office-transfers', adminOnly: true, ownerOnly: false },
 ])
 
 // Helper function to get nav item by id
@@ -53,11 +53,11 @@ const getNavItem = (id: string) => allNavItems.value.find(item => item.id === id
 
 // Filtered navigation items based on user role
 const topNavItems = computed(() => {
-  if (authStore.isAdmin) {
-    return allNavItems.value
-  }
-  // Non-admin users can only see exchange and vaults
-  return allNavItems.value.filter(item => !item.adminOnly)
+  return allNavItems.value.filter(item => {
+    if (item.ownerOnly) return authStore.isOwner
+    if (item.adminOnly) return authStore.isAdmin
+    return true
+  })
 })
 
 const leftSidebarItems = ref([
@@ -711,13 +711,13 @@ const clickDomSelector = (selector: string) => {
               </router-link>
 
               <router-link v-if="authStore.isAdmin"
-                :to="getNavItem('owner-panel')?.path || '/ihtiyar/owner-panel'"
+                :to="getNavItem('office-transfers')?.path || '/ihtiyar/office-transfers'"
                 class="nav-item"
-                :class="{ active: currentRoute === 'owner-panel' }"
-                @click.left="currentRoute = 'owner-panel'"
+                :class="{ active: currentRoute === 'office-transfers' }"
+                @click.left="currentRoute = 'office-transfers'"
               >
-                <span class="nav-icon material-symbols-outlined">{{ getNavItem('owner-panel')?.icon }}</span>
-                <div class="nav-label">OWNER PANEL</div>
+                <span class="nav-icon material-symbols-outlined">{{ getNavItem('office-transfers')?.icon }}</span>
+                <div class="nav-label">ŞUBE TRANSFER</div>
               </router-link>
 
               <router-link
@@ -732,8 +732,33 @@ const clickDomSelector = (selector: string) => {
             </div>
             <div class="nav-category-label">YÖNETİM</div>
           </div>
+
+          <!-- OWNER Section -->
+          <div v-if="authStore.isOwner" class="nav-section">
+            <div class="nav-group">
+              <router-link
+                :to="getNavItem('owner-panel')?.path || '/ihtiyar/owner-panel'"
+                class="nav-item nav-item-owner"
+                :class="{ active: currentRoute === 'owner-panel' }"
+                @click.left="currentRoute = 'owner-panel'"
+              >
+                <span class="nav-icon material-symbols-outlined">crown</span>
+                <div class="nav-label">OWNER PANEL</div>
+              </router-link>
+              <router-link
+                :to="getNavItem('office-hierarchy')?.path || '/ihtiyar/office-hierarchy'"
+                class="nav-item nav-item-owner"
+                :class="{ active: currentRoute === 'office-hierarchy' }"
+                @click.left="currentRoute = 'office-hierarchy'"
+              >
+                <span class="nav-icon material-symbols-outlined">account_tree</span>
+                <div class="nav-label">OFİS HİYERARŞİSİ</div>
+              </router-link>
+            </div>
+            <div class="nav-category-label nav-category-owner">👑 OWNER</div>
+          </div>
         </div>
-        
+
         <div class="flex items-center gap-3">
           <!-- Language Selector -->
           <LanguageSelector />
@@ -792,7 +817,8 @@ const clickDomSelector = (selector: string) => {
                   <div class="flex-1">
                     <p class="text-gray-500 text-xs">Yetki Seviyesi</p>
                     <p class="text-gray-800 font-medium">
-                      <span v-if="authStore.isAdmin" class="px-2 py-1 bg-red-100 text-red-700 rounded-md text-xs font-semibold">Admin</span>
+                      <span v-if="authStore.isOwner" class="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-md text-xs font-semibold">👑 Owner</span>
+                      <span v-else-if="authStore.isAdmin" class="px-2 py-1 bg-red-100 text-red-700 rounded-md text-xs font-semibold">Admin</span>
                       <span v-else-if="authStore.isModerator" class="px-2 py-1 bg-blue-100 text-blue-700 rounded-md text-xs font-semibold">Moderatör</span>
                       <span v-else class="px-2 py-1 bg-gray-100 text-gray-700 rounded-md text-xs font-semibold">Kullanıcı</span>
                     </p>
@@ -1388,6 +1414,20 @@ const clickDomSelector = (selector: string) => {
   margin-top: 4px;
   letter-spacing: 0.5px;
   font-weight: 600;
+}
+.nav-category-owner {
+  color: #b45309;
+}
+.nav-item-owner {
+  border-left: 2px solid transparent;
+}
+.nav-item-owner:hover, .nav-item-owner.active {
+  border-left-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.08);
+  color: #b45309;
+}
+.nav-item-owner .nav-icon {
+  color: #d97706;
 }
 
 .nav-divider {
