@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, readonly } from 'vue'
 import type { DesktopIcon, WindowState } from '@/types'
 
 export const useDesktopStore = defineStore('desktop', () => {
@@ -18,7 +18,7 @@ export const useDesktopStore = defineStore('desktop', () => {
   const activeWindows  = ref<WindowState[]>([])
   const selectedIconId = ref<string | null>(null)
 
-  const windows = computed(() => activeWindows.value)
+  const windows = readonly(activeWindows)
 
   let _zTop = 10
 
@@ -71,42 +71,24 @@ export const useDesktopStore = defineStore('desktop', () => {
     selectedIconId.value = id
   }
 
-  function openTransferWindow(data?: any) {
-    openWindow({
-      id: 'transfer-' + Date.now(),
-      title: 'Transfer',
-      type: 'transfer',
-      position: { x: 200, y: 100 },
-      size: { width: 600, height: 500 },
-      isMinimized: false,
-      isMaximized: false,
-      data
-    })
+  const WINDOW_CONFIGS: Record<string, { title: string; width: number; height: number }> = {
+    transfer: { title: 'Transfer',   width: 600, height: 500 },
+    deposit:  { title: 'Para Yatır', width: 500, height: 400 },
+    withdraw: { title: 'Para Çek',   width: 500, height: 400 },
   }
 
-  function openDepositWindow(vaultId?: string | number, data?: any) {
+  function openWindowByType(type: 'transfer' | 'deposit' | 'withdraw', payload?: { vaultId?: string | number; [key: string]: any }) {
+    const cfg = WINDOW_CONFIGS[type]
+    const vaultId = payload?.vaultId
     openWindow({
-      id: 'deposit-' + (vaultId != null ? vaultId : Date.now()),
-      title: 'Para Yatır',
-      type: 'deposit',
+      id: type + '-' + (vaultId != null ? vaultId : Date.now()),
+      title: cfg.title,
+      type,
       position: { x: 200, y: 100 },
-      size: { width: 500, height: 400 },
+      size: { width: cfg.width, height: cfg.height },
       isMinimized: false,
       isMaximized: false,
-      data: { vaultId, ...data }
-    })
-  }
-
-  function openWithdrawWindow(vaultId?: string | number, data?: any) {
-    openWindow({
-      id: 'withdraw-' + (vaultId != null ? vaultId : Date.now()),
-      title: 'Para Çek',
-      type: 'withdraw',
-      position: { x: 200, y: 100 },
-      size: { width: 500, height: 400 },
-      isMinimized: false,
-      isMaximized: false,
-      data: { vaultId, ...data }
+      data: payload ?? {},
     })
   }
 
@@ -123,7 +105,7 @@ export const useDesktopStore = defineStore('desktop', () => {
     icons, activeWindows, windows, selectedIconId,
     openWindow, closeWindow, minimizeWindow, maximizeWindow, focusWindow,
     updateWindowPosition, updateWindowSize, updateIconPosition, selectIcon,
-    openTransferWindow, openDepositWindow, openWithdrawWindow,
+    openWindowByType,
     updateNote, deleteNote
   }
 })

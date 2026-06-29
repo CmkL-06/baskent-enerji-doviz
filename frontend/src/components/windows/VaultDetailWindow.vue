@@ -446,18 +446,18 @@ const refresh = async () => {
 }
 
 const openTransfer = () => {
-  desktopStore.openTransferWindow()
+  desktopStore.openWindowByType('transfer')
 }
 
 const openDeposit = () => {
   if (vault.value?.vaultId) {
-    desktopStore.openDepositWindow(vault.value.vaultId)
+    desktopStore.openWindowByType('deposit', { vaultId: vault.value.vaultId })
   }
 }
 
 const openWithdraw = () => {
   if (vault.value?.vaultId) {
-    desktopStore.openWithdrawWindow(vault.value.vaultId)
+    desktopStore.openWindowByType('withdraw', { vaultId: vault.value.vaultId })
   }
 }
 

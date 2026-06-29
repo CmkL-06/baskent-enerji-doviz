@@ -513,10 +513,6 @@ onUnmounted(() => {
 })
 
 const reloadPage = () => window.location.reload()
-const clickDomSelector = (selector: string) => {
-  const el = document.querySelector(selector) as HTMLElement
-  el?.click()
-}
 </script>
 
 <template>
@@ -1108,30 +1104,6 @@ const clickDomSelector = (selector: string) => {
                 </button>
             </div>
             
-            <!-- Expenses Page Actions -->
-            <div v-if="currentPageName === 'expenses'" class="action-group">
-              <button
-                @click="clickDomSelector('.expenses-management button[class*=primary]')"
-                class="sidebar-btn primary"
-              >
-                <span class="material-symbols-outlined">add_card</span>
-                <span>{{ t('sidebar.newPaymentMethod') }}</span>
-              </button>
-              <button
-                @click="clickDomSelector('.expenses-management .tab-btn:nth-child(2)')"
-                class="sidebar-btn"
-              >
-                <span class="material-symbols-outlined">category</span>
-                <span>{{ t('sidebar.expenseCategories') }}</span>
-              </button>
-              <button
-                @click="clickDomSelector('.expenses-management .tab-btn:nth-child(3)')"
-                class="sidebar-btn"
-              >
-                <span class="material-symbols-outlined">analytics</span>
-                <span>{{ t('sidebar.expenseReports') }}</span>
-              </button>
-            </div>
             
             <!-- Parties Page Actions -->
             <div v-if="currentPageName === 'parties'" class="action-group">
