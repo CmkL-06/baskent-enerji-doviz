@@ -136,7 +136,7 @@
               </div>
               <div class="detail-item">
                 <span class="detail-label">Güncel Kur</span>
-                <span class="detail-value">{{ formatExchangeRate(balance.exchangeRateToBase, balance.currencyCode) }}</span>
+                <span class="detail-value">{{ formatExchangeRate(balance.exchangeRateToBase) }}</span>
               </div>
             </div>
           </div>
@@ -171,10 +171,10 @@
             </thead>
             <tbody>
               <tr v-for="transaction in transactions" :key="transaction.id">
-                <td>{{ new Date(transaction.transactionDate).toLocaleString('tr-TR') }}</td>
+                <td>{{ new Date(transaction.transactionDate || '').toLocaleString('tr-TR') }}</td>
                 <td class="transaction-number">{{ transaction.transactionNumber }}</td>
                 <td>
-                  <span :class="['transaction-badge', getTransactionTypeClass(transaction.type)]">
+                  <span :class="['transaction-badge', getTransactionTypeClass(Number(transaction.type))]">
                     {{ getTransactionDescription(transaction) }}
                   </span>
                 </td>
@@ -234,9 +234,9 @@
     <!-- Edit Dialog -->
     <Teleport to="body">
       <transition name="dialog-fade">
-        <div v-if="showEditDialog" class="dialog-overlay" @click="closeEditDialog">
-          <VaultEditDialog 
-            :vault="vault" 
+        <div v-if="showEditDialog && vault" class="dialog-overlay" @click="closeEditDialog">
+          <VaultEditDialog
+            :vault="vault"
             @close="closeEditDialog"
             @saved="onVaultSaved"
             @click.stop

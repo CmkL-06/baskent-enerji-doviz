@@ -41,7 +41,7 @@
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
-                Created {{ formatDate(vault.createdAt) }}
+                Created {{ vault.createdAt ? formatDate(vault.createdAt) : '' }}
               </span>
             </div>
           </div>
@@ -315,13 +315,13 @@
               <tr v-for="history in filteredBalanceHistory" :key="history.id">
                 <td class="date-cell">
                   <div class="date-time">
-                    <span class="date">{{ formatDate(history.createdDate) }}</span>
-                    <span class="time">{{ formatTime(history.createdDate) }}</span>
+                    <span class="date">{{ formatDate(history.createdDate || '') }}</span>
+                    <span class="time">{{ formatTime(history.createdDate || '') }}</span>
                   </div>
                 </td>
                 <td>
-                  <span :class="['type-badge', getTransactionTypeClass(history.transactionType)]">
-                    {{ getTransactionTypeName(history.transactionType) }}
+                  <span :class="['type-badge', getTransactionTypeClass(Number(history.transactionType))]">
+                    {{ getTransactionTypeName(Number(history.transactionType)) }}
                   </span>
                 </td>
                 <td>
@@ -332,8 +332,8 @@
                   </div>
                 </td>
                 <td>
-                  <span :class="['balance-change', history.balance >= 0 ? 'positive' : 'negative']">
-                    {{ history.balance >= 0 ? '+' : '' }}{{ formatAmount(history.balance) }}
+                  <span :class="['balance-change', (history.balance ?? 0) >= 0 ? 'positive' : 'negative']">
+                    {{ (history.balance ?? 0) >= 0 ? '+' : '' }}{{ formatAmount(history.balance ?? 0) }}
                   </span>
                 </td>
                 <td>
@@ -464,9 +464,9 @@
                   >
                     <div v-if="withdrawForm.currencyId" class="selected-currency">
                       <template v-if="availableBalances.find(b => b.currencyId === withdrawForm.currencyId)">
-                        <i v-if="getCurrencyCountryCode(availableBalances.find(b => b.currencyId === withdrawForm.currencyId).currencyCode)" :class="`fi fi-${getCurrencyCountryCode(availableBalances.find(b => b.currencyId === withdrawForm.currencyId).currencyCode)}`"></i>
-                        <span v-else-if="availableBalances.find(b => b.currencyId === withdrawForm.currencyId).currencyCode === 'USDT'" class="currency-badge usdt">₮</span>
-                        <span v-else class="currency-badge">{{ availableBalances.find(b => b.currencyId === withdrawForm.currencyId).currencyCode.substring(0, 2) }}</span>
+                        <i v-if="getCurrencyCountryCode(availableBalances.find(b => b.currencyId === withdrawForm.currencyId)?.currencyCode)" :class="`fi fi-${getCurrencyCountryCode(availableBalances.find(b => b.currencyId === withdrawForm.currencyId)?.currencyCode)}`"></i>
+                        <span v-else-if="availableBalances.find(b => b.currencyId === withdrawForm.currencyId)?.currencyCode === 'USDT'" class="currency-badge usdt">₮</span>
+                        <span v-else class="currency-badge">{{ availableBalances.find(b => b.currencyId === withdrawForm.currencyId)?.currencyCode?.substring(0, 2) }}</span>
                       </template>
                       <span>{{ availableBalances.find(b => b.currencyId === withdrawForm.currencyId)?.currencyCode }} - Kullanılabilir: {{ formatAmount(availableBalances.find(b => b.currencyId === withdrawForm.currencyId)?.availableBalance || 0) }}</span>
                     </div>
@@ -634,9 +634,9 @@
                   >
                     <div v-if="transferForm.currencyId" class="selected-currency">
                       <template v-if="availableBalances.find(b => b.currencyId === transferForm.currencyId)">
-                        <i v-if="getCurrencyCountryCode(availableBalances.find(b => b.currencyId === transferForm.currencyId).currencyCode)" :class="`fi fi-${getCurrencyCountryCode(availableBalances.find(b => b.currencyId === transferForm.currencyId).currencyCode)}`"></i>
-                        <span v-else-if="availableBalances.find(b => b.currencyId === transferForm.currencyId).currencyCode === 'USDT'" class="currency-badge usdt">₮</span>
-                        <span v-else class="currency-badge">{{ availableBalances.find(b => b.currencyId === transferForm.currencyId).currencyCode.substring(0, 2) }}</span>
+                        <i v-if="getCurrencyCountryCode(availableBalances.find(b => b.currencyId === transferForm.currencyId)?.currencyCode)" :class="`fi fi-${getCurrencyCountryCode(availableBalances.find(b => b.currencyId === transferForm.currencyId)?.currencyCode)}`"></i>
+                        <span v-else-if="availableBalances.find(b => b.currencyId === transferForm.currencyId)?.currencyCode === 'USDT'" class="currency-badge usdt">₮</span>
+                        <span v-else class="currency-badge">{{ availableBalances.find(b => b.currencyId === transferForm.currencyId)?.currencyCode?.substring(0, 2) }}</span>
                       </template>
                       <span>{{ availableBalances.find(b => b.currencyId === transferForm.currencyId)?.currencyCode }} - Kullanılabilir: {{ formatAmount(availableBalances.find(b => b.currencyId === transferForm.currencyId)?.availableBalance || 0) }}</span>
                     </div>
@@ -868,12 +868,12 @@ const filteredBalanceHistory = computed(() => {
     const endDate = new Date(dateRange.endDate || new Date())
     
     histories = histories.filter(history => {
-      const historyDate = new Date(history.createdDate)
+      const historyDate = new Date(history.createdDate || '')
       return historyDate >= startDate && historyDate <= endDate
     })
   }
   
-  return histories.sort((a, b) => new Date(b.createdDate).getTime() - new Date(a.createdDate).getTime())
+  return histories.sort((a, b) => new Date(b.createdDate || '').getTime() - new Date(a.createdDate || '').getTime())
 })
 
 // Methods
@@ -920,7 +920,7 @@ const getDateRange = (range: string) => {
         endDate: new Date().toISOString()
       }
     default:
-      return {}
+      return { startDate: new Date(0).toISOString(), endDate: new Date().toISOString() }
   }
 }
 
@@ -983,7 +983,7 @@ const loadVaultData = async (overrideId?: string) => {
     offices.value = officesData.data || officesData
     currencies.value = currenciesData.data || currenciesData
     const allVaults = vaultsData.data || vaultsData
-    otherVaults.value = allVaults.filter(v => (v.vaultId || v.id) !== vaultId)
+    otherVaults.value = allVaults.filter((v: any) => (v.vaultId || v.id) !== vaultId)
   } catch (error) {
     console.error('Failed to load vault data:', error)
     notification.error('Kasa verileri yüklenemedi')
@@ -1005,7 +1005,7 @@ const editVault = () => {
   if (!vault.value) return
   
   editForm.value = {
-    vaultName: vault.value.vaultName,
+    vaultName: vault.value.vaultName || '',
     description: vault.value.description || '',
     officeId: '',
     isActive: vault.value.isActive
@@ -1015,7 +1015,7 @@ const editVault = () => {
     o.vaults.some(v => (v.vaultId || v.id) === (vault.value?.vaultId || vault.value?.id))
   )
   if (office) {
-    editForm.value.officeId = office.officeId
+    editForm.value.officeId = String(office.officeId)
   }
   
   showEditDialog.value = true

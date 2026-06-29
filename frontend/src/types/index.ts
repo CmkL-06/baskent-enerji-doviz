@@ -25,3 +25,13 @@ export interface WindowState {
   zIndex?: number
   data?: any
 }
+
+export type Window = WindowState
+
+export interface Note {
+  id: string
+  title: string
+  content: string
+  createdAt?: string
+  updatedAt?: string
+}

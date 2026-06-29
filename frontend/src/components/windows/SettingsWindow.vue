@@ -14,7 +14,7 @@
           <label>Varsayılan Kaynak Para Birimi</label>
           <select v-model="localSettings.defaultFromCurrency" class="setting-select">
             <option v-for="currency in exchangeStore.currencies" :key="currency.code" :value="currency.code">
-              {{ currency.flag }} {{ currency.code }} - {{ currency.name }}
+              {{ currency.code }} - {{ currency.name }}
             </option>
           </select>
         </div>
@@ -23,7 +23,7 @@
           <label>Varsayılan Hedef Para Birimi</label>
           <select v-model="localSettings.defaultToCurrency" class="setting-select">
             <option v-for="currency in exchangeStore.currencies" :key="currency.code" :value="currency.code">
-              {{ currency.flag }} {{ currency.code }} - {{ currency.name }}
+              {{ currency.code }} - {{ currency.name }}
             </option>
           </select>
         </div>

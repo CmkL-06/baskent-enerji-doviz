@@ -783,9 +783,9 @@ watch(selectedOfficeId, async (newOfficeId) => {
     const savedVault = savedVaultId ? availableVaults.value.find(v => (v.vaultId || v.id) === savedVaultId) : null
     
     if (savedVault) {
-      selectedVaultId.value = savedVaultId
+      selectedVaultId.value = savedVaultId || ''
     } else if (availableVaults.value.length > 0) {
-      selectedVaultId.value = availableVaults.value[0].vaultId || availableVaults.value[0].id
+      selectedVaultId.value = String(availableVaults.value[0].vaultId ?? availableVaults.value[0].id ?? '')
       localStorage.setItem('selectedVaultId', selectedVaultId.value)
     }
     
@@ -810,26 +810,38 @@ watch(selectedVaultId, async (newVaultId) => {
 
 // Check vault counting requirement
 const checkVaultCounting = async () => {
-  if (!selectedOfficeId.value || !selectedVaultId.value) return
+  if (!selectedOfficeId.value || !selectedVaultId.value) {
+    console.log('Vault check skipped - office:', selectedOfficeId.value, 'vault:', selectedVaultId.value)
+    return
+  }
 
   try {
+    console.log('Checking vault count for office:', selectedOfficeId.value, 'vault:', selectedVaultId.value)
     const vaults = await apiService.getVaultsByOfficeId(selectedOfficeId.value)
     exchangeStore.vaults = vaults
 
-    const selectedVault = vaults.find(v => (v.vaultId || v.id) === selectedVaultId.value)
+    // Find the selected vault
+    const selectedVault = vaults.find((v: any) => (v.vaultId || v.id) === selectedVaultId.value)
+    console.log('Found vault:', selectedVault?.vaultName, 'shouldCount:', selectedVault?.shouldCount)
 
     if (selectedVault && selectedVault.shouldCount) {
+      console.log('Vault counting required')
       currentVault.value = selectedVault
       currentVault.value.isManual = false
 
+      // Admin kullanıcılara sadece uyarı göster, sayfayı gizleme
       if (authStore.isAdmin) {
+        console.log('Admin user - showing warning banner only')
         isPageHidden.value = false
         showVaultCountWarning.value = true
       } else {
+        // Normal kullanıcılara popup ve sayfa gizleme
+        console.log('Regular user - hiding page')
         isPageHidden.value = true
         showVaultCountWarning.value = false
       }
     } else {
+      // Kasa sayımı gerekmiyorsa uyarıları kapat
       isPageHidden.value = false
       showVaultCountWarning.value = false
     }

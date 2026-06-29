@@ -106,7 +106,7 @@ const loadOffices = async () => {
 }
 
 const saveChanges = async () => {
-  if (!editForm.value.vaultName.trim()) {
+  if (!(editForm.value.vaultName || '').trim()) {
     alert('Kasa adı boş olamaz')
     return
   }
@@ -124,7 +124,7 @@ const saveChanges = async () => {
     })
     
     // Refresh vault data in store
-    await exchangeStore.loadVaults()
+    await exchangeStore.loadVaults(editForm.value.officeId || '')
     
     emit('saved', updatedVault)
     emit('close')

@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import type { DesktopIcon, WindowState } from '@/types'
 
 export const useDesktopStore = defineStore('desktop', () => {
@@ -17,6 +17,8 @@ export const useDesktopStore = defineStore('desktop', () => {
 
   const activeWindows  = ref<WindowState[]>([])
   const selectedIconId = ref<string | null>(null)
+
+  const windows = computed(() => activeWindows.value)
 
   let _zTop = 10
 
@@ -69,9 +71,59 @@ export const useDesktopStore = defineStore('desktop', () => {
     selectedIconId.value = id
   }
 
+  function openTransferWindow(data?: any) {
+    openWindow({
+      id: 'transfer-' + Date.now(),
+      title: 'Transfer',
+      type: 'transfer',
+      position: { x: 200, y: 100 },
+      size: { width: 600, height: 500 },
+      isMinimized: false,
+      isMaximized: false,
+      data
+    })
+  }
+
+  function openDepositWindow(vaultId?: string | number, data?: any) {
+    openWindow({
+      id: 'deposit-' + (vaultId || Date.now()),
+      title: 'Para Yatır',
+      type: 'deposit',
+      position: { x: 200, y: 100 },
+      size: { width: 500, height: 400 },
+      isMinimized: false,
+      isMaximized: false,
+      data: { vaultId, ...data }
+    })
+  }
+
+  function openWithdrawWindow(vaultId?: string | number, data?: any) {
+    openWindow({
+      id: 'withdraw-' + (vaultId || Date.now()),
+      title: 'Para Çek',
+      type: 'withdraw',
+      position: { x: 200, y: 100 },
+      size: { width: 500, height: 400 },
+      isMinimized: false,
+      isMaximized: false,
+      data: { vaultId, ...data }
+    })
+  }
+
+  function updateNote(id: string, data: { title?: string; content?: string }) {
+    const w = activeWindows.value.find(w => w.id === id)
+    if (w && w.data) Object.assign(w.data, data)
+  }
+
+  function deleteNote(id: string) {
+    closeWindow(id)
+  }
+
   return {
-    icons, activeWindows, selectedIconId,
+    icons, activeWindows, windows, selectedIconId,
     openWindow, closeWindow, minimizeWindow, maximizeWindow, focusWindow,
-    updateWindowPosition, updateWindowSize, updateIconPosition, selectIcon
+    updateWindowPosition, updateWindowSize, updateIconPosition, selectIcon,
+    openTransferWindow, openDepositWindow, openWithdrawWindow,
+    updateNote, deleteNote
   }
 })

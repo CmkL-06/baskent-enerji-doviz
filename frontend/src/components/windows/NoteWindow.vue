@@ -97,7 +97,7 @@ const formatDate = (date: Date | string) => {
 };
 
 // Auto-save on content change
-let saveTimeout: NodeJS.Timeout;
+let saveTimeout: ReturnType<typeof setTimeout>;
 watch([noteTitle, noteContent], () => {
   clearTimeout(saveTimeout);
   saveTimeout = setTimeout(() => {

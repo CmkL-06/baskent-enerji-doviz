@@ -17,6 +17,10 @@ export const useAuthStore = defineStore('auth', () => {
     const rank = user.value?.rank
     return rank >= 99 || rank === 'Admin' || rank === 'Owner' || user.value?.isAdmin === true
   })
+  const isModerator = computed(() => {
+    const rank = user.value?.rank
+    return rank >= 50 || rank === 'Moderator' || rank === 'Moderatör'
+  })
 
   async function login(credentials: { mail: string; password: string }) {
     isLoading.value = true
@@ -56,5 +60,5 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { token, user, isLoading, error, isAuthenticated, isAdmin, userOffices, login, logout, initialize }
+  return { token, user, isLoading, error, isAuthenticated, isAdmin, isModerator, userOffices, login, logout, initialize }
 })

@@ -52,13 +52,14 @@ async function load() {
 }
 
 // ── Modal helpers ──────────────────────────────────
-function openCreate(parentId?: string, parentType?: string) {
+function openCreate(parentId?: string | number, parentType?: string) {
+  const parentIdStr = parentId !== undefined ? String(parentId) : undefined
   editTarget.value  = null
   saveError.value   = ''
   form.value = {
     id: '', officeName: '', officeDescription: '', address: '', phone: '',
     officeType: parentType === 'Merkez' ? 'Sube' : parentType === 'Sube' ? 'Bayi' : 'Sube',
-    parentOfficeId: parentId ?? null,
+    parentOfficeId: parentIdStr ?? null,
     dailyTransactionLimit: null, monthlyTransactionLimit: null, commissionRate: null,
   }
   showModal.value = true
@@ -68,7 +69,7 @@ function openEdit(office: OfficeNode) {
   editTarget.value  = office
   saveError.value   = ''
   form.value = {
-    id:                     office.id,
+    id:                     String(office.id),
     officeName:             office.officeName,
     officeDescription:      office.officeDescription ?? '',
     address:                office.address ?? '',

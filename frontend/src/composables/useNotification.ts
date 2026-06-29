@@ -7,6 +7,14 @@ export interface Notification {
   type: NotificationType
   message: string
   duration?: number
+  title?: string
+  position?: string
+}
+
+export interface NotifyOptions {
+  duration?: number
+  title?: string
+  position?: string
 }
 
 const notifications = ref<Notification[]>([])
@@ -23,10 +31,15 @@ export function useNotification() {
     if (idx >= 0) notifications.value.splice(idx, 1)
   }
 
-  const success = (message: string) => notify({ type: 'success', message })
-  const error   = (message: string) => notify({ type: 'error',   message })
-  const warning = (message: string) => notify({ type: 'warning', message })
-  const info    = (message: string) => notify({ type: 'info',    message })
+  const remove = dismiss
 
-  return { notifications, notify, dismiss, success, error, warning, info }
+  const success = (message: string, opts?: NotifyOptions) => notify({ type: 'success', message, ...opts })
+  const error   = (message: string, opts?: NotifyOptions) => notify({ type: 'error',   message, ...opts })
+  const warning = (message: string, opts?: NotifyOptions) => notify({ type: 'warning', message, ...opts })
+  const info    = (message: string, opts?: NotifyOptions) => notify({ type: 'info',    message, ...opts })
+
+  const exchangeSuccess = (message?: string) => success(message || 'İşlem başarıyla tamamlandı')
+  const printSuccess    = (message?: string) => success(message || 'Yazdırma işlemi başlatıldı')
+
+  return { notifications, notify, dismiss, remove, success, error, warning, info, exchangeSuccess, printSuccess }
 }

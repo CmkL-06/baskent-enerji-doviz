@@ -41,7 +41,7 @@ const groupedNotifications = computed(() => {
   const groups: Record<string, typeof notifications.value> = {}
   
   notifications.value.forEach(notification => {
-    const position = notification.position
+    const position = notification.position || 'top-right'
     if (!groups[position]) {
       groups[position] = []
     }

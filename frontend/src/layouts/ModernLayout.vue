@@ -427,8 +427,8 @@ const handleFilterAll = () => {
 
 const handleEndOfDay = async () => {
   // If we have a ref to the router view component, use its closeDay function
-  if (routerView.value?.performEndOfDay) {
-    await routerView.value.performEndOfDay()
+  if (routerViewRef.value?.performEndOfDay) {
+    await routerViewRef.value.performEndOfDay()
   } else {
     // Fallback to the old implementation
     const selectedOffice = exchangeStore.selectedOffice || exchangeStore.offices[0]
@@ -511,6 +511,12 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleKeyPress)
   window.removeEventListener('updatePartyTotals', updatePartyTotals as any)
 })
+
+const reloadPage = () => window.location.reload()
+const clickDomSelector = (selector: string) => {
+  const el = document.querySelector(selector) as HTMLElement
+  el?.click()
+}
 </script>
 
 <template>
@@ -1009,7 +1015,7 @@ onUnmounted(() => {
                 <span>Gün Sonu</span>
               </button>
               <button
-                @click="() => window.location.reload()"
+                @click="reloadPage"
                 class="sidebar-btn"
               >
                 <span class="material-symbols-outlined">refresh</span>
@@ -1079,21 +1085,21 @@ onUnmounted(() => {
             <!-- Expenses Page Actions -->
             <div v-if="currentPageName === 'expenses'" class="action-group">
               <button
-                @click="() => { const btn = document.querySelector('.expenses-management button[class*=primary]') as HTMLElement; btn?.click() }"
+                @click="clickDomSelector('.expenses-management button[class*=primary]')"
                 class="sidebar-btn primary"
               >
                 <span class="material-symbols-outlined">add_card</span>
                 <span>{{ t('sidebar.newPaymentMethod') }}</span>
               </button>
               <button
-                @click="() => { const tab = document.querySelector('.expenses-management .tab-btn:nth-child(2)') as HTMLElement; tab?.click() }"
+                @click="clickDomSelector('.expenses-management .tab-btn:nth-child(2)')"
                 class="sidebar-btn"
               >
                 <span class="material-symbols-outlined">category</span>
                 <span>{{ t('sidebar.expenseCategories') }}</span>
               </button>
               <button
-                @click="() => { const tab = document.querySelector('.expenses-management .tab-btn:nth-child(3)') as HTMLElement; tab?.click() }"
+                @click="clickDomSelector('.expenses-management .tab-btn:nth-child(3)')"
                 class="sidebar-btn"
               >
                 <span class="material-symbols-outlined">analytics</span>

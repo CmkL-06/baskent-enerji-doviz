@@ -55,7 +55,7 @@ export const useExchangeStore = defineStore('exchange', () => {
   // Alias used by ModernLayout.vue
   const loadOffices = fetchOffices
 
-  async function loadExchangeRates(officeId?: number) {
+  async function loadExchangeRates(officeId?: string | number) {
     try {
       const id = officeId ?? selectedOffice.value?.officeId ?? currentOfficeId.value
       const data = await apiService.getExchangeRates(id ?? undefined)
@@ -112,15 +112,31 @@ export const useExchangeStore = defineStore('exchange', () => {
     }
   }
 
+  const settings = ref({
+    defaultFromCurrency: 'USD',
+    defaultToCurrency: 'TRY',
+    autoRefreshRates: true,
+    refreshInterval: 60,
+    theme: 'light',
+    language: 'tr'
+  })
+
+  async function updateSettings(newSettings: Partial<typeof settings.value>) {
+    Object.assign(settings.value, newSettings)
+    try {
+      await (apiService as any).updateSettings?.(settings.value)
+    } catch {}
+  }
+
   return {
     currencies, vaults, offices, exchangeRates, currentOfficeId, selectedOffice, currentOffice,
-    transactions,
+    transactions, settings,
     initialize,
     fetchCurrencies, fetchVaults, fetchOffices,
     loadOffices, loadExchangeRates, loadVaults,
     getExchangeRate,
     setSelectedOffice, getSelectedOfficeId, setSelectedOfficeId,
-    loadTransactionHistory,
+    loadTransactionHistory, updateSettings,
     apiService
   }
 })

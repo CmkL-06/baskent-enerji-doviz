@@ -17,8 +17,9 @@ const CRYPTO_CODES = new Set(['BTC','ETH','USDT','USDC','BNB','XRP','SOL','ADA',
 
 const METAL_CODES = new Set(['XAU','XAG','XPT','XPD','GOLD','SILVER','PLATINUM'])
 
-export function getCurrencyCountryCode(code: string): string {
-  return CURRENCY_COUNTRY[code?.toUpperCase()] || ''
+export function getCurrencyCountryCode(code?: string | null): string {
+  if (!code) return ''
+  return CURRENCY_COUNTRY[code.toUpperCase()] || ''
 }
 
 export function getCurrencyFlag(code: string): string {
