@@ -27,7 +27,7 @@ const isMobileMenuOpen = ref(false)
 const isSidebarOpen = ref(false)
 const isUserMenuOpen = ref(false)
 
-// All navigation items  
+// All navigation items
 const allNavItems = computed(() => [
   { id: 'home', icon: 'dashboard', label: t('navbar.dashboard'), category: 'GENEL', path: '/ihtiyar/dashboard', adminOnly: false },
   { id: 'z-report', icon: 'insert_chart', label: t('navbar.zReport'), category: 'RAPORLAR', path: '/ihtiyar/z-report', adminOnly: true },
@@ -42,6 +42,7 @@ const allNavItems = computed(() => [
   { id: 'vault-snapshot', icon: 'photo_camera', label: 'Kasa Snapshot', category: 'YÖNETİM', path: '/ihtiyar/vault-snapshot', adminOnly: true },
   { id: 'auto-rate-management', icon: 'currency_exchange', label: 'Otomatik Kur Yönetimi', category: 'YÖNETİM', path: '/ihtiyar/auto-rate-management', adminOnly: true },
   { id: 'currencies', icon: 'payments', label: 'Para Birimleri', category: 'YÖNETİM', path: '/ihtiyar/currencies', adminOnly: true },
+  { id: 'user-offices', icon: 'admin_panel_settings', label: 'Yetkilendirme', category: 'YÖNETİM', path: '/ihtiyar/user-offices', adminOnly: true },
   { id: 'settings', icon: 'tune', label: t('navbar.settings'), category: 'YÖNETİM', path: '/ihtiyar/settings', adminOnly: false },
   { id: 'owner-panel',       icon: 'crown',           label: 'Owner Panel',        category: 'OWNER', path: '/ihtiyar/owner-panel',       adminOnly: false, ownerOnly: true },
   { id: 'office-hierarchy', icon: 'account_tree',    label: 'Ofis Hiyerarşisi',   category: 'OWNER', path: '/ihtiyar/office-hierarchy',  adminOnly: false, ownerOnly: true },
@@ -101,16 +102,16 @@ const loadExchangeRates = async () => {
   try {
     // Don't clear existing rates while loading new ones
     const previousRates = exchangeStore.exchangeRates
-    
+
     // Don't call loadExchangeRates if we don't have offices loaded yet
     // For non-admin users, ensure we have their offices first
     if (!authStore.isAdmin && authStore.user?.id && exchangeStore.offices.length === 0) {
       // Load user's offices first
       await exchangeStore.loadOffices()
     }
-    
+
     await exchangeStore.loadExchangeRates()
-    
+
     // Only update if we got valid rates
     if (exchangeStore.exchangeRates && exchangeStore.exchangeRates.length > 0) {
       updateTickerText()
@@ -170,10 +171,10 @@ const getCurrencyCountryCode = (currencyCode: string): string => {
 const tickerRates = computed(() => {
   const rates = exchangeStore.exchangeRates
   if (!rates || rates.length === 0) return []
-  
+
   // Get unique rates by source currency code and office
   const uniqueRatesMap = new Map()
-  
+
   rates
     .filter(rate => rate && rate.targetCurrencyCode === 'TRY' && rate.isActive !== false && rate.buyRate && rate.sellRate)
     .forEach(rate => {
@@ -189,7 +190,7 @@ const tickerRates = computed(() => {
         })
       }
     })
-  
+
   return Array.from(uniqueRatesMap.values())
 })
 
@@ -197,23 +198,23 @@ const tickerRates = computed(() => {
 const updateTickerText = () => {
   const rates = exchangeStore.exchangeRates
   const selectedOffice = exchangeStore.selectedOffice
-  
+
   if (!rates || rates.length === 0) {
     tickerText.value = 'Kur bilgisi bulunamadı'
     return
   }
-  
+
   // Get office name to display
   const officeName = selectedOffice?.officeName || exchangeStore.offices[0]?.officeName || ''
   const officePrefix = officeName ? `[${officeName}] ` : ''
-  
+
   // Build ticker text from exchange rates with better formatting
   const uniqueRatesMap = new Map()
-  
+
   rates
-    .filter(rate => 
-      rate && 
-      rate.targetCurrencyCode === 'TRY' && 
+    .filter(rate =>
+      rate &&
+      rate.targetCurrencyCode === 'TRY' &&
       rate.isActive !== false &&
       rate.sellRate
     )
@@ -223,20 +224,20 @@ const updateTickerText = () => {
         uniqueRatesMap.set(rate.sourceCurrencyCode, rate)
       }
     })
-  
+
   const validRates = Array.from(uniqueRatesMap.values())
-  
+
   if (validRates.length === 0) {
     tickerText.value = 'Kur bilgisi yok'
     return
   }
-  
+
   const rateTexts = validRates
     .map(rate => {
       return `${rate.sourceCurrencyCode}: ${rate.sellRate.toFixed(2)} ₺`
     })
     .join('   •   ')
-  
+
   // Add office name and repeat the text for continuous scrolling
   const fullText = `${officePrefix}${rateTexts}`
   tickerText.value = `${fullText}   •   ${fullText}   •   ${fullText}`
@@ -289,6 +290,28 @@ const currentPageName = computed(() => {
   return 'dashboard'
 })
 
+// New computed: nav groups for sidebar
+const navGroups = computed(() => {
+  const cats = ['GENEL', 'İŞLEMLER', 'RAPORLAR', 'YÖNETİM']
+  if (authStore.isOwner) cats.push('OWNER')
+  return cats
+    .map(cat => ({ cat, items: getCategoryItems(cat) }))
+    .filter(g => g.items.length > 0)
+})
+
+// New computed: page title for top header
+const pageTitle = computed(() => {
+  const match = topNavItems.value.find(item =>
+    route.path === item.path || route.path.startsWith(item.path + '/')
+  )
+  return match?.label ?? 'Dashboard'
+})
+
+// New computed: whether to show quick sidebar
+const hasQuickSidebar = computed(() =>
+  ['dashboard', 'z-report', 'parties', 'vaults', 'exchange'].includes(currentPageName.value)
+)
+
 const navigateTo = (item: any) => {
   currentRoute.value = item.id
   router.push(item.path)
@@ -301,7 +324,7 @@ const setSidebarTab = (item: any) => {
 
 const handleQuickAction = (action: any) => {
   if (!action.path) return
-  
+
   // If navigating to exchange with different type, force reload
   if (action.path.includes('/exchange?type=')) {
     const currentPath = router.currentRoute.value.fullPath
@@ -311,23 +334,23 @@ const handleQuickAction = (action: any) => {
       return
     }
   }
-  
+
   router.push(action.path)
 }
 
 const logout = () => {
   // Close dropdown
   isUserMenuOpen.value = false
-  
+
   // Clear ALL localStorage data
   localStorage.clear()
-  
+
   // Clear session storage too
   sessionStorage.clear()
-  
+
   // Call auth store logout
   authStore.logout()
-  
+
   // Navigate to login
   router.push('/')
 }
@@ -364,15 +387,15 @@ const handleCreateVault = () => {
 // Party-related methods
 const loadPartyData = async () => {
   if (!exchangeStore.selectedOffice?.officeId) return
-  
+
   try {
     const response = await apiService.getParties(exchangeStore.selectedOffice.officeId)
     parties.value = response
-    
+
     // Calculate totals
     let receivables = 0
     let debts = 0
-    
+
     response.forEach((party: any) => {
       party.accounts?.forEach((account: any) => {
         if (account.balance > 0) {
@@ -382,7 +405,7 @@ const loadPartyData = async () => {
         }
       })
     })
-    
+
     partyTotals.value = {
       totalReceivables: receivables,
       totalDebts: debts,
@@ -432,16 +455,16 @@ const handleEndOfDay = async () => {
   } else {
     // Fallback to the old implementation
     const selectedOffice = exchangeStore.selectedOffice || exchangeStore.offices[0]
-    
+
     if (!selectedOffice) {
       alert('Lütfen bir ofis seçiniz!')
       return
     }
-    
+
     if (!confirm('Gün sonu işlemini yapmak istediğinizden emin misiniz?')) {
       return
     }
-    
+
     try {
       await apiService.endDay(selectedOffice.officeId)
       alert('Gün sonu işlemi başarıyla tamamlandı!')
@@ -488,7 +511,7 @@ onMounted(async () => {
   // Load ticker preference from localStorage
   const savedTickerPreference = localStorage.getItem('showTicker')
   showTicker.value = savedTickerPreference === 'true' // Only show if explicitly set to 'true'
-  
+
   await loadExchangeRates()
   // Refresh rates every 60 seconds (instead of 30)
   tickerInterval = setInterval(loadExchangeRates, 60000) as unknown as number
@@ -496,7 +519,7 @@ onMounted(async () => {
   window.addEventListener('keydown', handleKeyPress)
   // Add party totals update listener
   window.addEventListener('updatePartyTotals', updatePartyTotals as any)
-  
+
   // Load party data if on parties page
   if (route.path.includes('/parties')) {
     await loadPartyData()
@@ -516,1515 +539,529 @@ const reloadPage = () => window.location.reload()
 </script>
 
 <template>
-  <div class="h-screen bg-gray-50 flex flex-col">
-    <!-- Top Navigation Bar -->
-    <nav class="bg-white border-b border-gray-200 shadow-sm flex-shrink-0">
-      <!-- Mobile Header -->
-      <div class="lg:hidden flex items-center justify-between p-4">
-        <button 
-          @click="toggleMobileMenu"
-          class="p-2 rounded-lg hover:bg-gray-100"
-        >
+  <div class="layout-root">
+
+    <!-- ── Left Nav Sidebar ───────────────────────────── -->
+    <aside class="nav-sidebar" :class="{ 'is-open': isMobileMenuOpen }">
+
+      <!-- Brand -->
+      <div class="nav-brand">
+        <div class="brand-icon">
+          <span class="material-symbols-outlined">currency_exchange</span>
+        </div>
+        <span class="brand-name">Exchange Office</span>
+      </div>
+
+      <!-- Navigation -->
+      <nav class="nav-menu">
+        <template v-for="group in navGroups" :key="group.cat">
+          <div class="nav-group-label">{{ group.cat }}</div>
+          <router-link
+            v-for="item in group.items"
+            :key="item.id"
+            :to="item.path"
+            class="nav-link"
+            active-class="is-active"
+            @click="isMobileMenuOpen = false"
+          >
+            <span class="material-symbols-outlined nav-link-icon">{{ item.icon }}</span>
+            <span class="nav-link-text">{{ item.label }}</span>
+            <span v-if="(item as any).isNew" class="nav-badge">YENİ</span>
+          </router-link>
+        </template>
+      </nav>
+
+      <!-- Footer -->
+      <div class="nav-footer">
+        <LanguageSelector class="nav-lang" />
+        <button class="nav-user-btn" @click="isUserMenuOpen = !isUserMenuOpen">
+          <div class="nav-avatar">{{ (authStore.user?.firstname || authStore.user?.username || '?')[0].toUpperCase() }}</div>
+          <div class="nav-user-info">
+            <span class="nav-user-name">{{ authStore.user?.firstname || authStore.user?.username }}</span>
+            <span class="nav-user-role">
+              <span v-if="authStore.isOwner">👑 Owner</span>
+              <span v-else-if="authStore.isAdmin">Admin</span>
+              <span v-else>Personel</span>
+            </span>
+          </div>
+          <span class="material-symbols-outlined nav-user-chevron">expand_more</span>
+        </button>
+
+        <!-- User dropdown (inside sidebar footer) -->
+        <div v-if="isUserMenuOpen" class="user-dropdown">
+          <div class="ud-header">
+            <div class="ud-avatar">{{ (authStore.user?.firstname || '?')[0].toUpperCase() }}</div>
+            <div>
+              <div class="ud-name">{{ authStore.user?.firstname }} {{ authStore.user?.lastname }}</div>
+              <div class="ud-username">@{{ authStore.user?.username }}</div>
+            </div>
+          </div>
+          <div class="ud-info">
+            <div class="ud-row"><span class="material-symbols-outlined">mail</span>{{ authStore.user?.mail }}</div>
+          </div>
+          <button class="ud-logout" @click="logout">
+            <span class="material-symbols-outlined">power_settings_new</span>
+            {{ t('navbar.logout') }}
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Mobile overlay -->
+    <div v-if="isMobileMenuOpen" class="nav-overlay" @click="isMobileMenuOpen = false" />
+
+    <!-- ── Right Area ──────────────────────────────────── -->
+    <div class="right-area">
+
+      <!-- Top Header -->
+      <header class="top-header">
+        <button class="hamburger" @click="toggleMobileMenu">
           <span class="material-symbols-outlined">menu</span>
         </button>
-        
-        <h1 class="text-lg font-bold text-gray-800">Exchange Office</h1>
-        
-        <div class="flex items-center gap-2">
-          <button 
-            @click="toggleSidebar"
-            class="p-2 rounded-lg hover:bg-gray-100"
-          >
-            <span class="material-symbols-outlined">dashboard</span>
-          </button>
-          <button class="p-2 rounded-lg hover:bg-gray-100" @click="logout">
-            <span class="material-symbols-outlined">account_circle</span>
-          </button>
-        </div>
-      </div>
-      
-      <!-- Desktop Navigation -->
-      <div class="hidden lg:flex items-center justify-between px-6 py-4">
-        <div class="nav-items flex items-start">
-          <!-- GENEL Section -->
-          <div class="nav-section">
-            <div class="nav-group">
-              <router-link
-                :to="getNavItem('home')?.path || '/ihtiyar/dashboard'"
-                class="nav-item"
-                :class="{ active: currentRoute === 'home' }"
-                @click.left="currentRoute = 'home'"
-              >
-                <span class="nav-icon material-symbols-outlined">{{ getNavItem('home')?.icon }}</span>
-                <div class="nav-label">{{ t('navbar.dashboard').toUpperCase() }}</div>
-              </router-link>
-            </div>
-            <div class="nav-category-label">GENEL</div>
-          </div>
-          
-          <div class="nav-divider"></div>
-          
-          <!-- RAPORLAR Section -->
-          <div v-if="authStore.isAdmin" class="nav-section">
-            <div class="nav-group">
-              <router-link
-                :to="getNavItem('z-report')?.path || '/ihtiyar/z-report'"
-                class="nav-item"
-                :class="{ active: currentRoute === 'z-report' }"
-                @click.left="currentRoute = 'z-report'"
-              >
-                <span class="nav-icon material-symbols-outlined">{{ getNavItem('z-report')?.icon }}</span>
-                <div class="nav-label">{{ t('navbar.zReport').toUpperCase() }}</div>
-              </router-link>
-              <!-- Z Report V2 - Hidden
-              <div
-                class="nav-item relative"
-                :class="{ active: currentRoute === 'z-report-v2' }"
-                @click="navigateTo(getNavItem('z-report-v2'))"
-              >
-                <span class="nav-icon material-symbols-outlined">{{ getNavItem('z-report-v2')?.icon }}</span>
-                <div class="nav-label">{{ t('navbar.zReportV2').toUpperCase() }}</div>
-                <span class="absolute -top-1 -right-1 px-2 py-0.5 bg-red-600 text-white text-xs font-bold rounded-full animate-pulse flex items-center gap-0.5">
-                  <span class="material-symbols-outlined text-xs">warning</span>
-                  DOKUNMA
-                </span>
-              </div>
-              -->
-            </div>
-            <div class="nav-category-label">RAPORLAR</div>
-          </div>
-          
-          <div class="nav-divider"></div>
-          
-          <!-- İŞLEMLER Section -->
-          <div class="nav-section">
-            <div class="nav-group">
-              <!-- Exchange V2 - Main Exchange -->
-              <router-link
-                :to="getNavItem('exchange-v2')?.path || '/ihtiyar/exchange-v2'"
-                class="nav-item"
-                :class="{ active: currentRoute === 'exchange-v2' }"
-                @click.left="currentRoute = 'exchange-v2'"
-              >
-                <span class="nav-icon material-symbols-outlined">{{ getNavItem('exchange-v2')?.icon }}</span>
-                <div class="nav-label">{{ t('navbar.exchange').toUpperCase() }}</div>
-              </router-link>
-              <!-- Parties - Now visible to all users -->
-              <router-link
-                :to="getNavItem('parties')?.path || '/ihtiyar/parties'"
-                class="nav-item relative"
-                :class="{ active: currentRoute === 'parties' }"
-                @click.left="currentRoute = 'parties'"
-              >
-                <span class="nav-icon material-symbols-outlined">{{ getNavItem('parties')?.icon }}</span>
-                <div class="nav-label">{{ t('navbar.parties').toUpperCase() }}</div>
-              </router-link>
-              <!-- Ghost Party - Hidden
-              <div v-if="authStore.isAdmin"
-                class="nav-item relative"
-                :class="{ active: currentRoute === 'ghost-party' }"
-                @click="navigateTo(getNavItem('ghost-party'))"
-              >
-                <span class="nav-icon material-symbols-outlined">{{ getNavItem('ghost-party')?.icon }}</span>
-                <div class="nav-label">{{ t('navbar.ghostParty').toUpperCase() }}</div>
-              </div>
-              -->
-              
-              <!-- Expenses - Always visible -->
-              <router-link
-                :to="getNavItem('expenses')?.path || '/ihtiyar/expenses'"
-                class="nav-item"
-                :class="{ active: currentRoute === 'expenses' }"
-                @click.left="currentRoute = 'expenses'"
-              >
-                <span class="nav-icon material-symbols-outlined">{{ getNavItem('expenses')?.icon }}</span>
-                <div class="nav-label">{{ t('navbar.expenses').toUpperCase() }}</div>
-              </router-link>
-          
-              <!-- Vaults - Always visible -->
-              <router-link
-                :to="getNavItem('vaults')?.path || '/ihtiyar/vaults'"
-                class="nav-item"
-                :class="{ active: currentRoute === 'vaults' }"
-                @click.left="currentRoute = 'vaults'"
-              >
-                <span class="nav-icon material-symbols-outlined">{{ getNavItem('vaults')?.icon }}</span>
-                <div class="nav-label">{{ t('navbar.vaults').toUpperCase() }}</div>
-              </router-link>
-            </div>
-            <div class="nav-category-label">İŞLEMLER</div>
-          </div>
-          
-          <div class="nav-divider"></div>
-          
-          <!-- YÖNETİM Section -->
-          <div class="nav-section">
-            <div class="nav-group">
-              <router-link v-if="authStore.isAdmin"
-                :to="getNavItem('users')?.path || '/ihtiyar/users'"
-                class="nav-item"
-                :class="{ active: currentRoute === 'users' }"
-                @click.left="currentRoute = 'users'"
-              >
-                <span class="nav-icon material-symbols-outlined">{{ getNavItem('users')?.icon }}</span>
-                <div class="nav-label">{{ t('navbar.users').toUpperCase() }}</div>
-              </router-link>
-              <router-link v-if="authStore.isAdmin"
-                :to="getNavItem('vault-counts')?.path || '/ihtiyar/vault-counts'"
-                class="nav-item"
-                :class="{ active: currentRoute === 'vault-counts' }"
-                @click.left="currentRoute = 'vault-counts'"
-              >
-                <span class="nav-icon material-symbols-outlined">{{ getNavItem('vault-counts')?.icon }}</span>
-                <div class="nav-label">KASA SAYIMLARI</div>
-              </router-link>
-              <router-link v-if="authStore.isAdmin"
-                :to="getNavItem('currencies')?.path || '/ihtiyar/currencies'"
-                class="nav-item"
-                :class="{ active: currentRoute === 'currencies' }"
-                @click.left="currentRoute = 'currencies'"
-              >
-                <span class="nav-icon material-symbols-outlined">{{ getNavItem('currencies')?.icon }}</span>
-                <div class="nav-label">PARA BİRİMLERİ</div>
-              </router-link>
-               <router-link v-if="authStore.isAdmin"
-                :to="getNavItem('vault-snapshot')?.path || '/ihtiyar/vault-snapshot'"
-                class="nav-item"
-                :class="{ active: currentRoute === 'vault-snapshot' }"
-                @click.left="currentRoute = 'vault-snapshot'"
-              >
-                <span class="nav-icon material-symbols-outlined">{{ getNavItem('vault-snapshot')?.icon }}</span>
-                <div class="nav-label">KASA KAYITLARI</div>
-              </router-link>
-              <router-link v-if="authStore.isAdmin"
-                :to="getNavItem('auto-rate-management')?.path || '/ihtiyar/auto-rate-management'"
-                class="nav-item"
-                :class="{ active: currentRoute === 'auto-rate-management' }"
-                @click.left="currentRoute = 'auto-rate-management'"
-              >
-                <span class="nav-icon material-symbols-outlined">{{ getNavItem('auto-rate-management')?.icon }}</span>
-                <div class="nav-label">OTOMATİK KUR</div>
-              </router-link>
-
-              <router-link v-if="authStore.isAdmin"
-                :to="getNavItem('office-transfers')?.path || '/ihtiyar/office-transfers'"
-                class="nav-item"
-                :class="{ active: currentRoute === 'office-transfers' }"
-                @click.left="currentRoute = 'office-transfers'"
-              >
-                <span class="nav-icon material-symbols-outlined">{{ getNavItem('office-transfers')?.icon }}</span>
-                <div class="nav-label">ŞUBE TRANSFER</div>
-              </router-link>
-
-              <router-link
-                :to="getNavItem('settings')?.path || '/ihtiyar/settings'"
-                class="nav-item"
-                :class="{ active: currentRoute === 'settings' }"
-                @click.left="currentRoute = 'settings'"
-              >
-                <span class="nav-icon material-symbols-outlined">{{ getNavItem('settings')?.icon }}</span>
-                <div class="nav-label">{{ t('navbar.settings').toUpperCase() }}</div>
-              </router-link>
-            </div>
-            <div class="nav-category-label">YÖNETİM</div>
-          </div>
-
-          <!-- OWNER Section -->
-          <div v-if="authStore.isOwner" class="nav-section">
-            <div class="nav-group">
-              <router-link
-                :to="getNavItem('owner-panel')?.path || '/ihtiyar/owner-panel'"
-                class="nav-item nav-item-owner"
-                :class="{ active: currentRoute === 'owner-panel' }"
-                @click.left="currentRoute = 'owner-panel'"
-              >
-                <span class="nav-icon material-symbols-outlined">crown</span>
-                <div class="nav-label">OWNER PANEL</div>
-              </router-link>
-              <router-link
-                :to="getNavItem('office-hierarchy')?.path || '/ihtiyar/office-hierarchy'"
-                class="nav-item nav-item-owner"
-                :class="{ active: currentRoute === 'office-hierarchy' }"
-                @click.left="currentRoute = 'office-hierarchy'"
-              >
-                <span class="nav-icon material-symbols-outlined">account_tree</span>
-                <div class="nav-label">OFİS HİYERARŞİSİ</div>
-              </router-link>
-            </div>
-            <div class="nav-category-label nav-category-owner">👑 OWNER</div>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-3">
-          <!-- Language Selector -->
-          <LanguageSelector />
-          
-          <!-- User Dropdown -->
-          <div class="relative">
-            <button 
-              @click="isUserMenuOpen = !isUserMenuOpen"
-              class="user-menu-btn"
-            >
-              <div class="user-avatar">
-                <span class="material-symbols-outlined">person</span>
-              </div>
-              <span class="text-sm font-medium hidden sm:inline">{{ authStore.user?.firstname || 'Kullanıcı' }}</span>
-              <span class="material-symbols-outlined text-sm">{{ isUserMenuOpen ? 'expand_less' : 'expand_more' }}</span>
-            </button>
-            
-            <!-- Dropdown Menu -->
-            <div 
-              v-if="isUserMenuOpen"
-              class="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden"
-            >
-              <!-- User Profile Card -->
-              <div class="bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-6 text-white">
-                <div class="flex items-center gap-4">
-                  <div class="w-16 h-16 bg-white/20 backdrop-blur-xl rounded-full flex items-center justify-center border-2 border-white/30">
-                    <span class="material-symbols-outlined text-3xl">account_circle</span>
-                  </div>
-                  <div class="flex-1">
-                    <h3 class="font-bold text-lg">{{ authStore.user?.firstname }} {{ authStore.user?.lastname }}</h3>
-                    <p class="text-sm opacity-90">@{{ authStore.user?.username }}</p>
-                  </div>
-                </div>
-              </div>
-              
-              <!-- User Info -->
-              <div class="p-4 space-y-3">
-                <div class="flex items-center gap-3 text-sm">
-                  <span class="material-symbols-outlined text-indigo-500 text-xl">mail</span>
-                  <div class="flex-1">
-                    <p class="text-gray-500 text-xs">E-posta</p>
-                    <p class="text-gray-800 font-medium">{{ authStore.user?.mail }}</p>
-                  </div>
-                </div>
-                
-                <div class="flex items-center gap-3 text-sm">
-                  <span class="material-symbols-outlined text-purple-500 text-xl">badge</span>
-                  <div class="flex-1">
-                    <p class="text-gray-500 text-xs">Kullanıcı Adı</p>
-                    <p class="text-gray-800 font-medium">{{ authStore.user?.username }}</p>
-                  </div>
-                </div>
-                
-                <div class="flex items-center gap-3 text-sm">
-                  <span class="material-symbols-outlined text-green-500 text-xl">shield</span>
-                  <div class="flex-1">
-                    <p class="text-gray-500 text-xs">Yetki Seviyesi</p>
-                    <p class="text-gray-800 font-medium">
-                      <span v-if="authStore.isOwner" class="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-md text-xs font-semibold">👑 Owner</span>
-                      <span v-else-if="authStore.isAdmin" class="px-2 py-1 bg-red-100 text-red-700 rounded-md text-xs font-semibold">Admin</span>
-                      <span v-else-if="authStore.isModerator" class="px-2 py-1 bg-blue-100 text-blue-700 rounded-md text-xs font-semibold">Moderatör</span>
-                      <span v-else class="px-2 py-1 bg-gray-100 text-gray-700 rounded-md text-xs font-semibold">Kullanıcı</span>
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              <!-- Logout Button -->
-              <div class="border-t border-gray-200 p-4">
-                <button 
-                  @click="logout"
-                  class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-lg hover:from-red-600 hover:to-pink-600 transition-all font-medium shadow-md hover:shadow-lg"
-                >
-                  <span class="material-symbols-outlined">power_settings_new</span>
-                  <span>{{ t('navbar.logout') }}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </nav>
-    
-    <!-- Mobile Navigation Menu -->
-    <div 
-      v-if="isMobileMenuOpen"
-      class="lg:hidden fixed inset-0 z-50 bg-black bg-opacity-50"
-      @click="toggleMobileMenu"
-    >
-      <div 
-        class="bg-white w-80 max-w-full h-full overflow-y-auto"
-        @click.stop
-      >
-        <div class="p-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 class="text-xl font-bold text-gray-800">Menü</h2>
-          <button @click="toggleMobileMenu" class="p-2 hover:bg-gray-100 rounded-lg">
-            <span class="material-symbols-outlined">close</span>
-          </button>
-        </div>
-        
-        <div class="p-4 space-y-2">
-          <div v-for="item in topNavItems" :key="item.id">
-            <button
-              @click="navigateTo(item); toggleMobileMenu()"
-              class="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition-colors"
-              :class="{ 'bg-purple-100 text-purple-700': currentRoute === item.id }"
-            >
-              <span class="material-symbols-outlined">{{ item.icon }}</span>
-              <span class="font-medium">{{ item.label }}</span>
-            </button>
-          </div>
-        </div>
-        
-        <div class="p-4 border-t border-gray-200">
+        <h1 class="header-title">{{ pageTitle }}</h1>
+        <div class="header-actions">
           <button
-            @click="logout"
-            class="w-full flex items-center gap-3 p-3 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+            class="header-icon-btn"
+            :class="{ active: showTicker }"
+            @click="showTicker = !showTicker; localStorage.setItem('showTicker', String(showTicker))"
+            title="Kur Ticker'ı"
           >
-            <span class="material-symbols-outlined">logout</span>
-            <span class="font-medium">Çıkış Yap</span>
+            <span class="material-symbols-outlined">show_chart</span>
+          </button>
+          <button class="header-user-btn" @click="isUserMenuOpen = !isUserMenuOpen">
+            <div class="header-avatar">{{ (authStore.user?.firstname || '?')[0].toUpperCase() }}</div>
+            <span class="header-user-name">{{ authStore.user?.firstname }}</span>
+            <span class="material-symbols-outlined" style="font-size:16px">expand_more</span>
           </button>
         </div>
-      </div>
-    </div>
-    
-    <!-- Ticker -->
-    <div v-if="showTicker" class="bg-black text-yellow-400 py-3 overflow-hidden flex-shrink-0 shadow-lg relative">
-      <div class="ticker-wrapper">
-        <div class="ticker-content inline-flex whitespace-nowrap animate-ticker font-medium text-base tracking-wide items-center">
-          <!-- Office Name -->
-          <span v-if="exchangeStore.selectedOffice" class="inline-flex items-center mx-4 text-white bg-yellow-600 px-3 py-1 rounded">
-            <span class="font-bold">{{ exchangeStore.selectedOffice.officeName }}</span>
-          </span>
-          <span class="mx-3">•</span>
-          
-          <!-- First set -->
-          <div class="inline-flex items-center">
-            <template v-for="(rate, index) in tickerRates" :key="`a-${index}`">
-              <span class="inline-flex items-center mx-4">
-                <!-- Special icons for USDT and KRUB -->
-                <span v-if="rate.code === 'USDT'" class="mr-2 text-lg">₮</span>
-                <span v-else-if="rate.code === 'KRUB'" class="mr-2">💳</span>
-                <!-- Flag icons for other currencies -->
-                <i v-else-if="rate.countryCode" :class="`fi fi-${rate.countryCode} mr-2`"></i>
-                <span>{{ rate.code }}: </span>
-                <span class="text-green-400">A:{{ rate.buyRate }}</span>
-                <span class="mx-1">/</span>
-                <span class="text-red-400">S:{{ rate.sellRate }}</span>
-                <span class="ml-1">₺</span>
-              </span>
-              <span class="mx-3">•</span>
-            </template>
-          </div>
-          
-          <!-- Office Name again for continuity -->
-          <span v-if="exchangeStore.selectedOffice" class="inline-flex items-center mx-4 text-white bg-yellow-600 px-3 py-1 rounded">
-            <span class="font-bold">{{ exchangeStore.selectedOffice.officeName }}</span>
-          </span>
-          <span class="mx-3">•</span>
-          
-          <!-- Second set for continuous scroll -->
-          <div class="inline-flex items-center">
-            <template v-for="(rate, index) in tickerRates" :key="`b-${index}`">
-              <span class="inline-flex items-center mx-4">
-                <span v-if="rate.code === 'USDT'" class="mr-2 text-lg">₮</span>
-                <span v-else-if="rate.code === 'KRUB'" class="mr-2">💳</span>
-                <i v-else-if="rate.countryCode" :class="`fi fi-${rate.countryCode} mr-2`"></i>
-                <span>{{ rate.code }}: </span>
-                <span class="text-green-400">A:{{ rate.buyRate }}</span>
-                <span class="mx-1">/</span>
-                <span class="text-red-400">S:{{ rate.sellRate }}</span>
-                <span class="ml-1">₺</span>
-              </span>
-              <span class="mx-3">•</span>
-            </template>
-          </div>
-          
-          <!-- Office Name again for continuity -->
-          <span v-if="exchangeStore.selectedOffice" class="inline-flex items-center mx-4 text-white bg-yellow-600 px-3 py-1 rounded">
-            <span class="font-bold">{{ exchangeStore.selectedOffice.officeName }}</span>
-          </span>
-          <span class="mx-3">•</span>
-          
-          <!-- Third set for continuous scroll -->
-          <div class="inline-flex items-center">
-            <template v-for="(rate, index) in tickerRates" :key="`c-${index}`">
-              <span class="inline-flex items-center mx-4">
-                <span v-if="rate.code === 'USDT'" class="mr-2 text-lg">₮</span>
-                <span v-else-if="rate.code === 'KRUB'" class="mr-2">💳</span>
-                <i v-else-if="rate.countryCode" :class="`fi fi-${rate.countryCode} mr-2`"></i>
-                <span>{{ rate.code }}: </span>
-                <span class="text-green-400">A:{{ rate.buyRate }}</span>
-                <span class="mx-1">/</span>
-                <span class="text-red-400">S:{{ rate.sellRate }}</span>
-                <span class="ml-1">₺</span>
-              </span>
-              <span class="mx-3">•</span>
+      </header>
+
+      <!-- Ticker -->
+      <div v-if="showTicker" class="ticker-bar">
+        <div class="ticker-inner">
+          <div class="ticker-track">
+            <template v-for="rep in 3" :key="rep">
+              <span v-if="exchangeStore.selectedOffice" class="ticker-office">{{ exchangeStore.selectedOffice.officeName }}</span>
+              <template v-for="(rate, i) in tickerRates" :key="`${rep}-${i}`">
+                <span class="ticker-item">
+                  <i v-if="rate.countryCode" :class="`fi fi-${rate.countryCode}`"></i>
+                  <span v-else-if="rate.code === 'USDT'">₮</span>
+                  {{ rate.code }}:
+                  <span class="ticker-buy">A:{{ rate.buyRate }}</span>
+                  <span class="ticker-sell">S:{{ rate.sellRate }}</span> ₺
+                </span>
+                <span class="ticker-sep">•</span>
+              </template>
             </template>
           </div>
         </div>
       </div>
-    </div>
-    
-    <!-- Main Container -->
-    <div class="flex flex-1 overflow-hidden">
-      <!-- Left Sidebar - Desktop -->
-      <aside v-if="shouldShowSidebar" class="modern-sidebar hidden lg:block">
-        <div class="sidebar-content">
-          <!-- Dynamic Page Title -->
-          <div class="sidebar-header">
-            <h3 class="sidebar-title">
+
+      <!-- Body: Quick sidebar + Content -->
+      <div class="body-area">
+
+        <!-- Quick Sidebar (desktop only, contextual) -->
+        <aside v-if="hasQuickSidebar" class="quick-sidebar">
+          <div class="qs-header">
+            <span class="qs-title">
               <span v-if="currentPageName === 'dashboard'">Hızlı İşlemler</span>
-              <span v-else-if="currentPageName === 'z-report'">Rapor İşlemleri</span>
-              <span v-else-if="currentPageName === 'exchange'">Döviz İşlemleri</span>
+              <span v-else-if="currentPageName === 'z-report'">Rapor</span>
               <span v-else-if="currentPageName === 'parties'">Cari İşlemleri</span>
-              <span v-else-if="currentPageName === 'expenses'">Gider İşlemleri</span>
               <span v-else-if="currentPageName === 'vaults'">Kasa İşlemleri</span>
-              <span v-else>Hızlı İşlemler</span>
-            </h3>
+              <span v-else>İşlemler</span>
+            </span>
           </div>
-          
-          <div class="sidebar-actions">
-            <!-- Hide quick search for now -->
-            <!-- <div>
-              <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">HIZLI ARAMA</h3>
-              <input 
-                type="text" 
-                placeholder="Ara..." 
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              >
-            </div> -->
-            
-            <!-- Dashboard Page Actions -->
-            <div v-if="currentPageName === 'dashboard'" class="action-group">
-              <button
-                @click="() => router.push('/ihtiyar/z-report')"
-                class="sidebar-btn primary"
-              >
-                <span class="material-symbols-outlined">analytics</span>
-                <span>Z Raporu</span>
+
+          <div class="qs-body">
+            <!-- Dashboard actions -->
+            <div v-if="currentPageName === 'dashboard'" class="qs-group">
+              <button class="qs-btn primary" @click="router.push('/ihtiyar/z-report')">
+                <span class="material-symbols-outlined">analytics</span>Z Raporu
               </button>
-              <button
-                @click="() => router.push('/ihtiyar/exchange')"
-                class="sidebar-btn"
-              >
-                <span class="material-symbols-outlined">currency_exchange</span>
-                <span>Döviz İşlemleri</span>
+              <button class="qs-btn" @click="router.push('/ihtiyar/exchange-v2')">
+                <span class="material-symbols-outlined">currency_exchange</span>Döviz İşlemi
               </button>
-              <button
-                @click="() => router.push('/ihtiyar/parties')"
-                class="sidebar-btn"
-              >
-                <span class="material-symbols-outlined">groups</span>
-                <span>Cariler</span>
+              <button class="qs-btn" @click="router.push('/ihtiyar/parties')">
+                <span class="material-symbols-outlined">groups</span>Cariler
               </button>
-              <button
-                @click="() => router.push('/ihtiyar/expenses')"
-                class="sidebar-btn"
-              >
-                <span class="material-symbols-outlined">payments</span>
-                <span>{{ t('sidebar.expenses') }}</span>
+              <button class="qs-btn" @click="router.push('/ihtiyar/expenses')">
+                <span class="material-symbols-outlined">payments</span>Giderler
               </button>
             </div>
-            
-            <!-- Z-Report Page Actions - Hidden for cleaner UI -->
-            <div v-if="currentPageName === 'z-report' && false" class="action-group">
-              <button
-                @click="handlePrintReport"
-                class="sidebar-btn"
-              >
-                <span class="material-symbols-outlined">print</span>
-                <span>Raporu Yazdır</span>
-              </button>
-              <button
-                v-if="authStore.isAdmin"
-                @click="handleEndOfDay"
-                class="sidebar-btn warning"
-              >
-                <span class="material-symbols-outlined">lock</span>
-                <span>Gün Sonu</span>
-              </button>
-              <button
-                @click="reloadPage"
-                class="sidebar-btn"
-              >
-                <span class="material-symbols-outlined">refresh</span>
-                <span>Yenile</span>
+
+            <!-- Z-Report actions -->
+            <div v-if="currentPageName === 'z-report'" class="qs-group">
+              <button class="qs-btn primary" @click="handlePrintReport">
+                <span class="material-symbols-outlined">print</span>Yazdır
               </button>
             </div>
-            
-            <!-- Z-Report Page Actions -->
-            <div v-if="currentPageName === 'z-report'" class="action-group">
-              <button
-                @click="handlePrintReport"
-                class="sidebar-btn primary"
-              >
-                <span class="material-symbols-outlined">print</span>
-                <span>Raporu Yazdır</span>
+
+            <!-- Exchange page actions -->
+            <div v-if="currentPageName === 'exchange'" class="qs-group">
+              <button v-if="authStore.isAdmin" class="qs-btn primary" @click="router.push({ name: 'ExchangeRates' })">
+                <span class="material-symbols-outlined">settings</span>Kur Yönetimi
               </button>
-            </div>
-            
-            <!-- Exchange Page Actions -->
-            <div v-if="currentPageName === 'exchange'" class="action-group">
-              <button
-                v-if="authStore.isAdmin"
-                @click="() => router.push({ name: 'ExchangeRates' })"
-                class="sidebar-btn primary"
-              >
-                <span class="material-symbols-outlined">settings</span>
-                <span>{{ t('sidebar.exchangeRates') }}</span>
+              <button class="qs-btn usdt" @click="openUSDTModal">
+                <span style="font-weight:800">₮</span>USDT Ödemeleri
               </button>
-              
-              <!-- USDT TRC20 Payments Button -->
-              <button
-                @click="openUSDTModal"
-                class="sidebar-btn"
-                style="background: linear-gradient(135deg, #26A17B 0%, #1E8E66 100%); color: white;"
-              >
-                <span style="font-size: 1.2rem; font-weight: bold;">₮</span>
-                <span>{{ t('sidebar.usdtPayments') }}</span>
-              </button>
-              <div v-if="showQuickActions" class="sidebar-divider"></div>
-              <button 
-                v-if="showQuickActions"
-                v-for="action in quickActions" 
-                :key="action.id"
-                @click="handleQuickAction(action)"
-                class="sidebar-btn"
-                :class="action.id.includes('buy') ? 'success' : 'danger'"
-              >
-                  <!-- Currency icons -->
-                  <div v-if="action.id.includes('usdt')" class="w-5 h-5">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <circle cx="12" cy="12" r="12" fill="#26A17B"/>
-                      <path d="M13.2 10.5V9.3H17.4V7.2H6.6V9.3H10.8V10.5C7.8 10.65 5.4 11.25 5.4 12C5.4 12.75 7.8 13.35 10.8 13.5V18.6H13.2V13.5C16.2 13.35 18.6 12.75 18.6 12C18.6 11.25 16.2 10.65 13.2 10.5ZM13.2 12.45C13.2 12.45 12.6 12.6 12 12.6C11.4 12.6 10.8 12.45 10.8 12.45C8.1 12.3 6.3 11.85 6.3 12C6.3 12.15 8.1 11.7 10.8 11.55V12.15C10.8 12.15 11.4 12.3 12 12.3C12.6 12.3 13.2 12.15 13.2 12.15V11.55C15.9 11.7 17.7 12.15 17.7 12C17.7 11.85 15.9 12.3 13.2 12.45Z" fill="white"/>
-                    </svg>
+              <template v-if="showQuickActions">
+                <div class="qs-divider"></div>
+                <button
+                  v-for="action in quickActions"
+                  :key="action.id"
+                  class="qs-btn"
+                  :class="action.id.includes('buy') ? 'buy' : 'sell'"
+                  @click="handleQuickAction(action)"
+                >
+                  <div v-if="action.id.includes('usdt')" style="width:18px;height:18px">
+                    <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="12" fill="#26A17B"/><path d="M13.2 10.5V9.3H17.4V7.2H6.6V9.3H10.8V10.5C7.8 10.65 5.4 11.25 5.4 12C5.4 12.75 7.8 13.35 10.8 13.5V18.6H13.2V13.5C16.2 13.35 18.6 12.75 18.6 12C18.6 11.25 16.2 10.65 13.2 10.5Z" fill="white"/></svg>
                   </div>
-                  <div v-else-if="action.id.includes('card-ruble')" class="flex items-center gap-1">
-                    <span class="material-symbols-outlined text-base">credit_card</span>
-                    <i class="fi fi-ru text-xs"></i>
+                  <div v-else-if="action.id.includes('card-ruble')" class="flex gap-1 items-center">
+                    <span class="material-symbols-outlined" style="font-size:16px">credit_card</span>
+                    <i class="fi fi-ru" style="font-size:11px"></i>
                   </div>
-                  <span v-else class="material-symbols-outlined text-xl">
+                  <span v-else class="material-symbols-outlined" style="font-size:18px">
                     {{ action.id.includes('buy') ? 'add_circle' : 'remove_circle' }}
                   </span>
-                  
-                  <span class="text-sm">{{ action.label }}</span>
+                  {{ action.label }}
                 </button>
+              </template>
             </div>
-            
-            
-            <!-- Parties Page Actions -->
-            <div v-if="currentPageName === 'parties'" class="action-group">
-              <!-- Quick Actions -->
-              <div class="quick-actions-section">
-                <h4 class="section-subtitle">
-                  <span class="material-symbols-outlined">flash_on</span>
-                  Hızlı İşlemler
-                </h4>
-                <button
-                  @click="handleCreateParty()"
-                  class="sidebar-btn primary gradient"
-                >
-                  <span class="material-symbols-outlined">person_add</span>
-                  <span>Yeni Cari Ekle</span>
-                </button>
-              </div>
-              
-              <!-- Divider -->
-              <div class="sidebar-divider"></div>
-              
-              <!-- Party Totals - Modern Cards -->
-              <div class="stats-section">
-                <h4 class="section-subtitle">
-                  <span class="material-symbols-outlined">analytics</span>
-                  Genel Bakış
-                </h4>
-                <div class="party-stats-modern">
-                  <div class="stat-card-modern receivables clickable"
-                     @click="handleFilterReceivables">
-                    <div class="stat-icon-wrapper">
-                      <span class="material-symbols-outlined">trending_up</span>
-                    </div>
-                    <div class="stat-content">
-                      <span class="stat-label">Toplam Alacak</span>
-                      <span class="stat-value">₺{{ formatCurrency(partyTotals.totalReceivables) }}</span>
-                    </div>
-                  </div>
-                  
-                  <div class="stat-card-modern debts clickable"
-                     :class="{ 'has-debt': partyTotals.totalDebts > 0 }"
-                     @click="handleFilterDebts">
-                    <div class="stat-icon-wrapper">
-                      <span class="material-symbols-outlined">trending_down</span>
-                    </div>
-                    <div class="stat-content">
-                      <span class="stat-label">Toplam Borç</span>
-                      <span class="stat-value">₺{{ formatCurrency(partyTotals.totalDebts) }}</span>
-                    </div>
-                  </div>
-                  
-                  <div class="stat-card-modern balance clickable" 
-                     :class="{ 'positive': partyTotals.netBalance > 0, 'negative': partyTotals.netBalance < 0 }"
-                     @click="handleFilterAll">
-                    <div class="stat-icon-wrapper">
-                      <span class="material-symbols-outlined">account_balance_wallet</span>
-                    </div>
-                    <div class="stat-content">
-                      <span class="stat-label">Net Bakiye</span>
-                      <span class="stat-value">
-                        ₺{{ formatCurrency(partyTotals.netBalance) }}
-                      </span>
-                    </div>
-                    <div class="stat-indicator" v-if="partyTotals.netBalance !== 0">
-                      <span class="material-symbols-outlined">
-                        {{ partyTotals.netBalance > 0 ? 'arrow_upward' : 'arrow_downward' }}
-                      </span>
-                    </div>
-                  </div>
+
+            <!-- Parties actions -->
+            <div v-if="currentPageName === 'parties'" class="qs-group">
+              <button class="qs-btn primary" @click="handleCreateParty()">
+                <span class="material-symbols-outlined">person_add</span>Yeni Cari Ekle
+              </button>
+              <div class="qs-divider"></div>
+              <div class="qs-stat-cards">
+                <div class="qs-stat green" @click="handleFilterReceivables">
+                  <span class="material-symbols-outlined">trending_up</span>
+                  <div><div class="qs-stat-label">Toplam Alacak</div><div class="qs-stat-val">₺{{ formatCurrency(partyTotals.totalReceivables) }}</div></div>
+                </div>
+                <div class="qs-stat" :class="partyTotals.totalDebts > 0 ? 'red' : 'gray'" @click="handleFilterDebts">
+                  <span class="material-symbols-outlined">trending_down</span>
+                  <div><div class="qs-stat-label">Toplam Borç</div><div class="qs-stat-val">₺{{ formatCurrency(partyTotals.totalDebts) }}</div></div>
+                </div>
+                <div class="qs-stat" :class="partyTotals.netBalance >= 0 ? 'indigo' : 'red'" @click="handleFilterAll">
+                  <span class="material-symbols-outlined">balance</span>
+                  <div><div class="qs-stat-label">Net Bakiye</div><div class="qs-stat-val">₺{{ formatCurrency(partyTotals.netBalance) }}</div></div>
                 </div>
               </div>
             </div>
-            
-            <!-- Vaults Page Actions -->
-            <div v-if="currentPageName === 'vaults'" class="action-group">
-              <button
-                v-if="authStore.isAdmin"
-                @click="handleCreateVault()"
-                class="sidebar-btn primary"
-              >
-                <span class="material-symbols-outlined">add_circle</span>
-                <span>Yeni Kasa</span>
+
+            <!-- Vaults actions -->
+            <div v-if="currentPageName === 'vaults' && authStore.isAdmin" class="qs-group">
+              <button class="qs-btn primary" @click="handleCreateVault()">
+                <span class="material-symbols-outlined">add_circle</span>Yeni Kasa
               </button>
             </div>
           </div>
-        </div>
-      </aside>
-      
-      <!-- Mobile Sidebar -->
-      <div 
-        v-if="isSidebarOpen && shouldShowSidebar"
-        class="lg:hidden fixed inset-0 z-50 bg-black bg-opacity-50"
-        @click="toggleSidebar"
-      >
-        <div 
-          class="absolute right-0 top-0 w-80 max-w-full h-full bg-white overflow-y-auto shadow-xl"
-          @click.stop
-        >
-          <div class="p-4 border-b border-gray-200 flex items-center justify-between">
-            <h2 class="text-xl font-bold text-gray-800">Hızlı İşlemler</h2>
-            <button @click="toggleSidebar" class="p-2 hover:bg-gray-100 rounded-lg">
-              <span class="material-symbols-outlined">close</span>
-            </button>
-          </div>
-          
-          <div class="p-5">
-            <div class="space-y-4">
-              <div>
-                <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">HIZLI ARAMA</h3>
-                <input 
-                  type="text" 
-                  placeholder="Ara..." 
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                >
-              </div>
-              
-              <!-- Z-Report Buttons - Only on Z-Report page -->
-              <div v-if="currentPageName === 'z-report'">
-                <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Z-RAPOR İŞLEMLERİ</h3>
-                <div class="space-y-2">
-                  <button
-                    @click="handleEndOfDay; toggleSidebar()"
-                    class="w-full px-4 py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2 bg-amber-100 text-amber-700 hover:bg-amber-200 border-2 border-amber-300"
-                  >
-                    <span class="material-symbols-outlined text-lg">lock</span>
-                    <span class="text-sm">GÜN SONU</span>
-                  </button>
+        </aside>
 
-                  <button
-                    @click="handlePrintReport; toggleSidebar()"
-                    class="w-full px-4 py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2 bg-blue-100 text-blue-700 hover:bg-blue-200 border-2 border-blue-300"
-                  >
-                    <span class="material-symbols-outlined text-lg">print</span>
-                    <span class="text-sm">YAZDIR</span>
-                  </button>
-                </div>
-              </div>
-              
-              <div v-if="isOnExchangePage">
-                <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">HIZLI İŞLEMLER</h3>
-                <div class="space-y-2">
-                  <!-- Exchange Rates Management Button - At the top -->
-                  <router-link
-                    v-if="authStore.isAdmin"
-                    :to="{ name: 'ExchangeRates' }"
-                    @click="toggleSidebar"
-                    class="w-full px-4 py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2 bg-purple-100 text-purple-700 hover:bg-purple-200 border-2 border-purple-300"
-                  >
-                    <span class="material-symbols-outlined text-lg">currency_exchange</span>
-                    <span class="text-sm">KUR YÖNETİMİ</span>
-                  </router-link>
-                  
-                  <!-- Quick actions removed for exchange v2 -->
-                </div>
-              </div>
-              
-              <div v-if="isOnVaultsPage && authStore.isAdmin">
-                <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">KASA İŞLEMLERİ</h3>
-                <div class="space-y-2">
-                  <button
-                    @click="handleCreateVault(); toggleSidebar()"
-                    class="w-full px-4 py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2 bg-blue-100 text-blue-700 hover:bg-blue-200 border-2 border-blue-300"
-                  >
-                    <span class="material-symbols-outlined text-lg">add_circle</span>
-                    <span class="text-sm">YENİ KASA OLUŞTUR</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Content Area -->
-      <main class="flex-1 overflow-y-auto">
-        <div class="p-4 lg:p-6">
+        <!-- Main content -->
+        <main class="main-content">
           <router-view v-slot="{ Component }">
             <component :is="Component" ref="routerViewRef" />
           </router-view>
-        </div>
-      </main>
-    </div>
+        </main>
+
+      </div><!-- /body-area -->
+    </div><!-- /right-area -->
+
   </div>
 </template>
 
 <style scoped>
-/* Navigation Styles */
-.nav-items {
+/* ═══ Root Layout ═══════════════════════════════════ */
+.layout-root {
   display: flex;
-  align-items: flex-start;
-  gap: 20px;
+  height: 100vh;
+  overflow: hidden;
+  background: #f8fafc;
 }
 
-.nav-section {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
-.nav-group {
-  display: flex;
-  gap: 5px;
-}
-
-.nav-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 12px 20px;
-  cursor: pointer;
-  border-radius: 12px;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
-  min-width: 100px;
-  border: 1px solid transparent;
-  position: relative;
-  will-change: transform, box-shadow;
-  transform: translateZ(0); /* Hardware acceleration */
-  backface-visibility: hidden; /* Prevent flickering */
-}
-
-.nav-item:hover {
-  background: linear-gradient(145deg, #f9fafb, #ffffff);
-  border-color: rgba(99, 102, 241, 0.2);
-  transform: translateY(-2px) translateZ(0);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
-}
-
-.nav-item:hover .nav-icon {
-  transform: scale(1.1) translateZ(0);
-  color: #6366f1;
-}
-
-.nav-item.active {
-  background: linear-gradient(145deg, #e0e7ff, #c7d2fe);
-  border-color: #6366f1;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
-}
-
-.nav-item.active::before {
-  content: '';
-  position: absolute;
-  bottom: -2px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 40%;
-  height: 3px;
-  background: linear-gradient(90deg, #6366f1, #8b5cf6);
-  border-radius: 2px;
-}
-
-.nav-icon {
-  font-size: 32px;
-  margin-bottom: 8px;
-  color: #4b5563;
-  line-height: 1;
-  transition: transform 0.2s ease, color 0.2s ease;
-  will-change: transform;
-  transform: translateZ(0);
-}
-
-.nav-item.active .nav-icon {
-  color: #6366f1;
-  filter: drop-shadow(0 2px 4px rgba(99, 102, 241, 0.3));
-}
-
-.nav-label {
-  font-size: 12px;
-  color: #1a1a1a;
-  text-align: center;
-  white-space: nowrap;
-  font-weight: 500;
-}
-
-.nav-category-label {
-  font-size: 10px;
-  color: #6b7280;
-  text-align: center;
-  white-space: nowrap;
-  margin-top: 4px;
-  letter-spacing: 0.5px;
-  font-weight: 600;
-}
-.nav-category-owner {
-  color: #b45309;
-}
-.nav-item-owner {
-  border-left: 2px solid transparent;
-}
-.nav-item-owner:hover, .nav-item-owner.active {
-  border-left-color: #f59e0b;
-  background: rgba(245, 158, 11, 0.08);
-  color: #b45309;
-}
-.nav-item-owner .nav-icon {
-  color: #d97706;
-}
-
-.nav-divider {
-  width: 1px;
-  height: 60px;
-  background: rgba(0, 0, 0, 0.1);
-  margin: 0 16px;
-  align-self: center;
-}
-
-/* Material Symbols Outlined */
-.material-symbols-outlined {
-  font-variation-settings: 
-    'FILL' 0,
-    'wght' 400,
-    'GRAD' 0,
-    'opsz' 24;
-}
-
-.nav-icon.material-symbols-outlined {
-  font-size: 32px;
-  font-weight: 400;
-  font-variation-settings: 
-    'FILL' 1,
-    'wght' 400,
-    'GRAD' 200,
-    'opsz' 48;
-}
-
-/* Ticker Animation - Continuous loop */
-@keyframes ticker {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-33.333%); }
-}
-
-.animate-ticker {
-  animation: ticker 60s linear infinite; /* Slowed down from 30s to 60s */
-}
-
-.ticker-wrapper {
-  display: flex;
-  align-items: center;
-}
-
-/* Modern Sidebar Styles */
-.modern-sidebar {
-  width: 280px;
-  background: white;
+/* ═══ Nav Sidebar ════════════════════════════════════ */
+.nav-sidebar {
+  width: 230px;
+  background: #fff;
   border-right: 1px solid #e5e7eb;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  height: 100vh;
+  overflow: hidden;
+  z-index: 40;
+}
+
+/* Brand */
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 16px;
+  border-bottom: 1px solid #f3f4f6;
   flex-shrink: 0;
 }
-
-.sidebar-content {
-  padding: 1.5rem;
+.brand-icon {
+  width: 34px; height: 34px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+}
+.brand-icon .material-symbols-outlined { color: #fff; font-size: 18px; }
+.brand-name {
+  font-size: 14px; font-weight: 700; color: #111; letter-spacing: -0.3px;
 }
 
-.sidebar-header {
-  margin-bottom: 1.5rem;
-}
-
-.sidebar-title {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #111827;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.sidebar-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.action-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.sidebar-btn {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  border: none;
-  border-radius: 10px;
-  background: #f3f4f6;
-  color: #374151;
-  font-size: 0.95rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
-  text-align: left;
-  will-change: transform;
-  transform: translateZ(0);
-}
-
-.sidebar-btn:hover {
-  background: #e5e7eb;
-  transform: translateX(5px) translateZ(0);
-}
-
-.sidebar-btn.primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-}
-
-.sidebar-btn.primary.gradient {
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-  font-weight: 700;
-}
-
-.sidebar-btn.primary.gradient:hover {
-  transform: translateX(4px) scale(1.02);
-  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
-}
-
-.sidebar-btn.success-light {
-  background: #f0fdf4;
-  color: #10b981;
-  border: 1px solid #bbf7d0;
-  font-weight: 600;
-}
-
-.sidebar-btn.success-light:hover {
-  background: #dcfce7;
-  border-color: #86efac;
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
-}
-
-.sidebar-btn.danger-light {
-  background: #fef2f2;
-  color: #ef4444;
-  border: 1px solid #fecaca;
-  font-weight: 600;
-}
-
-.sidebar-btn.danger-light:hover {
-  background: #fee2e2;
-  border-color: #fca5a5;
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
-}
-
-.sidebar-btn.primary:hover {
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-}
-
-.sidebar-btn.success {
-  background: #d1fae5;
-  color: #065f46;
-}
-
-.sidebar-btn.success:hover {
-  background: #a7f3d0;
-}
-
-.sidebar-btn.danger {
-  background: #fee2e2;
-  color: #991b1b;
-}
-
-.sidebar-btn.danger:hover {
-  background: #fecaca;
-}
-
-.sidebar-btn.warning {
-  background: #fed7aa;
-  color: #92400e;
-}
-
-.sidebar-btn.warning:hover {
-  background: #fbbf24;
-}
-
-.sidebar-btn .material-symbols-outlined {
-  font-size: 20px;
-}
-
-.sidebar-divider {
-  height: 1px;
-  background: #e5e7eb;
-  margin: 1rem 0;
-}
-
-.sidebar-stats {
-  background: #f9fafb;
-  border-radius: 10px;
-  padding: 1rem;
-}
-
-.stats-title {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #6b7280;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 1rem;
-}
-
-.stat-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.5rem 0;
-}
-
-.stat-item:not(:last-child) {
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.stat-label {
-  font-size: 0.9rem;
-  color: #6b7280;
-}
-
-.stat-value {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #7c3aed;
-}
-
-/* Quick Actions Section */
-.quick-actions-section {
-  margin-bottom: 1.5rem;
-}
-
-.section-subtitle {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  color: #6b7280;
-  letter-spacing: 0.5px;
-  margin-bottom: 1rem;
-}
-
-.section-subtitle .material-symbols-outlined {
-  font-size: 16px;
-  color: #8b5cf6;
-}
-
-/* Stats Section */
-.stats-section {
-  margin-top: 1.5rem;
-}
-
-/* Party Stats Modern Cards */
-.party-stats-modern {
-  display: flex;
-  flex-direction: column;
-  gap: 0.875rem;
-}
-
-.stat-card-modern {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  background: white;
-  border-radius: 14px;
-  border: 1px solid #f3f4f6;
-  position: relative;
-  overflow: hidden;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
-}
-
-.stat-card-modern.clickable {
-  cursor: pointer;
-}
-
-.stat-card-modern.clickable:hover {
-  background: #f9fafb;
-  border-color: #e5e7eb;
-}
-
-.stat-card-modern::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, transparent, currentColor, transparent);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.stat-card-modern:hover {
-  transform: translateX(4px) scale(1.01) translateZ(0);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-  background: white;
-}
-
-.stat-card-modern:hover::before {
-  opacity: 0.5;
-}
-
-.stat-card-modern.receivables {
-  background: #f0fdf4;
-  border-left: 4px solid #10b981;
-}
-
-.stat-card-modern.debts {
-  background: #f9fafb;
-  border-left: 4px solid #9ca3af;
-}
-
-.stat-card-modern.debts.has-debt {
-  background: #fef2f2;
-  border-left: 4px solid #ef4444;
-}
-
-.stat-card-modern.balance {
-  background: #f3f4fb;
-  border-left: 4px solid #6366f1;
-}
-
-.stat-card-modern.balance.positive {
-  background: #f0fdf4;
-  border-left: 4px solid #10b981;
-}
-
-.stat-card-modern.balance.negative {
-  background: #fef2f2;
-  border-left: 4px solid #ef4444;
-}
-
-.stat-icon-wrapper {
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 12px;
-  position: relative;
-}
-
-.stat-icon-wrapper .material-symbols-outlined {
-  font-size: 24px;
-  font-variation-settings: 
-    'FILL' 1,
-    'wght' 500,
-    'GRAD' 0,
-    'opsz' 48;
-}
-
-.stat-card-modern.receivables .stat-icon-wrapper {
-  background: rgba(16, 185, 129, 0.1);
-}
-
-.stat-card-modern.receivables .material-symbols-outlined {
-  color: #10b981;
-}
-
-.stat-card-modern.receivables .stat-value {
-  color: #10b981;
-}
-
-.stat-card-modern.debts .stat-icon-wrapper {
-  background: rgba(156, 163, 175, 0.1);
-}
-
-.stat-card-modern.debts .material-symbols-outlined {
-  color: #9ca3af;
-}
-
-.stat-card-modern.debts .stat-value {
-  color: #6b7280;
-}
-
-.stat-card-modern.debts.has-debt .stat-icon-wrapper {
-  background: rgba(239, 68, 68, 0.1);
-}
-
-.stat-card-modern.debts.has-debt .material-symbols-outlined {
-  color: #ef4444;
-}
-
-.stat-card-modern.debts.has-debt .stat-value {
-  color: #ef4444;
-}
-
-.stat-card-modern.balance .stat-icon-wrapper {
-  background: rgba(99, 102, 241, 0.1);
-}
-
-.stat-card-modern.balance .material-symbols-outlined {
-  color: #6366f1;
-}
-
-.stat-card-modern.balance.positive .stat-icon-wrapper {
-  background: rgba(16, 185, 129, 0.1);
-}
-
-.stat-card-modern.balance.positive .material-symbols-outlined {
-  color: #10b981;
-}
-
-.stat-card-modern.balance.negative .stat-icon-wrapper {
-  background: rgba(239, 68, 68, 0.1);
-}
-
-.stat-card-modern.balance.negative .material-symbols-outlined {
-  color: #ef4444;
-}
-
-.stat-card-modern .stat-content {
+/* Nav menu */
+.nav-menu {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+  overflow-y: auto;
+  padding: 12px 10px;
+  scrollbar-width: thin;
+  scrollbar-color: #e5e7eb transparent;
 }
+.nav-menu::-webkit-scrollbar { width: 4px; }
+.nav-menu::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 2px; }
 
-.stat-card-modern .stat-label {
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  color: #6b7280;
-  letter-spacing: 0.5px;
+.nav-group-label {
+  font-size: 10px; font-weight: 700; color: #9ca3af;
+  text-transform: uppercase; letter-spacing: .6px;
+  padding: 10px 8px 4px; margin-top: 4px;
 }
+.nav-group-label:first-child { margin-top: 0; }
 
-.stat-card-modern .stat-value {
-  font-size: 1.25rem;
-  font-weight: 800;
-  color: #1f2937;
-  letter-spacing: -0.5px;
-}
-
-.stat-indicator {
-  position: absolute;
-  right: 1rem;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.nav-link {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px;
   border-radius: 8px;
-  background: rgba(0, 0, 0, 0.03);
+  font-size: 13px; font-weight: 500; color: #4b5563;
+  text-decoration: none;
+  transition: background .12s, color .12s;
+  position: relative;
+  margin-bottom: 1px;
+}
+.nav-link:hover { background: #f3f4f6; color: #111; }
+.nav-link.is-active {
+  background: #eef2ff; color: #4f46e5; font-weight: 600;
+}
+.nav-link.is-active .nav-link-icon { color: #4f46e5; }
+.nav-link-icon { font-size: 18px; color: #9ca3af; flex-shrink: 0; transition: color .12s; }
+.nav-link-text { flex: 1; }
+.nav-badge {
+  font-size: 9px; font-weight: 700; background: #ef4444; color: #fff;
+  padding: 1px 5px; border-radius: 4px; letter-spacing: .3px;
 }
 
-.stat-indicator .material-symbols-outlined {
-  font-size: 18px;
-  font-variation-settings: 
-    'FILL' 1,
-    'wght' 700,
-    'GRAD' 0,
-    'opsz' 24;
+/* Footer */
+.nav-footer {
+  border-top: 1px solid #f3f4f6;
+  padding: 12px 10px;
+  flex-shrink: 0;
+  position: relative;
 }
+.nav-lang { margin-bottom: 8px; }
 
-.stat-card-modern.balance.positive .stat-indicator {
-  background: rgba(16, 185, 129, 0.1);
+.nav-user-btn {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 8px 10px;
+  border: none; background: transparent;
+  border-radius: 9px; cursor: pointer;
+  text-align: left; transition: background .12s;
 }
-
-.stat-card-modern.balance.positive .stat-indicator .material-symbols-outlined {
-  color: #10b981;
+.nav-user-btn:hover { background: #f3f4f6; }
+.nav-avatar {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff; font-size: 13px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
+.nav-user-info { flex: 1; min-width: 0; }
+.nav-user-name { display: block; font-size: 13px; font-weight: 600; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nav-user-role { display: block; font-size: 11px; color: #9ca3af; }
+.nav-user-chevron { font-size: 16px; color: #9ca3af; }
 
-.stat-card-modern.balance.negative .stat-indicator {
-  background: rgba(239, 68, 68, 0.1);
+/* User dropdown */
+.user-dropdown {
+  position: absolute; bottom: calc(100% + 4px); left: 10px; right: 10px;
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.12); z-index: 100; overflow: hidden;
 }
-
-.stat-card-modern.balance.negative .stat-indicator .material-symbols-outlined {
-  color: #ef4444;
+.ud-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px; background: linear-gradient(135deg, #6366f1, #8b5cf6);
 }
-
-/* Office Selector in Sidebar */
-.office-selector-sidebar {
-  margin-bottom: 1rem;
-  padding: 1rem;
-  background: #f9fafb;
-  border-radius: 8px;
+.ud-avatar {
+  width: 42px; height: 42px; border-radius: 50%;
+  background: rgba(255,255,255,.25); color: #fff; font-size: 16px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
-
-.office-selector-sidebar.modern {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(139, 92, 246, 0.05));
-  border: 1px solid rgba(99, 102, 241, 0.1);
-  border-radius: 12px;
-  padding: 1.25rem;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  will-change: transform;
-  transform: translateZ(0);
+.ud-name { font-size: 14px; font-weight: 700; color: #fff; }
+.ud-username { font-size: 12px; color: rgba(255,255,255,.8); }
+.ud-info { padding: 12px 16px; }
+.ud-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #6b7280; }
+.ud-row .material-symbols-outlined { font-size: 16px; color: #9ca3af; }
+.ud-logout {
+  display: flex; align-items: center; gap: 8px; justify-content: center;
+  width: 100%; padding: 10px 16px;
+  border: none; background: #fef2f2; color: #dc2626;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  border-top: 1px solid #e5e7eb;
 }
+.ud-logout .material-symbols-outlined { font-size: 16px; }
+.ud-logout:hover { background: #fee2e2; }
 
-.office-selector-sidebar.modern:hover {
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1);
-  transform: translateY(-2px) translateZ(0);
-}
-
-.selector-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-}
-
-.selector-header .material-symbols-outlined {
-  font-size: 18px;
-  color: #6366f1;
-  font-variation-settings: 
-    'FILL' 1,
-    'wght' 500,
-    'GRAD' 0,
-    'opsz' 24;
-}
-
-.office-selector-sidebar .selector-label {
-  display: block;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  color: #6b7280;
-  letter-spacing: 0.5px;
-  margin-bottom: 0.5rem;
-}
-
-.office-select-sidebar {
-  width: 100%;
-  padding: 0.5rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  background: white;
-  font-size: 0.9rem;
-  color: #1f2937;
-  transition: all 0.2s ease;
-}
-
-.office-select-sidebar.modern {
-  padding: 0.75rem;
-  border: 2px solid rgba(99, 102, 241, 0.2);
-  border-radius: 10px;
-  background: white;
-  font-weight: 600;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-}
-
-.office-select-sidebar:focus {
-  outline: none;
-  border-color: #7c3aed;
-  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
-}
-
-.office-select-sidebar.modern:focus {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
-}
-
-/* User Menu Button */
-.user-menu-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  border-radius: 12px;
-  background: linear-gradient(145deg, #ffffff, #f3f4f6);
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  will-change: transform;
-  transform: translateZ(0);
-}
-
-.user-menu-btn:hover {
-  background: linear-gradient(145deg, #f3f4f6, #e5e7eb);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  transform: translateY(-1px) translateZ(0);
-}
-
-.user-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-}
-
-.user-avatar .material-symbols-outlined {
-  font-size: 20px;
-  font-variation-settings: 
-    'FILL' 1,
-    'wght' 400,
-    'GRAD' 0,
-    'opsz' 24;
-}
-
-/* Icon animations - Optimized */
-@keyframes iconPulse {
-  0% { transform: scale(1) translateZ(0); }
-  50% { transform: scale(1.05) translateZ(0); }
-  100% { transform: scale(1) translateZ(0); }
-}
-
-.nav-item.active .nav-icon {
-  animation: iconPulse 2s ease-in-out infinite;
-  will-change: transform;
-}
-
-/* Custom scrollbar for desktop */
-@media (min-width: 1024px) {
-  .modern-sidebar::-webkit-scrollbar {
-    width: 6px;
+/* Mobile sidebar */
+@media (max-width: 1023px) {
+  .nav-sidebar {
+    position: fixed; left: 0; top: 0;
+    transform: translateX(-100%);
+    transition: transform .25s ease;
+    box-shadow: 4px 0 20px rgba(0,0,0,.15);
   }
-  
-  .modern-sidebar::-webkit-scrollbar-track {
-    background: #f3f4f6;
-  }
-  
-  .modern-sidebar::-webkit-scrollbar-thumb {
-    background: #d1d5db;
-    border-radius: 3px;
-  }
-  
-  .modern-sidebar::-webkit-scrollbar-thumb:hover {
-    background: #9ca3af;
-  }
+  .nav-sidebar.is-open { transform: translateX(0); }
+}
+
+/* ═══ Mobile overlay ═════════════════════════════════ */
+.nav-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.4);
+  z-index: 39; display: none;
+}
+@media (max-width: 1023px) {
+  .nav-overlay { display: block; }
+}
+
+/* ═══ Right Area ══════════════════════════════════════ */
+.right-area {
+  flex: 1; display: flex; flex-direction: column; overflow: hidden;
+}
+
+/* Top Header */
+.top-header {
+  height: 56px; display: flex; align-items: center; gap: 12px;
+  padding: 0 20px;
+  background: #fff; border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0; z-index: 10;
+}
+.hamburger {
+  display: none; padding: 6px; border: none; background: transparent;
+  border-radius: 8px; cursor: pointer; color: #374151;
+}
+.hamburger:hover { background: #f3f4f6; }
+.hamburger .material-symbols-outlined { font-size: 22px; }
+@media (max-width: 1023px) { .hamburger { display: flex; } }
+.header-title {
+  flex: 1; font-size: 15px; font-weight: 700; color: #111;
+}
+.header-actions { display: flex; align-items: center; gap: 8px; }
+.header-icon-btn {
+  width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
+  border: none; background: transparent; border-radius: 8px; cursor: pointer; color: #6b7280;
+}
+.header-icon-btn:hover { background: #f3f4f6; color: #111; }
+.header-icon-btn.active { background: #eef2ff; color: #6366f1; }
+.header-icon-btn .material-symbols-outlined { font-size: 20px; }
+.header-user-btn {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 10px; border: 1px solid #e5e7eb; border-radius: 20px;
+  background: transparent; cursor: pointer; font-size: 13px; font-weight: 500; color: #374151;
+}
+.header-user-btn:hover { background: #f3f4f6; }
+.header-avatar {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff; font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.header-user-name { font-size: 13px; }
+@media (max-width: 640px) { .header-user-name { display: none; } }
+
+/* Ticker */
+.ticker-bar { background: #0f172a; color: #fbbf24; overflow: hidden; height: 34px; flex-shrink: 0; }
+.ticker-inner { width: 100%; height: 100%; overflow: hidden; display: flex; align-items: center; }
+.ticker-track {
+  display: inline-flex; align-items: center; gap: 12px;
+  white-space: nowrap; font-size: 12px; font-weight: 500;
+  animation: ticker 60s linear infinite;
+}
+.ticker-office { background: #d97706; color: #fff; padding: 2px 8px; border-radius: 4px; font-weight: 700; font-size: 11px; }
+.ticker-item { display: inline-flex; align-items: center; gap: 4px; }
+.ticker-buy { color: #4ade80; }
+.ticker-sell { color: #f87171; }
+.ticker-sep { color: #475569; }
+@keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-33.333%); } }
+
+/* ═══ Body Area ══════════════════════════════════════ */
+.body-area {
+  flex: 1; display: flex; overflow: hidden;
+}
+
+/* Quick Sidebar */
+.quick-sidebar {
+  width: 260px; background: #fff; border-right: 1px solid #e5e7eb;
+  display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto;
+}
+@media (max-width: 1023px) { .quick-sidebar { display: none; } }
+.qs-header {
+  padding: 14px 16px; border-bottom: 1px solid #f3f4f6;
+}
+.qs-title { font-size: 12px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: .5px; }
+.qs-body { padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+.qs-group { display: flex; flex-direction: column; gap: 6px; }
+.qs-divider { height: 1px; background: #f3f4f6; margin: 4px 0; }
+
+.qs-btn {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border: none; border-radius: 9px;
+  background: #f9fafb; color: #374151;
+  font-size: 13px; font-weight: 500; cursor: pointer; text-align: left;
+  transition: background .12s, transform .12s;
+}
+.qs-btn:hover { background: #f3f4f6; transform: translateX(3px); }
+.qs-btn .material-symbols-outlined { font-size: 18px; color: #9ca3af; }
+.qs-btn.primary { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; }
+.qs-btn.primary .material-symbols-outlined { color: #fff; }
+.qs-btn.primary:hover { box-shadow: 0 4px 12px rgba(99,102,241,.35); transform: translateX(3px); }
+.qs-btn.usdt { background: linear-gradient(135deg, #26A17B, #1E8E66); color: #fff; font-weight: 700; }
+.qs-btn.buy { background: #f0fdf4; color: #166534; }
+.qs-btn.buy .material-symbols-outlined { color: #22c55e; }
+.qs-btn.sell { background: #fef2f2; color: #991b1b; }
+.qs-btn.sell .material-symbols-outlined { color: #ef4444; }
+
+/* Party stat cards */
+.qs-stat-cards { display: flex; flex-direction: column; gap: 8px; }
+.qs-stat {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 10px; cursor: pointer;
+  transition: transform .12s;
+  border-left: 3px solid transparent;
+}
+.qs-stat:hover { transform: translateX(3px); }
+.qs-stat .material-symbols-outlined { font-size: 20px; }
+.qs-stat-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #9ca3af; letter-spacing: .4px; }
+.qs-stat-val { font-size: 15px; font-weight: 800; }
+.qs-stat.green { background: #f0fdf4; border-color: #22c55e; }
+.qs-stat.green .material-symbols-outlined { color: #22c55e; }
+.qs-stat.green .qs-stat-val { color: #166534; }
+.qs-stat.red { background: #fef2f2; border-color: #ef4444; }
+.qs-stat.red .material-symbols-outlined { color: #ef4444; }
+.qs-stat.red .qs-stat-val { color: #991b1b; }
+.qs-stat.gray { background: #f9fafb; border-color: #d1d5db; }
+.qs-stat.gray .material-symbols-outlined { color: #9ca3af; }
+.qs-stat.gray .qs-stat-val { color: #6b7280; }
+.qs-stat.indigo { background: #eef2ff; border-color: #6366f1; }
+.qs-stat.indigo .material-symbols-outlined { color: #6366f1; }
+.qs-stat.indigo .qs-stat-val { color: #4f46e5; }
+
+/* ═══ Main Content ══════════════════════════════════ */
+.main-content {
+  flex: 1; overflow-y: auto; padding: 20px 24px;
+}
+@media (max-width: 768px) { .main-content { padding: 12px 16px; } }
+
+/* Material symbols */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
 </style>
