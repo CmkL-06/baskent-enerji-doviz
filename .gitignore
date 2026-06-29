@@ -1,5 +1,7 @@
 ﻿# Credentials & Secrets
 appsettings.json
+appsettings.Development.json
+appsettings.Production.json
 .env
 .env.local
 .env.*.local
@@ -23,6 +25,8 @@ npm-cache/
 .vscode/
 .idea/
 *.vs/
+.vs/
+*.user
 *.sln.iml
 
 # OS
@@ -40,6 +44,7 @@ __pycache__/
 # Logs
 logs/
 *.log
+bot.log
 scripts/CALISTIR-TUMU-LOG.txt
 
 # Backups
