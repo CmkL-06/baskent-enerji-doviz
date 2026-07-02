@@ -26,7 +26,7 @@ from translations import t
 import database as db
 from exchange_rates import get_rates
 from crypto_exchanges import BinanceAPI
-from baskent_api import send_exchange_for_transaction
+from baskent_api import send_exchange_for_transaction, process_queue as baskent_queue_processor
 
 logger = logging.getLogger(__name__)
 
@@ -157,8 +157,13 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Grup üyeliği kontrolü
     is_member = await check_group_membership(context, user_id)
     if not is_member:
-        kb = [[InlineKeyboardButton(t('join_group', lang),
-                                     url="https://t.me/MoneyTransferTurkeyOfficial")]]
+        context.user_data['referral'] = param
+        context.user_data['dealer_name'] = dealer.get('dealer_name')
+        kb = [
+            [InlineKeyboardButton(t('join_group', lang),
+                                   url="https://t.me/MoneyTransferTurkeyOfficial")],
+            [InlineKeyboardButton("✅ Katıldım, Devam Et", callback_data="check_joined")]
+        ]
         await update.message.reply_text(
             t('group_check_failed', lang),
             reply_markup=InlineKeyboardMarkup(kb),
@@ -290,6 +295,31 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = user.id
     lang = get_lang_by_id(user_id) or get_lang(user)
     data = query.data
+
+    # ── Kanala Katıldım Kontrolü ──
+    if data == "check_joined":
+        is_member = await check_group_membership(context, user_id)
+        if not is_member:
+            await query.answer(
+                "❌ Henüz kanala katılmadınız! Önce kanala katılın, sonra tekrar deneyin.",
+                show_alert=True
+            )
+            return
+        referral = context.user_data.get('referral')
+        if not referral:
+            await query.edit_message_text(
+                "⚠️ Oturum zaman aşımına uğradı.\nLütfen QR kodu tekrar okutun.",
+                parse_mode="Markdown"
+            )
+            return
+        await query.edit_message_text(
+            f"✅ **Kanala katılım doğrulandı!**\n\n"
+            f"Hoş geldiniz! Lütfen işlem türünü seçin:",
+            parse_mode="Markdown"
+        )
+        await _show_currency_selection(query.message, lang)
+        set_state(user_id, 'selecting_currency')
+        return
 
     # ── Para Birimi Seçimi ──
     if data.startswith("currency_"):
@@ -513,30 +543,59 @@ async def _handle_amount(update: Update, context: ContextTypes.DEFAULT_TYPE,
 
 
 async def _notify_operators(context, user, currency, amount, try_amount, referral, tid):
+    import html as _html
+    customer_name = _html.escape(user.first_name or "Müşteri")
+
+    # Operatör kanalına bildirim gönder (MoneyTransferTurkey_Operator)
+    operator_channel = Config.OPERATOR_CHANNEL_ID or Config.RUBLE_CHANNEL_ID
+    if operator_channel:
+        try:
+            async with Bot(token=Config.OPERATOR_BOT_TOKEN) as op_bot:
+                await op_bot.send_message(
+                    chat_id=operator_channel,
+                    text=(
+                        f"🔔 <b>YENİ MÜŞTERİ</b>\n"
+                        f"━━━━━━━━━━━━━━━\n"
+                        f"👤 Müşteri: {customer_name}\n"
+                        f"💱 İşlem: {amount} {currency}\n"
+                        f"💰 TL Karşılığı: {try_amount:,.2f} TL\n"
+                        f"🔗 Referans: {referral}\n"
+                        f"🔖 İşlem ID: #{tid}\n"
+                        f"⏰ Saat: {datetime.now().strftime('%H:%M')}\n"
+                        f"━━━━━━━━━━━━━━━\n"
+                        f"💰 İşlem Türü: Alış"
+                    ),
+                    parse_mode="HTML"
+                )
+        except Exception as e:
+            logger.error(f"Operatör kanalına bildirim hatası: {e}")
+
+    # Operatörlere DM bildirim
     operators = db.get_active_operators()
     if not operators:
         return
 
     try:
-        op_bot = Bot(token=Config.OPERATOR_BOT_TOKEN)
-        for op in operators:
-            try:
-                await op_bot.send_message(
-                    chat_id=op['id'],
-                    text=(
-                        f"🔔 **YENİ MÜŞTERİ!**\n"
-                        f"━━━━━━━━━━━━━━━\n"
-                        f"👤 Müşteri: {user.first_name}\n"
-                        f"💱 İşlem: {amount} {currency}\n"
-                        f"💰 TL Karşılığı: {try_amount:,.2f} TL\n"
-                        f"🔗 Referans: {referral}\n"
-                        f"━━━━━━━━━━━━━━━\n"
-                        f"💰 İşlem Türü : Alış"
-                    ),
-                    parse_mode="Markdown"
-                )
-            except Exception as e:
-                logger.error(f"Operatör {op['id']} bildirim hatası: {e}")
+        async with Bot(token=Config.OPERATOR_BOT_TOKEN) as op_bot:
+            for op in operators:
+                try:
+                    await op_bot.send_message(
+                        chat_id=op['id'],
+                        text=(
+                            f"🔔 <b>YENİ MÜŞTERİ!</b>\n"
+                            f"━━━━━━━━━━━━━━━\n"
+                            f"👤 Müşteri: {customer_name}\n"
+                            f"💱 İşlem: {amount} {currency}\n"
+                            f"💰 TL Karşılığı: {try_amount:,.2f} TL\n"
+                            f"🔗 Referans: {referral}\n"
+                            f"🔖 İşlem ID: #{tid}\n"
+                            f"━━━━━━━━━━━━━━━\n"
+                            f"💰 İşlem Türü: Alış"
+                        ),
+                        parse_mode="HTML"
+                    )
+                except Exception as e:
+                    logger.error(f"Operatör {op['id']} bildirim hatası: {e}")
     except Exception as e:
         logger.error(f"Operatör bot bildirim hatası: {e}")
 
@@ -1173,6 +1232,16 @@ def create_app() -> Application:
     return app
 
 
+async def _heartbeat_loop():
+    """60 saniyede bir heartbeat gönder"""
+    while True:
+        try:
+            db.update_heartbeat('main_bot', len(_state_cache))
+        except Exception as e:
+            logger.error(f"Heartbeat hatası: {e}")
+        await asyncio.sleep(60)
+
+
 async def start():
     """Bot'u başlat (run_all.py'den çağrılır)"""
     recover_active_sessions()
@@ -1181,6 +1250,11 @@ async def start():
     await app.start()
     await app.updater.start_polling(drop_pending_updates=True)
     logger.info("Ana müşteri botu başlatıldı")
+
+    # Background tasks
+    asyncio.create_task(_heartbeat_loop())
+    asyncio.create_task(baskent_queue_processor())
+    logger.info("BaskentEnerji kuyruk işleyici başlatıldı")
 
     # Sonsuz bekle
     stop_event = asyncio.Event()

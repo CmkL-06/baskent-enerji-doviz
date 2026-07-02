@@ -94,12 +94,12 @@ def send_exchange(transaction_id, dealer_vault_id, currency, amount,
         return False
 
 
-def send_exchange_for_transaction(transaction_id):
+def send_exchange_for_transaction(transaction_id, enqueue_on_fail=True):
     """
     DB'den işlem bilgilerini alıp BaşkentEnerji'ye gönder.
-    Tüm bilgiyi tek seferde topla.
+    Başarısız olursa retry kuyruğuna ekle.
     """
-    from database import get_conn
+    from database import get_conn, enqueue_baskent_api
     try:
         with get_conn() as conn:
             c = conn.cursor()
@@ -114,7 +114,7 @@ def send_exchange_for_transaction(transaction_id):
 
             if row:
                 vault_id, dealer_name, is_buy, rate, amount, currency = row
-                return send_exchange(
+                success = send_exchange(
                     transaction_id=transaction_id,
                     dealer_vault_id=vault_id,
                     currency=currency,
@@ -123,6 +123,51 @@ def send_exchange_for_transaction(transaction_id):
                     rate=rate or (39.0 if currency == 'USDT' else 0.40),
                     dealer_name=dealer_name
                 )
+                if not success and enqueue_on_fail:
+                    enqueue_baskent_api(transaction_id)
+                    logger.info(f"[BaşkentAPI] İşlem #{transaction_id} kuyruğa eklendi")
+                return success
     except Exception as e:
         logger.error(f"[BaşkentAPI] İşlem #{transaction_id} bilgi alma hatası: {e}")
+        if enqueue_on_fail:
+            try:
+                from database import enqueue_baskent_api
+                enqueue_baskent_api(transaction_id)
+            except Exception:
+                pass
     return False
+
+
+async def process_queue():
+    """Background task: pending kuyruk kayıtlarını işle (60s aralıkla)"""
+    import asyncio
+    from database import get_pending_baskent_queue, update_baskent_queue
+
+    while True:
+        await asyncio.sleep(60)
+        try:
+            pending = get_pending_baskent_queue()
+            if not pending:
+                continue
+
+            logger.info(f"[BaşkentAPI Queue] {len(pending)} bekleyen kayıt işleniyor")
+            for item in pending:
+                qid = item['queue_id']
+                tid = item['transaction_id']
+                try:
+                    success = send_exchange_for_transaction(tid, enqueue_on_fail=False)
+                    if success:
+                        update_baskent_queue(qid, 'success')
+                        logger.info(f"[BaşkentAPI Queue] #{tid} başarılı")
+                    else:
+                        attempts = item.get('attempts', 0) + 1
+                        max_att = item.get('max_attempts', 5)
+                        status = 'failed' if attempts >= max_att else 'pending'
+                        update_baskent_queue(qid, status, f"Deneme {attempts}/{max_att} başarısız")
+                        if status == 'failed':
+                            logger.warning(f"[BaşkentAPI Queue] #{tid} kalıcı hata ({max_att} deneme)")
+                except Exception as e:
+                    update_baskent_queue(qid, 'pending', str(e)[:500])
+                    logger.error(f"[BaşkentAPI Queue] #{tid} hata: {e}")
+        except Exception as e:
+            logger.error(f"[BaşkentAPI Queue] Kuyruk işleme hatası: {e}")

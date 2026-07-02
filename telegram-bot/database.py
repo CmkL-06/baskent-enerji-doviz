@@ -1,6 +1,8 @@
 """
-Veritabanı Modülü — Bağlantı Havuzu + CRUD İşlemleri
-Tüm SQL işlemleri burada merkezileştirilir.
+Veritabani Modulu -- Baglanti Havuzu + CRUD Islemleri
+Tum SQL islemleri burada merkezlestirilir.
+
+mtturkey_exchange DB'sindeki TgXxx tablolari kullanilir (PascalCase sutunlar).
 """
 import pyodbc
 import logging
@@ -10,41 +12,39 @@ from config import Config
 
 logger = logging.getLogger(__name__)
 
-# ═══════════════════════════════════════════════
-# BAĞLANTI HAVUZU
-# ═══════════════════════════════════════════════
+# ===================================================
+# BAGLANTI HAVUZU
+# ===================================================
 
 _pool = []
 _POOL_SIZE = 5
 
 
 def _create_connection():
-    """Yeni bir DB bağlantısı oluştur"""
+    """Yeni bir DB baglantisi olustur"""
     try:
         conn = pyodbc.connect(Config.connection_string(), timeout=10)
         conn.autocommit = False
         return conn
     except Exception as e:
-        logger.error(f"DB bağlantı hatası: {e}")
+        logger.error(f"DB baglanti hatasi: {e}")
         return None
 
 
 @contextmanager
 def get_conn():
     """
-    Bağlantı havuzundan bağlantı al, işlem bitince geri koy.
-    Kullanım:
+    Baglanti havuzundan baglanti al, islem bitince geri koy.
+    Kullanim:
         with get_conn() as conn:
             cursor = conn.cursor()
             cursor.execute(...)
             conn.commit()
     """
     conn = None
-    # Havuzdan al
     while _pool:
         conn = _pool.pop()
         try:
-            # Bağlantı hâlâ geçerli mi?
             conn.cursor().execute("SELECT 1")
             break
         except:
@@ -58,7 +58,7 @@ def get_conn():
         conn = _create_connection()
 
     if conn is None:
-        raise ConnectionError("Veritabanına bağlanılamadı")
+        raise ConnectionError("Veritabanina baglanilmadi")
 
     try:
         yield conn
@@ -69,10 +69,9 @@ def get_conn():
             pass
         raise
     finally:
-        # Havuza geri koy
         if len(_pool) < _POOL_SIZE:
             try:
-                conn.rollback()  # temiz state
+                conn.rollback()
                 _pool.append(conn)
             except:
                 try:
@@ -86,157 +85,81 @@ def get_conn():
                 pass
 
 
-# ═══════════════════════════════════════════════
-# TABLO OLUŞTURMA
-# ═══════════════════════════════════════════════
+# kwargs -> SQL sutun adi donusumu (update_transaction icin)
+_TX_COL_MAP = {
+    'status': 'Status',
+    'completed_at': 'CompletedAt',
+    'assigned_operator_id': 'AssignedOperatorId',
+    'completion_code': 'CompletionCode',
+    'txid': 'Txid',
+    'crypto_verified': 'CryptoVerified',
+    'crypto_verified_at': 'CryptoVerifiedAt',
+    'state_data': 'StateData',
+    'idempotency_key': 'IdempotencyKey',
+    'exchange_rate': 'ExchangeRate',
+    'try_amount': 'TryAmount',
+    'currency': 'Currency',
+    'amount': 'Amount',
+    'referral_code': 'ReferralCode',
+    'isBuy': 'IsBuy',
+}
+
+_CD_COL_MAP = {
+    'status': 'Status',
+    'confirmations': 'Confirmations',
+    'amount': 'Amount',
+    'network': 'Network',
+}
+
+
+# ===================================================
+# TABLO DOGRULAMA
+# ===================================================
 
 def init_database():
-    """Gerekli tabloları oluştur (IF NOT EXISTS)"""
+    """TgXxx tablolarinin var oldugunu dogrula (EF Core tarafindan olusturulur)"""
     try:
         with get_conn() as conn:
             c = conn.cursor()
-
             c.execute("""
-                IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Customers' AND xtype='U')
-                CREATE TABLE Customers (
-                    customer_id BIGINT PRIMARY KEY,
-                    first_name NVARCHAR(100),
-                    last_name NVARCHAR(100),
-                    username NVARCHAR(100),
-                    language_code NVARCHAR(10) DEFAULT 'tr',
-                    referral_code NVARCHAR(50),
-                    created_at DATETIME DEFAULT GETDATE(),
-                    last_activity DATETIME DEFAULT GETDATE()
-                )
+                SELECT COUNT(*) FROM sysobjects
+                WHERE name IN (
+                    'TgCustomers','TgTransactions','TgMessages','TgOperators',
+                    'TgChatSessions','TgCryptoDeposits','TgBankProviders',
+                    'TgBotHeartbeats','TgApiQueue','TgDealers','TgExchangeRates'
+                ) AND xtype='U'
             """)
-
-            c.execute("""
-                IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Operators' AND xtype='U')
-                CREATE TABLE Operators (
-                    operator_id BIGINT PRIMARY KEY,
-                    first_name NVARCHAR(100),
-                    username NVARCHAR(100),
-                    is_active BIT DEFAULT 1,
-                    is_admin BIT DEFAULT 0,
-                    created_at DATETIME DEFAULT GETDATE()
-                )
-            """)
-
-            c.execute("""
-                IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Transactions' AND xtype='U')
-                CREATE TABLE Transactions (
-                    transaction_id INT IDENTITY(1,1) PRIMARY KEY,
-                    customer_id BIGINT,
-                    currency NVARCHAR(10),
-                    amount DECIMAL(18,2),
-                    exchange_rate DECIMAL(18,6),
-                    try_amount DECIMAL(18,2),
-                    status NVARCHAR(30) DEFAULT 'pending',
-                    referral_code NVARCHAR(50),
-                    assigned_operator_id BIGINT,
-                    completion_code NVARCHAR(20),
-                    txid NVARCHAR(200),
-                    crypto_verified BIT DEFAULT 0,
-                    crypto_verified_at DATETIME,
-                    isBuy BIT DEFAULT 1,
-                    created_at DATETIME DEFAULT GETDATE(),
-                    completed_at DATETIME,
-                    FOREIGN KEY (customer_id) REFERENCES Customers(customer_id)
-                )
-            """)
-
-            c.execute("""
-                IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Messages' AND xtype='U')
-                CREATE TABLE Messages (
-                    message_id INT IDENTITY(1,1) PRIMARY KEY,
-                    transaction_id INT,
-                    sender_id BIGINT,
-                    sender_type NVARCHAR(20),
-                    message_text NVARCHAR(MAX),
-                    file_url NVARCHAR(500),
-                    file_type NVARCHAR(20),
-                    created_at DATETIME DEFAULT GETDATE(),
-                    FOREIGN KEY (transaction_id) REFERENCES Transactions(transaction_id)
-                )
-            """)
-
-            c.execute("""
-                IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='ChatSessions' AND xtype='U')
-                CREATE TABLE ChatSessions (
-                    session_id INT IDENTITY(1,1) PRIMARY KEY,
-                    customer_id BIGINT,
-                    operator_id BIGINT,
-                    transaction_id INT,
-                    is_active BIT DEFAULT 1,
-                    created_at DATETIME DEFAULT GETDATE(),
-                    closed_at DATETIME,
-                    FOREIGN KEY (transaction_id) REFERENCES Transactions(transaction_id)
-                )
-            """)
-
-            c.execute("""
-                IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='CryptoDeposits' AND xtype='U')
-                CREATE TABLE CryptoDeposits (
-                    deposit_id INT IDENTITY(1,1) PRIMARY KEY,
-                    transaction_id INT,
-                    dealer_id INT,
-                    txid NVARCHAR(200),
-                    amount DECIMAL(18,8),
-                    network NVARCHAR(20),
-                    to_address NVARCHAR(200),
-                    deposit_time DATETIME DEFAULT GETDATE(),
-                    confirmations INT DEFAULT 0,
-                    status NVARCHAR(20) DEFAULT 'pending',
-                    FOREIGN KEY (transaction_id) REFERENCES Transactions(transaction_id)
-                )
-            """)
-
-            # Eksik kolonları ekle (mevcut DB uyumluluğu + yeni iyileştirmeler)
-            _add_columns = [
-                ('Messages', 'file_url', 'NVARCHAR(500)'),
-                ('Messages', 'file_type', 'NVARCHAR(20)'),
-                # İyileştirme A: DB-backed state
-                ('Transactions', 'state_data', 'NVARCHAR(MAX)'),
-                # İyileştirme B: Idempotency key
-                ('Transactions', 'idempotency_key', 'NVARCHAR(50)'),
-            ]
-            for table, col, typ in _add_columns:
-                c.execute(f"""
-                    IF NOT EXISTS (
-                        SELECT * FROM sys.columns
-                        WHERE object_id = OBJECT_ID('{table}') AND name = '{col}'
-                    )
-                    ALTER TABLE {table} ADD {col} {typ}
-                """)
-
-            conn.commit()
-            logger.info("Veritabanı tabloları hazır")
-            return True
-
+            count = c.fetchone()[0]
+            if count >= 9:
+                logger.info(f"Veritabani tablolari hazir ({count}/11 Tg tablo)")
+                return True
+            else:
+                logger.error(f"Eksik tablolar! Sadece {count}/11 Tg tablo mevcut")
+                return False
     except Exception as e:
-        logger.error(f"Tablo oluşturma hatası: {e}")
+        logger.error(f"Tablo dogrulama hatasi: {e}")
         return False
 
 
-# ═══════════════════════════════════════════════
-# CUSTOMER İŞLEMLERİ
-# ═══════════════════════════════════════════════
+# ===================================================
+# CUSTOMER ISLEMLERI
+# ===================================================
 
 def upsert_customer(user):
-    """Müşteriyi kaydet veya güncelle"""
+    """Musteriyi kaydet veya guncelle"""
     try:
         with get_conn() as conn:
             c = conn.cursor()
             lang = getattr(user, 'language_code', 'tr') or 'tr'
             c.execute("""
-                IF EXISTS (SELECT 1 FROM Customers WHERE customer_id = ?)
-                    UPDATE Customers SET
-                        first_name = ?, last_name = ?, username = ?,
-                        language_code = ?, last_activity = GETDATE()
-                    WHERE customer_id = ?
+                IF EXISTS (SELECT 1 FROM TgCustomers WHERE CustomerId = ?)
+                    UPDATE TgCustomers SET
+                        FirstName = ?, LastName = ?, Username = ?,
+                        LanguageCode = ?, LastActivity = GETDATE()
+                    WHERE CustomerId = ?
                 ELSE
-                    INSERT INTO Customers
-                        (customer_id, first_name, last_name, username, language_code)
+                    INSERT INTO TgCustomers
+                        (CustomerId, FirstName, LastName, Username, LanguageCode)
                     VALUES (?, ?, ?, ?, ?)
             """,
                 user.id, user.first_name, user.last_name, user.username, lang, user.id,
@@ -245,16 +168,16 @@ def upsert_customer(user):
             conn.commit()
             return True
     except Exception as e:
-        logger.error(f"Müşteri kaydetme hatası: {e}")
+        logger.error(f"Musteri kaydetme hatasi: {e}")
         return False
 
 
 def get_customer_language(customer_id):
-    """Müşterinin dil tercihini getir"""
+    """Musterinin dil tercihini getir"""
     try:
         with get_conn() as conn:
             c = conn.cursor()
-            c.execute("SELECT language_code FROM Customers WHERE customer_id = ?", customer_id)
+            c.execute("SELECT LanguageCode FROM TgCustomers WHERE CustomerId = ?", customer_id)
             row = c.fetchone()
             if row and row[0]:
                 lang = row[0][:2].lower()
@@ -265,137 +188,169 @@ def get_customer_language(customer_id):
     return 'tr'
 
 
-# ═══════════════════════════════════════════════
-# TRANSACTION İŞLEMLERİ
-# ═══════════════════════════════════════════════
+# ===================================================
+# TRANSACTION ISLEMLERI
+# ===================================================
 
 def create_transaction(customer_id, currency, amount, referral_code,
                        exchange_rate=None, try_amount=None):
-    """Yeni işlem oluştur, transaction_id döndür"""
+    """Yeni islem olustur, transaction_id dondur"""
     try:
         with get_conn() as conn:
             c = conn.cursor()
             c.execute("""
-                INSERT INTO Transactions
-                    (customer_id, currency, amount, referral_code, exchange_rate, try_amount)
-                OUTPUT INSERTED.transaction_id
+                INSERT INTO TgTransactions
+                    (CustomerId, Currency, Amount, ReferralCode, ExchangeRate, TryAmount)
+                OUTPUT INSERTED.TransactionId
                 VALUES (?, ?, ?, ?, ?, ?)
             """, customer_id, currency, amount, referral_code, exchange_rate, try_amount)
             tid = c.fetchone()[0]
             conn.commit()
             return tid
     except Exception as e:
-        logger.error(f"İşlem oluşturma hatası: {e}")
+        logger.error(f"Islem olusturma hatasi: {e}")
         return None
 
 
 def update_transaction(transaction_id, **kwargs):
-    """İşlemi güncelle — kwargs ile istenen alanları güncelle"""
+    """Islemi guncelle -- kwargs ile istenen alanlari guncelle"""
     if not kwargs:
         return False
     try:
         sets = []
         vals = []
         for k, v in kwargs.items():
-            sets.append(f"{k} = ?")
+            col = _TX_COL_MAP.get(k, k)
+            sets.append(f"{col} = ?")
             vals.append(v)
         vals.append(transaction_id)
 
         with get_conn() as conn:
             c = conn.cursor()
             c.execute(
-                f"UPDATE Transactions SET {', '.join(sets)} WHERE transaction_id = ?",
+                f"UPDATE TgTransactions SET {', '.join(sets)} WHERE TransactionId = ?",
                 *vals
             )
             conn.commit()
             return c.rowcount > 0
     except Exception as e:
-        logger.error(f"İşlem güncelleme hatası: {e}")
+        logger.error(f"Islem guncelleme hatasi: {e}")
         return False
 
 
 def get_transaction(transaction_id):
-    """Tek işlem detayını getir (dict)"""
+    """Tek islem detayini getir (dict)"""
     try:
         with get_conn() as conn:
             c = conn.cursor()
             c.execute("""
-                SELECT t.*, c.first_name AS customer_name, c.username AS customer_username
-                FROM Transactions t
-                JOIN Customers c ON t.customer_id = c.customer_id
-                WHERE t.transaction_id = ?
+                SELECT t.TransactionId AS transaction_id,
+                       t.CustomerId AS customer_id,
+                       t.Currency AS currency,
+                       t.Amount AS amount,
+                       t.ExchangeRate AS exchange_rate,
+                       t.TryAmount AS try_amount,
+                       t.Status AS status,
+                       t.ReferralCode AS referral_code,
+                       t.AssignedOperatorId AS assigned_operator_id,
+                       t.CompletionCode AS completion_code,
+                       t.Txid AS txid,
+                       t.CryptoVerified AS crypto_verified,
+                       t.CryptoVerifiedAt AS crypto_verified_at,
+                       t.IsBuy AS isBuy,
+                       t.CreatedAt AS created_at,
+                       t.CompletedAt AS completed_at,
+                       t.StateData AS state_data,
+                       t.IdempotencyKey AS idempotency_key,
+                       c.FirstName AS customer_name,
+                       c.Username AS customer_username
+                FROM TgTransactions t
+                JOIN TgCustomers c ON t.CustomerId = c.CustomerId
+                WHERE t.TransactionId = ?
             """, transaction_id)
             row = c.fetchone()
             if row:
                 cols = [d[0] for d in c.description]
                 return dict(zip(cols, row))
     except Exception as e:
-        logger.error(f"İşlem getirme hatası: {e}")
+        logger.error(f"Islem getirme hatasi: {e}")
     return None
 
 
 def get_pending_usdt(customer_id):
-    """Müşterinin bekleyen USDT işlemini getir"""
+    """Musterinin bekleyen USDT islemini getir"""
     try:
         with get_conn() as conn:
             c = conn.cursor()
             c.execute("""
                 SELECT TOP 1
-                    t.transaction_id, t.currency, t.crypto_verified,
-                    t.completion_code, t.amount,
-                    d.crypto_address, d.crypto_network, d.dealer_id,
-                    d.api_key, d.api_secret
-                FROM Transactions t
-                LEFT JOIN Dealers d ON d.dealer_code = t.referral_code
-                WHERE t.customer_id = ?
-                  AND t.status IN ('pending', 'pending_crypto')
-                  AND t.currency = 'USDT'
-                  AND t.crypto_verified = 0
-                ORDER BY t.created_at DESC
+                    t.TransactionId AS transaction_id,
+                    t.Currency AS currency,
+                    t.CryptoVerified AS crypto_verified,
+                    t.CompletionCode AS completion_code,
+                    t.Amount AS amount,
+                    d.CryptoAddress AS crypto_address,
+                    d.CryptoNetwork AS crypto_network,
+                    d.DealerId AS dealer_id,
+                    d.ApiKey AS api_key,
+                    d.ApiSecret AS api_secret
+                FROM TgTransactions t
+                LEFT JOIN TgDealers d ON d.DealerCode = t.ReferralCode
+                WHERE t.CustomerId = ?
+                  AND t.Status IN ('pending', 'pending_crypto')
+                  AND t.Currency = 'USDT'
+                  AND t.CryptoVerified = 0
+                ORDER BY t.CreatedAt DESC
             """, customer_id)
             row = c.fetchone()
             if row:
                 cols = [d[0] for d in c.description]
                 return dict(zip(cols, row))
     except Exception as e:
-        logger.error(f"Bekleyen USDT sorgu hatası: {e}")
+        logger.error(f"Bekleyen USDT sorgu hatasi: {e}")
     return None
 
 
 def get_pending_ruble(customer_id):
-    """Müşterinin bekleyen Ruble işlemini getir"""
+    """Musterinin bekleyen Ruble islemini getir"""
     try:
         with get_conn() as conn:
             c = conn.cursor()
             c.execute("""
-                SELECT TOP 1 transaction_id, status
-                FROM Transactions
-                WHERE customer_id = ?
-                  AND currency = 'RUBLE'
-                  AND status IN ('waiting_payment', 'bank_provided')
-                ORDER BY created_at DESC
+                SELECT TOP 1
+                    TransactionId AS transaction_id,
+                    Status AS status
+                FROM TgTransactions
+                WHERE CustomerId = ?
+                  AND Currency = 'RUBLE'
+                  AND Status IN ('waiting_payment', 'bank_provided')
+                ORDER BY CreatedAt DESC
             """, customer_id)
             row = c.fetchone()
             if row:
                 return {'transaction_id': row[0], 'status': row[1]}
     except Exception as e:
-        logger.error(f"Bekleyen Ruble sorgu hatası: {e}")
+        logger.error(f"Bekleyen Ruble sorgu hatasi: {e}")
     return None
 
 
 def get_active_transaction(customer_id):
-    """Müşterinin son aktif işlemini getir"""
+    """Musterinin son aktif islemini getir"""
     try:
         with get_conn() as conn:
             c = conn.cursor()
             c.execute("""
-                SELECT TOP 1 transaction_id, currency, crypto_verified,
-                       status, assigned_operator_id
-                FROM Transactions
-                WHERE customer_id = ?
-                  AND status IN ('pending', 'in_progress', 'pending_crypto',
+                SELECT TOP 1
+                    TransactionId AS transaction_id,
+                    Currency AS currency,
+                    CryptoVerified AS crypto_verified,
+                    Status AS status,
+                    AssignedOperatorId AS assigned_operator_id
+                FROM TgTransactions
+                WHERE CustomerId = ?
+                  AND Status IN ('pending', 'in_progress', 'pending_crypto',
                                  'waiting_payment', 'payment_sent', 'operator_chat')
-                ORDER BY created_at DESC
+                ORDER BY CreatedAt DESC
             """, customer_id)
             row = c.fetchone()
             if row:
@@ -407,28 +362,32 @@ def get_active_transaction(customer_id):
 
 
 def get_pending_transactions():
-    """Bekleyen tüm işlemleri getir (operatör listesi için)"""
+    """Bekleyen tum islemleri getir (operator listesi icin)"""
     try:
         with get_conn() as conn:
             c = conn.cursor()
             c.execute("""
-                SELECT t.transaction_id, c.first_name, c.customer_id,
-                       t.currency, t.amount, t.created_at
-                FROM Transactions t
-                JOIN Customers c ON t.customer_id = c.customer_id
-                WHERE t.status = 'pending'
-                ORDER BY t.created_at DESC
+                SELECT t.TransactionId AS transaction_id,
+                       c.FirstName AS first_name,
+                       c.CustomerId AS customer_id,
+                       t.Currency AS currency,
+                       t.Amount AS amount,
+                       t.CreatedAt AS created_at
+                FROM TgTransactions t
+                JOIN TgCustomers c ON t.CustomerId = c.CustomerId
+                WHERE t.Status = 'pending'
+                ORDER BY t.CreatedAt DESC
             """)
             rows = c.fetchall()
             cols = [d[0] for d in c.description]
             return [dict(zip(cols, r)) for r in rows]
     except Exception as e:
-        logger.error(f"Bekleyen işlemler sorgu hatası: {e}")
+        logger.error(f"Bekleyen islemler sorgu hatasi: {e}")
     return []
 
 
 def complete_transaction(transaction_id, completion_code=None):
-    """İşlemi tamamla"""
+    """Islemi tamamla"""
     updates = {
         'status': 'completed',
         'completed_at': datetime.now()
@@ -439,16 +398,16 @@ def complete_transaction(transaction_id, completion_code=None):
 
 
 def cancel_transaction(transaction_id, customer_id):
-    """İşlemi iptal et"""
+    """Islemi iptal et"""
     try:
         with get_conn() as conn:
             c = conn.cursor()
             c.execute("""
-                UPDATE Transactions
-                SET status = 'cancelled', completed_at = GETDATE()
-                WHERE transaction_id = ?
-                  AND customer_id = ?
-                  AND status IN ('pending', 'pending_crypto', 'in_progress')
+                UPDATE TgTransactions
+                SET Status = 'cancelled', CompletedAt = GETDATE()
+                WHERE TransactionId = ?
+                  AND CustomerId = ?
+                  AND Status IN ('pending', 'pending_crypto', 'in_progress')
             """, transaction_id, customer_id)
             conn.commit()
             return c.rowcount > 0
@@ -456,40 +415,40 @@ def cancel_transaction(transaction_id, customer_id):
         return False
 
 
-# ═══════════════════════════════════════════════
-# MESAJ İŞLEMLERİ
-# ═══════════════════════════════════════════════
+# ===================================================
+# MESAJ ISLEMLERI
+# ===================================================
 
 def save_message(transaction_id, sender_id, sender_type, message_text,
                  file_url=None, file_type=None):
-    """Mesajı DB'ye kaydet"""
+    """Mesaji DB'ye kaydet"""
     try:
         with get_conn() as conn:
             c = conn.cursor()
             c.execute("""
-                INSERT INTO Messages
-                    (transaction_id, sender_id, sender_type, message_text, file_url, file_type)
+                INSERT INTO TgMessages
+                    (TransactionId, SenderId, SenderType, MessageText, FileUrl, FileType)
                 VALUES (?, ?, ?, ?, ?, ?)
             """, transaction_id, sender_id, sender_type, message_text, file_url, file_type)
             conn.commit()
             return True
     except Exception as e:
-        logger.error(f"Mesaj kaydetme hatası: {e}")
+        logger.error(f"Mesaj kaydetme hatasi: {e}")
         return False
 
 
-# ═══════════════════════════════════════════════
-# OPERATÖR İŞLEMLERİ
-# ═══════════════════════════════════════════════
+# ===================================================
+# OPERATOR ISLEMLERI
+# ===================================================
 
 def get_operator(operator_id):
-    """Operatör bilgisini getir"""
+    """Operator bilgisini getir"""
     try:
         with get_conn() as conn:
             c = conn.cursor()
             c.execute("""
-                SELECT operator_id, first_name, is_active, is_admin
-                FROM Operators WHERE operator_id = ?
+                SELECT OperatorId, FirstName, IsActive, IsAdmin
+                FROM TgOperators WHERE OperatorId = ?
             """, operator_id)
             row = c.fetchone()
             if row:
@@ -503,30 +462,30 @@ def get_operator(operator_id):
 
 
 def register_operator(user):
-    """Yeni operatör kaydı (pasif olarak)"""
+    """Yeni operator kaydi (pasif olarak)"""
     try:
         with get_conn() as conn:
             c = conn.cursor()
             c.execute("""
-                IF NOT EXISTS (SELECT 1 FROM Operators WHERE operator_id = ?)
-                    INSERT INTO Operators (operator_id, first_name, username, is_active, is_admin)
+                IF NOT EXISTS (SELECT 1 FROM TgOperators WHERE OperatorId = ?)
+                    INSERT INTO TgOperators (OperatorId, FirstName, Username, IsActive, IsAdmin)
                     VALUES (?, ?, ?, 0, 0)
             """, user.id, user.id, user.first_name, user.username)
             conn.commit()
             return True
     except Exception as e:
-        logger.error(f"Operatör kayıt hatası: {e}")
+        logger.error(f"Operator kayit hatasi: {e}")
         return False
 
 
 def get_active_operators():
-    """Aktif operatörlerin listesini getir"""
+    """Aktif operatorlerin listesini getir"""
     try:
         with get_conn() as conn:
             c = conn.cursor()
             c.execute("""
-                SELECT operator_id, first_name, username
-                FROM Operators WHERE is_active = 1
+                SELECT OperatorId, FirstName, Username
+                FROM TgOperators WHERE IsActive = 1
             """)
             return [{'id': r[0], 'name': r[1], 'username': r[2]} for r in c.fetchall()]
     except:
@@ -534,23 +493,23 @@ def get_active_operators():
 
 
 def get_operator_stats(operator_id):
-    """Operatör istatistiklerini getir"""
+    """Operator istatistiklerini getir"""
     try:
         with get_conn() as conn:
             c = conn.cursor()
             c.execute("""
                 SELECT COUNT(*)
-                FROM Transactions
-                WHERE assigned_operator_id = ?
-                  AND CAST(completed_at AS DATE) = CAST(GETDATE() AS DATE)
+                FROM TgTransactions
+                WHERE AssignedOperatorId = ?
+                  AND CAST(CompletedAt AS DATE) = CAST(GETDATE() AS DATE)
             """, operator_id)
             today = c.fetchone()[0] or 0
 
             c.execute("""
                 SELECT COUNT(*)
-                FROM Transactions
-                WHERE assigned_operator_id = ?
-                  AND status = 'completed'
+                FROM TgTransactions
+                WHERE AssignedOperatorId = ?
+                  AND Status = 'completed'
             """, operator_id)
             total = c.fetchone()[0] or 0
 
@@ -560,38 +519,37 @@ def get_operator_stats(operator_id):
 
 
 def set_operator_access(operator_id, is_active=None, is_admin=None):
-    """Operatör yetkisini/aktifliğini güncelle"""
+    """Operator yetkisini/aktifligini guncelle"""
     if is_active is None and is_admin is None:
         return False
     if int(operator_id) == int(Config.ADMIN_ID):
-        # Owner hesabı sistem tarafından yönetilir.
         return False
     try:
         sets = []
         vals = []
         if is_active is not None:
-            sets.append("is_active = ?")
+            sets.append("IsActive = ?")
             vals.append(1 if is_active else 0)
         if is_admin is not None:
-            sets.append("is_admin = ?")
+            sets.append("IsAdmin = ?")
             vals.append(1 if is_admin else 0)
         vals.append(operator_id)
 
         with get_conn() as conn:
             c = conn.cursor()
             c.execute(
-                f"UPDATE Operators SET {', '.join(sets)} WHERE operator_id = ?",
+                f"UPDATE TgOperators SET {', '.join(sets)} WHERE OperatorId = ?",
                 *vals
             )
             conn.commit()
             return c.rowcount > 0
     except Exception as e:
-        logger.error(f"Operatör erişim güncelleme hatası: {e}")
+        logger.error(f"Operator erisim guncelleme hatasi: {e}")
         return False
 
 
 def get_all_operators(include_inactive=True, exclude_ids=None):
-    """Tüm operatörleri getir"""
+    """Tum operatorleri getir"""
     try:
         excluded = []
         if exclude_ids:
@@ -605,16 +563,20 @@ def get_all_operators(include_inactive=True, exclude_ids=None):
             c = conn.cursor()
             if include_inactive:
                 c.execute("""
-                    SELECT operator_id, first_name, username, is_active, is_admin, created_at
-                    FROM Operators
-                    ORDER BY created_at DESC
+                    SELECT OperatorId AS operator_id, FirstName AS first_name,
+                           Username AS username, IsActive AS is_active,
+                           IsAdmin AS is_admin, CreatedAt AS created_at
+                    FROM TgOperators
+                    ORDER BY CreatedAt DESC
                 """)
             else:
                 c.execute("""
-                    SELECT operator_id, first_name, username, is_active, is_admin, created_at
-                    FROM Operators
-                    WHERE is_active = 1
-                    ORDER BY created_at DESC
+                    SELECT OperatorId AS operator_id, FirstName AS first_name,
+                           Username AS username, IsActive AS is_active,
+                           IsAdmin AS is_admin, CreatedAt AS created_at
+                    FROM TgOperators
+                    WHERE IsActive = 1
+                    ORDER BY CreatedAt DESC
                 """)
             rows = c.fetchall()
             cols = [d[0] for d in c.description]
@@ -626,56 +588,55 @@ def get_all_operators(include_inactive=True, exclude_ids=None):
                 if int(row.get('operator_id') or 0) not in excluded
             ]
     except Exception as e:
-        logger.error(f"Operatör listeleme hatası: {e}")
+        logger.error(f"Operator listeleme hatasi: {e}")
         return []
 
 
 def get_owner_conversations(limit=20, only_active=False):
     """
-    Owner/Admin paneli için operatöre atanmış görüşmeleri getir.
-    Not: limit güvenli integer'a normalize edilir.
+    Owner/Admin paneli icin operatore atanmis gorusmeleri getir.
     """
     try:
         top_n = max(1, min(int(limit), 100))
         where = (
-            "WHERE t.assigned_operator_id IS NOT NULL "
-            "AND t.assigned_operator_id <> ?"
+            "WHERE t.AssignedOperatorId IS NOT NULL "
+            "AND t.AssignedOperatorId <> ?"
         )
         if only_active:
-            where += " AND t.status IN ('pending', 'in_progress', 'operator_chat', 'waiting_payment', 'payment_sent')"
+            where += " AND t.Status IN ('pending', 'in_progress', 'operator_chat', 'waiting_payment', 'payment_sent')"
 
         sql = f"""
             SELECT TOP {top_n}
-                t.transaction_id,
-                t.status,
-                t.currency,
-                t.amount,
-                t.created_at,
-                t.completed_at,
-                c.customer_id,
-                c.first_name AS customer_name,
-                o.operator_id,
-                o.first_name AS operator_name,
+                t.TransactionId AS transaction_id,
+                t.Status AS status,
+                t.Currency AS currency,
+                t.Amount AS amount,
+                t.CreatedAt AS created_at,
+                t.CompletedAt AS completed_at,
+                c.CustomerId AS customer_id,
+                c.FirstName AS customer_name,
+                o.OperatorId AS operator_id,
+                o.FirstName AS operator_name,
                 (
-                    SELECT MAX(m.created_at)
-                    FROM Messages m
-                    WHERE m.transaction_id = t.transaction_id
+                    SELECT MAX(m.CreatedAt)
+                    FROM TgMessages m
+                    WHERE m.TransactionId = t.TransactionId
                 ) AS last_message_at,
                 (
                     SELECT COUNT(*)
-                    FROM Messages m
-                    WHERE m.transaction_id = t.transaction_id
+                    FROM TgMessages m
+                    WHERE m.TransactionId = t.TransactionId
                 ) AS message_count
-            FROM Transactions t
-            LEFT JOIN Customers c ON c.customer_id = t.customer_id
-            LEFT JOIN Operators o ON o.operator_id = t.assigned_operator_id
+            FROM TgTransactions t
+            LEFT JOIN TgCustomers c ON c.CustomerId = t.CustomerId
+            LEFT JOIN TgOperators o ON o.OperatorId = t.AssignedOperatorId
             {where}
             ORDER BY
                 COALESCE((
-                    SELECT MAX(m.created_at)
-                    FROM Messages m
-                    WHERE m.transaction_id = t.transaction_id
-                ), t.created_at) DESC
+                    SELECT MAX(m.CreatedAt)
+                    FROM TgMessages m
+                    WHERE m.TransactionId = t.TransactionId
+                ), t.CreatedAt) DESC
         """
         with get_conn() as conn:
             c = conn.cursor()
@@ -684,33 +645,33 @@ def get_owner_conversations(limit=20, only_active=False):
             cols = [d[0] for d in c.description]
             return [dict(zip(cols, r)) for r in rows]
     except Exception as e:
-        logger.error(f"Owner görüşme listesi hatası: {e}")
+        logger.error(f"Owner gorusme listesi hatasi: {e}")
         return []
 
 
 def get_transaction_messages(transaction_id, limit=120):
-    """Bir işlemin mesaj geçmişini getir (eski -> yeni)."""
+    """Bir islemin mesaj gecmisini getir (eski -> yeni)."""
     try:
         top_n = max(1, min(int(limit), 500))
         sql = f"""
             SELECT TOP {top_n}
-                m.message_id,
-                m.transaction_id,
-                m.sender_id,
-                m.sender_type,
-                m.message_text,
-                m.file_url,
-                m.file_type,
-                m.created_at,
-                c.first_name AS customer_name,
-                o.first_name AS operator_name
-            FROM Messages m
-            LEFT JOIN Customers c
-                ON c.customer_id = m.sender_id AND m.sender_type = 'customer'
-            LEFT JOIN Operators o
-                ON o.operator_id = m.sender_id AND m.sender_type IN ('operator', 'bank_provider')
-            WHERE m.transaction_id = ?
-            ORDER BY m.created_at ASC
+                m.MessageId AS message_id,
+                m.TransactionId AS transaction_id,
+                m.SenderId AS sender_id,
+                m.SenderType AS sender_type,
+                m.MessageText AS message_text,
+                m.FileUrl AS file_url,
+                m.FileType AS file_type,
+                m.CreatedAt AS created_at,
+                c.FirstName AS customer_name,
+                o.FirstName AS operator_name
+            FROM TgMessages m
+            LEFT JOIN TgCustomers c
+                ON c.CustomerId = m.SenderId AND m.SenderType = 'customer'
+            LEFT JOIN TgOperators o
+                ON o.OperatorId = m.SenderId AND m.SenderType IN ('operator', 'bank_provider')
+            WHERE m.TransactionId = ?
+            ORDER BY m.CreatedAt ASC
         """
         with get_conn() as conn:
             c = conn.cursor()
@@ -719,13 +680,13 @@ def get_transaction_messages(transaction_id, limit=120):
             cols = [d[0] for d in c.description]
             return [dict(zip(cols, r)) for r in rows]
     except Exception as e:
-        logger.error(f"İşlem mesajları getirme hatası: {e}")
+        logger.error(f"Islem mesajlari getirme hatasi: {e}")
         return []
 
 
-# ═══════════════════════════════════════════════
-# DEALER İŞLEMLERİ
-# ═══════════════════════════════════════════════
+# ===================================================
+# DEALER ISLEMLERI
+# ===================================================
 
 def get_dealer(dealer_code):
     """Bayi bilgisini getir"""
@@ -733,10 +694,13 @@ def get_dealer(dealer_code):
         with get_conn() as conn:
             c = conn.cursor()
             c.execute("""
-                SELECT dealer_id, dealer_code, dealer_name, is_active,
-                       balance, vaultId, crypto_address, crypto_network,
-                       exchange_name, api_key, api_secret
-                FROM Dealers WHERE dealer_code = ?
+                SELECT DealerId AS dealer_id, DealerCode AS dealer_code,
+                       DealerName AS dealer_name, IsActive AS is_active,
+                       Balance AS balance, VaultId AS vaultId,
+                       CryptoAddress AS crypto_address, CryptoNetwork AS crypto_network,
+                       ExchangeName AS exchange_name, ApiKey AS api_key,
+                       ApiSecret AS api_secret
+                FROM TgDealers WHERE DealerCode = ?
             """, dealer_code)
             row = c.fetchone()
             if row:
@@ -748,12 +712,12 @@ def get_dealer(dealer_code):
 
 
 def reduce_dealer_balance(dealer_code, amount_try):
-    """Bayi bakiyesinden düş"""
+    """Bayi bakiyesinden dus"""
     try:
         with get_conn() as conn:
             c = conn.cursor()
             c.execute("""
-                UPDATE Dealers SET balance = balance - ? WHERE dealer_code = ?
+                UPDATE TgDealers SET Balance = Balance - ? WHERE DealerCode = ?
             """, amount_try, dealer_code)
             conn.commit()
             return True
@@ -761,18 +725,18 @@ def reduce_dealer_balance(dealer_code, amount_try):
         return False
 
 
-# ═══════════════════════════════════════════════
-# KUR İŞLEMLERİ
-# ═══════════════════════════════════════════════
+# ===================================================
+# KUR ISLEMLERI
+# ===================================================
 
 def get_exchange_rates_from_db():
-    """Veritabanından kurları getir"""
+    """Veritabanindan kurlari getir"""
     try:
         with get_conn() as conn:
             c = conn.cursor()
             c.execute("""
-                SELECT currency, buy_rate FROM ExchangeRates
-                WHERE currency IN ('USDT', 'RUB')
+                SELECT Currency, BuyRate FROM TgExchangeRates
+                WHERE Currency IN ('USDT', 'RUB')
             """)
             rates = {}
             for currency, rate in c.fetchall():
@@ -782,16 +746,16 @@ def get_exchange_rates_from_db():
         return None
 
 
-# ═══════════════════════════════════════════════
-# CRYPTO DEPOSIT İŞLEMLERİ
-# ═══════════════════════════════════════════════
+# ===================================================
+# CRYPTO DEPOSIT ISLEMLERI
+# ===================================================
 
 def check_txid_used(txid):
-    """TXID daha önce kullanılmış mı?"""
+    """TXID daha once kullanilmis mi?"""
     try:
         with get_conn() as conn:
             c = conn.cursor()
-            c.execute("SELECT deposit_id FROM CryptoDeposits WHERE txid = ?", txid)
+            c.execute("SELECT DepositId FROM TgCryptoDeposits WHERE Txid = ?", txid)
             return c.fetchone() is not None
     except:
         return False
@@ -799,43 +763,47 @@ def check_txid_used(txid):
 
 def save_crypto_deposit(transaction_id, dealer_id, txid, amount, network,
                         to_address, confirmations, status='pending'):
-    """Kripto deposit kaydı oluştur"""
+    """Kripto deposit kaydi olustur"""
     try:
         with get_conn() as conn:
             c = conn.cursor()
             c.execute("""
-                INSERT INTO CryptoDeposits
-                    (transaction_id, dealer_id, txid, amount, network,
-                     to_address, deposit_time, confirmations, status)
+                INSERT INTO TgCryptoDeposits
+                    (TransactionId, DealerId, Txid, Amount, Network,
+                     ToAddress, DepositTime, Confirmations, Status)
                 VALUES (?, ?, ?, ?, ?, ?, GETDATE(), ?, ?)
             """, transaction_id, dealer_id, txid, amount, network,
                 to_address, confirmations, status)
             conn.commit()
             return True
     except Exception as e:
-        logger.error(f"Crypto deposit kayıt hatası: {e}")
+        logger.error(f"Crypto deposit kayit hatasi: {e}")
         return False
 
 
 def update_crypto_deposit(txid=None, transaction_id=None, **kwargs):
-    """Crypto deposit güncelle"""
+    """Crypto deposit guncelle"""
     if not kwargs:
         return False
     try:
-        sets = [f"{k} = ?" for k in kwargs]
-        vals = list(kwargs.values())
+        sets = []
+        vals = []
+        for k, v in kwargs.items():
+            col = _CD_COL_MAP.get(k, k)
+            sets.append(f"{col} = ?")
+            vals.append(v)
 
         if txid:
-            where = "txid = ?"
+            where = "Txid = ?"
             vals.append(txid)
         else:
-            where = "transaction_id = ?"
+            where = "TransactionId = ?"
             vals.append(transaction_id)
 
         with get_conn() as conn:
             c = conn.cursor()
             c.execute(
-                f"UPDATE CryptoDeposits SET {', '.join(sets)} WHERE {where}",
+                f"UPDATE TgCryptoDeposits SET {', '.join(sets)} WHERE {where}",
                 *vals
             )
             conn.commit()
@@ -850,13 +818,15 @@ def get_pending_crypto_deposit(transaction_id):
         with get_conn() as conn:
             c = conn.cursor()
             c.execute("""
-                SELECT cd.txid, cd.amount, cd.network, cd.to_address,
-                       cd.confirmations, t.completion_code,
-                       d.api_key, d.api_secret
-                FROM CryptoDeposits cd
-                JOIN Transactions t ON cd.transaction_id = t.transaction_id
-                JOIN Dealers d ON cd.dealer_id = d.dealer_id
-                WHERE cd.transaction_id = ? AND cd.status = 'pending'
+                SELECT cd.Txid AS txid, cd.Amount AS amount,
+                       cd.Network AS network, cd.ToAddress AS to_address,
+                       cd.Confirmations AS confirmations,
+                       t.CompletionCode AS completion_code,
+                       d.ApiKey AS api_key, d.ApiSecret AS api_secret
+                FROM TgCryptoDeposits cd
+                JOIN TgTransactions t ON cd.TransactionId = t.TransactionId
+                JOIN TgDealers d ON cd.DealerId = d.DealerId
+                WHERE cd.TransactionId = ? AND cd.Status = 'pending'
             """, transaction_id)
             row = c.fetchone()
             if row:
@@ -867,16 +837,16 @@ def get_pending_crypto_deposit(transaction_id):
     return None
 
 
-# ═══════════════════════════════════════════════
-# WEB PANEL BİLDİRİM
-# ═══════════════════════════════════════════════
+# ===================================================
+# WEB PANEL BILDIRIM
+# ===================================================
 
 def notify_web_panel(transaction_id):
-    """Web panele anlık bildirim gönder"""
+    """Web panele anlik bildirim gonder (.NET API SSE)"""
     try:
         import requests as req
         req.post(
-            f'{Config.WEB_PANEL_URL}/api/notify_message',
+            f'{Config.WEB_PANEL_URL}/api/v1/tg/notify',
             json={'transaction_id': transaction_id},
             timeout=0.5
         )
@@ -884,22 +854,22 @@ def notify_web_panel(transaction_id):
         pass
 
 
-# ═══════════════════════════════════════════════
-# STATE YÖNETİMİ (İyileştirme A — DB-Backed)
-# ═══════════════════════════════════════════════
+# ===================================================
+# STATE YONETIMI (DB-Backed)
+# ===================================================
 
 def get_user_state(customer_id):
-    """Müşterinin aktif işlem durumunu DB'den getir"""
+    """Musterinin aktif islem durumunu DB'den getir"""
     try:
         import json
         with get_conn() as conn:
             c = conn.cursor()
             c.execute("""
-                SELECT TOP 1 transaction_id, status, state_data
-                FROM Transactions
-                WHERE customer_id = ?
-                  AND status NOT IN ('completed', 'cancelled')
-                ORDER BY created_at DESC
+                SELECT TOP 1 TransactionId, Status, StateData
+                FROM TgTransactions
+                WHERE CustomerId = ?
+                  AND Status NOT IN ('completed', 'cancelled')
+                ORDER BY CreatedAt DESC
             """, customer_id)
             row = c.fetchone()
             if row:
@@ -915,40 +885,39 @@ def get_user_state(customer_id):
                     'data': state_data.get('data', {})
                 }
     except Exception as e:
-        logger.error(f"State getirme hatası: {e}")
+        logger.error(f"State getirme hatasi: {e}")
     return None
 
 
 def set_user_state(customer_id, state, data=None):
-    """Müşterinin aktif işlem durumunu DB'ye kaydet"""
+    """Musterinin aktif islem durumunu DB'ye kaydet"""
     try:
         import json
         state_json = json.dumps({'state': state, 'data': data or {}}, ensure_ascii=False)
         with get_conn() as conn:
             c = conn.cursor()
             c.execute("""
-                UPDATE Transactions
-                SET state_data = ?
-                WHERE customer_id = ?
-                  AND status NOT IN ('completed', 'cancelled')
-                  AND transaction_id = (
-                      SELECT TOP 1 transaction_id FROM Transactions
-                      WHERE customer_id = ?
-                        AND status NOT IN ('completed', 'cancelled')
-                      ORDER BY created_at DESC
+                UPDATE TgTransactions
+                SET StateData = ?
+                WHERE CustomerId = ?
+                  AND Status NOT IN ('completed', 'cancelled')
+                  AND TransactionId = (
+                      SELECT TOP 1 TransactionId FROM TgTransactions
+                      WHERE CustomerId = ?
+                        AND Status NOT IN ('completed', 'cancelled')
+                      ORDER BY CreatedAt DESC
                   )
             """, state_json, customer_id, customer_id)
             conn.commit()
             return c.rowcount > 0
     except Exception as e:
-        logger.error(f"State kaydetme hatası: {e}")
+        logger.error(f"State kaydetme hatasi: {e}")
         return False
 
 
 def get_all_active_states():
     """
-    Tüm aktif oturumları getir — Bot başlangıcında recovery için.
-    Dönen dict: {customer_id: {'state': '...', 'data': {...}, 'transaction_id': N}}
+    Tum aktif oturumlari getir -- Bot baslatildiginda recovery icin.
     """
     result = {}
     try:
@@ -956,10 +925,10 @@ def get_all_active_states():
         with get_conn() as conn:
             c = conn.cursor()
             c.execute("""
-                SELECT customer_id, transaction_id, status, state_data
-                FROM Transactions
-                WHERE status NOT IN ('completed', 'cancelled')
-                  AND state_data IS NOT NULL
+                SELECT CustomerId, TransactionId, Status, StateData
+                FROM TgTransactions
+                WHERE Status NOT IN ('completed', 'cancelled')
+                  AND StateData IS NOT NULL
             """)
             for row in c.fetchall():
                 cid, tid, status, raw = row
@@ -975,27 +944,27 @@ def get_all_active_states():
                     'data': state_data.get('data', {})
                 }
     except Exception as e:
-        logger.error(f"Aktif state'ler getirme hatası: {e}")
+        logger.error(f"Aktif state'ler getirme hatasi: {e}")
     return result
 
 
-# ═══════════════════════════════════════════════
-# IDEMPOTENCY (İyileştirme B)
-# ═══════════════════════════════════════════════
+# ===================================================
+# IDEMPOTENCY
+# ===================================================
 
 def set_idempotency_key(transaction_id, key):
-    """İşleme idempotency key ata"""
+    """Isleme idempotency key ata"""
     return update_transaction(transaction_id, idempotency_key=key)
 
 
 def check_idempotency_key(key):
-    """Bu key daha önce kullanılmış mı? Kullanıldıysa transaction_id döner."""
+    """Bu key daha once kullanilmis mi?"""
     try:
         with get_conn() as conn:
             c = conn.cursor()
             c.execute("""
-                SELECT transaction_id FROM Transactions
-                WHERE idempotency_key = ?
+                SELECT TransactionId FROM TgTransactions
+                WHERE IdempotencyKey = ?
             """, key)
             row = c.fetchone()
             if row:
@@ -1003,3 +972,211 @@ def check_idempotency_key(key):
     except:
         pass
     return None
+
+
+# ===================================================
+# BANK PROVIDER ISLEMLERI
+# ===================================================
+
+def get_bank_providers():
+    """Aktif banka saglayicilarinin ID listesini dondur"""
+    try:
+        with get_conn() as conn:
+            c = conn.cursor()
+            c.execute("SELECT ProviderId FROM TgBankProviders WHERE IsActive = 1")
+            return [row[0] for row in c.fetchall()]
+    except Exception as e:
+        logger.error(f"Bank provider listeleme hatasi: {e}")
+        return []
+
+
+def is_bank_provider(user_id):
+    """Kullanici aktif banka saglayicisi mi?"""
+    try:
+        with get_conn() as conn:
+            c = conn.cursor()
+            c.execute("SELECT 1 FROM TgBankProviders WHERE ProviderId = ? AND IsActive = 1", user_id)
+            return c.fetchone() is not None
+    except Exception as e:
+        logger.error(f"Bank provider kontrol hatasi: {e}")
+        return False
+
+
+def add_bank_provider(provider_id, added_by):
+    """Yeni banka saglayicisi ekle"""
+    try:
+        with get_conn() as conn:
+            c = conn.cursor()
+            c.execute("""
+                IF EXISTS (SELECT 1 FROM TgBankProviders WHERE ProviderId = ?)
+                    UPDATE TgBankProviders SET IsActive = 1 WHERE ProviderId = ?
+                ELSE
+                    INSERT INTO TgBankProviders (ProviderId, AddedBy) VALUES (?, ?)
+            """, provider_id, provider_id, provider_id, added_by)
+            conn.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Bank provider ekleme hatasi: {e}")
+        return False
+
+
+def remove_bank_provider(provider_id):
+    """Banka saglayicisini pasif yap"""
+    try:
+        with get_conn() as conn:
+            c = conn.cursor()
+            c.execute("UPDATE TgBankProviders SET IsActive = 0 WHERE ProviderId = ?", provider_id)
+            conn.commit()
+            return c.rowcount > 0
+    except Exception as e:
+        logger.error(f"Bank provider kaldirma hatasi: {e}")
+        return False
+
+
+def seed_bank_providers(provider_ids):
+    """Ilk calistirmada .env'deki provider'lari tabloya ekle (yoksa)"""
+    try:
+        with get_conn() as conn:
+            c = conn.cursor()
+            for pid in provider_ids:
+                c.execute("""
+                    IF NOT EXISTS (SELECT 1 FROM TgBankProviders WHERE ProviderId = ?)
+                        INSERT INTO TgBankProviders (ProviderId, AddedBy) VALUES (?, ?)
+                """, pid, pid, pid)
+            conn.commit()
+    except Exception as e:
+        logger.error(f"Bank provider seed hatasi: {e}")
+
+
+# ===================================================
+# BOT HEARTBEAT ISLEMLERI
+# ===================================================
+
+def update_heartbeat(bot_name, active_sessions=0):
+    """Bot heartbeat guncelle"""
+    try:
+        with get_conn() as conn:
+            c = conn.cursor()
+            c.execute("""
+                IF EXISTS (SELECT 1 FROM TgBotHeartbeats WHERE BotName = ?)
+                    UPDATE TgBotHeartbeats SET LastHeartbeat = GETDATE(), ActiveSessions = ?
+                    WHERE BotName = ?
+                ELSE
+                    INSERT INTO TgBotHeartbeats (BotName, LastHeartbeat, ActiveSessions)
+                    VALUES (?, GETDATE(), ?)
+            """, bot_name, active_sessions, bot_name, bot_name, active_sessions)
+            conn.commit()
+    except Exception as e:
+        logger.error(f"Heartbeat guncelleme hatasi: {e}")
+
+
+def get_bot_heartbeats():
+    """Tum bot heartbeat bilgilerini getir"""
+    try:
+        with get_conn() as conn:
+            c = conn.cursor()
+            c.execute("""
+                SELECT BotName AS bot_name, LastHeartbeat AS last_heartbeat,
+                       LastTransactionAt AS last_transaction_at,
+                       ActiveSessions AS active_sessions
+                FROM TgBotHeartbeats
+            """)
+            rows = c.fetchall()
+            cols = [d[0] for d in c.description]
+            return [dict(zip(cols, r)) for r in rows]
+    except Exception as e:
+        logger.error(f"Heartbeat getirme hatasi: {e}")
+        return []
+
+
+# ===================================================
+# BASKENT API KUYRUK ISLEMLERI
+# ===================================================
+
+def enqueue_baskent_api(transaction_id):
+    """Basarisiz BaskentEnerji API cagrisini kuyruga ekle"""
+    try:
+        with get_conn() as conn:
+            c = conn.cursor()
+            c.execute("""
+                IF NOT EXISTS (
+                    SELECT 1 FROM TgApiQueue
+                    WHERE TransactionId = ? AND Status = 'pending'
+                )
+                INSERT INTO TgApiQueue (TransactionId) VALUES (?)
+            """, transaction_id, transaction_id)
+            conn.commit()
+            return True
+    except Exception as e:
+        logger.error(f"BaskentApi kuyruk ekleme hatasi: {e}")
+        return False
+
+
+def get_pending_baskent_queue():
+    """Bekleyen BaskentEnerji API cagrilarini getir"""
+    try:
+        with get_conn() as conn:
+            c = conn.cursor()
+            c.execute("""
+                SELECT QueueId AS queue_id, TransactionId AS transaction_id,
+                       Attempts AS attempts, MaxAttempts AS max_attempts,
+                       LastError AS last_error
+                FROM TgApiQueue
+                WHERE Status = 'pending' AND Attempts < MaxAttempts
+                ORDER BY CreatedAt ASC
+            """)
+            rows = c.fetchall()
+            cols = [d[0] for d in c.description]
+            return [dict(zip(cols, r)) for r in rows]
+    except Exception as e:
+        logger.error(f"BaskentApi kuyruk getirme hatasi: {e}")
+        return []
+
+
+def update_baskent_queue(queue_id, status, error=None):
+    """Kuyruk kaydini guncelle"""
+    try:
+        with get_conn() as conn:
+            c = conn.cursor()
+            c.execute("""
+                UPDATE TgApiQueue
+                SET Status = ?, Attempts = Attempts + 1, LastAttempt = GETDATE(), LastError = ?
+                WHERE QueueId = ?
+            """, status, error, queue_id)
+            conn.commit()
+    except Exception as e:
+        logger.error(f"BaskentApi kuyruk guncelleme hatasi: {e}")
+
+
+def get_active_operator_assignments():
+    try:
+        with get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT AssignedOperatorId, CustomerId, TransactionId "
+                "FROM TgTransactions WHERE Status IN ('processing','in_progress') "
+                "AND AssignedOperatorId IS NOT NULL"
+            )
+            return [{'operator_id': r[0], 'customer_id': r[1], 'transaction_id': r[2]} for r in cursor.fetchall()]
+    except Exception as e:
+        logger.error(f"Aktif atama sorgulama hatasi: {e}")
+        return []
+
+
+def get_operator_active_chat(operator_id):
+    try:
+        with get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT CustomerId, TransactionId FROM TgTransactions "
+                "WHERE AssignedOperatorId=? AND Status IN ('processing','in_progress') "
+                "ORDER BY CreatedAt DESC",
+                operator_id
+            )
+            row = cursor.fetchone()
+            if row:
+                return {'customer_id': row[0], 'transaction_id': row[1]}
+            return None
+    except Exception as e:
+        logger.error(f"Operator aktif chat sorgulama hatasi: {e}")
+        return None

@@ -22,6 +22,7 @@ class Config:
     # ── Telegram Grup/Kanal ──
     REQUIRED_GROUP_ID = int(os.getenv('REQUIRED_GROUP_ID', '-1003021754065'))
     RUBLE_CHANNEL_ID = os.getenv('RUBLE_CHANNEL_ID', '')
+    OPERATOR_CHANNEL_ID = os.getenv('OPERATOR_CHANNEL_ID', '')
     SKIP_GROUP_CHECK = os.getenv('SKIP_GROUP_CHECK', 'False').lower() == 'true'
 
     # ── Veritabanı ──

@@ -40,7 +40,7 @@ active_ruble_transactions: dict = {}
 # ═══════════════════════════════════════════════
 
 def _is_bank_provider(user_id: int) -> bool:
-    return user_id in Config.BANK_PROVIDERS
+    return db.is_bank_provider(user_id)
 
 
 def _get_customer_lang(customer_id: int) -> str:
@@ -148,15 +148,16 @@ async def cmd_add_provider(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         new_id = int(context.args[0])
-        if new_id not in Config.BANK_PROVIDERS:
-            Config.BANK_PROVIDERS.append(new_id)
+        if db.is_bank_provider(new_id):
+            await update.message.reply_text("⚠️ Bu kullanıcı zaten sağlayıcı listesinde!")
+        else:
+            db.add_bank_provider(new_id, update.message.from_user.id)
+            providers = db.get_bank_providers()
             await update.message.reply_text(
                 f"✅ Yeni sağlayıcı eklendi!\n\n"
                 f"🆔 ID: {new_id}\n"
-                f"📊 Toplam sağlayıcı sayısı: {len(Config.BANK_PROVIDERS)}"
+                f"📊 Toplam sağlayıcı sayısı: {len(providers)}"
             )
-        else:
-            await update.message.reply_text("⚠️ Bu kullanıcı zaten sağlayıcı listesinde!")
     except ValueError:
         await update.message.reply_text("❌ Geçersiz kullanıcı ID!")
 
@@ -176,11 +177,12 @@ async def cmd_remove_provider(update: Update, context: ContextTypes.DEFAULT_TYPE
             await update.message.reply_text("⚠️ Admin silinemez!")
             return
 
-        if pid in Config.BANK_PROVIDERS:
-            Config.BANK_PROVIDERS.remove(pid)
+        if db.is_bank_provider(pid):
+            db.remove_bank_provider(pid)
+            providers = db.get_bank_providers()
             await update.message.reply_text(
                 f"✅ Sağlayıcı kaldırıldı!\n🆔 ID: {pid}\n"
-                f"📊 Kalan sağlayıcı sayısı: {len(Config.BANK_PROVIDERS)}"
+                f"📊 Kalan sağlayıcı sayısı: {len(providers)}"
             )
         else:
             await update.message.reply_text("❌ Bu kullanıcı sağlayıcı listesinde değil!")
@@ -194,12 +196,13 @@ async def cmd_list_providers(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text("⛔ Bu komutu kullanma yetkiniz yok!")
         return
 
+    providers = db.get_bank_providers()
     msg = "🏦 <b>Aktif Banka Hesabı Sağlayıcıları:</b>\n\n"
-    for i, pid in enumerate(Config.BANK_PROVIDERS, 1):
+    for i, pid in enumerate(providers, 1):
         admin_tag = " 👑 (Admin)" if pid == Config.ADMIN_ID else ""
         you_tag = " 👤 (Siz)" if pid == user_id else ""
         msg += f"{i}. <code>{pid}</code>{admin_tag}{you_tag}\n"
-    msg += f"\n📊 Toplam: {len(Config.BANK_PROVIDERS)} sağlayıcı"
+    msg += f"\n📊 Toplam: {len(providers)} sağlayıcı"
 
     await update.message.reply_text(msg, parse_mode="HTML")
 
@@ -539,13 +542,29 @@ def create_app() -> Application:
     return app
 
 
+async def _heartbeat_loop():
+    """60 saniyede bir heartbeat gönder"""
+    while True:
+        try:
+            db.update_heartbeat('ruble_bot', len(active_ruble_transactions))
+        except Exception as e:
+            logger.error(f"Heartbeat hatası: {e}")
+        await asyncio.sleep(60)
+
+
 async def start():
     """Bot'u başlat (run_all.py'den çağrılır)"""
+    # .env'deki provider'ları DB'ye seed et
+    db.seed_bank_providers(Config.BANK_PROVIDERS)
+
     app = create_app()
     await app.initialize()
     await app.start()
     await app.updater.start_polling(drop_pending_updates=True)
     logger.info("Ruble kanal botu başlatıldı")
+
+    # Heartbeat background task
+    asyncio.create_task(_heartbeat_loop())
 
     # Sonsuz bekle
     stop_event = asyncio.Event()
@@ -566,4 +585,5 @@ if __name__ == "__main__":
         level=logging.INFO
     )
     db.init_database()
+    db.seed_bank_providers(Config.BANK_PROVIDERS)
     asyncio.run(start())

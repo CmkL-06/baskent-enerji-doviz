@@ -809,15 +809,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Aktif chat var mı?
+    # Aktif chat var mı? (DB fallback)
     if operator_id not in active_chats:
-        await update.message.reply_text(
-            "⚠️ **Aktif müşteriniz yok!**\n\n"
-            "Önce bir müşteri almanız gerekiyor.",
-            reply_markup=_main_menu_kb(),
-            parse_mode="Markdown"
-        )
-        return
+        db_chat = db.get_operator_active_chat(operator_id)
+        if db_chat:
+            active_chats[operator_id] = db_chat
+        else:
+            await update.message.reply_text(
+                "⚠️ **Aktif müşteriniz yok!**\n\n"
+                "Önce bir müşteri almanız gerekiyor.",
+                reply_markup=_main_menu_kb(),
+                parse_mode="Markdown"
+            )
+            return
 
     chat_data = active_chats[operator_id]
     cid = chat_data['customer_id']
@@ -858,11 +862,15 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     operator_id = update.message.from_user.id
 
     if operator_id not in active_chats:
-        await update.message.reply_text(
-            "⚠️ Aktif müşteriniz yok.",
-            reply_markup=_main_menu_kb()
-        )
-        return
+        db_chat = db.get_operator_active_chat(operator_id)
+        if db_chat:
+            active_chats[operator_id] = db_chat
+        else:
+            await update.message.reply_text(
+                "⚠️ Aktif müşteriniz yok.",
+                reply_markup=_main_menu_kb()
+            )
+            return
 
     chat_data = active_chats[operator_id]
     cid = chat_data['customer_id']
@@ -925,6 +933,18 @@ async def forward_to_operator(customer_id: int, text: str, transaction_id: int =
         if chat_data['customer_id'] == customer_id:
             target_op = op_id
             break
+
+    # DB fallback — web panelden atanmışsa
+    if not target_op:
+        assignments = db.get_active_operator_assignments()
+        for a in assignments:
+            if a['customer_id'] == customer_id:
+                target_op = a['operator_id']
+                active_chats[target_op] = {
+                    'customer_id': a['customer_id'],
+                    'transaction_id': a['transaction_id']
+                }
+                break
 
     if not target_op:
         return False
@@ -1035,6 +1055,16 @@ def create_app() -> Application:
     return app
 
 
+async def _heartbeat_loop():
+    """60 saniyede bir heartbeat gönder"""
+    while True:
+        try:
+            db.update_heartbeat('operator_bot', len(active_chats))
+        except Exception as e:
+            logger.error(f"Heartbeat hatası: {e}")
+        await asyncio.sleep(60)
+
+
 async def start():
     """Bot'u başlat (run_all.py'den çağrılır)"""
     app = create_app()
@@ -1042,6 +1072,22 @@ async def start():
     await app.start()
     await app.updater.start_polling(drop_pending_updates=True)
     logger.info("Operatör botu başlatıldı")
+
+    # DB'den aktif atamaları yükle
+    try:
+        assignments = db.get_active_operator_assignments()
+        for a in assignments:
+            active_chats[a['operator_id']] = {
+                'customer_id': a['customer_id'],
+                'transaction_id': a['transaction_id']
+            }
+        if assignments:
+            logger.info(f"DB'den {len(assignments)} aktif atama yüklendi")
+    except Exception as e:
+        logger.error(f"Aktif atama yükleme hatası: {e}")
+
+    # Heartbeat background task
+    asyncio.create_task(_heartbeat_loop())
 
     # Sonsuz bekle
     stop_event = asyncio.Event()
