@@ -381,13 +381,13 @@ const getTransactionDescription = (transaction: Transaction) => {
 const getExchangeRate = (transaction: any) => {
   if (!transaction.details || transaction.details.length < 2) return '-'
   
-  const fromAmount = transaction.details[1].amount
-  const toAmount = transaction.details[0].amount
-  
-  if (fromAmount === 0) return '-'
-  
+  const fromAmount = transaction.details[1]?.amount ?? 0
+  const toAmount = transaction.details[0]?.amount ?? 0
+
+  if (!fromAmount) return '-'
+
   const rate = toAmount / fromAmount
-  return rate.toFixed(2)
+  return (rate ?? 0).toFixed(2)
 }
 
 const getRateTooltip = (transaction: any) => {

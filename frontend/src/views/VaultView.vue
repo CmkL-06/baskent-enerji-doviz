@@ -94,14 +94,14 @@
           </button>
           -->
           
-          <button type="button" @click="openInterOfficeExchange" class="action-button exchange">
+          <button type="button" @click="router.push('/ihtiyar/exchange-v2')" class="action-button exchange">
             <div class="action-icon">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M2 7h20m-10 7v6m0-6l3 3m-3-3l-3 3M7 7V4a1 1 0 011-1h8a1 1 0 011 1v3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M7 10L12 5L17 10M17 14L12 19L7 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </div>
-            <span class="action-label">Ofisler Arası İşlem</span>
-            <span class="action-description">Diğer ofis kasalarıyla işlem</span>
+            <span class="action-label">Döviz İşlemi</span>
+            <span class="action-description">Alış / satış işlemi yap</span>
           </button>
           
           <!-- Düzenleme butonu gizlendi
@@ -129,8 +129,24 @@
         </div>
       </div>
 
+      <!-- Section Tabs -->
+      <div class="section-tabs">
+        <button :class="['section-tab', { active: activeSection === 'balances' }]" @click="activeSection = 'balances'">
+          <span class="material-symbols-outlined" style="font-size:18px">account_balance_wallet</span>
+          Bakiyeler
+        </button>
+        <button :class="['section-tab', { active: activeSection === 'history' }]" @click="activeSection = 'history'">
+          <span class="material-symbols-outlined" style="font-size:18px">history</span>
+          Geçmiş
+        </button>
+        <button v-if="authStore.isAdmin" :class="['section-tab', { active: activeSection === 'count' }]" @click="activeSection = 'count'; loadCountHistory()">
+          <span class="material-symbols-outlined" style="font-size:18px">inventory_2</span>
+          Sayım
+        </button>
+      </div>
+
       <!-- Balances Overview -->
-      <div class="balances-card">
+      <div v-if="activeSection === 'balances'" class="balances-card">
         <div class="balances-header">
           <h2 class="section-title">Kasa Bakiyeleri</h2>
           <div class="header-controls">
@@ -267,7 +283,7 @@
       </div>
 
       <!-- Balance History -->
-      <div class="history-card">
+      <div v-if="activeSection === 'history'" class="history-card">
         <div class="history-header">
           <h2 class="section-title">Bakiye Geçmişi</h2>
           <div class="history-controls">
@@ -355,6 +371,112 @@
               <path d="M9 14h6m-6 4h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
             </svg>
             <p>Bu dönemde bakiye geçmişi bulunmuyor</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ Count Section ═══ -->
+      <div v-if="activeSection === 'count'" class="count-section">
+        <div class="count-section-header">
+          <h2 class="section-title">
+            <span class="material-symbols-outlined" style="font-size:20px;font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24">inventory_2</span>
+            Kasa Sayımı
+          </h2>
+          <button @click="openCountForm" class="count-start-btn">
+            <span class="material-symbols-outlined" style="font-size:18px;font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24">add_circle</span>
+            Yeni Sayım
+          </button>
+        </div>
+
+        <!-- Count Form -->
+        <div v-if="showCountForm" class="count-form-card">
+          <div class="count-form-header">
+            <h3>Fiziksel Sayım</h3>
+            <p class="count-form-hint">Her para birimi için kasadaki gerçek tutarı giriniz.</p>
+          </div>
+          <div class="count-form-body">
+            <div v-for="detail in countDetails" :key="detail.currencyId" class="count-row">
+              <div class="count-currency-info">
+                <i v-if="getCurrencyCountryCode(detail.currencyCode)" :class="`fi fi-${getCurrencyCountryCode(detail.currencyCode)}`" style="font-size:16px"></i>
+                <span class="count-currency-code">{{ detail.currencyCode }}</span>
+              </div>
+              <div class="count-field">
+                <span class="count-field-label">Sistem</span>
+                <span class="count-field-value">{{ formatAmount(detail.systemAmount) }}</span>
+              </div>
+              <div class="count-field">
+                <span class="count-field-label">Gerçek Tutar</span>
+                <input v-model.number="detail.actualAmount" type="number" step="0.01" placeholder="0.00" class="count-input" />
+              </div>
+              <div v-if="detail.actualAmount !== null && detail.actualAmount !== undefined" class="count-field">
+                <span class="count-field-label">Fark</span>
+                <span :class="['count-diff-val', getCountDiscrepancy(detail) === 0 ? 'count-diff--ok' : 'count-diff--warn']">
+                  {{ getCountDiscrepancy(detail) > 0 ? '+' : '' }}{{ formatAmount(getCountDiscrepancy(detail)) }}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="count-form-footer">
+            <label class="count-snapshot-check">
+              <input type="checkbox" v-model="countAlsoSnapshot" />
+              <span>Sayım sonrası snapshot al</span>
+            </label>
+            <input v-if="countAlsoSnapshot" v-model="countSnapshotDesc" placeholder="Snapshot açıklaması (opsiyonel)" class="count-snapshot-input" />
+            <div class="count-form-actions">
+              <button @click="showCountForm = false" class="count-cancel-btn">İptal</button>
+              <button @click="submitVaultCount" :disabled="isSavingCount" class="count-save-btn">
+                <span class="material-symbols-outlined" style="font-size:16px;font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24">{{ isSavingCount ? 'refresh' : 'save' }}</span>
+                {{ isSavingCount ? 'Kaydediliyor...' : 'Sayımı Kaydet' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Count History -->
+        <div class="count-history-card">
+          <h3 class="count-history-title">Sayım Geçmişi</h3>
+          <div v-if="isLoadingCounts" class="count-loading">
+            <span class="material-symbols-outlined animate-spin" style="font-size:24px">refresh</span>
+            Yükleniyor...
+          </div>
+          <table v-else-if="countHistory.length > 0" class="count-history-table">
+            <thead>
+              <tr>
+                <th>Tarih</th>
+                <th>Para Birimi</th>
+                <th>Sistem</th>
+                <th>Sayım</th>
+                <th>Fark</th>
+                <th>Sayan</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template v-for="count in countHistory" :key="count.id">
+                <tr v-for="(detail, di) in (count.details || count.countDetails || [])" :key="count.id + '-' + di">
+                  <td v-if="di === 0" :rowspan="(count.details || count.countDetails || []).length" class="count-date-cell">
+                    <div class="count-date">{{ formatDate(count.countDate || count.createdDate || '') }}</div>
+                    <div class="count-time">{{ formatTime(count.countDate || count.createdDate || '') }}</div>
+                  </td>
+                  <td>
+                    <span class="count-curr-badge">{{ detail.currencyCode || '' }}</span>
+                  </td>
+                  <td class="count-mono">{{ formatAmount(detail.systemAmount ?? detail.expectedAmount ?? 0) }}</td>
+                  <td class="count-mono">{{ formatAmount(detail.actualAmount ?? detail.countedAmount ?? 0) }}</td>
+                  <td>
+                    <span :class="['count-diff-badge', (detail.discrepancy ?? ((detail.actualAmount ?? detail.countedAmount ?? 0) - (detail.systemAmount ?? detail.expectedAmount ?? 0))) === 0 ? 'count-diff--ok' : 'count-diff--warn']">
+                      {{ formatAmount(detail.discrepancy ?? ((detail.actualAmount ?? detail.countedAmount ?? 0) - (detail.systemAmount ?? detail.expectedAmount ?? 0))) }}
+                    </span>
+                  </td>
+                  <td v-if="di === 0" :rowspan="(count.details || count.countDetails || []).length" class="count-user-cell">
+                    {{ count.countedBy || count.userName || '-' }}
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+          <div v-else class="count-empty">
+            <span class="material-symbols-outlined" style="font-size:40px;color:#d1d5db;font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24">inventory_2</span>
+            <p>Henüz sayım kaydı bulunmuyor</p>
           </div>
         </div>
       </div>
@@ -767,6 +889,16 @@ const selectedBalanceRange = ref('all')
 const selectedTypeFilter = ref('all')
 const showExchangeHistories = ref(false)
 const viewMode = ref<'list' | 'grid'>('grid')
+const activeSection = ref<'balances' | 'history' | 'count'>('balances')
+
+// Count state
+const countDetails = ref<Array<{ currencyId: string, currencyCode: string, currencyName: string, systemAmount: number, actualAmount: number | null }>>([])
+const countHistory = ref<any[]>([])
+const isLoadingCounts = ref(false)
+const isSavingCount = ref(false)
+const showCountForm = ref(false)
+const countAlsoSnapshot = ref(true)
+const countSnapshotDesc = ref('')
 
 // Dialogs
 const showDepositDialog = ref(false)
@@ -1003,6 +1135,83 @@ const loadVaultData = async (overrideId?: string) => {
 
 const refresh = () => {
   loadVaultData()
+  if (activeSection.value === 'count') loadCountHistory()
+}
+
+// ═══ Vault Count Methods ═══
+async function loadCountHistory() {
+  if (!vault.value) return
+  isLoadingCounts.value = true
+  try {
+    const vaultId = (vault.value as any).vaultId || vault.value.id
+    const data = await apiService.getVaultCounts(vaultId)
+    countHistory.value = Array.isArray(data) ? data : (data?.items ?? [])
+  } catch {
+    countHistory.value = []
+  } finally {
+    isLoadingCounts.value = false
+  }
+}
+
+function openCountForm() {
+  if (!vault.value?.balances) return
+  countDetails.value = vault.value.balances.map((b: any) => ({
+    currencyId: b.currencyId,
+    currencyCode: b.currencyCode ?? b.currencyName ?? '',
+    currencyName: b.currencyName ?? b.currencyCode ?? '',
+    systemAmount: b.balance ?? 0,
+    actualAmount: null,
+  }))
+  countAlsoSnapshot.value = true
+  countSnapshotDesc.value = ''
+  showCountForm.value = true
+}
+
+function getCountDiscrepancy(detail: any): number {
+  return (detail.actualAmount ?? 0) - (detail.systemAmount ?? 0)
+}
+
+async function submitVaultCount() {
+  if (!vault.value) return
+  const details = countDetails.value
+    .filter(d => d.actualAmount !== null && d.actualAmount !== undefined)
+    .map(d => ({ CurrencyId: d.currencyId, ActualAmount: d.actualAmount }))
+
+  if (details.length === 0) {
+    notification.warning('En az bir para birimi için sayım tutarı giriniz')
+    return
+  }
+
+  isSavingCount.value = true
+  try {
+    const vaultId = (vault.value as any).vaultId || vault.value.id
+    await apiService.submitVaultCount({
+      VaultId: vaultId,
+      IsManual: true,
+      CountDetails: details,
+    })
+
+    if (countAlsoSnapshot.value) {
+      const office = offices.value.find(o =>
+        o.vaults.some(v => (v.vaultId || v.id) === vaultId)
+      )
+      if (office) {
+        await apiService.createVaultSnapshot({
+          OfficeId: (office as any).officeId || office.id,
+          Description: countSnapshotDesc.value || `Sayım — ${vault.value.vaultName}`,
+        }).catch(() => {})
+      }
+    }
+
+    showCountForm.value = false
+    notification.success('Sayım başarıyla kaydedildi')
+    await loadCountHistory()
+    await loadVaultData()
+  } catch (e: any) {
+    notification.error(e?.response?.data?.message || 'Sayım kaydedilemedi')
+  } finally {
+    isSavingCount.value = false
+  }
 }
 
 const goBack = () => {
@@ -1102,19 +1311,19 @@ const saveBalanceUpdate = async () => {
 }
 
 const processDeposit = async () => {
-  if (!vault.value) return
-  
+  if (isProcessing.value || !vault.value) return
+
   // Manual validation
   if (!depositForm.value.currencyId) {
     notification.error('Lütfen bir para birimi seçin')
     return
   }
-  
+
   if (!depositForm.value.amount || depositForm.value.amount <= 0) {
     notification.error('Lütfen geçerli bir tutar girin')
     return
   }
-  
+
   isProcessing.value = true
   try {
     // API endpoint for deposit would be implemented here
@@ -1139,19 +1348,19 @@ const processDeposit = async () => {
 }
 
 const processWithdraw = async () => {
-  if (!vault.value) return
-  
+  if (isProcessing.value || !vault.value) return
+
   // Manual validation
   if (!withdrawForm.value.currencyId) {
     notification.error('Lütfen bir para birimi seçin')
     return
   }
-  
+
   if (!withdrawForm.value.amount || withdrawForm.value.amount <= 0) {
     notification.error('Lütfen geçerli bir tutar girin')
     return
   }
-  
+
   isProcessing.value = true
   try {
     // API endpoint for withdrawal would be implemented here
@@ -1176,24 +1385,24 @@ const processWithdraw = async () => {
 }
 
 const processTransfer = async () => {
-  if (!vault.value) return
-  
+  if (isProcessing.value || !vault.value) return
+
   // Manual validation
   if (!transferForm.value.targetVaultId) {
     notification.error('Lütfen hedef kasa seçin')
     return
   }
-  
+
   if (!transferForm.value.currencyId) {
     notification.error('Lütfen bir para birimi seçin')
     return
   }
-  
+
   if (!transferForm.value.amount || transferForm.value.amount <= 0) {
     notification.error('Lütfen geçerli bir tutar girin')
     return
   }
-  
+
   isProcessing.value = true
   try {
     await apiService.transferBetweenVaults({
@@ -2667,5 +2876,325 @@ onUnmounted(() => {
   .modal-container {
     margin: 1rem;
   }
+}
+
+/* ═══ Section Tabs ═══ */
+.section-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: #f3f4f6;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+.section-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.section-tab:hover {
+  color: #374151;
+  background: rgba(255,255,255,0.5);
+}
+.section-tab.active {
+  background: white;
+  color: #6366f1;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+/* ═══ Count Section ═══ */
+.count-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.count-section-header .section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+}
+.count-start-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #6366f1, #818cf8);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.count-start-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99,102,241,0.3);
+}
+.count-form-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+.count-form-header {
+  padding: 20px 24px 12px;
+  border-bottom: 1px solid #f3f4f6;
+}
+.count-form-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 4px;
+}
+.count-form-hint {
+  font-size: 13px;
+  color: #9ca3af;
+  margin: 0;
+}
+.count-form-body {
+  padding: 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.count-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 14px;
+  background: #f9fafb;
+  border-radius: 10px;
+}
+.count-currency-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 80px;
+}
+.count-currency-code {
+  font-weight: 600;
+  font-size: 14px;
+  color: #1f2937;
+}
+.count-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 100px;
+}
+.count-field-label {
+  font-size: 11px;
+  color: #9ca3af;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.count-field-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  color: #374151;
+  font-weight: 500;
+}
+.count-input {
+  width: 120px;
+  padding: 6px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.count-input:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+}
+.count-diff-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  font-weight: 600;
+}
+.count-diff--ok { color: #10b981; }
+.count-diff--warn { color: #ef4444; }
+.count-form-footer {
+  padding: 16px 24px;
+  border-top: 1px solid #f3f4f6;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.count-snapshot-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #4b5563;
+  cursor: pointer;
+}
+.count-snapshot-check input[type="checkbox"] {
+  accent-color: #6366f1;
+}
+.count-snapshot-input {
+  flex: 1;
+  min-width: 180px;
+  padding: 6px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 13px;
+  outline: none;
+}
+.count-snapshot-input:focus {
+  border-color: #6366f1;
+}
+.count-form-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+.count-cancel-btn {
+  padding: 8px 18px;
+  background: #f3f4f6;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #6b7280;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.count-cancel-btn:hover { background: #e5e7eb; }
+.count-save-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 20px;
+  background: linear-gradient(135deg, #10b981, #34d399);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.count-save-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16,185,129,0.3);
+}
+.count-save-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Count History */
+.count-history-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 20px 24px;
+}
+.count-history-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 16px;
+}
+.count-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 40px;
+  color: #9ca3af;
+  font-size: 14px;
+}
+.count-history-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
+}
+.count-history-table thead th {
+  text-align: left;
+  padding: 10px 12px;
+  color: #6b7280;
+  font-weight: 500;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid #f3f4f6;
+}
+.count-history-table tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f3f4f6;
+  color: #374151;
+}
+.count-date-cell {
+  vertical-align: top;
+}
+.count-date {
+  font-weight: 500;
+  font-size: 13px;
+}
+.count-time {
+  font-size: 12px;
+  color: #9ca3af;
+}
+.count-curr-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #ede9fe;
+  color: #6366f1;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.count-mono {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+}
+.count-diff-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+}
+.count-user-cell {
+  vertical-align: top;
+  color: #6b7280;
+  font-size: 13px;
+}
+.count-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 40px;
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.animate-spin {
+  animation: spin 1s linear infinite;
 }
 </style>

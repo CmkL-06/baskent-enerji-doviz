@@ -27,11 +27,11 @@ const totalTransactions = ref(0)
 const transactions = computed(() => {
   return exchangeStore.transactions.map(t => ({
     ...t,
-    formattedDate: new Date(t.transactionDate).toLocaleString('tr-TR'),
-    formattedAmount: `${t.sourceCurrencyCode} ${t.sourceAmount.toFixed(2)}`,
-    formattedRate: `₺${t.exchangeRate.toFixed(4)}`,
-    formattedTotal: `₺${t.targetAmount.toFixed(2)}`,
-    hasSpecialRate: t.customRate !== null
+    formattedDate: t.transactionDate ? new Date(t.transactionDate).toLocaleString('tr-TR') : '-',
+    formattedAmount: `${t.sourceCurrencyCode ?? ''} ${(t.sourceAmount ?? 0).toFixed(2)}`,
+    formattedRate: `₺${(t.exchangeRate ?? 0).toFixed(4)}`,
+    formattedTotal: `₺${(t.targetAmount ?? 0).toFixed(2)}`,
+    hasSpecialRate: t.customRate != null
   }))
 })
 
@@ -57,12 +57,12 @@ const getCurrencyColor = (currency: string) => {
   return currencyColors[currency] || '#888888'
 }
 
-const getStatusText = (status: TransactionStatus) => {
-  const statusMap: Record<TransactionStatus, string> = {
-    0: 'Bekliyor',
-    1: 'Onaylandı',
-    2: 'İptal',
-    3: 'Başarısız'
+const getStatusText = (status: number) => {
+  const statusMap: Record<number, string> = {
+    1: 'Bekliyor',
+    2: 'Tamamlandı',
+    3: 'İptal',
+    4: 'Başarısız'
   }
   return statusMap[status] || 'Bilinmiyor'
 }
@@ -82,7 +82,7 @@ const loadTransactions = async () => {
     }
     
     const response = await exchangeStore.loadTransactionHistory(params)
-    totalTransactions.value = response?.totalCount || 0
+    totalTransactions.value = response?.pagination?.totalCount ?? response?.totalCount ?? 0
   } catch (error) {
     console.error('Failed to load transactions:', error)
   } finally {
@@ -133,7 +133,7 @@ onMounted(async () => {
   <div class="modern-history">
     <!-- Filter Section -->
     <div class="filter-section">
-      <h2>HIZLI İŞLEMLER</h2>
+      <h2>İŞLEM FİLTRELERİ</h2>
       <div class="filter-controls">
         <select 
           v-model="filters.officeId" 
@@ -395,7 +395,7 @@ onMounted(async () => {
 
 .total {
   font-weight: 600;
-  color: #5aff8c;
+  color: #16a34a;
 }
 
 .special-rate {
@@ -433,17 +433,12 @@ onMounted(async () => {
 /* Filter select */
 .filter-select {
   padding: 10px 15px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: white;
+  border: 1px solid #e5e7eb;
   border-radius: 8px;
-  color: white;
+  color: #1a1a1a;
   font-size: 14px;
   min-width: 150px;
-}
-
-.filter-select option {
-  background: #2a1a4e;
-  color: white;
 }
 
 /* Loading and empty states */
@@ -451,7 +446,7 @@ onMounted(async () => {
 .empty-cell {
   text-align: center;
   padding: 40px;
-  color: rgba(255, 255, 255, 0.6);
+  color: #9ca3af;
 }
 
 .loading-spinner {
@@ -478,23 +473,23 @@ onMounted(async () => {
   font-weight: 600;
 }
 
-.status-badge.status-0 { /* Pending */
-  background: rgba(255, 193, 7, 0.2);
-  color: #ffc107;
+.status-badge.status-1 { /* Pending */
+  background: rgba(255, 193, 7, 0.15);
+  color: #b45309;
 }
 
-.status-badge.status-1 { /* Completed */
-  background: rgba(40, 167, 69, 0.2);
-  color: #28a745;
+.status-badge.status-2 { /* Completed */
+  background: rgba(40, 167, 69, 0.15);
+  color: #15803d;
 }
 
-.status-badge.status-2 { /* Cancelled */
-  background: rgba(220, 53, 69, 0.2);
-  color: #dc3545;
+.status-badge.status-3 { /* Cancelled */
+  background: rgba(220, 53, 69, 0.15);
+  color: #b91c1c;
 }
 
-.status-badge.status-3 { /* Failed */
-  background: rgba(255, 90, 140, 0.2);
-  color: #ff5a8c;
+.status-badge.status-4 { /* Failed */
+  background: rgba(220, 53, 69, 0.15);
+  color: #b91c1c;
 }
 </style>

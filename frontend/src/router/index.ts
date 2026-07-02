@@ -21,39 +21,35 @@ const router = createRouter({
       children: [
         { path: '', redirect: '/ihtiyar/dashboard' },
         { path: 'dashboard',            name: 'Dashboard',         component: () => import('@/views/ModernDashboard.vue') },
-        { path: 'exchange',             name: 'Exchange',          component: () => import('@/views/ModernExchange.vue') },
+        { path: 'exchange',             redirect: '/ihtiyar/exchange-v2' },
         { path: 'exchange-v2',          name: 'ExchangeV2',        component: () => import('@/views/ModernExchangeV2.vue') },
         { path: 'exchange-rates',       name: 'ExchangeRates',     component: () => import('@/views/ModernExchangeRates.vue') },
-        { path: 'history',              name: 'History',           component: () => import('@/views/ModernHistory.vue') },
+        { path: 'history',              redirect: '/ihtiyar/z-report' },
         { path: 'z-report',             name: 'ZReport',           component: () => import('@/views/ModernZReport.vue') },
-        { path: 'z-report-v2',          name: 'ZReportV2',         component: () => import('@/views/ModernZReportV2.vue') },
+        { path: 'z-report-v2',          redirect: '/ihtiyar/z-report' },
         { path: 'parties',              name: 'Parties',           component: () => import('@/views/ModernPartyAccounts.vue') },
-        { path: 'ghost-party',          name: 'GhostParty',        component: () => import('@/views/ModernGhostParty.vue') },
+        { path: 'ghost-party',          redirect: '/ihtiyar/parties' },
         { path: 'expenses',             name: 'Expenses',          component: () => import('@/views/ExpensesManagement.vue') },
-        { path: 'vaults',               name: 'Vaults',            component: () => import('@/views/VaultView.vue') },
-        { path: 'vaults/:id',           name: 'VaultDetail',       component: () => import('@/views/VaultView.vue') },
-        { path: 'vault-counts',         name: 'VaultCounts',       component: () => import('@/views/VaultCountManagement.vue') },
-        { path: 'vault-snapshot',       name: 'VaultSnapshot',     component: () => import('@/views/VaultSnapshot.vue') },
-        { path: 'vault-management',     name: 'VaultManagement',   component: () => import('@/views/VaultManagement.vue') },
-        { path: 'users',                name: 'Users',             component: () => import('@/views/ModernUserManagementV2.vue') },
-        { path: 'user-offices',         name: 'UserOffices',       component: () => import('@/views/ModernUserOfficeManagement.vue') },
-        { path: 'auto-rate-management', name: 'AutoRate',          component: () => import('@/views/AutoRateManagement.vue') },
-        { path: 'currencies',           name: 'Currencies',        component: () => import('@/views/CurrencyManagement.vue') },
+        { path: 'vaults/:id?',          name: 'Vaults',            component: () => import('@/views/VaultView.vue') },
+        { path: 'vault-counts',         redirect: '/ihtiyar/vaults' },
+        { path: 'vault-snapshot',       redirect: '/ihtiyar/vaults' },
+        { path: 'vault-management',     redirect: '/ihtiyar/vaults' },
+        { path: 'users',                name: 'Users',             component: () => import('@/views/ModernUserManagementV2.vue'), meta: { adminOnly: true } },
+        { path: 'user-offices',         name: 'UserOffices',       redirect: { name: 'Users' } },
+        { path: 'auto-rate-management', name: 'AutoRate',          component: () => import('@/views/AutoRateManagement.vue'), meta: { adminOnly: true } },
+        { path: 'currencies',           name: 'Currencies',        component: () => import('@/views/CurrencyManagement.vue'), meta: { adminOnly: true } },
         { path: 'settings',             name: 'Settings',          component: () => import('@/views/ModernSettings.vue') },
-        { path: 'inter-office',         name: 'InterOffice',       component: () => import('@/views/InterOfficeExchange.vue') },
-        { path: 'owner-panel',          name: 'OwnerPanel',        component: () => import('@/views/OwnerPanel.vue') },
-        { path: 'office-hierarchy',     name: 'OfficeHierarchy',   component: () => import('@/views/OfficeHierarchy.vue') },
-        { path: 'office-transfers',     name: 'OfficeTransfers',   component: () => import('@/views/OfficeTransfers.vue') },
+        { path: 'inter-office',         redirect: '/ihtiyar/dashboard' },
+        { path: 'owner-panel',          name: 'OwnerPanel',        component: () => import('@/views/OwnerPanel.vue'), meta: { ownerOnly: true } },
+        { path: 'office-transfers',     redirect: '/ihtiyar/owner-panel' },
 
+        // Telegram MTT
+        { path: 'tg-admin',             name: 'TgAdmin',           component: () => import('@/views/Telegram/TgAdminPanel.vue'), meta: { adminOnly: true } },
+        { path: 'tg-dealer',            name: 'TgDealer',          component: () => import('@/views/Telegram/TgDealerPanel.vue') },
+        { path: 'tg-operator',          name: 'TgOperator',        component: () => import('@/views/Telegram/TgOperatorPanel.vue') },
       ]
     },
-    // Masaüstü (eski) UI
-    {
-      path: '/desktop',
-      name: 'Desktop',
-      component: () => import('@/components/Desktop.vue'),
-      meta: { requiresAuth: true }
-    },
+    { path: '/desktop', redirect: '/ihtiyar/dashboard' },
     { path: '/:pathMatch(.*)*', redirect: '/login' }
   ]
 })
@@ -63,6 +59,10 @@ router.beforeEach((to, _from, next) => {
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     next('/login')
   } else if (to.path === '/login' && auth.isAuthenticated) {
+    next('/ihtiyar/dashboard')
+  } else if (to.meta.ownerOnly && !auth.isOwner) {
+    next('/ihtiyar/dashboard')
+  } else if (to.meta.adminOnly && !auth.isAdmin) {
     next('/ihtiyar/dashboard')
   } else {
     next()

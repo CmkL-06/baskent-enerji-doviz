@@ -123,9 +123,6 @@ export const useExchangeStore = defineStore('exchange', () => {
 
   async function updateSettings(newSettings: Partial<typeof settings.value>) {
     Object.assign(settings.value, newSettings)
-    try {
-      await (apiService as any).updateSettings?.(settings.value)
-    } catch {}
   }
 
   return {
@@ -136,7 +133,6 @@ export const useExchangeStore = defineStore('exchange', () => {
     loadOffices, loadExchangeRates, loadVaults,
     getExchangeRate,
     setSelectedOffice, getSelectedOfficeId, setSelectedOfficeId,
-    loadTransactionHistory, updateSettings,
-    apiService
+    loadTransactionHistory, updateSettings
   }
 })

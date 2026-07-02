@@ -22,7 +22,9 @@ apiClient.interceptors.response.use(
     if (err.response?.status === 401) {
       localStorage.removeItem('token')
       localStorage.removeItem('user')
-      if (window.location.pathname !== '/login') window.location.href = '/login'
+      if (window.location.pathname !== '/login') {
+        import('@/router').then(m => m.default.push('/login'))
+      }
     }
     return Promise.reject(err)
   }
@@ -62,6 +64,12 @@ const apiService = {
   saveVault:           (data: any)                            => post('/exchange/vault', data),
   deleteVault:         (id: any)                              => post(`/exchange/vault/delete/${id}`),
 
+  // ── Vault Counts  [VaultService → /api/v1/exchange/vaults/count]
+  submitVaultCount:      (data: any)                           => post('/exchange/vaults/count', data),
+  getVaultCounts:        (vaultId: any, params?: any)          => get(`/exchange/vaults/${vaultId}/counts`, { params }),
+  resetVaultCountStatus: (vaultId: any)                        => post(`/exchange/vaults/${vaultId}/reset-count`),
+  setVaultCountStatus:   (vaultId: any, shouldCount: boolean)  => apiClient.post(`/exchange/vaults/${vaultId}/set-count-status`, JSON.stringify(shouldCount), { headers: { 'Content-Type': 'application/json' } }).then(r => r.data),
+
   // ── Offices  [ExchangeController → /api/v1/exchange/office(s)]
   getOffices:             ()             => get('/exchange/offices/summary'),
   getOfficeSummaries:     ()             => get('/exchange/offices/summary'),
@@ -69,12 +77,10 @@ const apiService = {
   deleteOffice:           (id: any)      => post(`/exchange/office/delete/${id}`),
   getOfficeUsers:         (officeId: any) => get(`/exchange/office/${officeId}/users`),
 
-  // ── Ofis Hiyerarşi  [ExchangeHierarchyController → /api/v1/exchange/offices/...]
+  // ── Ofis hiyerarşi
   getOfficeHierarchy:     ()                   => get('/exchange/offices/hierarchy'),
   getMerkezOffice:        ()                   => get('/exchange/offices/merkez'),
-  getOfficeChildren:      (parentId: string)   => get(`/exchange/offices/${parentId}/children`),
   getMyOfficeAccess:      ()                   => get('/exchange/offices/my-access'),
-  saveOfficeHierarchy:    (data: any)          => post('/exchange/office', data),
 
   // ── Ofislerarası Transfer  [ExchangeHierarchyController → /api/v1/exchange/office-transfer/...]
   createTransferRequest:  (data: any)          => post('/exchange/office-transfer/request', data),
@@ -166,27 +172,27 @@ const apiService = {
   // ── Reports  [ExchangeController → /api/v1/exchange/reports]
   getZReportDaily:   (officeId?: any, date?: string) => {
     const p: any = {}
-    if (officeId) p.officeId = officeId
-    if (date) p.date = date
+    if (officeId != null) p.officeId = officeId
+    if (date != null) p.date = date
     return get('/exchange/reports/z-report/daily', { params: p })
   },
   getZReportWeekly:  (officeId?: any, weekStart?: string) => {
     const p: any = {}
-    if (officeId) p.officeId = officeId
-    if (weekStart) p.weekStart = weekStart
+    if (officeId != null) p.officeId = officeId
+    if (weekStart != null) p.weekStart = weekStart
     return get('/exchange/reports/z-report/weekly', { params: p })
   },
   getZReportMonthly: (officeId?: any, year?: number, month?: number) => {
     const p: any = {}
-    if (officeId) p.officeId = officeId
-    if (year) p.year = year
-    if (month) p.month = month
+    if (officeId != null) p.officeId = officeId
+    if (year != null) p.year = year
+    if (month != null) p.month = month
     return get('/exchange/reports/z-report/monthly', { params: p })
   },
   getZReportYearly:  (officeId?: any, year?: number) => {
     const p: any = {}
-    if (officeId) p.officeId = officeId
-    if (year) p.year = year
+    if (officeId != null) p.officeId = officeId
+    if (year != null) p.year = year
     return get('/exchange/reports/z-report/yearly', { params: p })
   },
   getZReportCustom:  (params?: any) => get('/exchange/reports/z-report/custom', { params }),
@@ -195,27 +201,66 @@ const apiService = {
   getPnLReport:      (params?: any) => get('/exchange/reports/pnl', { params }),
   getMonthlyReport:  (params?: any) => get('/exchange/reports/monthly', { params }),
 
-  // ── Vault balance histories  [ExchangeController → /api/v1/exchange/vault-balance-histories]
-  getVaultBalanceHistories: (officeId: any, date?: string) => {
-    const p: any = {}
-    if (officeId) p.officeId = officeId
-    if (date) p.date = date
-    return get('/exchange/vault-balance-histories', { params: p })
+  // ── WAC (Weighted Average Cost)
+  getWac:            (vaultId: any, currencyId: any) => get(`/exchange/wac/${vaultId}/${currencyId}`),
+  getAllWacs:         (vaultId: any) => get(`/exchange/wac/${vaultId}`),
+  getWacHistory:     (vaultId: any, currencyId?: any, limit = 50) => {
+    const p: any = { limit }
+    if (currencyId != null) p.currencyId = currencyId
+    return get(`/exchange/wac/${vaultId}/history`, { params: p })
   },
 
-  // ── Expense aggregates
+  // ── Day Closure (Gün Kapanışı)
+  getDayStatus:      (officeId: any) => get(`/exchange/day-status/${officeId}`),
+  closeDay:          (data: any) => post('/exchange/day-close', data),
+  getDayClosure:     (officeId: any, date: string) => get(`/exchange/day-closure/${officeId}/${date}`),
+  getClosureHistory: (officeId: any, params?: any) => get(`/exchange/day-closure/${officeId}/history`, { params }),
+  getConsolidatedDayClosure: (date?: string) => get('/exchange/day-closure/consolidated', { params: date ? { date } : {} }),
+
+  // ── Vault balance histories  [ExchangeController → /api/v1/exchange/vault/balance-histories]
+  getVaultBalanceHistories: (officeId: any, date?: string) => {
+    const p: any = {}
+    if (officeId != null) p.officeId = officeId
+    if (date != null) p.date = date
+    return get('/exchange/vault/balance-histories', { params: p })
+  },
+
+  // ── Vault Snapshots  [VaultSnapshotController → /api/v1/exchange/vault-snapshots]
+  createVaultSnapshot:     (data: any)                              => post('/exchange/vault-snapshots', data),
+  getVaultSnapshots:       (officeId: any, params?: any)            => get(`/exchange/vault-snapshots/office/${officeId}`, { params }),
+  getVaultSnapshotsByDate: (officeId: any, date: string)            => get(`/exchange/vault-snapshots/office/${officeId}/date/${date}`),
+  getVaultSnapshotById:    (snapshotId: any)                        => get(`/exchange/vault-snapshots/${snapshotId}`),
+  deleteVaultSnapshot:     (snapshotId: any)                        => del(`/exchange/vault-snapshots/${snapshotId}`),
+  compareVaultSnapshots:   (id1: any, id2: any)                     => get(`/exchange/vault-snapshots/compare`, { params: { snapshotId1: id1, snapshotId2: id2 } }),
+
+  // ── Expense aggregates  [ExchangeController → /api/v1/exchange/expense/reports/...]
   getTotalExpenses:      (officeId: any, startDate?: string, endDate?: string) => {
     const p: any = { officeId }
-    if (startDate) p.startDate = startDate
-    if (endDate) p.endDate = endDate
-    return get('/exchange/expense/total', { params: p })
+    if (startDate != null) p.startDate = startDate
+    if (endDate != null) p.endDate = endDate
+    return get('/exchange/expense/reports/total', { params: p })
   },
   getExpensesByCategory: (officeId: any, startDate?: string, endDate?: string) => {
     const p: any = { officeId }
-    if (startDate) p.startDate = startDate
-    if (endDate) p.endDate = endDate
-    return get('/exchange/expense/by-category', { params: p })
+    if (startDate != null) p.startDate = startDate
+    if (endDate != null) p.endDate = endDate
+    return get('/exchange/expense/reports/by-category', { params: p })
   },
+
+  // ── Alerts  [ExchangeHierarchyController → /api/v1/exchange/alerts/...]
+  getUnreadAlerts:      ()                    => get('/exchange/alerts/unread'),
+  getAlertsByOffice:    (officeId: string, limit = 50) => get(`/exchange/alerts/office/${officeId}`, { params: { limit } }),
+  markAlertRead:        (alertId: string)     => post(`/exchange/alerts/${alertId}/read`),
+  markAllAlertsRead:    ()                    => post('/exchange/alerts/read-all'),
+  resolveAlert:         (alertId: string)     => post(`/exchange/alerts/${alertId}/resolve`),
+
+  // ── Merkezi Kur Yönetimi  [ExchangeHierarchyController → /api/v1/exchange/rates/...]
+  pushRatesToBranches:  (merkezOfficeId: string) => post('/exchange/rates/push-to-branches', { merkezOfficeId }),
+  getEffectiveRate:     (officeId: string, sourceCurrencyId: string, targetCurrencyId: string) =>
+                          get(`/exchange/rates/effective/${officeId}/${sourceCurrencyId}/${targetCurrencyId}`),
+
+  // ── Performans  [ExchangeHierarchyController → /api/v1/exchange/reports/branch-comparison]
+  getBranchComparison:  (period = 'daily')    => get('/exchange/reports/branch-comparison', { params: { period } }),
 
   // ── Generic
   get, post, put, delete: del, patch,

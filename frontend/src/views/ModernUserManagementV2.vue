@@ -6,14 +6,13 @@ import apiService from '@/services/apiservice'
 const authStore = useAuthStore()
 
 const users   = ref<any[]>([])
+const offices = ref<any[]>([])
 const loading = ref(false)
 const error   = ref('')
 const search  = ref('')
 
 const selected    = ref<any>(null)
-const panelOpen   = ref(false)
-const panelMode   = ref<'edit' | 'create'>('edit')
-const activeTab   = ref<'info' | 'password'>('info')
+const activeTab   = ref<'info' | 'password' | 'offices'>('info')
 
 const saving    = ref(false)
 const saveError = ref('')
@@ -22,6 +21,10 @@ const saveOk    = ref(false)
 const editForm   = ref({ username: '', mail: '', firstname: '', lastname: '', rank: 1 })
 const pwForm     = ref({ newPassword: '', confirm: '' })
 const createForm = ref({ username: '', mail: '', password: '', firstname: '', lastname: '' })
+const createMode = ref(false)
+
+const userOffices = ref<any[]>([])
+const officeSaving = ref(false)
 
 const RANKS = [
   { value: 0,   label: 'Yasaklı',   color: '#ef4444', bg: '#fef2f2', ring: '#fca5a5' },
@@ -42,8 +45,7 @@ function rankValue(rank: any) {
 
 function avatarColor(name: string) {
   const colors = ['#6366f1','#8b5cf6','#ec4899','#f97316','#14b8a6','#0ea5e9','#84cc16','#ef4444']
-  const idx = (name?.charCodeAt(0) ?? 0) % colors.length
-  return colors[idx]
+  return colors[(name?.charCodeAt(0) ?? 0) % colors.length]
 }
 
 const filteredUsers = computed(() => {
@@ -56,15 +58,22 @@ const filteredUsers = computed(() => {
   )
 })
 
+const assignedIds = computed(() => new Set(userOffices.value.map((o: any) => o.officeId ?? o.id)))
+
 async function load() {
   loading.value = true; error.value = ''
-  try { users.value = await apiService.getUsers() }
-  catch (e: any) { error.value = e.response?.data?.message || 'Kullanıcılar yüklenemedi' }
-  finally { loading.value = false }
+  try {
+    const [u, o] = await Promise.all([apiService.getUsers(), apiService.getOffices()])
+    users.value = u ?? []
+    offices.value = o ?? []
+  } catch (e: any) {
+    error.value = e.response?.data?.message || 'Veriler yüklenemedi'
+  } finally { loading.value = false }
 }
 
-function openPanel(user: any) {
+async function selectUser(user: any) {
   selected.value = user
+  createMode.value = false
   activeTab.value = 'info'
   saveError.value = ''; saveOk.value = false
   editForm.value = {
@@ -75,23 +84,22 @@ function openPanel(user: any) {
     rank:      rankValue(user.rank)
   }
   pwForm.value = { newPassword: '', confirm: '' }
-  panelOpen.value = true
+  userOffices.value = []
+  try {
+    const res = await apiService.getUserOffices(user.id)
+    userOffices.value = res ?? []
+  } catch { userOffices.value = [] }
 }
 
-function openCreatePanel() {
+function openCreateMode() {
   selected.value = null
-  panelMode.value = 'create'
+  createMode.value = true
+  activeTab.value = 'info'
   saveError.value = ''; saveOk.value = false
   createForm.value = { username: '', mail: '', password: '', firstname: '', lastname: '' }
-  panelOpen.value = true
 }
 
-function closePanel() {
-  panelOpen.value = false
-  setTimeout(() => { selected.value = null; panelMode.value = 'edit' }, 300)
-}
-
-function switchTab(tab: 'info' | 'password') {
+function switchTab(tab: 'info' | 'password' | 'offices') {
   activeTab.value = tab
   saveError.value = ''; saveOk.value = false
 }
@@ -103,7 +111,7 @@ async function saveInfo() {
     saveOk.value = true
     await load()
     const updated = users.value.find(u => u.id === selected.value.id)
-    if (updated) selected.value = updated
+    if (updated) { selected.value = updated }
   } catch (e: any) {
     saveError.value = e.response?.data?.message || 'Kaydedilemedi'
   } finally { saving.value = false }
@@ -118,7 +126,7 @@ async function createUser() {
     await apiService.registerUser(f)
     saveOk.value = true
     await load()
-    setTimeout(closePanel, 1200)
+    setTimeout(() => { createMode.value = false }, 1200)
   } catch (e: any) {
     saveError.value = e.response?.data?.message || 'Kullanıcı oluşturulamadı'
   } finally { saving.value = false }
@@ -138,344 +146,485 @@ async function savePassword() {
   } finally { saving.value = false }
 }
 
+async function toggleOffice(office: any) {
+  if (!selected.value || !authStore.isAdmin) return
+  const officeId = office.officeId ?? office.id
+  officeSaving.value = true
+  try {
+    if (assignedIds.value.has(officeId)) {
+      await apiService.removeOfficeFromUser(selected.value.id, officeId)
+      userOffices.value = userOffices.value.filter((o: any) => (o.officeId ?? o.id) !== officeId)
+    } else {
+      await apiService.attachOfficeToUser({ userId: selected.value.id, officeId })
+      userOffices.value = [...userOffices.value, { officeId, ...office }]
+    }
+  } catch (e: any) {
+    error.value = e.response?.data?.message || 'İşlem başarısız'
+    setTimeout(() => error.value = '', 3000)
+  } finally { officeSaving.value = false }
+}
+
 onMounted(load)
 </script>
 
 <template>
-  <div class="um-page">
-
+  <div class="uy-page">
     <!-- Header -->
-    <div class="um-header">
+    <div class="uy-header">
       <div>
-        <h1 class="um-title">Kullanıcılar</h1>
-        <p class="um-sub">{{ users.length }} kullanıcı</p>
+        <h1 class="uy-title">Kullanıcı Yönetimi</h1>
+        <p class="uy-sub">{{ users.length }} kullanıcı · {{ offices.length }} ofis</p>
       </div>
-      <div class="um-header-right">
-        <div class="um-search-wrap">
-          <span class="material-symbols-outlined um-si">search</span>
-          <input v-model="search" class="um-search" placeholder="Ara..." />
-        </div>
-        <button v-if="authStore.isOwner" class="um-create-btn" @click="openCreatePanel">
+      <div class="uy-header-actions">
+        <button v-if="authStore.isOwner" class="uy-create-btn" @click="openCreateMode">
           <span class="material-symbols-outlined">person_add</span> Yeni Kullanıcı
         </button>
-        <button class="um-refresh" @click="load" :disabled="loading">
+        <button class="uy-icon-btn" @click="load" :disabled="loading" title="Yenile">
           <span class="material-symbols-outlined" :class="{ spin: loading }">refresh</span>
         </button>
       </div>
     </div>
 
-    <div v-if="error" class="um-error">{{ error }}</div>
+    <div v-if="error" class="uy-error">{{ error }}</div>
 
-    <!-- Skeleton -->
-    <div v-if="loading && !users.length" class="um-grid">
-      <div v-for="i in 6" :key="i" class="um-card um-skeleton"></div>
-    </div>
-
-    <!-- Cards -->
-    <div v-else class="um-grid">
-      <div
-        v-for="u in filteredUsers"
-        :key="u.id"
-        class="um-card"
-        :class="{ 'um-card-active': selected?.id === u.id && panelOpen }"
-        @click="openPanel(u)"
-      >
-        <div class="um-card-top">
-          <div class="um-avatar" :style="{ background: avatarColor(u.firstname || u.username) }">
-            {{ (u.firstname || u.username || '?')[0].toUpperCase() }}
-          </div>
-          <span class="um-rank-badge"
-            :style="{ color: rankInfo(u.rank).color, background: rankInfo(u.rank).bg, border: `1px solid ${rankInfo(u.rank).ring}` }">
-            {{ rankInfo(u.rank).label }}
-          </span>
+    <div class="uy-layout">
+      <!-- Left: User List -->
+      <div class="uy-left">
+        <div class="uy-search-box">
+          <span class="material-symbols-outlined uy-search-icon">search</span>
+          <input v-model="search" class="uy-search" placeholder="Kullanıcı ara..." />
         </div>
-        <div class="um-card-name">{{ u.firstname }} {{ u.lastname }}</div>
-        <div class="um-card-user">@{{ u.username }}</div>
-        <div class="um-card-mail">{{ u.mail }}</div>
-        <div class="um-card-arrow">
-          <span class="material-symbols-outlined">chevron_right</span>
+
+        <div v-if="loading" class="uy-loader">
+          <span class="material-symbols-outlined spin">progress_activity</span>
+        </div>
+
+        <div v-else class="uy-user-list">
+          <div
+            v-for="u in filteredUsers"
+            :key="u.id"
+            class="uy-user-row"
+            :class="{ active: selected?.id === u.id && !createMode }"
+            @click="selectUser(u)"
+          >
+            <div class="uy-avatar" :style="{ background: avatarColor(u.firstname || u.username) }">
+              {{ (u.firstname || u.username || '?')[0].toUpperCase() }}
+            </div>
+            <div class="uy-user-info">
+              <div class="uy-user-name">{{ u.firstname }} {{ u.lastname }}</div>
+              <div class="uy-user-meta">
+                <span>@{{ u.username }}</span>
+                <span class="uy-rank-dot"
+                  :style="{ background: rankInfo(u.rank).color }"
+                  :title="rankInfo(u.rank).label"></span>
+              </div>
+            </div>
+            <span class="material-symbols-outlined uy-chevron">chevron_right</span>
+          </div>
+          <div v-if="!filteredUsers.length" class="uy-empty-list">
+            <span class="material-symbols-outlined">person_search</span>
+            Kullanıcı bulunamadı
+          </div>
         </div>
       </div>
 
-      <div v-if="!filteredUsers.length && !loading" class="um-empty-card">
-        <span class="material-symbols-outlined">person_search</span>
-        <p>Kullanıcı bulunamadı</p>
+      <!-- Right: Detail / Create -->
+      <div class="uy-right">
+
+        <!-- Placeholder -->
+        <div v-if="!selected && !createMode" class="uy-placeholder">
+          <span class="material-symbols-outlined">manage_accounts</span>
+          <p>Listeden bir kullanıcı seçin</p>
+          <p class="uy-placeholder-hint">veya yeni kullanıcı oluşturun</p>
+        </div>
+
+        <!-- Create Mode -->
+        <template v-if="createMode">
+          <div class="uy-detail-header">
+            <div class="uy-detail-avatar" style="background:#6366f1">
+              <span class="material-symbols-outlined" style="font-size:22px">person_add</span>
+            </div>
+            <div>
+              <div class="uy-detail-name">Yeni Kullanıcı</div>
+              <div class="uy-detail-sub">Owner işlemi</div>
+            </div>
+          </div>
+
+          <div class="uy-detail-body">
+            <div class="uy-field-row">
+              <div class="uy-field">
+                <label>Ad</label>
+                <input v-model="createForm.firstname" class="uy-input" placeholder="Ad" />
+              </div>
+              <div class="uy-field">
+                <label>Soyad</label>
+                <input v-model="createForm.lastname" class="uy-input" placeholder="Soyad" />
+              </div>
+            </div>
+            <div class="uy-field">
+              <label>Kullanıcı Adı *</label>
+              <input v-model="createForm.username" class="uy-input" placeholder="kullanici_adi" />
+            </div>
+            <div class="uy-field">
+              <label>E-posta *</label>
+              <input v-model="createForm.mail" type="email" class="uy-input" placeholder="ornek@email.com" />
+            </div>
+            <div class="uy-field">
+              <label>Şifre *</label>
+              <input v-model="createForm.password" type="password" class="uy-input" placeholder="••••••••" />
+            </div>
+            <div v-if="saveOk" class="uy-msg uy-msg-ok">Kullanıcı oluşturuldu</div>
+            <div v-if="saveError" class="uy-msg uy-msg-err">{{ saveError }}</div>
+            <button class="uy-btn uy-btn-primary" @click="createUser" :disabled="saving">
+              <span v-if="saving" class="material-symbols-outlined spin">progress_activity</span>
+              {{ saving ? 'Oluşturuluyor...' : 'Kullanıcı Oluştur' }}
+            </button>
+          </div>
+        </template>
+
+        <!-- Edit Mode -->
+        <template v-if="selected && !createMode">
+          <!-- Detail Header -->
+          <div class="uy-detail-header">
+            <div class="uy-detail-avatar" :style="{ background: avatarColor(selected.firstname || selected.username) }">
+              {{ (selected.firstname || selected.username || '?')[0].toUpperCase() }}
+            </div>
+            <div class="uy-detail-identity">
+              <div class="uy-detail-name">{{ selected.firstname }} {{ selected.lastname }}</div>
+              <div class="uy-detail-sub">@{{ selected.username }} · {{ selected.mail }}</div>
+            </div>
+            <span class="uy-rank-badge"
+              :style="{ color: rankInfo(selected.rank).color, background: rankInfo(selected.rank).bg, border: `1px solid ${rankInfo(selected.rank).ring}` }">
+              {{ rankInfo(selected.rank).label }}
+            </span>
+          </div>
+
+          <!-- Tabs -->
+          <div class="uy-tabs">
+            <button class="uy-tab" :class="{ active: activeTab === 'info' }" @click="switchTab('info')">
+              <span class="material-symbols-outlined">edit</span> Bilgiler
+            </button>
+            <button class="uy-tab" :class="{ active: activeTab === 'password' }" @click="switchTab('password')">
+              <span class="material-symbols-outlined">key</span> Şifre
+            </button>
+            <button v-if="authStore.isAdmin" class="uy-tab" :class="{ active: activeTab === 'offices' }" @click="switchTab('offices')">
+              <span class="material-symbols-outlined">store</span> Ofisler
+              <span class="uy-tab-count">{{ assignedIds.size }}</span>
+            </button>
+          </div>
+
+          <!-- Info Tab -->
+          <div v-if="activeTab === 'info'" class="uy-detail-body">
+            <div class="uy-field-row">
+              <div class="uy-field">
+                <label>Ad</label>
+                <input v-model="editForm.firstname" class="uy-input" placeholder="Ad" :disabled="!authStore.isOwner" />
+              </div>
+              <div class="uy-field">
+                <label>Soyad</label>
+                <input v-model="editForm.lastname" class="uy-input" placeholder="Soyad" :disabled="!authStore.isOwner" />
+              </div>
+            </div>
+            <div class="uy-field">
+              <label>Kullanıcı Adı</label>
+              <input v-model="editForm.username" class="uy-input" :disabled="!authStore.isOwner" />
+            </div>
+            <div class="uy-field">
+              <label>E-posta</label>
+              <input v-model="editForm.mail" type="email" class="uy-input" :disabled="!authStore.isOwner" />
+            </div>
+            <div class="uy-field">
+              <label>Yetki Seviyesi</label>
+              <div class="uy-rank-grid" :class="{ disabled: !authStore.isOwner }">
+                <button
+                  v-for="r in RANKS"
+                  :key="r.value"
+                  class="uy-rank-chip"
+                  :class="{ selected: editForm.rank === r.value }"
+                  :style="editForm.rank === r.value ? { background: r.bg, color: r.color, borderColor: r.ring } : {}"
+                  @click="authStore.isOwner && (editForm.rank = r.value)"
+                >{{ r.label }}</button>
+              </div>
+            </div>
+
+            <div v-if="saveOk" class="uy-msg uy-msg-ok">Kaydedildi</div>
+            <div v-if="saveError" class="uy-msg uy-msg-err">{{ saveError }}</div>
+
+            <button v-if="authStore.isOwner" class="uy-btn uy-btn-primary" @click="saveInfo" :disabled="saving">
+              <span v-if="saving" class="material-symbols-outlined spin">progress_activity</span>
+              {{ saving ? 'Kaydediliyor...' : 'Kaydet' }}
+            </button>
+          </div>
+
+          <!-- Password Tab -->
+          <div v-if="activeTab === 'password'" class="uy-detail-body">
+            <div class="uy-info-banner">
+              <span class="material-symbols-outlined">info</span>
+              <span>{{ selected.firstname || selected.username }} kullanıcısının şifresini değiştiriyorsunuz.</span>
+            </div>
+            <div class="uy-field">
+              <label>Yeni Şifre</label>
+              <input v-model="pwForm.newPassword" type="password" class="uy-input" placeholder="••••••••" :disabled="!authStore.isOwner" />
+            </div>
+            <div class="uy-field">
+              <label>Şifre Tekrar</label>
+              <input v-model="pwForm.confirm" type="password" class="uy-input" placeholder="••••••••" :disabled="!authStore.isOwner" />
+            </div>
+
+            <div v-if="saveOk" class="uy-msg uy-msg-ok">Şifre değiştirildi</div>
+            <div v-if="saveError" class="uy-msg uy-msg-err">{{ saveError }}</div>
+
+            <button v-if="authStore.isOwner" class="uy-btn uy-btn-warn" @click="savePassword" :disabled="saving">
+              <span v-if="saving" class="material-symbols-outlined spin">progress_activity</span>
+              {{ saving ? 'Değiştiriliyor...' : 'Şifreyi Değiştir' }}
+            </button>
+          </div>
+
+          <!-- Offices Tab -->
+          <div v-if="activeTab === 'offices'" class="uy-detail-body uy-offices-body">
+            <div v-if="offices.length === 0" class="uy-empty-offices">Ofis bulunamadı</div>
+            <div v-else class="uy-office-list">
+              <div
+                v-for="office in offices"
+                :key="office.officeId ?? office.id"
+                class="uy-office-row"
+                :class="{ assigned: assignedIds.has(office.officeId ?? office.id) }"
+              >
+                <div class="uy-office-info">
+                  <span class="material-symbols-outlined uy-office-icon">store</span>
+                  <div>
+                    <div class="uy-office-name">{{ office.officeName ?? office.name }}</div>
+                    <div class="uy-office-code">{{ office.officeCode ?? office.code ?? '' }}</div>
+                  </div>
+                </div>
+                <button
+                  class="uy-toggle"
+                  :class="{ on: assignedIds.has(office.officeId ?? office.id) }"
+                  :disabled="officeSaving || !authStore.isAdmin"
+                  @click="toggleOffice(office)"
+                >
+                  <span class="uy-toggle-ball"></span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </template>
       </div>
     </div>
-
-    <!-- Overlay -->
-    <div v-if="panelOpen" class="um-overlay" @click="closePanel"></div>
-
-    <!-- Detail Panel -->
-    <div class="um-panel" :class="{ 'um-panel-open': panelOpen }">
-
-      <!-- CREATE MODE -->
-      <template v-if="panelMode === 'create'">
-        <div class="um-panel-header">
-          <div class="um-panel-avatar" style="background:#6366f1">
-            <span class="material-symbols-outlined" style="font-size:22px">person_add</span>
-          </div>
-          <div class="um-panel-identity">
-            <div class="um-panel-name">Yeni Kullanıcı</div>
-            <div class="um-panel-uname">Owner işlemi</div>
-          </div>
-          <button class="um-panel-close" @click="closePanel">
-            <span class="material-symbols-outlined">close</span>
-          </button>
-        </div>
-        <div class="um-panel-body" style="margin-top:16px">
-          <div class="um-field-row">
-            <div class="um-field">
-              <label>Ad</label>
-              <input v-model="createForm.firstname" class="um-input" placeholder="Ad" />
-            </div>
-            <div class="um-field">
-              <label>Soyad</label>
-              <input v-model="createForm.lastname" class="um-input" placeholder="Soyad" />
-            </div>
-          </div>
-          <div class="um-field">
-            <label>Kullanıcı Adı *</label>
-            <input v-model="createForm.username" class="um-input" placeholder="kullanici_adi" />
-          </div>
-          <div class="um-field">
-            <label>E-posta *</label>
-            <input v-model="createForm.mail" type="email" class="um-input" placeholder="ornek@email.com" />
-          </div>
-          <div class="um-field">
-            <label>Şifre *</label>
-            <input v-model="createForm.password" type="password" class="um-input" placeholder="••••••••" />
-          </div>
-          <div v-if="saveOk" class="um-ok">Kullanıcı oluşturuldu ✓</div>
-          <div v-if="saveError" class="um-err">{{ saveError }}</div>
-          <button class="um-save-btn" @click="createUser" :disabled="saving">
-            <span v-if="saving" class="material-symbols-outlined spin">progress_activity</span>
-            {{ saving ? 'Oluşturuluyor...' : 'Kullanıcı Oluştur' }}
-          </button>
-        </div>
-      </template>
-
-      <!-- EDIT MODE -->
-      <template v-if="panelMode === 'edit' && selected">
-
-        <!-- Panel Header -->
-        <div class="um-panel-header">
-          <div class="um-panel-avatar" :style="{ background: avatarColor(selected.firstname || selected.username) }">
-            {{ (selected.firstname || selected.username || '?')[0].toUpperCase() }}
-          </div>
-          <div class="um-panel-identity">
-            <div class="um-panel-name">{{ selected.firstname }} {{ selected.lastname }}</div>
-            <div class="um-panel-uname">@{{ selected.username }}</div>
-          </div>
-          <button class="um-panel-close" @click="closePanel">
-            <span class="material-symbols-outlined">close</span>
-          </button>
-        </div>
-
-        <!-- Rank + mail row -->
-        <div class="um-panel-rank-row">
-          <span class="um-rank-badge um-rank-lg"
-            :style="{ color: rankInfo(selected.rank).color, background: rankInfo(selected.rank).bg, border: `1px solid ${rankInfo(selected.rank).ring}` }">
-            {{ rankInfo(selected.rank).label }}
-          </span>
-          <span class="um-panel-mail">{{ selected.mail }}</span>
-        </div>
-
-        <!-- Tabs -->
-        <div class="um-tabs">
-          <button class="um-tab" :class="{ active: activeTab === 'info' }" @click="switchTab('info')">
-            <span class="material-symbols-outlined">edit</span> Bilgileri Düzenle
-          </button>
-          <button class="um-tab" :class="{ active: activeTab === 'password' }" @click="switchTab('password')">
-            <span class="material-symbols-outlined">key</span> Şifre
-          </button>
-        </div>
-
-        <!-- Info Tab -->
-        <div v-if="activeTab === 'info'" class="um-panel-body">
-          <div class="um-field-row">
-            <div class="um-field">
-              <label>Ad</label>
-              <input v-model="editForm.firstname" class="um-input" placeholder="Ad" :disabled="!authStore.isOwner" />
-            </div>
-            <div class="um-field">
-              <label>Soyad</label>
-              <input v-model="editForm.lastname" class="um-input" placeholder="Soyad" :disabled="!authStore.isOwner" />
-            </div>
-          </div>
-          <div class="um-field">
-            <label>Kullanıcı Adı</label>
-            <input v-model="editForm.username" class="um-input" :disabled="!authStore.isOwner" />
-          </div>
-          <div class="um-field">
-            <label>E-posta</label>
-            <input v-model="editForm.mail" type="email" class="um-input" :disabled="!authStore.isOwner" />
-          </div>
-          <div class="um-field">
-            <label>Yetki Seviyesi</label>
-            <div class="um-rank-select-wrap" :class="{ disabled: !authStore.isOwner }">
-              <button
-                v-for="r in RANKS"
-                :key="r.value"
-                class="um-rank-option"
-                :class="{ selected: editForm.rank === r.value }"
-                :style="editForm.rank === r.value ? { background: r.bg, color: r.color, borderColor: r.ring } : {}"
-                @click="authStore.isOwner && (editForm.rank = r.value)"
-              >{{ r.label }}</button>
-            </div>
-          </div>
-
-          <div v-if="saveOk" class="um-ok">Kaydedildi ✓</div>
-          <div v-if="saveError" class="um-err">{{ saveError }}</div>
-
-          <button v-if="authStore.isOwner" class="um-save-btn" @click="saveInfo" :disabled="saving">
-            <span v-if="saving" class="material-symbols-outlined spin">progress_activity</span>
-            {{ saving ? 'Kaydediliyor...' : 'Kaydet' }}
-          </button>
-        </div>
-
-        <!-- Password Tab -->
-        <div v-if="activeTab === 'password'" class="um-panel-body">
-          <div class="um-pw-info">
-            <span class="material-symbols-outlined">info</span>
-            <span>{{ selected.firstname || selected.username }} kullanıcısının şifresini değiştiriyorsunuz.</span>
-          </div>
-          <div class="um-field">
-            <label>Yeni Şifre</label>
-            <input v-model="pwForm.newPassword" type="password" class="um-input" placeholder="••••••••" :disabled="!authStore.isOwner" />
-          </div>
-          <div class="um-field">
-            <label>Şifre Tekrar</label>
-            <input v-model="pwForm.confirm" type="password" class="um-input" placeholder="••••••••" :disabled="!authStore.isOwner" />
-          </div>
-
-          <div v-if="saveOk" class="um-ok">Şifre değiştirildi ✓</div>
-          <div v-if="saveError" class="um-err">{{ saveError }}</div>
-
-          <button v-if="authStore.isOwner" class="um-save-btn um-save-btn-warn" @click="savePassword" :disabled="saving">
-            <span v-if="saving" class="material-symbols-outlined spin">progress_activity</span>
-            {{ saving ? 'Değiştiriliyor...' : 'Şifreyi Değiştir' }}
-          </button>
-        </div>
-
-      </template>
-    </div>
-
   </div>
 </template>
 
 <style scoped>
-.um-page { padding: 24px; position: relative; }
+.uy-page { padding: 24px; max-width: 1400px; margin: 0 auto; }
 
-.um-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-.um-title  { font-size: 22px; font-weight: 700; color: #111; margin: 0; }
-.um-sub    { font-size: 13px; color: #9ca3af; margin: 2px 0 0; }
-.um-header-right { display: flex; align-items: center; gap: 8px; }
-.um-search-wrap  { position: relative; }
-.um-si { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 17px; color: #9ca3af; pointer-events: none; }
-.um-search { padding: 8px 12px 8px 34px; border: 1px solid #e5e7eb; border-radius: 10px; font-size: 14px; width: 200px; outline: none; transition: border-color .15s; }
-.um-search:focus { border-color: #6366f1; }
-.um-refresh { display: flex; align-items: center; padding: 8px; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; cursor: pointer; color: #6b7280; transition: all .15s; }
-.um-refresh:hover { background: #f3f4f6; }
-.um-create-btn { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border: none; border-radius: 10px; background: #6366f1; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; transition: background .15s; }
-.um-create-btn:hover { background: #4f46e5; }
-.um-create-btn .material-symbols-outlined { font-size: 17px; }
-.um-error { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; border-radius: 10px; padding: 12px 16px; font-size: 14px; margin-bottom: 16px; }
-
-.um-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
-
-.um-card {
-  background: #fff;
-  border: 1.5px solid #e5e7eb;
-  border-radius: 16px;
-  padding: 20px 18px 16px;
-  cursor: pointer;
-  transition: all .18s;
-  position: relative;
-  overflow: hidden;
+/* Header */
+.uy-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.uy-title { font-size: 22px; font-weight: 700; color: #111; margin: 0; }
+.uy-sub { font-size: 13px; color: #9ca3af; margin: 2px 0 0; }
+.uy-header-actions { display: flex; align-items: center; gap: 8px; }
+.uy-create-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border: none; border-radius: 10px;
+  background: #6366f1; color: #fff; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: background .15s;
 }
-.um-card:hover { border-color: #6366f1; box-shadow: 0 4px 16px rgba(99,102,241,.12); transform: translateY(-2px); }
-.um-card-active { border-color: #6366f1 !important; box-shadow: 0 4px 20px rgba(99,102,241,.18) !important; }
-
-.um-card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
-.um-avatar { width: 46px; height: 46px; border-radius: 50%; color: #fff; font-weight: 700; font-size: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-
-.um-rank-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; letter-spacing: .3px; }
-.um-rank-lg { font-size: 13px; padding: 4px 14px; }
-
-.um-card-name { font-weight: 600; font-size: 15px; color: #111; line-height: 1.3; }
-.um-card-user { font-size: 12px; color: #9ca3af; margin: 2px 0 8px; }
-.um-card-mail { font-size: 12px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.um-card-arrow { position: absolute; bottom: 14px; right: 14px; color: #d1d5db; transition: color .15s; }
-.um-card:hover .um-card-arrow { color: #6366f1; }
-
-.um-skeleton { min-height: 140px; background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
-@keyframes shimmer { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
-
-.um-empty-card { grid-column: 1/-1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 60px; color: #9ca3af; }
-.um-empty-card .material-symbols-outlined { font-size: 48px; }
-
-.um-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.3); z-index: 40; backdrop-filter: blur(1px); }
-
-.um-panel {
-  position: fixed;
-  top: 0; right: 0;
-  width: 380px; max-width: 95vw;
-  height: 100vh;
-  background: #fff;
-  box-shadow: -8px 0 40px rgba(0,0,0,.12);
-  z-index: 50;
-  display: flex;
-  flex-direction: column;
-  transform: translateX(100%);
-  transition: transform .28s cubic-bezier(.4,0,.2,1);
-  overflow-y: auto;
+.uy-create-btn:hover { background: #4f46e5; }
+.uy-create-btn .material-symbols-outlined { font-size: 17px; }
+.uy-icon-btn {
+  display: flex; align-items: center; padding: 8px;
+  border: 1px solid #e5e7eb; border-radius: 10px;
+  background: #fff; cursor: pointer; color: #6b7280; transition: all .15s;
 }
-.um-panel-open { transform: translateX(0); }
+.uy-icon-btn:hover { background: #f3f4f6; }
+.uy-error {
+  background: #fef2f2; border: 1px solid #fecaca; color: #dc2626;
+  border-radius: 10px; padding: 12px 16px; font-size: 14px; margin-bottom: 16px;
+}
 
-.um-panel-header { display: flex; align-items: center; gap: 12px; padding: 20px 20px 0; flex-shrink: 0; }
-.um-panel-avatar { width: 50px; height: 50px; border-radius: 50%; color: #fff; font-weight: 700; font-size: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.um-panel-identity { flex: 1; min-width: 0; }
-.um-panel-name { font-weight: 700; font-size: 16px; color: #111; }
-.um-panel-uname { font-size: 13px; color: #9ca3af; }
-.um-panel-close { margin-left: auto; background: none; border: none; cursor: pointer; color: #9ca3af; display: flex; padding: 4px; border-radius: 6px; }
-.um-panel-close:hover { background: #f3f4f6; color: #374151; }
+/* Layout */
+.uy-layout { display: grid; grid-template-columns: 320px 1fr; gap: 20px; min-height: 560px; }
 
-.um-panel-rank-row { display: flex; align-items: center; gap: 10px; padding: 14px 20px; border-bottom: 1px solid #f3f4f6; }
-.um-panel-mail { font-size: 12px; color: #6b7280; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Left Panel */
+.uy-left {
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 16px;
+  overflow: hidden; display: flex; flex-direction: column;
+}
+.uy-search-box { position: relative; padding: 12px; border-bottom: 1px solid #f3f4f6; }
+.uy-search-icon {
+  position: absolute; left: 22px; top: 50%; transform: translateY(-50%);
+  font-size: 17px; color: #9ca3af; pointer-events: none;
+}
+.uy-search {
+  width: 100%; box-sizing: border-box;
+  padding: 8px 10px 8px 34px; border: 1px solid #e5e7eb; border-radius: 8px;
+  font-size: 13px; outline: none; transition: border-color .15s;
+}
+.uy-search:focus { border-color: #6366f1; }
 
-.um-tabs { display: flex; gap: 4px; padding: 12px 20px 0; border-bottom: 1px solid #f3f4f6; }
-.um-tab { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border: none; background: none; cursor: pointer; font-size: 13px; color: #6b7280; border-radius: 8px 8px 0 0; border-bottom: 2px solid transparent; transition: all .15s; }
-.um-tab .material-symbols-outlined { font-size: 16px; }
-.um-tab.active { color: #6366f1; border-bottom-color: #6366f1; background: #eef2ff; }
-.um-tab:hover:not(.active) { background: #f9fafb; color: #374151; }
+.uy-loader { display: flex; justify-content: center; align-items: center; padding: 40px; color: #9ca3af; }
 
-.um-panel-body { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
-.um-field { display: flex; flex-direction: column; gap: 5px; }
-.um-field label { font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: .5px; }
-.um-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.um-input { padding: 10px 12px; border: 1.5px solid #e5e7eb; border-radius: 10px; font-size: 14px; outline: none; transition: border-color .15s; background: #fff; }
-.um-input:focus { border-color: #6366f1; }
-.um-input:disabled { background: #f9fafb; color: #9ca3af; cursor: not-allowed; }
+.uy-user-list { overflow-y: auto; flex: 1; }
+.uy-user-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px; cursor: pointer;
+  border-bottom: 1px solid #f9fafb; transition: background .12s;
+}
+.uy-user-row:hover { background: #f9fafb; }
+.uy-user-row.active { background: #eef2ff; }
+.uy-avatar {
+  width: 38px; height: 38px; border-radius: 50%; color: #fff;
+  font-weight: 700; font-size: 15px; display: flex; align-items: center;
+  justify-content: center; flex-shrink: 0;
+}
+.uy-user-info { flex: 1; min-width: 0; }
+.uy-user-name { font-size: 14px; font-weight: 600; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.uy-user-meta { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #9ca3af; }
+.uy-rank-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.uy-chevron { font-size: 18px; color: #d1d5db; }
+.uy-user-row.active .uy-chevron { color: #6366f1; }
+.uy-empty-list {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 40px 20px; color: #9ca3af; font-size: 13px;
+}
+.uy-empty-list .material-symbols-outlined { font-size: 40px; }
 
-.um-rank-select-wrap { display: flex; flex-wrap: wrap; gap: 6px; }
-.um-rank-select-wrap.disabled { opacity: .6; pointer-events: none; }
-.um-rank-option { padding: 5px 12px; border-radius: 20px; border: 1.5px solid #e5e7eb; background: #f9fafb; color: #6b7280; font-size: 12px; font-weight: 500; cursor: pointer; transition: all .15s; }
-.um-rank-option:hover { border-color: #9ca3af; }
-.um-rank-option.selected { font-weight: 700; }
+/* Right Panel */
+.uy-right {
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 16px;
+  overflow: hidden; display: flex; flex-direction: column;
+}
+.uy-placeholder {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  height: 100%; gap: 10px; color: #9ca3af; padding: 60px;
+}
+.uy-placeholder .material-symbols-outlined { font-size: 56px; }
+.uy-placeholder p { font-size: 14px; margin: 0; }
+.uy-placeholder-hint { font-size: 12px !important; color: #d1d5db; }
 
-.um-ok  { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 14px; font-size: 13px; }
-.um-err { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 8px; padding: 10px 14px; font-size: 13px; }
+/* Detail Header */
+.uy-detail-header {
+  display: flex; align-items: center; gap: 14px;
+  padding: 20px; border-bottom: 1px solid #f3f4f6;
+}
+.uy-detail-avatar {
+  width: 48px; height: 48px; border-radius: 50%; color: #fff;
+  font-weight: 700; font-size: 19px; display: flex; align-items: center;
+  justify-content: center; flex-shrink: 0;
+}
+.uy-detail-identity { flex: 1; min-width: 0; }
+.uy-detail-name { font-weight: 700; font-size: 16px; color: #111; }
+.uy-detail-sub { font-size: 12px; color: #9ca3af; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.uy-rank-badge {
+  display: inline-block; padding: 4px 12px; border-radius: 20px;
+  font-size: 12px; font-weight: 600; letter-spacing: .3px; flex-shrink: 0;
+}
 
-.um-save-btn { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px; border-radius: 10px; border: none; background: #6366f1; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s; }
-.um-save-btn:hover { background: #4f46e5; }
-.um-save-btn:disabled { opacity: .6; cursor: not-allowed; }
-.um-save-btn-warn { background: #f59e0b; }
-.um-save-btn-warn:hover { background: #d97706; }
+/* Tabs */
+.uy-tabs {
+  display: flex; gap: 2px; padding: 0 20px;
+  border-bottom: 1px solid #f3f4f6; background: #fafbfc;
+}
+.uy-tab {
+  display: flex; align-items: center; gap: 6px;
+  padding: 10px 16px; border: none; background: none; cursor: pointer;
+  font-size: 13px; font-weight: 500; color: #6b7280;
+  border-bottom: 2px solid transparent; transition: all .15s;
+}
+.uy-tab .material-symbols-outlined { font-size: 16px; }
+.uy-tab.active { color: #6366f1; border-bottom-color: #6366f1; background: #fff; }
+.uy-tab:hover:not(.active) { color: #374151; background: #f3f4f6; }
+.uy-tab-count {
+  font-size: 11px; font-weight: 700; background: #eef2ff; color: #6366f1;
+  padding: 1px 7px; border-radius: 10px; margin-left: 2px;
+}
 
-.um-pw-info { display: flex; align-items: center; gap: 10px; background: #eff6ff; border-radius: 8px; padding: 12px 14px; color: #3b82f6; font-size: 13px; }
-.um-pw-info .material-symbols-outlined { font-size: 18px; flex-shrink: 0; }
+/* Detail Body */
+.uy-detail-body { padding: 20px; display: flex; flex-direction: column; gap: 16px; flex: 1; overflow-y: auto; }
+.uy-field { display: flex; flex-direction: column; gap: 5px; }
+.uy-field label { font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: .5px; }
+.uy-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.uy-input {
+  padding: 10px 12px; border: 1.5px solid #e5e7eb; border-radius: 10px;
+  font-size: 14px; outline: none; transition: border-color .15s; background: #fff;
+}
+.uy-input:focus { border-color: #6366f1; }
+.uy-input:disabled { background: #f9fafb; color: #9ca3af; cursor: not-allowed; }
 
+/* Rank Selector */
+.uy-rank-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.uy-rank-grid.disabled { opacity: .6; pointer-events: none; }
+.uy-rank-chip {
+  padding: 5px 12px; border-radius: 20px; border: 1.5px solid #e5e7eb;
+  background: #f9fafb; color: #6b7280; font-size: 12px; font-weight: 500;
+  cursor: pointer; transition: all .15s;
+}
+.uy-rank-chip:hover { border-color: #9ca3af; }
+.uy-rank-chip.selected { font-weight: 700; }
+
+/* Messages */
+.uy-msg { border-radius: 8px; padding: 10px 14px; font-size: 13px; }
+.uy-msg-ok { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+.uy-msg-err { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+
+/* Buttons */
+.uy-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 12px; border-radius: 10px; border: none;
+  font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s;
+}
+.uy-btn:disabled { opacity: .6; cursor: not-allowed; }
+.uy-btn-primary { background: #6366f1; color: #fff; }
+.uy-btn-primary:hover { background: #4f46e5; }
+.uy-btn-warn { background: #f59e0b; color: #fff; }
+.uy-btn-warn:hover { background: #d97706; }
+
+.uy-info-banner {
+  display: flex; align-items: center; gap: 10px;
+  background: #eff6ff; border-radius: 8px; padding: 12px 14px;
+  color: #3b82f6; font-size: 13px;
+}
+.uy-info-banner .material-symbols-outlined { font-size: 18px; flex-shrink: 0; }
+
+/* Offices Tab */
+.uy-offices-body { padding: 12px; }
+.uy-empty-offices { text-align: center; padding: 40px; color: #9ca3af; font-size: 13px; }
+.uy-office-list { display: flex; flex-direction: column; gap: 6px; }
+.uy-office-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px; border: 1.5px solid #e5e7eb; border-radius: 12px;
+  transition: all .15s;
+}
+.uy-office-row.assigned { border-color: #a5b4fc; background: #eef2ff; }
+.uy-office-info { display: flex; align-items: center; gap: 12px; }
+.uy-office-icon { font-size: 20px; color: #9ca3af; }
+.uy-office-row.assigned .uy-office-icon { color: #6366f1; }
+.uy-office-name { font-size: 14px; font-weight: 600; color: #111; }
+.uy-office-code { font-size: 12px; color: #9ca3af; }
+
+/* Toggle */
+.uy-toggle {
+  position: relative; width: 44px; height: 24px; border-radius: 12px;
+  border: none; background: #d1d5db; cursor: pointer;
+  transition: background .2s; flex-shrink: 0; padding: 0;
+}
+.uy-toggle.on { background: #6366f1; }
+.uy-toggle:disabled { opacity: .5; cursor: not-allowed; }
+.uy-toggle-ball {
+  position: absolute; top: 3px; left: 3px;
+  width: 18px; height: 18px; border-radius: 50%; background: #fff;
+  transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2);
+}
+.uy-toggle.on .uy-toggle-ball { transform: translateX(20px); }
+
+/* Spinner */
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin { animation: spin .7s linear infinite; display: inline-block; }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .uy-page { padding: 12px; }
+  .uy-layout { grid-template-columns: 1fr; }
+  .uy-left { max-height: 300px; }
+}
 </style>

@@ -10,7 +10,6 @@ const router        = useRouter()
 const authStore     = useAuthStore()
 const exchangeStore = useExchangeStore()
 
-// ── State ──────────────────────────────────────────
 type Tab = 'pending' | 'all'
 const activeTab  = ref<Tab>('pending')
 
@@ -19,13 +18,11 @@ const allTx      = ref<OfficeTransfer[]>([])
 const loading    = ref(true)
 const error      = ref('')
 
-// Reject modal
 const rejectModal    = ref(false)
 const rejectTarget   = ref<string | null>(null)
 const rejectReason   = ref('')
 const rejectSaving   = ref(false)
 
-// Create request modal
 const createModal  = ref(false)
 const createSaving = ref(false)
 const createError  = ref('')
@@ -40,7 +37,6 @@ const createForm = ref({
   notes:         '',
 })
 
-// ── Load ───────────────────────────────────────────
 onMounted(async () => {
   if (!authStore.isAdmin) { router.push('/ihtiyar/dashboard'); return }
   await Promise.all([loadPending(), loadVaultsCurrencies()])
@@ -64,14 +60,12 @@ async function loadAll() {
   loading.value = true
   error.value   = ''
   try {
-    // load transfers for all accessible offices (fetch my-access offices first)
     const myAccess = await apiService.getMyOfficeAccess() ?? []
     const results: OfficeTransfer[] = []
     for (const uo of myAccess) {
       const txs = await apiService.getTransfersByOffice(uo.officeId) ?? []
       results.push(...txs)
     }
-    // deduplicate by id
     const seen = new Set<string>()
     allTx.value = results.filter(t => { if (seen.has(t.id)) return false; seen.add(t.id); return true })
       .sort((a, b) => new Date(b.createdDate).getTime() - new Date(a.createdDate).getTime())
@@ -100,7 +94,6 @@ async function switchTab(tab: Tab) {
   else await loadAll()
 }
 
-// ── Approve ────────────────────────────────────────
 async function approve(id: string) {
   try {
     await apiService.processTransfer(id, { approve: true })
@@ -110,7 +103,6 @@ async function approve(id: string) {
   }
 }
 
-// ── Reject ─────────────────────────────────────────
 function openReject(id: string) {
   rejectTarget.value = id
   rejectReason.value = ''
@@ -131,7 +123,6 @@ async function confirmReject() {
   }
 }
 
-// ── Create request ─────────────────────────────────
 function openCreate() {
   createError.value = ''
   createForm.value  = { sourceVaultId: '', targetVaultId: '', currencyId: '', amount: null, notes: '' }
@@ -160,15 +151,14 @@ async function submitCreate() {
   }
 }
 
-// ── Helpers ────────────────────────────────────────
-function statusBadge(status: string) {
+function statusClass(status: string) {
   return {
-    Pending:   'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
-    Completed: 'bg-green-500/20  text-green-300  border-green-500/30',
-    Rejected:  'bg-red-500/20    text-red-300    border-red-500/30',
-    Approved:  'bg-blue-500/20   text-blue-300   border-blue-500/30',
-    Cancelled: 'bg-gray-500/20   text-gray-400   border-gray-500/30',
-  }[status] ?? 'bg-gray-700 text-gray-300 border-gray-600'
+    Pending:   'status-pending',
+    Completed: 'status-completed',
+    Rejected:  'status-rejected',
+    Approved:  'status-approved',
+    Cancelled: 'status-cancelled',
+  }[status] ?? 'status-default'
 }
 
 function statusLabel(s: string) {
@@ -180,96 +170,78 @@ function fmtDate(d: string) { return new Date(d).toLocaleString('tr-TR', { day:'
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-950 text-white p-6">
-
+  <div class="office-transfers">
     <!-- Header -->
-    <div class="flex items-center justify-between mb-6">
+    <div class="ot-header">
       <div>
-        <h1 class="text-2xl font-bold text-white">Ofislerarası Transferler</h1>
-        <p class="text-gray-400 text-sm mt-1">Merkez ↔ Şube/Bayi para transferleri</p>
+        <h1 class="ot-title">Ofislerarası Transferler</h1>
+        <p class="ot-subtitle">Merkez ↔ Şube/Bayi para transferleri</p>
       </div>
-      <button
-        @click="openCreate"
-        class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition-colors"
-      >
-        <span class="material-icons text-base">send</span>
+      <button class="btn-primary" @click="openCreate">
+        <span class="material-symbols-outlined">send</span>
         Transfer Talebi
       </button>
     </div>
 
     <!-- Tabs -->
-    <div class="flex gap-1 p-1 bg-gray-900 rounded-xl border border-gray-800 mb-6 w-fit">
+    <div class="tab-group">
       <button
         v-for="t in [{ id: 'pending', label: 'Bekleyen', icon: 'hourglass_empty' }, { id: 'all', label: 'Tümü', icon: 'history' }]"
         :key="t.id"
         @click="switchTab(t.id as Tab)"
-        :class="['flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors',
-          activeTab === t.id ? 'bg-gray-700 text-white font-medium' : 'text-gray-400 hover:text-white']"
+        :class="['tab-btn', { active: activeTab === t.id }]"
       >
-        <span class="material-icons text-base">{{ t.icon }}</span>
+        <span class="material-symbols-outlined tab-icon">{{ t.icon }}</span>
         {{ t.label }}
-        <span
-          v-if="t.id === 'pending' && pending.length > 0"
-          class="bg-yellow-500 text-black text-xs font-bold px-1.5 py-0.5 rounded-full leading-none"
-        >{{ pending.length }}</span>
+        <span v-if="t.id === 'pending' && pending.length > 0" class="badge-count">{{ pending.length }}</span>
       </button>
     </div>
 
-    <!-- Loading / Error -->
-    <div v-if="loading" class="flex items-center justify-center py-20">
-      <div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+    <!-- Loading -->
+    <div v-if="loading" class="state-center">
+      <div class="spinner"></div>
     </div>
-    <div v-else-if="error" class="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-300 text-sm mb-4">
-      {{ error }}
-    </div>
+
+    <!-- Error -->
+    <div v-else-if="error" class="error-box">{{ error }}</div>
 
     <!-- Pending list -->
     <div v-else-if="activeTab === 'pending'">
-      <div v-if="!authStore.isAdmin" class="text-center py-16 text-gray-500">
-        <span class="material-icons text-4xl block mb-2">lock</span>
-        Bekleyen transferleri görmek için Admin yetkisi gereklidir.
+      <div v-if="!authStore.isAdmin" class="state-center">
+        <span class="material-symbols-outlined state-icon">lock</span>
+        <p>Bekleyen transferleri görmek için Admin yetkisi gereklidir.</p>
       </div>
-      <div v-else-if="pending.length === 0" class="text-center py-16 text-gray-500">
-        <span class="material-icons text-5xl block mb-3">check_circle_outline</span>
-        Bekleyen transfer yok.
+      <div v-else-if="pending.length === 0" class="state-center">
+        <span class="material-symbols-outlined state-icon">check_circle</span>
+        <p>Bekleyen transfer yok.</p>
       </div>
-      <div v-else class="space-y-3">
-        <div
-          v-for="t in pending"
-          :key="t.id"
-          class="bg-gray-900 border border-gray-800 rounded-xl p-4"
-        >
-          <div class="flex items-start justify-between gap-4">
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2 mb-2 flex-wrap">
-                <span class="font-semibold text-white">{{ t.sourceOfficeName }}</span>
-                <span class="material-icons text-gray-500 text-base">arrow_forward</span>
-                <span class="font-semibold text-white">{{ t.targetOfficeName }}</span>
-                <span :class="['text-xs px-2 py-0.5 rounded border', statusBadge(t.status)]">{{ statusLabel(t.status) }}</span>
+      <div v-else class="transfer-list">
+        <div v-for="t in pending" :key="t.id" class="transfer-card">
+          <div class="transfer-body">
+            <div class="transfer-info">
+              <div class="transfer-route">
+                <span class="office-name">{{ t.sourceOfficeName }}</span>
+                <span class="material-symbols-outlined route-arrow">arrow_forward</span>
+                <span class="office-name">{{ t.targetOfficeName }}</span>
+                <span :class="['status-badge', statusClass(t.status)]">{{ statusLabel(t.status) }}</span>
               </div>
-              <div class="flex items-center gap-4 text-sm text-gray-300 flex-wrap">
-                <span class="font-mono font-bold text-yellow-400">{{ fmt(t.amount) }} {{ t.currencyCode }}</span>
-                <span class="text-gray-500 text-xs">{{ t.sourceVaultName }} → {{ t.targetVaultName }}</span>
+              <div class="transfer-details">
+                <span class="amount-highlight">{{ fmt(t.amount) }} {{ t.currencyCode }}</span>
+                <span class="vault-info">{{ t.sourceVaultName }} → {{ t.targetVaultName }}</span>
               </div>
-              <div class="flex items-center gap-4 mt-2 text-xs text-gray-500 flex-wrap">
-                <span>Talep: <strong class="text-gray-400">{{ t.requestedByName }}</strong></span>
+              <div class="transfer-meta">
+                <span>Talep: <strong>{{ t.requestedByName }}</strong></span>
                 <span>{{ fmtDate(t.createdDate) }}</span>
-                <span v-if="t.notes" class="italic text-gray-600">"{{ t.notes }}"</span>
+                <span v-if="t.notes" class="transfer-note">"{{ t.notes }}"</span>
               </div>
             </div>
-            <div class="flex items-center gap-2 shrink-0">
-              <button
-                @click="approve(t.id)"
-                class="flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-500 rounded-lg text-xs font-medium transition-colors"
-              >
-                <span class="material-icons text-sm">check</span>
+            <div class="transfer-actions">
+              <button class="btn-approve" @click="approve(t.id)">
+                <span class="material-symbols-outlined">check</span>
                 Onayla
               </button>
-              <button
-                @click="openReject(t.id)"
-                class="flex items-center gap-1 px-3 py-1.5 bg-red-600/80 hover:bg-red-500 rounded-lg text-xs font-medium transition-colors"
-              >
-                <span class="material-icons text-sm">close</span>
+              <button class="btn-reject" @click="openReject(t.id)">
+                <span class="material-symbols-outlined">close</span>
                 Reddet
               </button>
             </div>
@@ -280,48 +252,40 @@ function fmtDate(d: string) { return new Date(d).toLocaleString('tr-TR', { day:'
 
     <!-- All transfers list -->
     <div v-else>
-      <div v-if="allTx.length === 0" class="text-center py-16 text-gray-500">
-        <span class="material-icons text-5xl block mb-3">history</span>
-        Transfer geçmişi bulunamadı.
+      <div v-if="allTx.length === 0" class="state-center">
+        <span class="material-symbols-outlined state-icon">history</span>
+        <p>Transfer geçmişi bulunamadı.</p>
       </div>
-      <div v-else class="space-y-2">
-        <div
-          v-for="t in allTx"
-          :key="t.id"
-          class="bg-gray-900 border border-gray-800 rounded-xl p-3 flex items-center gap-3 flex-wrap"
-        >
-          <span :class="['text-xs px-2 py-0.5 rounded border shrink-0', statusBadge(t.status)]">{{ statusLabel(t.status) }}</span>
-          <span class="text-sm text-gray-300 min-w-0">
+      <div v-else class="transfer-list">
+        <div v-for="t in allTx" :key="t.id" class="transfer-row">
+          <span :class="['status-badge', statusClass(t.status)]">{{ statusLabel(t.status) }}</span>
+          <span class="transfer-route-inline">
             <strong>{{ t.sourceOfficeName }}</strong>
-            <span class="text-gray-500 mx-1">→</span>
+            <span class="route-sep">→</span>
             <strong>{{ t.targetOfficeName }}</strong>
           </span>
-          <span class="font-mono font-bold text-yellow-400 ml-auto shrink-0">{{ fmt(t.amount) }} {{ t.currencyCode }}</span>
-          <span class="text-xs text-gray-500 shrink-0">{{ fmtDate(t.createdDate) }}</span>
-          <span v-if="t.rejectionReason" class="text-xs text-red-400 truncate max-w-xs">Red: {{ t.rejectionReason }}</span>
+          <span class="amount-highlight">{{ fmt(t.amount) }} {{ t.currencyCode }}</span>
+          <span class="date-text">{{ fmtDate(t.createdDate) }}</span>
+          <span v-if="t.rejectionReason" class="rejection-text">Red: {{ t.rejectionReason }}</span>
         </div>
       </div>
     </div>
 
-    <!-- ── Reject Modal ──────────────────────────────── -->
+    <!-- Reject Modal -->
     <Teleport to="body">
-      <div v-if="rejectModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
-        <div class="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md shadow-2xl p-6">
-          <h3 class="text-lg font-semibold mb-4 text-red-400">Transferi Reddet</h3>
-          <label class="block text-xs text-gray-400 mb-1">Red Gerekçesi (opsiyonel)</label>
+      <div v-if="rejectModal" class="modal-overlay">
+        <div class="modal-card">
+          <h3 class="modal-title modal-title-danger">Transferi Reddet</h3>
+          <label class="form-label">Red Gerekçesi (opsiyonel)</label>
           <input
             v-model="rejectReason"
             type="text"
             placeholder="Bakiye yetersiz, yanlış hesap vb."
-            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-red-500 mb-5"
+            class="form-input"
           />
-          <div class="flex justify-end gap-3">
-            <button @click="rejectModal = false" class="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors">İptal</button>
-            <button
-              @click="confirmReject"
-              :disabled="rejectSaving"
-              class="px-5 py-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors"
-            >
+          <div class="modal-actions">
+            <button class="btn-cancel" @click="rejectModal = false">İptal</button>
+            <button class="btn-danger" @click="confirmReject" :disabled="rejectSaving">
               {{ rejectSaving ? 'Reddetiliyor…' : 'Reddet' }}
             </button>
           </div>
@@ -329,84 +293,66 @@ function fmtDate(d: string) { return new Date(d).toLocaleString('tr-TR', { day:'
       </div>
     </Teleport>
 
-    <!-- ── Create Transfer Modal ──────────────────────── -->
+    <!-- Create Transfer Modal -->
     <Teleport to="body">
-      <div v-if="createModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-        <div class="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md shadow-2xl">
-          <div class="flex items-center justify-between p-5 border-b border-gray-800">
-            <h2 class="text-lg font-semibold">Transfer Talebi Oluştur</h2>
-            <button @click="createModal = false"><span class="material-icons text-gray-400">close</span></button>
+      <div v-if="createModal" class="modal-overlay">
+        <div class="modal-card modal-wide">
+          <div class="modal-header">
+            <h2 class="modal-title">Transfer Talebi Oluştur</h2>
+            <button class="btn-icon" @click="createModal = false">
+              <span class="material-symbols-outlined">close</span>
+            </button>
           </div>
-          <div class="p-5 space-y-4">
-            <!-- Kaynak kasa -->
-            <div>
-              <label class="block text-xs text-gray-400 mb-1">Kaynak Kasa *</label>
-              <select
-                v-model="createForm.sourceVaultId"
-                class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
-              >
+          <div class="modal-body">
+            <div class="form-group">
+              <label class="form-label">Kaynak Kasa *</label>
+              <select v-model="createForm.sourceVaultId" class="form-input">
                 <option value="">Seçin…</option>
                 <option v-for="v in vaults" :key="v.id" :value="v.id">{{ v.name }}</option>
               </select>
             </div>
-            <!-- Hedef kasa -->
-            <div>
-              <label class="block text-xs text-gray-400 mb-1">Hedef Kasa *</label>
-              <select
-                v-model="createForm.targetVaultId"
-                class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
-              >
+            <div class="form-group">
+              <label class="form-label">Hedef Kasa *</label>
+              <select v-model="createForm.targetVaultId" class="form-input">
                 <option value="">Seçin…</option>
                 <option v-for="v in vaults" :key="v.id" :value="v.id">{{ v.name }}</option>
               </select>
             </div>
-            <!-- Para birimi + miktar -->
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-xs text-gray-400 mb-1">Para Birimi *</label>
-                <select
-                  v-model="createForm.currencyId"
-                  class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
-                >
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Para Birimi *</label>
+                <select v-model="createForm.currencyId" class="form-input">
                   <option value="">Seçin…</option>
                   <option v-for="c in currencies" :key="c.id" :value="c.id">{{ c.currencyCode }}</option>
                 </select>
               </div>
-              <div>
-                <label class="block text-xs text-gray-400 mb-1">Miktar *</label>
+              <div class="form-group">
+                <label class="form-label">Miktar *</label>
                 <input
                   v-model.number="createForm.amount"
                   type="number"
                   min="0.01"
                   step="0.01"
                   placeholder="0.00"
-                  class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500"
+                  class="form-input"
                 />
               </div>
             </div>
-            <!-- Not -->
-            <div>
-              <label class="block text-xs text-gray-400 mb-1">Not</label>
+            <div class="form-group">
+              <label class="form-label">Not</label>
               <input
                 v-model="createForm.notes"
                 type="text"
                 placeholder="İsteğe bağlı açıklama"
-                class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500"
+                class="form-input"
               />
             </div>
-            <!-- Error -->
-            <div v-if="createError" class="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-sm text-red-300">
-              {{ createError }}
-            </div>
+            <div v-if="createError" class="error-box">{{ createError }}</div>
           </div>
-          <div class="flex justify-end gap-3 p-5 border-t border-gray-800">
-            <button @click="createModal = false" class="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors">İptal</button>
-            <button
-              @click="submitCreate"
-              :disabled="createSaving"
-              class="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors"
-            >
-              <span v-if="createSaving" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+          <div class="modal-footer">
+            <button class="btn-cancel" @click="createModal = false">İptal</button>
+            <button class="btn-primary" @click="submitCreate" :disabled="createSaving">
+              <div v-if="createSaving" class="spinner-sm"></div>
               {{ createSaving ? 'Gönderiliyor…' : 'Gönder' }}
             </button>
           </div>
@@ -415,3 +361,505 @@ function fmtDate(d: string) { return new Date(d).toLocaleString('tr-TR', { day:'
     </Teleport>
   </div>
 </template>
+
+<style scoped>
+.office-transfers {
+  padding: 24px;
+}
+
+.ot-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.ot-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.ot-subtitle {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 4px 0 0;
+}
+
+/* Buttons */
+.btn-primary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: #5a8cff;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-primary:hover { background: #4a7ce5; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-primary .material-symbols-outlined,
+.btn-approve .material-symbols-outlined,
+.btn-reject .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.btn-approve {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  background: #22c55e;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-approve:hover { background: #16a34a; }
+
+.btn-reject {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-reject:hover { background: #dc2626; }
+
+.btn-cancel {
+  padding: 8px 16px;
+  background: none;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  color: #6b7280;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-cancel:hover { color: #1a1a1a; border-color: #d1d5db; }
+
+.btn-danger {
+  padding: 8px 20px;
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-danger:hover { background: #dc2626; }
+.btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-icon {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: color 0.2s;
+}
+
+.btn-icon:hover { color: #1a1a1a; }
+
+/* Tabs */
+.tab-group {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: #f3f4f6;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  width: fit-content;
+}
+
+.tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #6b7280;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab-btn.active {
+  background: white;
+  color: #1a1a1a;
+  font-weight: 500;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.tab-icon {
+  font-size: 18px;
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+.badge-count {
+  background: #f59e0b;
+  color: #1a1a1a;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 10px;
+  line-height: 1.4;
+}
+
+/* States */
+.state-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: #9ca3af;
+  text-align: center;
+}
+
+.state-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+.error-box {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  padding: 12px 16px;
+  color: #b91c1c;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #5a8cff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.spinner-sm {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Transfer Cards */
+.transfer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.transfer-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 16px 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.transfer-body {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.transfer-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.transfer-route {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.office-name {
+  font-weight: 600;
+  color: #1a1a1a;
+  font-size: 15px;
+}
+
+.route-arrow {
+  font-size: 16px;
+  color: #9ca3af;
+}
+
+.transfer-details {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.amount-highlight {
+  font-family: monospace;
+  font-weight: 700;
+  color: #d97706;
+  font-size: 15px;
+}
+
+.vault-info {
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+.transfer-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.transfer-meta strong {
+  color: #6b7280;
+}
+
+.transfer-note {
+  font-style: italic;
+  color: #9ca3af;
+}
+
+.transfer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Transfer row (all tab) */
+.transfer-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px 16px;
+}
+
+.transfer-route-inline {
+  font-size: 14px;
+  color: #374151;
+}
+
+.route-sep {
+  color: #9ca3af;
+  margin: 0 4px;
+}
+
+.date-text {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-left: auto;
+}
+
+.rejection-text {
+  font-size: 12px;
+  color: #ef4444;
+}
+
+/* Status badges */
+.status-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+.status-pending {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fcd34d;
+}
+
+.status-completed {
+  background: #d1fae5;
+  color: #065f46;
+  border-color: #6ee7b7;
+}
+
+.status-rejected {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fca5a5;
+}
+
+.status-approved {
+  background: #dbeafe;
+  color: #1e40af;
+  border-color: #93c5fd;
+}
+
+.status-cancelled {
+  background: #f3f4f6;
+  color: #6b7280;
+  border-color: #d1d5db;
+}
+
+.status-default {
+  background: #f3f4f6;
+  color: #6b7280;
+  border-color: #d1d5db;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0,0,0,0.5);
+}
+
+.modal-card {
+  background: white;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  padding: 24px;
+}
+
+.modal-wide {
+  max-width: 480px;
+  padding: 0;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0 0 16px;
+}
+
+.modal-title-danger {
+  color: #ef4444;
+}
+
+.modal-body {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+/* Form */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-label {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.form-input {
+  width: 100%;
+  padding: 10px 12px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #1a1a1a;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.form-input:focus {
+  border-color: #5a8cff;
+}
+
+.form-input::placeholder {
+  color: #9ca3af;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+</style>

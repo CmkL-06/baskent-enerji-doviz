@@ -17,6 +17,17 @@ const CRYPTO_CODES = new Set(['BTC','ETH','USDT','USDC','BNB','XRP','SOL','ADA',
 
 const METAL_CODES = new Set(['XAU','XAG','XPT','XPD','GOLD','SILVER','PLATINUM'])
 
+const SPECIAL_FLAG_MAP: Record<string, string> = {
+  KRUB: 'ru', MGBP: 'gb', MEUR: 'eu', KGS: 'kg',
+}
+
+export function getCurrencyFlagImg(code?: string | null): string {
+  if (!code) return ''
+  const upper = code.toUpperCase()
+  const cc = SPECIAL_FLAG_MAP[upper] || CURRENCY_COUNTRY[upper]
+  return cc ? `/flags/${cc}.png` : ''
+}
+
 export function getCurrencyCountryCode(code?: string | null): string {
   if (!code) return ''
   return CURRENCY_COUNTRY[code.toUpperCase()] || ''

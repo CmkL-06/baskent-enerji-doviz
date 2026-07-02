@@ -1,10 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import router from '@/router'
 import apiService from '@/services/apiservice'
 
 export const useAuthStore = defineStore('auth', () => {
-  const router = useRouter()
 
   const token      = ref<string | null>(localStorage.getItem('token'))
   const user       = ref<any | null>(JSON.parse(localStorage.getItem('user') || 'null'))
@@ -33,6 +32,7 @@ export const useAuthStore = defineStore('auth', () => {
       const res = await apiService.login(credentials)
       const jwt  = res.apiToken ?? res.token
       const info = res.userInfo ?? res.user
+      if (!jwt || !info) throw new Error('Geçersiz sunucu yanıtı')
       token.value = jwt
       user.value  = info
       localStorage.setItem('token', jwt)

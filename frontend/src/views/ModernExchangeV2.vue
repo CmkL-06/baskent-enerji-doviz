@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useExchangeStore } from '@/stores/exchange'
 import { useAuthStore } from '@/stores/auth'
@@ -8,17 +9,48 @@ import CurrencySelector from '@/components/common/CurrencySelector.vue'
 import TransactionHistory from '@/components/common/TransactionHistory.vue'
 import USDTPaymentsModal from './USDTPaymentsModal.vue'
 import VaultCountingModal from './VaultCountingModal.vue'
+import DayClosureModal from './DayClosureModal.vue'
 import { useNotification } from '@/composables/useNotification'
-import { getCurrencyCountryCode } from '@/utils/currency'
+import { getCurrencyCountryCode, getCurrencyName } from '@/utils/currency'
 
 const { t } = useI18n()
 
+const route = useRoute()
 const exchangeStore = useExchangeStore()
 const authStore = useAuthStore()
 const notification = useNotification()
 
+// Terminal mode
+const terminalMode = ref<'standard' | 'arbitrage' | 'batch'>('standard')
+
 // Transaction type toggle (buy/sell)
-const transactionType = ref<'buy' | 'sell'>('buy')
+const initialType = route.query.type === 'sell' ? 'sell' : 'buy'
+const transactionType = ref<'buy' | 'sell'>(initialType)
+
+watch(() => route.query.type, (val) => {
+  if (val === 'buy' || val === 'sell') transactionType.value = val
+})
+
+// Batch mode queue
+const batchQueue = ref<Array<{
+  id: string
+  type: 'buy' | 'sell' | 'arbitrage'
+  sourceCurrencyId: string
+  targetCurrencyId: string
+  sourceAmount: number
+  targetAmount: number
+  exchangeRate: number
+  customRate: string | number | null
+  note: string
+}>>([])
+
+const batchSourceCurrencyId = ref('')
+const batchTargetCurrencyId = ref('')
+const batchAmount = ref(0)
+const batchRate = ref(0)
+const batchCustomRate = ref<string | number | null>(null)
+const batchType = ref<'buy' | 'sell'>('buy')
+const batchNote = ref('')
 
 // Popular currencies for quick access
 const popularCurrencies = ['USD', 'EUR', 'RUB', 'KRUB', 'USDT']
@@ -60,6 +92,22 @@ const isPageHidden = ref(false)
 const showVaultCountWarning = ref(false)
 const currentVault = ref<any>(null)
 const showNotes = ref(false)
+const dayBlocked = ref(false)
+const dayStatus = ref<any>(null)
+const showDayClosureModal = ref(false)
+const wacData = ref<Record<string, number>>({})
+const ownerOverrideLoss = ref(false)
+
+// Receipt state
+const lastReceipt = ref<{
+  type: 'buy' | 'sell' | 'arbitrage'
+  items: Array<{ source: string, target: string, amount: number, rate: number, total: number, customRate: boolean }>
+  totals: Array<{ code: string, amount: number }>
+  timestamp: string
+  notes: string
+} | null>(null)
+const showReceiptPanel = ref(false)
+const arbMarginPercent = ref<number>(0)
 
 // Component refs
 const transactionHistoryRef = ref<any>(null)
@@ -187,6 +235,21 @@ const formatNumber = (value: number, decimals: number = 2): string => {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals
   }).format(value)
+}
+
+// Türkçe sayı girişini güvenli parse et.
+// "1.234,56" → 1234.56 (binlik ayraçlı), "38,75" → 38.75, "38.75" → 38.75 (sayı toString).
+// Yalnızca hem '.' hem ',' varsa '.' binlik sayılır — mevcut tek-ayraçlı davranış korunur.
+const parseNum = (value: any): number => {
+  if (value === null || value === undefined || value === '') return 0
+  let s = String(value).trim()
+  if (s.includes(',') && s.includes('.')) {
+    s = s.replace(/\./g, '').replace(',', '.')
+  } else {
+    s = s.replace(',', '.')
+  }
+  const n = parseFloat(s)
+  return isNaN(n) ? 0 : n
 }
 
 // Get currency info by code
@@ -325,12 +388,235 @@ const getExternalRatesForItem = (item: ExchangeItem) => {
   return crossRates
 }
 
+// Active quick currency (for highlight)
+const activeQuickCurrency = computed(() => {
+  if (exchangeItems.value.length === 0) return ''
+  const firstItem = exchangeItems.value[0]
+  const currId = firstItem.sourceCurrencyId
+  if (!currId) return ''
+  const c = getCurrencyById(currId)
+  return c?.currencyCode || ''
+})
+
+// Today's profit summary
+const todayProfit = ref<number | null>(null)
+const todayTxCount = ref(0)
+
+async function loadTodayStats() {
+  if (!selectedOfficeId.value) return
+  try {
+    const today = new Date().toISOString().split('T')[0]
+    const result = await apiService.getTransactionHistory({
+      officeId: selectedOfficeId.value,
+      startDate: today + 'T00:00:00',
+      endDate: today + 'T23:59:59',
+      page: 1,
+      pageSize: 200
+    })
+    if (result?.data) {
+      todayTxCount.value = result.pagination?.totalCount || result.data.length
+      todayProfit.value = result.data.reduce((sum: number, tx: any) => sum + (tx.profit || 0), 0)
+    }
+  } catch { /* ignore */ }
+}
+
+// Keyboard shortcut: Ctrl+Enter to submit
+function handleKeyDown(e: KeyboardEvent) {
+  if (e.ctrlKey && e.key === 'Enter') {
+    e.preventDefault()
+    if (terminalMode.value === 'batch') {
+      submitBatch()
+    } else {
+      submitExchange()
+    }
+  }
+  if (e.key === 'F2') { e.preventDefault(); transactionType.value = 'buy'; terminalMode.value = 'standard' }
+  if (e.key === 'F3') { e.preventDefault(); transactionType.value = 'sell'; terminalMode.value = 'standard' }
+  if (e.key === 'F4') { e.preventDefault(); terminalMode.value = 'arbitrage' }
+}
+
+// ═══ Position Bar ═══
+const positionData = computed(() => {
+  if (!selectedVaultBalances.value?.length) return []
+  const pinned = new Set(popularCurrencies)
+  return selectedVaultBalances.value
+    .filter((b: any) => {
+      const c = currencies.value.find(c => c.id === b.currencyId)
+      if (!c || c.currencyCode === 'TRY') return false
+      return pinned.has(c.currencyCode) || b.balance !== 0
+    })
+    .map((b: any) => {
+      const c = currencies.value.find(c => c.id === b.currencyId)
+      const code = c?.currencyCode || ''
+      const wac = wacData.value[b.currencyId] ?? 0
+      const costValue = b.balance * wac
+      const systemRate = getSystemRateForCode(code)
+      const marketValue = b.balance * systemRate
+      const unrealizedPnl = marketValue - costValue
+      return {
+        currencyId: b.currencyId,
+        code,
+        balance: b.balance,
+        wac,
+        systemRate,
+        costValue,
+        marketValue,
+        unrealizedPnl,
+        pnlPercent: costValue > 0 ? ((unrealizedPnl / costValue) * 100) : 0
+      }
+    })
+    .sort((a: any, b: any) => {
+      const aPinned = pinned.has(a.code) ? 0 : 1
+      const bPinned = pinned.has(b.code) ? 0 : 1
+      if (aPinned !== bPinned) return aPinned - bPinned
+      return Math.abs(b.marketValue) - Math.abs(a.marketValue)
+    })
+})
+
+function getSystemRateForCode(code: string): number {
+  const key = `${code}-TRY`
+  const rates = externalMarketRates.value[key]
+  if (rates?.length) {
+    const sysRate = rates.find((r: any) => r.source?.includes('SYSTEM') || r.source?.includes('Sistem'))
+    if (sysRate) return sysRate.buyRate || sysRate.sellRate || 0
+    return rates[0]?.buyRate || rates[0]?.sellRate || 0
+  }
+  const c = currencies.value.find(c => c.currencyCode === code)
+  if (c) {
+    const rate = exchangeStore.getExchangeRate(c.id, tryId.value, 'sell')
+    return rate || 0
+  }
+  return 0
+}
+
+const totalPositionValue = computed(() => positionData.value.reduce((s, p) => s + p.marketValue, 0))
+const totalUnrealizedPnl = computed(() => positionData.value.reduce((s, p) => s + p.unrealizedPnl, 0))
+
+// ═══ Rate Matrix ═══
+const matrixCurrencies = ['USD', 'EUR', 'RUB', 'GBP']
+
+const rateMatrix = computed(() => {
+  const matrix: Record<string, Record<string, number>> = {}
+  for (const from of matrixCurrencies) {
+    matrix[from] = {}
+    for (const to of matrixCurrencies) {
+      if (from === to) { matrix[from][to] = 1; continue }
+      const fromRate = getSystemRateForCode(from)
+      const toRate = getSystemRateForCode(to)
+      matrix[from][to] = toRate > 0 ? fromRate / toRate : 0
+    }
+  }
+  return matrix
+})
+
+function matrixToArbitrage(from: string, to: string) {
+  const fromCurrency = currencies.value.find(c => c.currencyCode === from)
+  const toCurrency = currencies.value.find(c => c.currencyCode === to)
+  if (!fromCurrency || !toCurrency || from === to) return
+  terminalMode.value = 'arbitrage'
+  if (exchangeItems.value.length > 0) {
+    exchangeItems.value[0].sourceCurrencyId = fromCurrency.id
+    exchangeItems.value[0].targetCurrencyId = toCurrency.id
+    exchangeItems.value[0].rateManuallySet = false
+    exchangeItems.value[0].customRate = null
+    updateExchangeRate(exchangeItems.value[0])
+  }
+}
+
+// ═══ Batch Mode ═══
+function addToBatch() {
+  if (!batchSourceCurrencyId.value || !batchTargetCurrencyId.value || batchAmount.value <= 0) {
+    notification.warning('Lütfen para birimi, miktar ve kur bilgilerini doldurun')
+    return
+  }
+  let rate = batchRate.value
+  if (batchCustomRate.value !== null && batchCustomRate.value !== '') {
+    const parsed = parseNum(batchCustomRate.value)
+    if (parsed > 0) rate = parsed
+  }
+  batchQueue.value.push({
+    id: crypto.randomUUID(),
+    type: batchType.value,
+    sourceCurrencyId: batchSourceCurrencyId.value,
+    targetCurrencyId: batchTargetCurrencyId.value,
+    sourceAmount: batchAmount.value,
+    targetAmount: batchAmount.value * rate,
+    exchangeRate: rate,
+    customRate: batchCustomRate.value,
+    note: batchNote.value
+  })
+  batchAmount.value = 0
+  batchCustomRate.value = null
+  batchNote.value = ''
+  notification.success('İşlem kuyruğa eklendi')
+}
+
+function removeBatchItem(id: string) {
+  batchQueue.value = batchQueue.value.filter(i => i.id !== id)
+}
+
+async function submitBatch() {
+  if (batchQueue.value.length === 0) {
+    notification.warning('Kuyrukta işlem yok')
+    return
+  }
+  isLoading.value = true
+  try {
+    const transactions = batchQueue.value.map(item => ({
+      vaultId: selectedVaultId.value,
+      sourceCurrencyId: item.sourceCurrencyId,
+      targetCurrencyId: item.targetCurrencyId,
+      sourceAmount: item.sourceAmount,
+      isBuyingFromCustomer: item.type === 'buy',
+      customRate: item.customRate ? parseNum(item.customRate) : undefined,
+      notes: item.note || undefined,
+      ownerOverrideLoss: ownerOverrideLoss.value
+    }))
+    buildReceiptFromBatch()
+    await apiService.createExchangeTransaction(transactions)
+    notification.success(`${batchQueue.value.length} işlem başarıyla tamamlandı`)
+    showReceiptPanel.value = true
+    batchQueue.value = []
+    if (transactionHistoryRef.value) transactionHistoryRef.value.loadTransactions()
+    loadTodayStats()
+    notification.exchangeSuccess()
+  } catch (error: any) {
+    notification.error(`Toplu işlem hatası: ${error.response?.data?.message || error.message}`)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const batchTotal = computed(() => {
+  const totals = new Map<string, number>()
+  batchQueue.value.forEach(item => {
+    const sc = getCurrencyById(item.sourceCurrencyId)
+    const tc = getCurrencyById(item.targetCurrencyId)
+    if (sc) {
+      const key = sc.currencyCode
+      totals.set(key, (totals.get(key) || 0) + (item.type === 'buy' ? item.sourceAmount : -item.sourceAmount))
+    }
+    if (tc) {
+      const key = tc.currencyCode
+      totals.set(key, (totals.get(key) || 0) + (item.type === 'buy' ? -item.targetAmount : item.targetAmount))
+    }
+  })
+  return Array.from(totals.entries()).map(([code, amount]) => ({ code, amount }))
+})
+
+// Update batch rate when currencies change
+watch([batchSourceCurrencyId, batchTargetCurrencyId, batchType], async () => {
+  if (batchSourceCurrencyId.value && batchTargetCurrencyId.value) {
+    const rate = exchangeStore.getExchangeRate(batchSourceCurrencyId.value, batchTargetCurrencyId.value, batchType.value)
+    batchRate.value = rate || 0
+  }
+})
+
 // Methods
 const selectQuickCurrency = (currencyCode: string) => {
   const currency = getCurrencyByCode(currencyCode)
   if (!currency) return
-  
-  // Update the first item's source currency
+
   if (exchangeItems.value.length > 0) {
     exchangeItems.value[0].sourceCurrencyId = currency.id
     updateExchangeRate(exchangeItems.value[0])
@@ -357,16 +643,14 @@ const removeExchangeItem = (index: number) => {
 }
 
 const updateAmount = (item: ExchangeItem, value: string) => {
-  const cleanValue = value.replace(',', '.')
-  const amount = parseFloat(cleanValue) || 0
+  const amount = parseNum(value)
   item.sourceAmount = amount
-  
+
   // Calculate target amount using exchange rate
   let rate = item.exchangeRate
   if (item.customRate !== null && item.customRate !== '') {
-    const cleanValue = item.customRate.toString().replace(',', '.')
-    const customRateNum = parseFloat(cleanValue)
-    if (!isNaN(customRateNum)) {
+    const customRateNum = parseNum(item.customRate)
+    if (!isNaN(customRateNum) && customRateNum > 0) {
       rate = customRateNum
     }
   }
@@ -446,9 +730,8 @@ const updateExchangeRate = async (item: ExchangeItem) => {
     if (item.sourceAmount > 0) {
       let rate = item.exchangeRate
       if (item.customRate) {
-        const cleanValue = item.customRate.toString().replace(',', '.')
-        const customRateNum = parseFloat(cleanValue)
-        if (!isNaN(customRateNum)) {
+        const customRateNum = parseNum(item.customRate)
+        if (customRateNum > 0) {
           rate = customRateNum
         }
       }
@@ -497,10 +780,9 @@ const handleRateInput = (item: ExchangeItem, value: string) => {
   item.customRate = value
   
   if (value !== '') {
-    const cleanValue = value.toString().replace(',', '.')
-    const rate = parseFloat(cleanValue)
-    
-    if (!isNaN(rate)) {
+    const rate = parseNum(value)
+
+    if (rate > 0) {
       item.exchangeRate = rate
       if (item.sourceAmount > 0) {
         item.targetAmount = item.sourceAmount * rate
@@ -573,18 +855,32 @@ const validateExchange = async () => {
     }
   }
   
-  // Check balance when selling
-  if (transactionType.value === 'sell' && balanceCheck.value) {
-    const totalNeeded = exchangeItems.value
-      .filter(i => i.targetCurrencyId === balanceCheck.value.currencyId)
-      .reduce((sum, i) => sum + (i.targetAmount || 0), 0)
-    
-    if (totalNeeded > balanceCheck.value.balance) {
-      notification.error(`Yetersiz bakiye. Gerekli: ${formatNumber(totalNeeded)}, Mevcut: ${formatNumber(balanceCheck.value.balance)} ${balanceCheck.value.currencyCode}`)
-      return false
+  // Satışta bakiye kontrolü — her farklı hedef döviz için AYRI kontrol
+  // (backend de doğruluyor; bu erken/kullanıcı-dostu uyarı)
+  if (transactionType.value === 'sell') {
+    const neededByCurrency = new Map<string, number>()
+    for (const i of exchangeItems.value) {
+      if (i.targetCurrencyId && i.targetCurrencyId !== tryId.value) {
+        neededByCurrency.set(
+          i.targetCurrencyId,
+          (neededByCurrency.get(i.targetCurrencyId) || 0) + (i.targetAmount || 0)
+        )
+      }
+    }
+    for (const [currencyId, needed] of neededByCurrency) {
+      try {
+        const bal = await apiService.getVaultBalance(selectedVaultId.value, currencyId)
+        const available = bal.balance || 0
+        if (needed > available) {
+          notification.error(`Yetersiz bakiye. Gerekli: ${formatNumber(needed)}, Mevcut: ${formatNumber(available)} ${bal.currencyCode || ''}`)
+          return false
+        }
+      } catch (e) {
+        // Bakiye alınamazsa backend doğrulamasına bırak
+      }
     }
   }
-  
+
   return true
 }
 
@@ -601,21 +897,24 @@ const submitExchange = async () => {
       targetCurrencyId: item.targetCurrencyId,
       sourceAmount: item.sourceAmount,
       isBuyingFromCustomer: transactionType.value === 'buy',
-      customRate: item.customRate ? parseFloat(item.customRate.toString().replace(',', '.')) : undefined,
-      notes: notes.value || undefined
+      customRate: item.customRate ? parseNum(item.customRate) : undefined,
+      notes: notes.value || undefined,
+      ownerOverrideLoss: ownerOverrideLoss.value
     }))
     
+    buildReceiptFromCurrent()
     await apiService.createExchangeTransaction(transactions)
-    
-    // Show success message
+
     notification.success(t('exchange.messages.transactionSuccess'))
-    
+    showReceiptPanel.value = true
+
     resetForm()
-    
+
     if (transactionHistoryRef.value) {
       transactionHistoryRef.value.loadTransactions()
     }
-    
+
+    loadTodayStats()
     notification.exchangeSuccess()
   } catch (error: any) {
     console.error('Exchange failed:', error)
@@ -627,6 +926,7 @@ const submitExchange = async () => {
 
 const resetForm = () => {
   notes.value = ''
+  ownerOverrideLoss.value = false
   exchangeItems.value = [{
     id: crypto.randomUUID(),
     sourceCurrencyId: '',
@@ -763,6 +1063,143 @@ const printInvoice = () => {
   }, 250)
 }
 
+function buildReceiptFromCurrent() {
+  const items = exchangeItems.value.map(item => {
+    const sc = getCurrencyById(item.sourceCurrencyId)
+    const tc = getCurrencyById(item.targetCurrencyId)
+    return {
+      source: sc?.currencyCode || '-',
+      target: tc?.currencyCode || '-',
+      amount: item.sourceAmount,
+      rate: item.exchangeRate,
+      total: item.targetAmount,
+      customRate: item.customRate !== null && item.customRate !== ''
+    }
+  })
+  const totals = grandTotal.value.map(t => ({ code: t.currencyCode, amount: t.amount }))
+  lastReceipt.value = {
+    type: terminalMode.value === 'arbitrage' ? 'arbitrage' : transactionType.value,
+    items,
+    totals,
+    timestamp: new Date().toISOString(),
+    notes: notes.value || ''
+  }
+}
+
+function buildReceiptFromBatch() {
+  const items = batchQueue.value.map(item => {
+    const sc = getCurrencyById(item.sourceCurrencyId)
+    const tc = getCurrencyById(item.targetCurrencyId)
+    return {
+      source: sc?.currencyCode || '-',
+      target: tc?.currencyCode || '-',
+      amount: item.sourceAmount,
+      rate: item.exchangeRate,
+      total: item.targetAmount,
+      customRate: item.customRate !== null && item.customRate !== ''
+    }
+  })
+  lastReceipt.value = {
+    type: 'buy',
+    items,
+    totals: batchTotal.value.map(t => ({ code: t.code, amount: t.amount })),
+    timestamp: new Date().toISOString(),
+    notes: ''
+  }
+}
+
+function printReceipt(receipt?: typeof lastReceipt.value) {
+  const data = receipt || lastReceipt.value
+  if (!data || data.items.length === 0) return
+
+  const printWindow = window.open('', '_blank', 'width=800,height=600')
+  if (!printWindow) { notification.error('Yazdırma penceresi açılamadı'); return }
+
+  const typeLabel = data.type === 'buy' ? 'DÖVİZ ALIM FİŞİ' : data.type === 'sell' ? 'DÖVİZ SATIM FİŞİ' : 'ARBİTRAJ İŞLEM FİŞİ'
+  const typeBadge = data.type === 'buy' ? '#16a34a' : data.type === 'sell' ? '#dc2626' : '#d97706'
+  const ts = new Date(data.timestamp)
+  const dateStr = ts.toLocaleDateString('tr-TR')
+  const timeStr = ts.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+
+  let rows = ''
+  data.items.forEach((item, i) => {
+    const customBadge = item.customRate ? '<span style="background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:3px;font-size:9px;margin-left:4px">Ö</span>' : ''
+    rows += `<tr>
+      <td style="padding:8px 6px;border-bottom:1px solid #eee;text-align:center;color:#6b7280;font-size:12px">${i + 1}</td>
+      <td style="padding:8px 6px;border-bottom:1px solid #eee;font-weight:600">${item.source}</td>
+      <td style="padding:8px 6px;border-bottom:1px solid #eee;text-align:center;color:#9ca3af">→</td>
+      <td style="padding:8px 6px;border-bottom:1px solid #eee;font-weight:600">${item.target}</td>
+      <td style="padding:8px 6px;border-bottom:1px solid #eee;text-align:right;font-family:monospace">${formatNumber(item.amount)}</td>
+      <td style="padding:8px 6px;border-bottom:1px solid #eee;text-align:right;font-family:monospace">${formatNumber(item.rate, 4)}${customBadge}</td>
+      <td style="padding:8px 6px;border-bottom:1px solid #eee;text-align:right;font-family:monospace;font-weight:700">${formatNumber(item.total)}</td>
+    </tr>`
+  })
+
+  let totalsHTML = ''
+  data.totals.forEach(t => {
+    totalsHTML += `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:14px">
+      <span style="font-weight:600">${t.code}</span>
+      <span style="font-family:monospace;font-weight:700">${formatNumber(t.amount)}</span>
+    </div>`
+  })
+
+  let marginHTML = ''
+  if (data.type === 'arbitrage' && arbMarginPercent.value > 0) {
+    marginHTML = `<div style="margin-top:16px;padding:12px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px">
+      <div style="font-weight:700;font-size:13px;color:#92400e;margin-bottom:8px">📊 Kar Marjı Hesabı (% ${formatNumber(arbMarginPercent.value, 2)})</div>`
+    data.items.forEach(item => {
+      const marginAmount = item.total * (arbMarginPercent.value / 100)
+      const customerRate = item.rate * (1 + arbMarginPercent.value / 100)
+      const customerTotal = item.amount * customerRate
+      marginHTML += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;font-family:monospace">
+        <span>${item.amount} ${item.source} → ${item.target}</span>
+        <span>Müşteri Kur: <strong>${formatNumber(customerRate, 4)}</strong> | Müşteri Tutar: <strong>${formatNumber(customerTotal)}</strong> | Kar: <strong style="color:#16a34a">+${formatNumber(marginAmount)}</strong> ${item.target}</span>
+      </div>`
+    })
+    const totalMarginProfit = data.items.reduce((s, item) => s + item.total * (arbMarginPercent.value / 100), 0)
+    marginHTML += `<div style="margin-top:8px;padding-top:8px;border-top:1px solid #fcd34d;font-weight:700;text-align:right;font-size:13px;color:#16a34a">Toplam Kar: +${formatNumber(totalMarginProfit)} ${data.items[0]?.target || ''}</div></div>`
+  }
+
+  printWindow.document.write(`<!DOCTYPE html><html><head><title>${typeLabel}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;padding:32px;line-height:1.5;color:#1f2937}
+@media print{body{padding:16px}@page{margin:10mm}}
+</style></head><body>
+<div style="text-align:center;margin-bottom:24px;padding-bottom:16px;border-bottom:2px solid #e5e7eb">
+  <div style="font-size:11px;color:#9ca3af;letter-spacing:2px;margin-bottom:4px">BAŞKENT ENERJİ DÖVİZ</div>
+  <h2 style="font-size:20px;font-weight:700;letter-spacing:1px;margin-bottom:12px">
+    <span style="display:inline-block;padding:4px 16px;border-radius:6px;background:${typeBadge};color:white">${typeLabel}</span>
+  </h2>
+  <div style="display:flex;justify-content:center;gap:40px;font-size:13px;color:#6b7280">
+    <span>📅 ${dateStr}</span><span>🕐 ${timeStr}</span>
+  </div>
+</div>
+<table style="width:100%;border-collapse:collapse;margin-bottom:20px">
+  <thead><tr style="background:#f9fafb">
+    <th style="padding:8px 6px;text-align:center;font-size:11px;color:#9ca3af;border-bottom:2px solid #e5e7eb">#</th>
+    <th style="padding:8px 6px;text-align:left;font-size:11px;color:#9ca3af;border-bottom:2px solid #e5e7eb">Kaynak</th>
+    <th style="padding:8px 6px;border-bottom:2px solid #e5e7eb"></th>
+    <th style="padding:8px 6px;text-align:left;font-size:11px;color:#9ca3af;border-bottom:2px solid #e5e7eb">Hedef</th>
+    <th style="padding:8px 6px;text-align:right;font-size:11px;color:#9ca3af;border-bottom:2px solid #e5e7eb">Miktar</th>
+    <th style="padding:8px 6px;text-align:right;font-size:11px;color:#9ca3af;border-bottom:2px solid #e5e7eb">Kur</th>
+    <th style="padding:8px 6px;text-align:right;font-size:11px;color:#9ca3af;border-bottom:2px solid #e5e7eb">Tutar</th>
+  </tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+<div style="max-width:280px;margin-left:auto;padding:12px 16px;background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb">
+  <div style="font-size:11px;color:#9ca3af;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">Toplam</div>
+  ${totalsHTML}
+</div>
+${marginHTML}
+${data.notes ? `<div style="margin-top:16px;padding:10px 14px;background:#f3f4f6;border-radius:6px;font-size:12px;color:#6b7280"><strong>Not:</strong> ${data.notes}</div>` : ''}
+<div style="margin-top:32px;text-align:center;font-size:10px;color:#d1d5db;border-top:1px solid #f3f4f6;padding-top:12px">Bu belge bilgi amaçlıdır • Başkent Enerji Döviz</div>
+</body></html>`)
+  printWindow.document.close()
+  printWindow.focus()
+  setTimeout(() => { printWindow.print(); printWindow.close(); notification.printSuccess() }, 300)
+}
+
 // Watch office selection
 watch(selectedOfficeId, async (newOfficeId) => {
   if (newOfficeId) {
@@ -794,6 +1231,8 @@ watch(selectedOfficeId, async (newOfficeId) => {
         updateExchangeRate(item)
       }
     })
+
+    await Promise.all([loadWacData(), fetchExternalMarketRates()])
   }
 })
 
@@ -950,6 +1389,55 @@ watch(transactionType, () => {
   }
 })
 
+// WAC data
+async function loadWacData() {
+  if (!selectedVaultId.value) return
+  try {
+    const data = await apiService.getAllWacs(selectedVaultId.value)
+    wacData.value = data && typeof data === 'object' ? data : {}
+  } catch (err) {
+    console.error('WAC data load failed:', err)
+  }
+}
+
+function getWacForCurrency(currencyId: string): number {
+  return wacData.value[currencyId] ?? 0
+}
+
+function isSellBelowWac(item: ExchangeItem): boolean {
+  if (transactionType.value !== 'sell') return false
+  const foreignId = item.sourceCurrencyId
+  if (!foreignId || foreignId === tryId.value) return false
+  const wac = getWacForCurrency(foreignId)
+  if (wac <= 0) return false
+  let rate = item.exchangeRate
+  if (item.customRate !== null && item.customRate !== '') {
+    const parsed = parseNum(item.customRate)
+    if (parsed > 0) rate = parsed
+  }
+  return rate > 0 && rate < wac
+}
+
+// Day closure check
+async function checkDayStatus() {
+  if (!selectedOfficeId.value) return
+  try {
+    dayStatus.value = await apiService.getDayStatus(selectedOfficeId.value)
+    dayBlocked.value = dayStatus.value?.canTransact === false
+  } catch (err) {
+    console.error('Day status check failed:', err)
+  }
+}
+
+function openDayClosureModal() {
+  showDayClosureModal.value = true
+}
+
+async function onDayClosureDone() {
+  showDayClosureModal.value = false
+  await checkDayStatus()
+}
+
 // Listen for USDT modal open event
 const handleOpenUSDTModal = () => {
   openUSDTModal()
@@ -957,8 +1445,9 @@ const handleOpenUSDTModal = () => {
 
 // Initialize
 onMounted(async () => {
-  // Add event listener for USDT modal
+  // Add event listeners
   window.addEventListener('open-usdt-modal', handleOpenUSDTModal)
+  window.addEventListener('keydown', handleKeyDown)
   
   // Start vault check interval (every 5 minutes)
   vaultCheckInterval.value = setInterval(() => {
@@ -1066,6 +1555,9 @@ onMounted(async () => {
       checkVaultCounting()
     }, 1000)
 
+    // Check day closure status, load WAC data, and today's stats
+    await Promise.all([checkDayStatus(), loadWacData(), loadTodayStats()])
+
     // Fetch external market rates
     fetchExternalMarketRates()
 
@@ -1091,8 +1583,9 @@ onUnmounted(() => {
   if (vaultCheckInterval.value) {
     clearInterval(vaultCheckInterval.value)
   }
-  // Remove event listener
+  // Remove event listeners
   window.removeEventListener('open-usdt-modal', handleOpenUSDTModal)
+  window.removeEventListener('keydown', handleKeyDown)
 })
 
 // Watch for currency changes
@@ -1117,474 +1610,427 @@ watch(() => exchangeItems.value.map(item => ({
 
 <template>
   <!-- Loading State -->
-  <div v-if="isInitialLoading" class="w-full max-w-7xl mx-auto">
-    <div class="flex items-center justify-center h-64 mt-8">
-      <div class="text-center">
-        <div class="inline-flex items-center justify-center w-16 h-16 mb-4">
-          <svg class="animate-spin h-12 w-12 text-purple-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-        </div>
-        <p class="text-lg text-gray-600">{{ t('exchange.messages.loadingData') }}</p>
+  <div v-if="isInitialLoading" class="ex-page">
+    <div class="ex-overlay-center">
+      <div class="ex-spinner-wrap">
+        <svg class="ex-spinner" viewBox="0 0 24 24" fill="none">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        </svg>
       </div>
+      <p class="ex-overlay-text">{{ t('exchange.messages.loadingData') }}</p>
     </div>
   </div>
-  
-  <!-- Page Hidden Overlay -->
-  <div v-if="isPageHidden && !isInitialLoading" class="w-full max-w-7xl mx-auto">
-    <div class="flex items-center justify-center h-[70vh]">
-      <div class="text-center">
-        <div class="inline-flex items-center justify-center w-24 h-24 mb-6 bg-gradient-to-br from-red-500 to-red-600 rounded-full shadow-lg">
-          <span class="material-symbols-outlined text-white text-5xl">inventory</span>
-        </div>
-        <h2 class="text-3xl font-bold text-gray-900 mb-3">Kasa Sayımı Zorunlu</h2>
-        <p class="text-lg text-gray-600 mb-8 max-w-md mx-auto">
-          Devam etmek için kasanızı saymanız gerekmektedir.
-          Bu işlem ihtiyarın mental ve ruh sağlığı açısından zorunludur.
-        </p>
-        <button 
-          @click="openVaultCountingModal"
-          class="px-8 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white font-semibold rounded-xl hover:from-red-700 hover:to-red-800 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-        >
-          <span class="material-symbols-outlined mr-2 align-middle">calculate</span>
-          Kasa Sayımına Başla
+
+  <!-- Vault Counting Required -->
+  <div v-else-if="isPageHidden" class="ex-page">
+    <div class="ex-overlay-center">
+      <div class="ex-overlay-icon ex-overlay-icon--red">
+        <span class="material-symbols-outlined ex-icon-filled" style="font-size:40px">inventory</span>
+      </div>
+      <h2 class="ex-overlay-title">Kasa Sayımı Zorunlu</h2>
+      <p class="ex-overlay-desc">Devam etmek için kasanızı saymanız gerekmektedir.</p>
+      <button @click="openVaultCountingModal" class="ex-btn ex-btn--red">
+        <span class="material-symbols-outlined ex-icon-filled">calculate</span>
+        Kasa Sayımına Başla
+      </button>
+    </div>
+  </div>
+
+  <!-- Day Closure Required -->
+  <div v-else-if="dayBlocked" class="ex-page">
+    <div class="ex-overlay-center">
+      <div class="ex-overlay-icon ex-overlay-icon--amber">
+        <span class="material-symbols-outlined ex-icon-filled" style="font-size:40px">lock_clock</span>
+      </div>
+      <h2 class="ex-overlay-title">Gün Kapanışı Gerekli</h2>
+      <p class="ex-overlay-desc">{{ dayStatus?.blockReason || 'Önceki günün kapanışı yapılmadan işlem yapılamaz.' }}</p>
+      <p v-if="dayStatus?.unclosedDayCount > 1" class="ex-overlay-hint">
+        {{ dayStatus.unclosedDayCount }} gün kapanmamış — ara günler otomatik kapatılacak.
+      </p>
+      <button @click="openDayClosureModal" class="ex-btn ex-btn--amber">
+        <span class="material-symbols-outlined ex-icon-filled">lock</span>
+        Gün Kapanışını Yap
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div v-else class="ex-page">
+
+    <!-- Top Bar: Office/Vault + Actions -->
+    <div class="ex-topbar">
+      <div class="ex-topbar-left">
+        <h2 class="ex-topbar-title">MoneyTransferTurkey Döviz Ofisi Yönetim Paneli</h2>
+      </div>
+      <div class="ex-topbar-right">
+        <button @click="refreshRates" :disabled="!selectedOfficeId || loadingExternalRates" class="ex-topbar-btn" title="Kurları Yenile">
+          <span class="material-symbols-outlined" :class="{ 'animate-spin': loadingExternalRates }">sync</span>
+          <span v-if="refreshCountdown < 60" class="ex-countdown">{{ refreshCountdown }}s</span>
+        </button>
+        <button @click="openManualVaultCounting" :disabled="!selectedVaultId" class="ex-topbar-btn" title="Kasa Sayımı">
+          <span class="material-symbols-outlined">calculate</span>
+        </button>
+        <button @click="transactionHistoryRef?.printAllTransactions?.()" :disabled="!selectedOfficeId" class="ex-topbar-btn" title="Yazdır">
+          <span class="material-symbols-outlined">print</span>
         </button>
       </div>
     </div>
-  </div>
-  
-  <!-- Main Content -->
-  <div v-else-if="!isPageHidden" class="w-full max-w-7xl mx-auto">
-    <!-- Transaction Type Toggle - VERY PROMINENT -->
-    <div class="mb-6">
-      <div :class="[
-        'rounded-xl shadow-lg p-1 transition-all',
-        transactionType === 'buy' 
-          ? 'bg-gradient-to-r from-green-500 to-green-600' 
-          : 'bg-gradient-to-r from-red-500 to-red-600'
-      ]">
-        <div class="bg-white rounded-lg p-6">
-          <h3 class="text-xl font-bold text-gray-900 mb-4 text-center">{{ t('exchange.transactionType.selectTitle') }}</h3>
-          <div class="grid grid-cols-2 gap-4">
-            <button
-              @click="transactionType = 'buy'"
-              :class="[
-                'relative py-3 px-4 rounded-lg font-semibold transition-all transform',
-                transactionType === 'buy' 
-                  ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg scale-105 ring-2 ring-green-300' 
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:scale-102'
-              ]"
-            >
-              <div class="flex flex-col items-center gap-1">
-                <span class="material-symbols-outlined text-2xl">download</span>
-                <span class="text-base">{{ t('exchange.transactionType.buy') }}</span>
-                <span class="text-xs opacity-90">{{ t('exchange.transactionType.buyDesc') }}</span>
-              </div>
-              <div v-if="transactionType === 'buy'" 
-                   class="absolute -top-2 -right-2 bg-white text-green-600 rounded-full p-0.5 shadow-lg">
-                <span class="material-symbols-outlined text-lg">check_circle</span>
-              </div>
-            </button>
-            <button
-              @click="transactionType = 'sell'"
-              :class="[
-                'relative py-3 px-4 rounded-lg font-semibold transition-all transform',
-                transactionType === 'sell' 
-                  ? 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg scale-105 ring-2 ring-red-300' 
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:scale-102'
-              ]"
-            >
-              <div class="flex flex-col items-center gap-1">
-                <span class="material-symbols-outlined text-2xl">upload</span>
-                <span class="text-base">{{ t('exchange.transactionType.sell') }}</span>
-                <span class="text-xs opacity-90">{{ t('exchange.transactionType.sellDesc') }}</span>
-              </div>
-              <div v-if="transactionType === 'sell'" 
-                   class="absolute -top-2 -right-2 bg-white text-red-600 rounded-full p-0.5 shadow-lg">
-                <span class="material-symbols-outlined text-lg">check_circle</span>
-              </div>
-            </button>
+
+    <!-- Warning: No office/vault -->
+    <div v-if="!selectedOfficeId || !selectedVaultId" class="ex-warning-banner">
+      <span class="material-symbols-outlined ex-icon-filled">warning</span>
+      <div>
+        <p class="ex-warning-title">{{ t('exchange.officeVault.warningTitle') }}</p>
+        <p class="ex-warning-desc">
+          {{ !selectedOfficeId ? t('exchange.officeVault.warningOffice') : '' }}
+          {{ !selectedVaultId ? t('exchange.officeVault.warningVault') : '' }}
+        </p>
+      </div>
+    </div>
+
+    <!-- Vault Count Warning (admin) -->
+    <div v-if="showVaultCountWarning" class="ex-warning-banner ex-warning-banner--amber">
+      <span class="material-symbols-outlined ex-icon-filled">inventory</span>
+      <div class="flex-1">
+        <p class="ex-warning-title">Kasa Sayımı Gerekli</p>
+        <p class="ex-warning-desc">Bu kasa için sayım henüz yapılmamış.</p>
+      </div>
+      <button @click="openManualVaultCounting" class="ex-btn ex-btn--amber ex-btn--sm">
+        <span class="material-symbols-outlined">calculate</span>
+        Sayım Yap
+      </button>
+    </div>
+
+    <!-- ═══ Position Bar ═══ -->
+    <div v-if="positionData.length > 0" class="ex-pos-bar">
+      <div class="ex-pos-bar-header">
+        <span class="material-symbols-outlined ex-icon-filled" style="font-size:16px">account_balance_wallet</span>
+        <span class="ex-pos-bar-title">Pozisyonlar</span>
+        <span class="ex-pos-bar-total">
+          Toplam: {{ formatNumber(totalPositionValue) }} ₺
+          <span :class="totalUnrealizedPnl >= 0 ? 'ex-pnl--pos' : 'ex-pnl--neg'">
+            ({{ totalUnrealizedPnl >= 0 ? '+' : '' }}{{ formatNumber(totalUnrealizedPnl) }} ₺)
+          </span>
+        </span>
+      </div>
+      <div class="ex-pos-bar-items">
+        <div v-for="pos in positionData" :key="pos.currencyId" class="ex-pos-item" @click="selectQuickCurrency(pos.code)">
+          <div class="ex-pos-top">
+            <i v-if="getCurrencyCountryCode(pos.code)" :class="`fi fi-${getCurrencyCountryCode(pos.code)}`" style="font-size:14px"></i>
+            <span class="ex-pos-code">{{ pos.code }}</span>
+          </div>
+          <div class="ex-pos-balance">{{ formatNumber(pos.balance) }}</div>
+          <div class="ex-pos-details">
+            <span class="ex-pos-wac">WAC: {{ formatNumber(pos.wac, 2) }}</span>
+            <span :class="pos.unrealizedPnl >= 0 ? 'ex-pnl--pos' : 'ex-pnl--neg'" class="ex-pos-pnl">
+              {{ pos.unrealizedPnl >= 0 ? '+' : '' }}{{ formatNumber(pos.unrealizedPnl, 0) }}₺
+            </span>
           </div>
         </div>
       </div>
     </div>
 
+    <!-- ═══ Terminal Mode Tabs ═══ -->
+    <div class="ex-terminal-tabs">
+      <button @click="terminalMode = 'standard'" class="ex-tab" :class="{ 'ex-tab--active': terminalMode === 'standard' }">
+        <span class="material-symbols-outlined ex-icon-filled" style="font-size:18px">swap_vert</span>
+        Alış / Satış
+        <span class="ex-tab-key">F2/F3</span>
+      </button>
+      <button @click="terminalMode = 'arbitrage'" class="ex-tab" :class="{ 'ex-tab--active-arb': terminalMode === 'arbitrage' }">
+        <span class="material-symbols-outlined ex-icon-filled" style="font-size:18px">currency_exchange</span>
+        Arbitraj
+        <span class="ex-tab-key">F4</span>
+      </button>
+      <button @click="terminalMode = 'batch'" class="ex-tab" :class="{ 'ex-tab--active-batch': terminalMode === 'batch' }">
+        <span class="material-symbols-outlined ex-icon-filled" style="font-size:18px">playlist_add</span>
+        Toplu İşlem
+      </button>
+    </div>
 
-    <!-- Main Layout -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- Left Column: Process -->
-      <div class="lg:col-span-2 space-y-6">
-        <!-- Warning Message -->
-        <div v-if="!selectedOfficeId || !selectedVaultId" class="bg-red-50 border-2 border-red-300 rounded-lg p-4 mb-6">
-          <div class="flex items-center gap-3">
-            <span class="material-symbols-outlined text-red-600 text-3xl">warning</span>
-            <div>
-              <p class="font-semibold text-red-900">{{ t('exchange.officeVault.warningTitle') }}</p>
-              <p class="text-sm text-red-700 mt-1">
-                {{ !selectedOfficeId ? t('exchange.officeVault.warningOffice') : '' }}
-                {{ !selectedVaultId ? t('exchange.officeVault.warningVault') : '' }}
-              </p>
-            </div>
-          </div>
+    <!-- ═══ Standard Mode: Buy/Sell Toggle + Quick Chips ═══ -->
+    <template v-if="terminalMode === 'standard'">
+      <div class="ex-type-toggle">
+        <button
+          @click="transactionType = 'buy'"
+          class="ex-type-btn"
+          :class="transactionType === 'buy' ? 'ex-type-btn--buy-active' : 'ex-type-btn--inactive'"
+        >
+          <span class="material-symbols-outlined ex-icon-filled">download</span>
+          <span class="ex-type-label">{{ t('exchange.transactionType.buy') }}</span>
+          <span class="ex-type-desc">{{ t('exchange.transactionType.buyDesc') }}</span>
+        </button>
+        <button
+          @click="transactionType = 'sell'"
+          class="ex-type-btn"
+          :class="transactionType === 'sell' ? 'ex-type-btn--sell-active' : 'ex-type-btn--inactive'"
+        >
+          <span class="material-symbols-outlined ex-icon-filled">upload</span>
+          <span class="ex-type-label">{{ t('exchange.transactionType.sell') }}</span>
+          <span class="ex-type-desc">{{ t('exchange.transactionType.sellDesc') }}</span>
+        </button>
+      </div>
+
+      <div class="ex-quick-bar">
+        <span class="ex-quick-title">
+          <span class="material-symbols-outlined ex-icon-filled ex-icon-xs">flash_on</span>
+          {{ t('exchange.quickSelect.title') }}
+        </span>
+        <div class="ex-quick-chips">
+          <button
+            v-for="currency in popularCurrencies"
+            :key="currency"
+            @click="selectQuickCurrency(currency)"
+            class="ex-chip"
+            :class="[`ex-chip--${currency.toLowerCase()}`, { 'ex-chip--active': activeQuickCurrency === currency }]"
+          >
+            <span v-if="currency === 'KRUB'" class="material-symbols-outlined ex-icon-filled" style="font-size:16px;color:#6b46c1">credit_card</span>
+            <span v-else-if="currency === 'USDT'" class="ex-chip-crypto">₮</span>
+            <i v-else :class="`fi fi-${currency === 'USD' ? 'us' : currency === 'EUR' ? 'eu' : 'ru'}`" class="ex-chip-flag"></i>
+            <span>{{ currency }}</span>
+          </button>
         </div>
-        
+      </div>
+    </template>
 
-        <!-- Quick Currency Selection -->
-        <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-          <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-            <span class="material-symbols-outlined text-purple-600">flash_on</span>
-            {{ t('exchange.quickSelect.title') }}
-          </h3>
-          <div class="flex flex-wrap gap-3">
-            <button
-              v-for="currency in popularCurrencies"
-              :key="currency"
-              @click="selectQuickCurrency(currency)"
-              class="relative px-4 py-2 bg-white border-2 border-gray-200 rounded-lg hover:shadow-lg transition-all flex items-center gap-2 overflow-hidden"
-              :class="{
-                'hover:border-green-400': currency === 'USD',
-                'hover:border-blue-400': currency === 'EUR',
-                'hover:border-red-400': currency === 'RUB',
-                'hover:border-purple-400': currency === 'KRUB',
-                'hover:border-teal-400': currency === 'USDT'
-              }"
-            >
-              <div class="absolute left-0 top-1/2 w-1 h-[70%] -translate-y-1/2"
-                :class="{
-                  'bg-gradient-to-b from-green-400 to-green-600': currency === 'USD',
-                  'bg-gradient-to-b from-blue-400 to-blue-600': currency === 'EUR',
-                  'bg-gradient-to-b from-red-400 to-red-600': currency === 'RUB',
-                  'bg-gradient-to-b from-purple-400 to-purple-600': currency === 'KRUB',
-                  'bg-gradient-to-b from-teal-400 to-teal-600': currency === 'USDT'
-                }"
-              ></div>
-              <span v-if="currency === 'KRUB'" class="material-symbols-outlined"
-                :class="{
-                  'text-purple-600': currency === 'KRUB'
-                }"
-              >credit_card</span>
-              <span v-else-if="currency === 'USDT'" class="font-bold text-lg text-teal-600">₮</span>
-              <img 
-                v-else
-                :src="`https://flagcdn.com/24x18/${currency === 'USD' ? 'us' : currency === 'EUR' ? 'eu' : currency === 'RUB' ? 'ru' : 'xx'}.png`" 
-                :alt="currency"
-                class="w-5 h-4"
-                onerror="this.style.display='none'"
-              >
-              <span class="font-semibold"
-                :class="{
-                  'text-green-700': currency === 'USD',
-                  'text-blue-700': currency === 'EUR',
-                  'text-red-700': currency === 'RUB',
-                  'text-purple-700': currency === 'KRUB',
-                  'text-teal-700': currency === 'USDT'
-                }"
-              >{{ currency }}</span>
+    <!-- ═══ Arbitrage Mode Header ═══ -->
+    <div v-if="terminalMode === 'arbitrage'" class="ex-arb-header">
+      <div class="ex-arb-info">
+        <span class="material-symbols-outlined ex-icon-filled" style="font-size:20px;color:#f59e0b">currency_exchange</span>
+        <div>
+          <p class="ex-arb-title">Arbitraj Modu</p>
+          <p class="ex-arb-desc">Döviz↔Döviz direkt çevrim. Çapraz kur otomatik hesaplanır.</p>
+        </div>
+      </div>
+      <div class="ex-arb-margin">
+        <label class="ex-arb-margin-label">
+          <span class="material-symbols-outlined ex-icon-filled" style="font-size:14px">percent</span>
+          Kar Marjı
+        </label>
+        <input
+          type="text"
+          :value="arbMarginPercent || ''"
+          @input="arbMarginPercent = parseNum(($event.target as HTMLInputElement).value)"
+          class="ex-input ex-input--mono ex-arb-margin-input"
+          placeholder="0"
+          inputmode="decimal"
+        />
+        <button
+          @click="buildReceiptFromCurrent(); printReceipt()"
+          :disabled="!exchangeItems.some(i => i.sourceCurrencyId && i.targetCurrencyId && i.sourceAmount > 0)"
+          class="ex-btn ex-btn--amber ex-btn--sm"
+          title="Arbitraj fişi oluştur ve yazdır"
+        >
+          <span class="material-symbols-outlined ex-icon-filled" style="font-size:16px">receipt_long</span>
+          Fiş Al
+        </button>
+      </div>
+    </div>
+
+    <!-- ═══ Batch Mode Header + Form ═══ -->
+    <div v-if="terminalMode === 'batch'" class="ex-batch-section">
+      <div class="ex-batch-form">
+        <div class="ex-batch-form-row">
+          <div class="ex-batch-toggle">
+            <button @click="batchType = 'buy'" class="ex-batch-type-btn" :class="{ 'ex-batch-type--buy': batchType === 'buy' }">Alış</button>
+            <button @click="batchType = 'sell'" class="ex-batch-type-btn" :class="{ 'ex-batch-type--sell': batchType === 'sell' }">Satış</button>
+          </div>
+          <CurrencySelector
+            :modelValue="batchSourceCurrencyId"
+            @update:modelValue="batchSourceCurrencyId = $event"
+            :currencies="filteredCurrencies"
+            placeholder="Döviz"
+            :compact="true"
+            :vaultBalances="selectedVaultBalances"
+          />
+          <div class="ex-batch-arrow">→</div>
+          <CurrencySelector
+            :modelValue="batchTargetCurrencyId"
+            @update:modelValue="batchTargetCurrencyId = $event"
+            :currencies="currencies"
+            placeholder="Hedef"
+            :compact="true"
+          />
+          <input type="text" :value="batchAmount || ''" @input="batchAmount = parseNum(($event.target as HTMLInputElement).value)" class="ex-input ex-input--mono ex-batch-input" placeholder="Miktar" inputmode="decimal" />
+          <input type="text" :value="batchCustomRate !== null && batchCustomRate !== '' ? batchCustomRate : batchRate || ''" @input="batchCustomRate = ($event.target as HTMLInputElement).value" class="ex-input ex-input--mono ex-batch-input ex-batch-input--rate" placeholder="Kur" inputmode="decimal" :class="{ 'ex-input--custom': batchCustomRate !== null && batchCustomRate !== '' }" />
+          <input type="text" v-model="batchNote" class="ex-input ex-batch-input ex-batch-input--note" placeholder="Not..." />
+          <button @click="addToBatch" class="ex-btn ex-btn--indigo ex-btn--sm">
+            <span class="material-symbols-outlined" style="font-size:18px">add</span>
+            Ekle
+          </button>
+        </div>
+      </div>
+
+      <!-- Batch Queue -->
+      <div v-if="batchQueue.length > 0" class="ex-batch-queue">
+        <div class="ex-batch-queue-header">
+          <span>Kuyruk ({{ batchQueue.length }} işlem)</span>
+          <button @click="submitBatch" :disabled="isLoading" class="ex-btn ex-btn--indigo ex-btn--sm">
+            <span class="material-symbols-outlined ex-icon-filled" style="font-size:16px">{{ isLoading ? 'refresh' : 'send' }}</span>
+            Tümünü Onayla
+          </button>
+        </div>
+        <div v-for="item in batchQueue" :key="item.id" class="ex-batch-item">
+          <span class="ex-batch-item-type" :class="item.type === 'buy' ? 'ex-item-badge--buy' : 'ex-item-badge--sell'">{{ item.type === 'buy' ? 'A' : 'S' }}</span>
+          <span class="ex-batch-item-detail">
+            {{ formatNumber(item.sourceAmount) }} {{ getCurrencyById(item.sourceCurrencyId)?.currencyCode }}
+            → {{ formatNumber(item.targetAmount) }} {{ getCurrencyById(item.targetCurrencyId)?.currencyCode }}
+            <span class="ex-batch-item-rate">@ {{ formatNumber(item.exchangeRate, 4) }}</span>
+          </span>
+          <span v-if="item.note" class="ex-batch-item-note">{{ item.note }}</span>
+          <button @click="removeBatchItem(item.id)" class="ex-item-delete">
+            <span class="material-symbols-outlined" style="font-size:16px">close</span>
+          </button>
+        </div>
+        <div class="ex-batch-totals">
+          <span v-for="total in batchTotal" :key="total.code" class="ex-batch-total-item" :class="total.amount >= 0 ? 'ex-pnl--pos' : 'ex-pnl--neg'">
+            {{ total.amount >= 0 ? '+' : '' }}{{ formatNumber(total.amount) }} {{ total.code }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main 2-Column Layout (Standard + Arbitrage modes) -->
+    <div v-if="terminalMode !== 'batch'" class="ex-layout">
+
+      <!-- Left: Exchange Form -->
+      <div class="ex-form-col">
+
+        <!-- Exchange Card -->
+        <div class="ex-card">
+          <div class="ex-card-header">
+            <h3 class="ex-card-title">{{ t('exchange.operations.title') }}</h3>
+            <button @click="addExchangeItem" class="ex-btn ex-btn--indigo ex-btn--sm">
+              <span class="material-symbols-outlined" style="font-size:18px">add</span>
+              {{ t('exchange.operations.addButton') }}
             </button>
           </div>
-        </div>
 
-        <!-- Exchange Items -->
-        <div class="bg-white border border-gray-200 rounded-lg shadow-sm">
-          <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-            <h3 class="text-lg font-semibold text-gray-900">{{ t('exchange.operations.title') }}</h3>
-            <button 
-              @click="addExchangeItem" 
-              class="flex items-center gap-1 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm transition-colors"
-            >
-              <span class="material-symbols-outlined text-lg">add</span>
-              <span class="hidden sm:inline">{{ t('exchange.operations.addButton') }}</span>
-            </button>
-          </div>
+          <div class="ex-card-body">
+            <div v-for="(item, index) in exchangeItems" :key="item.id" class="ex-item" :class="transactionType === 'buy' ? 'ex-item--buy' : 'ex-item--sell'">
 
-          <div class="p-6 space-y-4">
-            <!-- All Items - Compact when multiple, full when single -->
-            <div
-              v-for="(item, index) in exchangeItems"
-              :key="item.id"
-            >
-              <!-- Full Card (Only when single item) -->
-              <div
-                v-if="exchangeItems.length === 1"
-                class="border-2 rounded-xl p-5 space-y-4 shadow-lg transition-all"
-                :class="{
-                  'border-green-400 bg-gradient-to-br from-green-50 via-emerald-50 to-green-100': transactionType === 'buy',
-                  'border-red-400 bg-gradient-to-br from-red-50 via-rose-50 to-red-100': transactionType === 'sell'
-                }"
-              >
-                <div class="flex justify-between items-center mb-3">
-                  <div class="flex items-center gap-2">
-                    <span class="text-sm font-semibold"
-                      :class="{
-                        'text-green-900': transactionType === 'buy',
-                        'text-red-900': transactionType === 'sell'
-                      }"
-                    >{{ t('exchange.operations.transactionNumber') }}1</span>
-                    <span class="px-3 py-1.5 rounded-full text-sm font-bold"
-                      :class="{
-                        'bg-green-600 text-white shadow-md': transactionType === 'buy',
-                        'bg-red-600 text-white shadow-md': transactionType === 'sell'
-                      }"
-                    >
-                      {{ transactionType === 'buy' ? 'ALIŞ' : 'SATIŞ' }}
-                    </span>
-                  </div>
+              <!-- Item Header -->
+              <div class="ex-item-header">
+                <div class="ex-item-badge" :class="transactionType === 'buy' ? 'ex-item-badge--buy' : 'ex-item-badge--sell'">
+                  {{ transactionType === 'buy' ? 'ALIŞ' : 'SATIŞ' }} #{{ index + 1 }}
+                </div>
+                <button v-if="exchangeItems.length > 1" @click="removeExchangeItem(index)" class="ex-item-delete">
+                  <span class="material-symbols-outlined">close</span>
+                </button>
+              </div>
+
+              <!-- Currency Row -->
+              <div class="ex-item-currencies">
+                <div class="ex-field">
+                  <label class="ex-field-label">
+                    {{ t('exchange.operations.receivedCurrency') }}
+                    <span class="ex-field-hint">({{ transactionType === 'buy' ? t('exchange.operations.fromCustomer') : t('exchange.operations.toVault') }})</span>
+                  </label>
+                  <CurrencySelector
+                    :modelValue="transactionType === 'buy' ? item.sourceCurrencyId : item.targetCurrencyId"
+                    @update:modelValue="transactionType === 'buy' ? updateSourceCurrency(item, $event) : updateTargetCurrency(item, $event)"
+                    :currencies="transactionType === 'buy' ? filteredCurrencies : currencies"
+                    :placeholder="t('exchange.operations.selectCurrency')"
+                    :disabled="!selectedOfficeId || !selectedVaultId"
+                    :vaultBalances="selectedVaultBalances"
+                  />
                 </div>
 
-                <!-- Currency Selection Row -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">
-                      {{ t('exchange.operations.receivedCurrency') }}
-                      <span class="text-xs text-gray-500 ml-1">({{ transactionType === 'buy' ? t('exchange.operations.fromCustomer') : t('exchange.operations.toVault') }})</span>
-                    </label>
-                    <CurrencySelector
-                      :modelValue="transactionType === 'buy' ? item.sourceCurrencyId : item.targetCurrencyId"
-                      @update:modelValue="transactionType === 'buy' ? updateSourceCurrency(item, $event) : updateTargetCurrency(item, $event)"
-                      :currencies="transactionType === 'buy' ? filteredCurrencies : currencies"
-                      :placeholder="t('exchange.operations.selectCurrency')"
-                      :disabled="!selectedOfficeId || !selectedVaultId"
-                      :vaultBalances="selectedVaultBalances"
-                    />
-                  </div>
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">
-                      {{ t('exchange.operations.givenCurrency') }}
-                      <span class="text-xs text-gray-500 ml-1">({{ transactionType === 'buy' ? t('exchange.operations.fromVault') : t('exchange.operations.toCustomer') }})</span>
-                    </label>
-                    <CurrencySelector
-                      :modelValue="transactionType === 'buy' ? item.targetCurrencyId : item.sourceCurrencyId"
-                      @update:modelValue="transactionType === 'buy' ? updateTargetCurrency(item, $event) : updateSourceCurrency(item, $event)"
-                      :currencies="transactionType === 'buy' ? currencies : filteredCurrencies"
-                      :placeholder="t('exchange.operations.selectCurrency')"
-                      :disabled="!selectedOfficeId || !selectedVaultId"
-                      :vaultBalances="selectedVaultBalances"
-                    />
-                  </div>
+                <div class="ex-arrow-divider">
+                  <span class="material-symbols-outlined">swap_horiz</span>
                 </div>
 
-                <!-- Amount and Rate Row -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('exchange.operations.amount') }}</label>
-                    <input
-                      type="text"
-                      :value="item.sourceAmount ? item.sourceAmount.toString().replace('.', ',') : ''"
-                      @input="updateAmount(item, ($event.target as HTMLInputElement).value)"
-                      class="amount-input font-mono"
-                      placeholder="0,00"
-                      inputmode="decimal"
-                      :disabled="!selectedOfficeId || !selectedVaultId"
-                    />
-                  </div>
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">
-                      {{ t('exchange.operations.rate') }}
-                      <span v-if="item.customRate" class="ml-1 text-xs bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded">{{ t('exchange.operations.customRate') }}</span>
-                    </label>
-                    <input
-                      type="text"
-                      :value="item.customRate !== null && item.customRate !== '' ? item.customRate : (item.rateManuallySet ? '' : item.exchangeRate.toString())"
-                      @input="handleRateInput(item, ($event.target as HTMLInputElement).value)"
-                      @blur="handleRateBlur(item)"
-                      @focus="($event.target as HTMLInputElement).select()"
-                      class="rate-input font-mono"
-                      :class="{ 'custom-rate': item.customRate !== null && item.customRate !== '' }"
-                      placeholder="0,00"
-                      inputmode="decimal"
-                      :disabled="!selectedOfficeId || !selectedVaultId"
-                    />
-                  </div>
+                <div class="ex-field">
+                  <label class="ex-field-label">
+                    {{ t('exchange.operations.givenCurrency') }}
+                    <span class="ex-field-hint">({{ transactionType === 'buy' ? t('exchange.operations.fromVault') : t('exchange.operations.toCustomer') }})</span>
+                  </label>
+                  <CurrencySelector
+                    :modelValue="transactionType === 'buy' ? item.targetCurrencyId : item.sourceCurrencyId"
+                    @update:modelValue="transactionType === 'buy' ? updateTargetCurrency(item, $event) : updateSourceCurrency(item, $event)"
+                    :currencies="transactionType === 'buy' ? currencies : filteredCurrencies"
+                    :placeholder="t('exchange.operations.selectCurrency')"
+                    :disabled="!selectedOfficeId || !selectedVaultId"
+                    :vaultBalances="selectedVaultBalances"
+                  />
                 </div>
+              </div>
 
-                <!-- External Market Rates - Full Width at Bottom -->
-                <div v-if="getExternalRatesForItem(item).length > 0" class="mt-3 pt-3 border-t border-gray-300">
-                  <div class="text-xs font-medium text-gray-600 mb-2 flex items-center gap-1">
-                    <span class="material-symbols-outlined text-sm">trending_up</span>
-                    Piyasa Kurları Karşılaştırması
-                  </div>
-                  <div class="flex flex-wrap gap-2">
-                    <div class="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-300 rounded-lg shadow-sm">
-                      <span class="font-bold text-purple-700 text-sm">Bizim Sistem:</span>
-                      <span class="font-mono text-purple-900 font-bold text-base">{{ formatNumber(item.exchangeRate, 4) }}</span>
-                    </div>
-                    <div
-                      v-for="rate in getExternalRatesForItem(item)"
-                      :key="rate.source"
-                      class="flex items-center gap-1.5 px-3 py-2 bg-white rounded-lg border-2 shadow-sm transition-all hover:shadow-md"
-                      :class="{
-                        'border-green-400 bg-green-50': rate.displayRate && item.exchangeRate && rate.displayRate < item.exchangeRate,
-                        'border-red-400 bg-red-50': rate.displayRate && item.exchangeRate && rate.displayRate > item.exchangeRate,
-                        'border-gray-300': !rate.displayRate || !item.exchangeRate || rate.displayRate === item.exchangeRate
-                      }"
-                    >
-                      <span class="font-bold text-gray-700 text-sm">{{ rate.source }}:</span>
-                      <span class="font-mono font-semibold text-base"
-                        :class="{
-                          'text-green-700': rate.displayRate && item.exchangeRate && rate.displayRate < item.exchangeRate,
-                          'text-red-700': rate.displayRate && item.exchangeRate && rate.displayRate > item.exchangeRate,
-                          'text-gray-900': !rate.displayRate || !item.exchangeRate || rate.displayRate === item.exchangeRate
-                        }"
-                      >{{ rate.displayRate ? formatNumber(rate.displayRate, 4) : '-' }}</span>
-                    </div>
+              <!-- Amount + Rate Row -->
+              <div class="ex-item-numbers">
+                <div class="ex-field ex-field--grow">
+                  <label class="ex-field-label">{{ t('exchange.operations.amount') }}</label>
+                  <input
+                    type="text"
+                    :value="item.sourceAmount ? item.sourceAmount.toString().replace('.', ',') : ''"
+                    @input="updateAmount(item, ($event.target as HTMLInputElement).value)"
+                    class="ex-input ex-input--mono"
+                    placeholder="0,00"
+                    inputmode="decimal"
+                    :disabled="!selectedOfficeId || !selectedVaultId"
+                  />
+                </div>
+                <div class="ex-field ex-field--grow">
+                  <label class="ex-field-label">
+                    {{ t('exchange.operations.rate') }}
+                    <span v-if="item.customRate !== null && item.customRate !== ''" class="ex-custom-badge">{{ t('exchange.operations.customRate') }}</span>
+                  </label>
+                  <input
+                    type="text"
+                    :value="item.customRate !== null && item.customRate !== '' ? item.customRate : (item.rateManuallySet ? '' : item.exchangeRate.toString())"
+                    @input="handleRateInput(item, ($event.target as HTMLInputElement).value)"
+                    @blur="handleRateBlur(item)"
+                    @focus="($event.target as HTMLInputElement).select()"
+                    class="ex-input ex-input--mono"
+                    :class="{ 'ex-input--custom': item.customRate !== null && item.customRate !== '' }"
+                    placeholder="0,00"
+                    inputmode="decimal"
+                    :disabled="!selectedOfficeId || !selectedVaultId"
+                  />
+                </div>
+                <div class="ex-field ex-field--result">
+                  <label class="ex-field-label">Tutar</label>
+                  <div class="ex-result-value">
+                    {{ formatNumber(item.targetAmount) }}
+                    <span class="ex-result-code">{{ getCurrencyById(transactionType === 'buy' ? item.targetCurrencyId : item.sourceCurrencyId)?.currencyCode || '' }}</span>
                   </div>
                 </div>
               </div>
 
-              <!-- Compact Card (When multiple items) -->
-              <div
-                v-else
-                class="border-2 rounded-lg p-3 hover:shadow-md transition-all relative"
-                :class="{
-                  'border-green-300 bg-gradient-to-r from-green-50 to-emerald-50': transactionType === 'buy',
-                  'border-red-300 bg-gradient-to-r from-red-50 to-rose-50': transactionType === 'sell'
-                }"
-                :style="{ zIndex: 100 - index }"
-              >
-                <div class="flex items-center gap-2">
-                  <!-- Transaction Number & Type Badge -->
-                  <div class="flex items-center gap-1.5 w-24 flex-shrink-0">
-                    <span class="text-xs font-semibold text-gray-600 whitespace-nowrap">İşlem {{ index + 1 }}</span>
-                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold whitespace-nowrap"
-                      :class="{
-                        'bg-green-600 text-white': transactionType === 'buy',
-                        'bg-red-600 text-white': transactionType === 'sell'
-                      }"
-                    >
-                      {{ transactionType === 'buy' ? 'ALIŞ' : 'SATIŞ' }}
-                    </span>
-                  </div>
-
-                  <!-- Received Currency -->
-                  <div class="flex-1 min-w-[200px]">
-                    <CurrencySelector
-                      :modelValue="transactionType === 'buy' ? item.sourceCurrencyId : item.targetCurrencyId"
-                      @update:modelValue="transactionType === 'buy' ? updateSourceCurrency(item, $event) : updateTargetCurrency(item, $event)"
-                      :currencies="transactionType === 'buy' ? filteredCurrencies : currencies"
-                      :placeholder="t('exchange.operations.selectCurrency')"
-                      :disabled="!selectedOfficeId || !selectedVaultId"
-                      :vaultBalances="selectedVaultBalances"
-                      compact
-                      :dropdownMinWidth="300"
-                    />
-                  </div>
-
-                  <!-- Arrow Icon -->
-                  <span class="material-symbols-outlined text-gray-400 text-sm flex-shrink-0">arrow_forward</span>
-
-                  <!-- Given Currency -->
-                  <div class="flex-1 min-w-[200px]">
-                    <CurrencySelector
-                      :modelValue="transactionType === 'buy' ? item.targetCurrencyId : item.sourceCurrencyId"
-                      @update:modelValue="transactionType === 'buy' ? updateTargetCurrency(item, $event) : updateSourceCurrency(item, $event)"
-                      :currencies="transactionType === 'buy' ? currencies : filteredCurrencies"
-                      :placeholder="t('exchange.operations.selectCurrency')"
-                      :disabled="!selectedOfficeId || !selectedVaultId"
-                      :vaultBalances="selectedVaultBalances"
-                      compact
-                      :dropdownMinWidth="300"
-                    />
-                  </div>
-
-                  <!-- Amount -->
-                  <div class="w-28">
-                    <input
-                      type="text"
-                      :value="item.sourceAmount ? item.sourceAmount.toString().replace('.', ',') : ''"
-                      @input="updateAmount(item, ($event.target as HTMLInputElement).value)"
-                      class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono"
-                      placeholder="Miktar"
-                      inputmode="decimal"
-                      :disabled="!selectedOfficeId || !selectedVaultId"
-                    />
-                  </div>
-
-                  <!-- Rate -->
-                  <div class="w-28">
-                    <input
-                      type="text"
-                      :value="item.customRate !== null && item.customRate !== '' ? item.customRate : (item.rateManuallySet ? '' : item.exchangeRate.toString())"
-                      @input="handleRateInput(item, ($event.target as HTMLInputElement).value)"
-                      @blur="handleRateBlur(item)"
-                      @focus="($event.target as HTMLInputElement).select()"
-                      class="w-full px-2 py-1.5 text-sm border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono"
-                      :class="{
-                        'border-yellow-300 bg-yellow-50': item.customRate !== null && item.customRate !== '',
-                        'border-gray-300': !(item.customRate !== null && item.customRate !== '')
-                      }"
-                      placeholder="Kur"
-                      inputmode="decimal"
-                      :disabled="!selectedOfficeId || !selectedVaultId"
-                    />
-                  </div>
-
-                  <!-- Delete Button -->
-                  <button
-                    v-if="exchangeItems.length > 1"
-                    @click="removeExchangeItem(index)"
-                    class="text-red-600 hover:text-red-700 hover:bg-red-50 p-1.5 rounded flex-shrink-0"
-                  >
-                    <span class="material-symbols-outlined text-lg">delete</span>
-                  </button>
-                </div>
-
-                <!-- External Market Rates - Full Width at Bottom -->
-                <div v-if="getExternalRatesForItem(item).length > 0" class="mt-2 pt-2 border-t border-gray-300">
-                  <div class="text-xs font-medium text-gray-600 mb-1.5 flex items-center gap-1">
-                    <span class="material-symbols-outlined text-xs">trending_up</span>
-                    Piyasa Kurları
-                  </div>
-                  <div class="flex flex-wrap gap-1.5">
-                    <div class="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-300 rounded shadow-sm">
-                      <span class="font-bold text-purple-700 text-xs">Sistem:</span>
-                      <span class="font-mono text-purple-900 font-bold text-sm">{{ formatNumber(item.exchangeRate, 4) }}</span>
-                    </div>
-                    <div
-                      v-for="rate in getExternalRatesForItem(item)"
-                      :key="rate.source"
-                      class="flex items-center gap-1 px-2 py-1 bg-white rounded border-2 shadow-sm transition-all hover:shadow-md"
-                      :class="{
-                        'border-green-400 bg-green-50': rate.displayRate && item.exchangeRate && rate.displayRate < item.exchangeRate,
-                        'border-red-400 bg-red-50': rate.displayRate && item.exchangeRate && rate.displayRate > item.exchangeRate,
-                        'border-gray-300': !rate.displayRate || !item.exchangeRate || rate.displayRate === item.exchangeRate
-                      }"
-                    >
-                      <span class="font-bold text-gray-700 text-xs">{{ rate.source }}:</span>
-                      <span class="font-mono font-semibold text-sm"
-                        :class="{
-                          'text-green-700': rate.displayRate && item.exchangeRate && rate.displayRate < item.exchangeRate,
-                          'text-red-700': rate.displayRate && item.exchangeRate && rate.displayRate > item.exchangeRate,
-                          'text-gray-900': !rate.displayRate || !item.exchangeRate || rate.displayRate === item.exchangeRate
-                        }"
-                      >{{ rate.displayRate ? formatNumber(rate.displayRate, 4) : '-' }}</span>
-                    </div>
-                  </div>
-                </div>
+              <!-- WAC Info -->
+              <div v-if="transactionType === 'sell' && item.sourceCurrencyId && item.sourceCurrencyId !== tryId && getWacForCurrency(item.sourceCurrencyId) > 0" class="ex-wac-row">
+                <span class="ex-wac-label">WAC Maliyet:</span>
+                <span class="ex-wac-value" :class="isSellBelowWac(item) ? 'ex-wac-value--loss' : 'ex-wac-value--ok'">
+                  {{ formatNumber(getWacForCurrency(item.sourceCurrencyId), 4) }} ₺
+                </span>
+                <span v-if="isSellBelowWac(item)" class="ex-wac-warn">
+                  <span class="material-symbols-outlined ex-icon-filled" style="font-size:16px">warning</span>
+                  Maliyetin altında!
+                </span>
               </div>
+
+
+
             </div>
           </div>
         </div>
 
         <!-- Notes -->
-        <div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-          <button
-            @click="showNotes = !showNotes"
-            class="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
-          >
-            <div class="flex items-center gap-2">
-              <span class="material-symbols-outlined text-gray-600">{{ showNotes ? 'expand_less' : 'expand_more' }}</span>
-              <span class="text-sm font-medium text-gray-700">{{ t('exchange.notes.label') }}</span>
-              <span v-if="notes" class="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">Not var</span>
+        <div class="ex-card">
+          <button @click="showNotes = !showNotes" class="ex-notes-toggle">
+            <div class="ex-notes-toggle-left">
+              <span class="material-symbols-outlined" style="font-size:18px">edit_note</span>
+              <span>{{ t('exchange.notes.label') }}</span>
+              <span v-if="notes" class="ex-notes-badge">Not var</span>
             </div>
-            <span class="material-symbols-outlined text-gray-400">{{ showNotes ? 'remove' : 'add' }}</span>
+            <span class="material-symbols-outlined" style="font-size:18px">{{ showNotes ? 'expand_less' : 'expand_more' }}</span>
           </button>
-
-          <div v-if="showNotes" class="px-6 pb-6 pt-2">
+          <div v-if="showNotes" class="ex-notes-body">
             <textarea
               v-model="notes"
               rows="3"
-              class="notes-textarea"
+              class="ex-textarea"
               :placeholder="t('exchange.notes.placeholder')"
               :disabled="!selectedOfficeId || !selectedVaultId"
             ></textarea>
@@ -1592,323 +2038,203 @@ watch(() => exchangeItems.value.map(item => ({
         </div>
       </div>
 
-      <!-- Right Column: Summary & USDT -->
-      <div class="space-y-6">
-        <!-- Transaction Summary -->
-        <div class="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-xl shadow-lg overflow-hidden">
-          <div class="bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-4">
-            <h3 class="text-lg font-semibold text-white flex items-center gap-2">
-              <span class="material-symbols-outlined">receipt_long</span>
-              {{ t('exchange.summary.title') }}
-            </h3>
+      <!-- Right: Summary -->
+      <div class="ex-summary-col">
+        <div class="ex-card ex-summary-card">
+          <div class="ex-summary-header">
+            <span class="material-symbols-outlined ex-icon-filled">receipt_long</span>
+            {{ t('exchange.summary.title') }}
           </div>
-          <div class="p-6">
-            
-            <!-- Balance Check for Selling -->
-            <div v-if="transactionType === 'sell' && balanceCheck" class="mb-4">
-              <div 
-                class="p-3 rounded-lg border"
-                :class="{
-                  'bg-blue-50 border-blue-200': isBalanceSufficient,
-                  'bg-red-50 border-red-200': !isBalanceSufficient
-                }"
-              >
-                <div class="flex items-center gap-2 text-sm">
-                  <span 
-                    class="material-symbols-outlined"
-                    :class="{
-                      'text-blue-600': isBalanceSufficient,
-                      'text-red-600': !isBalanceSufficient
-                    }"
-                  >
-                    {{ isBalanceSufficient ? 'account_balance' : 'error' }}
-                  </span>
-                  <div>
-                    <p class="font-medium" :class="{
-                      'text-blue-900': isBalanceSufficient,
-                      'text-red-900': !isBalanceSufficient
-                    }">
-                      {{ t('exchange.summary.vaultBalance') }} {{ !isBalanceSufficient ? '(' + t('exchange.summary.insufficient') + ')' : '' }}
-                    </p>
-                    <p :class="{
-                      'text-blue-700': isBalanceSufficient,
-                      'text-red-700': !isBalanceSufficient
-                    }">
-                      {{ t('exchange.summary.available') }}: {{ formatNumber(balanceCheck.balance) }} {{ balanceCheck.currencyCode }}
-                      <span v-if="totalForeignCurrencyNeeded > 0">
-                        / {{ t('exchange.summary.required') }}: {{ formatNumber(totalForeignCurrencyNeeded) }}
-                      </span>
-                    </p>
-                  </div>
-                </div>
+
+          <div class="ex-summary-body">
+            <!-- Balance Check -->
+            <div v-if="transactionType === 'sell' && balanceCheck" class="ex-balance-check" :class="isBalanceSufficient ? 'ex-balance-check--ok' : 'ex-balance-check--low'">
+              <span class="material-symbols-outlined ex-icon-filled">{{ isBalanceSufficient ? 'account_balance' : 'error' }}</span>
+              <div>
+                <p class="ex-balance-title">
+                  {{ t('exchange.summary.vaultBalance') }}
+                  <span v-if="!isBalanceSufficient"> ({{ t('exchange.summary.insufficient') }})</span>
+                </p>
+                <p class="ex-balance-detail">
+                  {{ t('exchange.summary.available') }}: {{ formatNumber(balanceCheck.balance) }} {{ balanceCheck.currencyCode }}
+                  <span v-if="totalForeignCurrencyNeeded > 0"> / {{ t('exchange.summary.required') }}: {{ formatNumber(totalForeignCurrencyNeeded) }}</span>
+                </p>
               </div>
             </div>
 
-            <!-- Summary Table -->
-            <div class="mb-4">
-              <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{{ t('exchange.summary.details') }}</div>
-
-              <!-- Single Item - Full Card -->
-              <div v-if="exchangeItems.length === 1" class="space-y-3">
-                <div
-                  v-for="item in exchangeItems"
-                  :key="item.id"
-                  class="bg-gradient-to-r from-gray-50 to-white rounded-lg p-4 border border-gray-200"
-                >
-                  <!-- Received Amount (Prominent) -->
-                  <div class="mb-3 pb-3 border-b border-gray-200">
-                    <div class="text-xs text-gray-500 mb-1">
-                      {{ t('exchange.summary.receivedFromCustomer') }}
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <div class="flex items-center gap-1">
-                        <span v-if="getCurrencyById(transactionType === 'buy' ? item.sourceCurrencyId : item.targetCurrencyId)?.currencyCode === 'USDT'"
-                              class="text-green-600 font-bold text-xl">₮</span>
-                        <span v-else-if="getCurrencyById(transactionType === 'buy' ? item.sourceCurrencyId : item.targetCurrencyId)?.currencyCode === 'KRUB'"
-                              class="text-lg">💳</span>
-                        <i v-else-if="getCurrencyCountryCode(getCurrencyById(transactionType === 'buy' ? item.sourceCurrencyId : item.targetCurrencyId)?.currencyCode || '')"
-                           :class="`fi fi-${getCurrencyCountryCode(getCurrencyById(transactionType === 'buy' ? item.sourceCurrencyId : item.targetCurrencyId)?.currencyCode || '')}`"
-                           class="text-xl"></i>
-                      </div>
-                      <div>
-                        <span class="text-green-600 text-2xl font-bold">
-                          +{{ formatNumber(transactionType === 'buy' ? item.sourceAmount : item.targetAmount) }}
-                        </span>
-                        <span class="text-lg font-semibold text-gray-700 ml-1">
-                          {{ getCurrencyById(transactionType === 'buy' ? item.sourceCurrencyId : item.targetCurrencyId)?.currencyCode || '-' }}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Exchange Details -->
-                  <div class="flex items-center justify-between">
-                    <div class="text-xs text-gray-500">
-                      {{ t('exchange.summary.exchangeRate') }}: {{ formatNumber(item.exchangeRate) }}
-                      <span v-if="item.customRate" class="ml-1 bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded text-xs font-medium">{{ t('exchange.operations.customRate') }}</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <span class="material-symbols-outlined text-gray-400 text-lg">swap_horiz</span>
-                      <div class="text-right">
-                        <div class="text-xs text-gray-500">
-                          {{ transactionType === 'buy' ? t('exchange.summary.givenFromVault') : t('exchange.summary.givenToCustomer') }}
-                        </div>
-                        <div class="flex items-center gap-1">
-                          <span v-if="getCurrencyById(transactionType === 'buy' ? item.targetCurrencyId : item.sourceCurrencyId)?.currencyCode === 'USDT'"
-                                class="text-green-600 font-bold">₮</span>
-                          <span v-else-if="getCurrencyById(transactionType === 'buy' ? item.targetCurrencyId : item.sourceCurrencyId)?.currencyCode === 'KRUB'"
-                                class="text-sm">💳</span>
-                          <i v-else-if="getCurrencyCountryCode(getCurrencyById(transactionType === 'buy' ? item.targetCurrencyId : item.sourceCurrencyId)?.currencyCode || '')"
-                             :class="`fi fi-${getCurrencyCountryCode(getCurrencyById(transactionType === 'buy' ? item.targetCurrencyId : item.sourceCurrencyId)?.currencyCode || '')}`"
-                             class="text-sm"></i>
-                          <span class="text-red-600 font-bold">
-                            -{{ formatNumber(transactionType === 'buy' ? item.targetAmount : item.sourceAmount) }}
-                          </span>
-                          <span class="font-medium text-gray-700 text-sm ml-0.5">
-                            {{ getCurrencyById(transactionType === 'buy' ? item.targetCurrencyId : item.sourceCurrencyId)?.currencyCode }}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Multiple Items - Compact List -->
-              <div v-else class="bg-gradient-to-r from-gray-50 to-white rounded-lg p-3 border border-gray-200 space-y-1.5">
-                <div
-                  v-for="(item, index) in exchangeItems"
-                  :key="item.id"
-                  class="flex items-center justify-between py-1.5 border-b border-gray-100 last:border-0"
-                >
-                  <span class="text-xs text-gray-500 w-8">#{{ index + 1 }}</span>
-                  <div class="flex items-center gap-1.5 flex-1">
+            <!-- Items Summary -->
+            <div class="ex-summary-section">
+              <div class="ex-summary-section-title">{{ t('exchange.summary.details') }}</div>
+              <div class="ex-summary-items">
+                <div v-for="(item, index) in exchangeItems" :key="item.id" class="ex-summary-row">
+                  <span class="ex-summary-num">#{{ index + 1 }}</span>
+                  <div class="ex-summary-from">
                     <i v-if="getCurrencyCountryCode(getCurrencyById(transactionType === 'buy' ? item.sourceCurrencyId : item.targetCurrencyId)?.currencyCode || '')"
                        :class="`fi fi-${getCurrencyCountryCode(getCurrencyById(transactionType === 'buy' ? item.sourceCurrencyId : item.targetCurrencyId)?.currencyCode || '')}`"
-                       class="text-sm"></i>
-                    <span class="text-green-600 font-bold text-sm">
+                       style="font-size:14px"></i>
+                    <span class="ex-summary-amount ex-summary-amount--in">
                       +{{ formatNumber(transactionType === 'buy' ? item.sourceAmount : item.targetAmount) }}
                     </span>
-                    <span class="text-xs font-medium text-gray-700">
-                      {{ getCurrencyById(transactionType === 'buy' ? item.sourceCurrencyId : item.targetCurrencyId)?.currencyCode }}
+                    <span class="ex-summary-code">
+                      {{ getCurrencyById(transactionType === 'buy' ? item.sourceCurrencyId : item.targetCurrencyId)?.currencyCode || '-' }}
                     </span>
                   </div>
-                  <span class="material-symbols-outlined text-gray-300 text-sm">arrow_forward</span>
-                  <div class="flex items-center gap-1.5 flex-1 justify-end">
+                  <span class="material-symbols-outlined" style="font-size:14px;color:#d1d5db">arrow_forward</span>
+                  <div class="ex-summary-to">
                     <i v-if="getCurrencyCountryCode(getCurrencyById(transactionType === 'buy' ? item.targetCurrencyId : item.sourceCurrencyId)?.currencyCode || '')"
                        :class="`fi fi-${getCurrencyCountryCode(getCurrencyById(transactionType === 'buy' ? item.targetCurrencyId : item.sourceCurrencyId)?.currencyCode || '')}`"
-                       class="text-sm"></i>
-                    <span class="text-red-600 font-bold text-sm">
+                       style="font-size:14px"></i>
+                    <span class="ex-summary-amount ex-summary-amount--out">
                       -{{ formatNumber(transactionType === 'buy' ? item.targetAmount : item.sourceAmount) }}
                     </span>
-                    <span class="text-xs font-medium text-gray-700">
-                      {{ getCurrencyById(transactionType === 'buy' ? item.targetCurrencyId : item.sourceCurrencyId)?.currencyCode }}
+                    <span class="ex-summary-code">
+                      {{ getCurrencyById(transactionType === 'buy' ? item.targetCurrencyId : item.sourceCurrencyId)?.currencyCode || '-' }}
                     </span>
                   </div>
+                  <span v-if="item.customRate !== null && item.customRate !== ''" class="ex-custom-badge" style="margin-left:4px">Ö</span>
                 </div>
               </div>
             </div>
 
             <!-- Grand Total -->
-            <div class="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-4 border border-purple-200">
-              <div class="flex items-center justify-between mb-2">
-                <span class="text-sm font-medium text-gray-700 flex items-center gap-1">
-                  <span class="material-symbols-outlined text-purple-600 text-lg">payments</span>
-                  {{ t('exchange.summary.paymentAmount') }}
+            <div class="ex-grand-total">
+              <div class="ex-grand-total-label">
+                <span class="material-symbols-outlined ex-icon-filled" style="font-size:18px">payments</span>
+                {{ t('exchange.summary.paymentAmount') }}
+              </div>
+              <div v-for="total in grandTotal" :key="total.currencyCode" class="ex-grand-total-row">
+                <div class="ex-grand-total-left">
+                  <span v-if="total.currencyCode === 'USDT'" class="ex-chip-crypto" style="font-size:16px">₮</span>
+                  <span v-else-if="total.currencyCode === 'KRUB'" class="material-symbols-outlined ex-icon-filled" style="font-size:16px">credit_card</span>
+                  <i v-else-if="getCurrencyCountryCode(total.currencyCode)" :class="`fi fi-${getCurrencyCountryCode(total.currencyCode)}`" style="font-size:16px"></i>
+                  <span>{{ total.currencyCode }}</span>
+                </div>
+                <span class="ex-grand-total-val">{{ formatNumber(total.amount) }}</span>
+              </div>
+              <div v-if="grandTotal.length === 0" class="ex-grand-total-empty">{{ t('exchange.summary.noTransaction') }}</div>
+
+              <!-- TRY total for sell -->
+              <div v-if="transactionType === 'sell' && totalTryAmount > 0" class="ex-try-total">
+                <span>Müşteriden Alınacak:</span>
+                <span class="ex-grand-total-val">{{ formatNumber(totalTryAmount) }} <i class="fi fi-tr" style="font-size:14px"></i></span>
+              </div>
+            </div>
+
+            <!-- WAC Warning + Owner Override -->
+            <div v-if="transactionType === 'sell' && exchangeItems.some(item => isSellBelowWac(item))" class="ex-wac-block">
+              <div class="ex-wac-block-title">
+                <span class="material-symbols-outlined ex-icon-filled" style="font-size:18px">error</span>
+                Satış kuru WAC maliyetinin altında — zarar edilecek!
+              </div>
+              <label v-if="authStore.isOwner" class="ex-wac-override">
+                <input type="checkbox" v-model="ownerOverrideLoss" class="ex-checkbox" />
+                <span>Patron Onayı: Zararına satışa izin ver</span>
+              </label>
+              <p v-else class="ex-wac-block-info">Bu satış yalnızca Owner yetkisiyle yapılabilir.</p>
+            </div>
+
+            <!-- Today Stats -->
+            <div v-if="todayTxCount > 0" class="ex-today-stats">
+              <div class="ex-today-row">
+                <span class="ex-today-label">
+                  <span class="material-symbols-outlined ex-icon-filled" style="font-size:14px">today</span>
+                  Bugünkü İşlemler
+                </span>
+                <span class="ex-today-val">{{ todayTxCount }}</span>
+              </div>
+              <div v-if="todayProfit !== null" class="ex-today-row">
+                <span class="ex-today-label">Toplam Kar</span>
+                <span class="ex-today-val" :class="todayProfit >= 0 ? 'ex-today-val--pos' : 'ex-today-val--neg'">
+                  {{ todayProfit >= 0 ? '+' : '' }}{{ formatNumber(todayProfit) }} ₺
                 </span>
               </div>
-              <div class="space-y-2">
-                <div v-for="total in grandTotal" :key="total.currencyCode" 
-                     class="flex justify-between items-center">
-                  <div class="flex items-center gap-2">
-                    <span v-if="total.currencyCode === 'USDT'" 
-                          class="text-green-600 font-bold">₮</span>
-                    <span v-else-if="total.currencyCode === 'KRUB'" 
-                          class="text-sm">💳</span>
-                    <i v-else-if="getCurrencyCountryCode(total.currencyCode)" 
-                       :class="`fi fi-${getCurrencyCountryCode(total.currencyCode)}`"
-                       class="text-lg"></i>
-                    <span class="font-medium text-gray-700">{{ total.currencyCode }}</span>
-                  </div>
-                  <span class="text-xl font-bold text-purple-700 font-mono">
-                    {{ formatNumber(total.amount) }}
-                  </span>
-                </div>
-                <div v-if="grandTotal.length === 0" class="text-center text-gray-500 text-sm py-2">
-                  {{ t('exchange.summary.noTransaction') }}
-                </div>
-                
-                <!-- Total TRY Amount - Only show for SELL transactions -->
-                <div v-if="transactionType === 'sell' && totalTryAmount > 0" class="mt-3 pt-3 border-t border-purple-200">
-                  <div class="flex justify-between items-center">
-                    <span class="text-sm font-medium text-gray-700">
-                      Müşteriden Alınacak Toplam:
-                    </span>
-                    <div class="flex items-center gap-1">
-                      <span class="text-xl font-bold text-purple-700 font-mono">
-                        {{ formatNumber(totalTryAmount) }}
-                      </span>
-                      <i class="fi fi-tr text-lg"></i>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
 
-            <!-- Submit Button -->
+            <!-- Submit -->
             <button
               @click="submitExchange"
-              :disabled="isLoading || exchangeItems.length === 0 || !selectedOfficeId || !selectedVaultId"
-              class="w-full mt-6 px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white font-semibold rounded-xl hover:from-green-700 hover:to-green-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+              :disabled="isLoading || exchangeItems.length === 0 || !selectedOfficeId || !selectedVaultId || (transactionType === 'sell' && exchangeItems.some(item => isSellBelowWac(item)) && !ownerOverrideLoss)"
+              class="ex-submit-btn"
+              :class="transactionType === 'buy' ? 'ex-submit-btn--buy' : 'ex-submit-btn--sell'"
             >
               <span v-if="isLoading" class="material-symbols-outlined animate-spin">refresh</span>
-              <span v-else class="material-symbols-outlined">check_circle</span>
-              <span>{{ isLoading ? t('exchange.summary.processing') : t('exchange.summary.submit') }}</span>
+              <span v-else class="material-symbols-outlined ex-icon-filled">check_circle</span>
+              {{ isLoading ? t('exchange.summary.processing') : t('exchange.summary.submit') }}
+              <span v-if="!isLoading" class="ex-submit-hint">Ctrl+Enter</span>
             </button>
-          </div>
-        </div>
 
-        <!-- Vault Count Warning (if admin) -->
-        <div v-if="showVaultCountWarning" class="bg-gradient-to-br from-white to-gray-50 border-2 border-amber-400 rounded-xl shadow-lg overflow-hidden">
-          <div class="bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-3">
-            <h3 class="text-base font-bold text-white flex items-center gap-2">
-              <span class="material-symbols-outlined">inventory</span>
-              Kasa Sayımı Gerekli
-            </h3>
-          </div>
-          <div class="p-4">
-            <p class="text-sm text-amber-900 mb-3">
-              Bu kasa için sayım henüz yapılmamış. Lütfen en kısa sürede kasa sayımı yapın.
-            </p>
-            <button
-              @click="openManualVaultCounting"
-              class="w-full px-4 py-2.5 bg-gradient-to-r from-amber-600 to-orange-600 text-white font-semibold rounded-lg hover:from-amber-700 hover:to-orange-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
-            >
-              <span class="material-symbols-outlined text-lg">calculate</span>
-              <span>Sayım Yap</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Control Panel -->
-        <div class="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-xl shadow-lg overflow-hidden">
-          <div class="bg-gradient-to-r from-gray-700 to-gray-800 px-4 py-3">
-            <h3 class="text-base font-bold text-white flex items-center gap-2">
-              <span class="material-symbols-outlined">settings</span>
-              Kontrol Paneli
-            </h3>
-          </div>
-          <div class="p-4 space-y-3">
-            <!-- Office Selection -->
-            <div>
-              <label class="block text-xs font-medium text-gray-600 mb-1.5">Ofis</label>
-              <select
-                v-model="selectedOfficeId"
-                class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
-              >
-                <option value="">Ofis Seçin</option>
-                <option v-for="office in exchangeStore.offices" :key="office.officeId || office.id" :value="office.officeId || office.id">
-                  {{ office.officeName }}
-                </option>
-              </select>
-            </div>
-
-            <!-- Vault Selection -->
-            <div>
-              <label class="block text-xs font-medium text-gray-600 mb-1.5">Kasa</label>
-              <select
-                v-model="selectedVaultId"
-                :disabled="!selectedOfficeId"
-                class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
-              >
-                <option value="">Kasa Seçin</option>
-                <option v-for="vault in availableVaults" :key="vault.vaultId || vault.id" :value="vault.vaultId || vault.id">
-                  {{ vault.vaultName }}
-                </option>
-              </select>
-            </div>
-
-            <!-- Action Buttons -->
-            <div class="pt-2 space-y-2">
-              <!-- Refresh Rates Button -->
-              <button
-                @click="refreshRates"
-                :disabled="!selectedOfficeId || loadingExternalRates"
-                class="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
-              >
-                <span class="material-symbols-outlined text-base" :class="{ 'animate-spin': loadingExternalRates }">sync</span>
-                <span>Tüm Kurları Yenile</span>
-                <span v-if="refreshCountdown < 60" class="text-xs opacity-90">({{ refreshCountdown }}s)</span>
-              </button>
-
-              <!-- Vault Count Button -->
-              <button
-                @click="openManualVaultCounting"
-                :disabled="!selectedVaultId"
-                class="w-full px-3 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-gray-300 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
-              >
-                <span class="material-symbols-outlined text-base">calculate</span>
-                <span>Kasa Sayımı Yap</span>
-              </button>
-
-              <!-- Print Button -->
-              <button
-                @click="transactionHistoryRef?.printAllTransactions?.()"
-                :disabled="!selectedOfficeId"
-                class="w-full px-3 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
-              >
-                <span class="material-symbols-outlined text-base">print</span>
-                <span>Yazdır</span>
-              </button>
+            <!-- Receipt Panel -->
+            <div v-if="showReceiptPanel && lastReceipt" class="ex-receipt-panel">
+              <div class="ex-receipt-panel-header">
+                <span class="material-symbols-outlined ex-icon-filled" style="font-size:18px;color:#16a34a">check_circle</span>
+                <span class="ex-receipt-panel-title">İşlem Başarılı</span>
+                <button @click="showReceiptPanel = false" class="ex-receipt-panel-close">
+                  <span class="material-symbols-outlined" style="font-size:16px">close</span>
+                </button>
+              </div>
+              <div class="ex-receipt-panel-body">
+                <div v-for="(item, i) in lastReceipt.items" :key="i" class="ex-receipt-line">
+                  <span>{{ formatNumber(item.amount) }} {{ item.source }}</span>
+                  <span style="color:#9ca3af">→</span>
+                  <span>{{ formatNumber(item.total) }} {{ item.target }}</span>
+                  <span class="ex-receipt-rate">@ {{ formatNumber(item.rate, 4) }}</span>
+                </div>
+              </div>
+              <div class="ex-receipt-panel-actions">
+                <button @click="printReceipt()" class="ex-btn ex-btn--indigo ex-btn--sm">
+                  <span class="material-symbols-outlined ex-icon-filled" style="font-size:16px">print</span>
+                  Fiş Yazdır
+                </button>
+                <button @click="showReceiptPanel = false" class="ex-btn ex-btn--ghost ex-btn--sm">Kapat</button>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
-    
+
+    <!-- ═══ Rate Matrix ═══ -->
+    <div class="ex-matrix-section">
+      <div class="ex-card">
+        <div class="ex-card-header">
+          <h3 class="ex-card-title">
+            <span class="material-symbols-outlined ex-icon-filled" style="font-size:18px;color:#6366f1">grid_view</span>
+            Çapraz Kur Matrisi
+          </h3>
+        </div>
+        <div class="ex-matrix-wrap">
+          <table class="ex-matrix">
+            <thead>
+              <tr>
+                <th></th>
+                <th v-for="to in matrixCurrencies" :key="to">
+                  <i v-if="getCurrencyCountryCode(to)" :class="`fi fi-${getCurrencyCountryCode(to)}`" style="font-size:12px"></i>
+                  {{ to }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="from in matrixCurrencies" :key="from">
+                <td class="ex-matrix-label">
+                  <i v-if="getCurrencyCountryCode(from)" :class="`fi fi-${getCurrencyCountryCode(from)}`" style="font-size:12px"></i>
+                  {{ from }}
+                </td>
+                <td v-for="to in matrixCurrencies" :key="to"
+                    :class="{ 'ex-matrix-self': from === to, 'ex-matrix-cell': from !== to }"
+                    @click="from !== to && matrixToArbitrage(from, to)">
+                  <span v-if="from === to" class="ex-matrix-dash">—</span>
+                  <span v-else class="ex-matrix-rate">{{ rateMatrix[from]?.[to] ? formatNumber(rateMatrix[from][to], 4) : '-' }}</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <!-- Transaction History -->
-    <div class="mt-8 mb-6">
-      <TransactionHistory 
+    <div class="ex-history">
+      <TransactionHistory
         ref="transactionHistoryRef"
         :office-id="selectedOfficeId"
         :page-size="50"
@@ -1917,13 +2243,12 @@ watch(() => exchangeItems.value.map(item => ({
         :selected-date="new Date().toISOString().split('T')[0]"
       />
     </div>
-    
-    <!-- USDT Payments Modal -->
+
     <USDTPaymentsModal ref="usdtModalRef" />
   </div>
-  
-  <!-- Vault Counting Modal - OUTSIDE of conditional blocks so it's always mounted -->
-  <VaultCountingModal 
+
+  <!-- Global Modals -->
+  <VaultCountingModal
     ref="vaultCountingModalRef"
     :vault-id="currentVault?.vaultId || currentVault?.id || selectedVaultId"
     :vault-name="currentVault?.vaultName || availableVaults.find(v => (v.vaultId || v.id) === selectedVaultId)?.vaultName || ''"
@@ -1932,69 +2257,1267 @@ watch(() => exchangeItems.value.map(item => ({
     @complete="handleVaultCountComplete"
     @waiting-customer="handleWaitingCustomer"
   />
+
+  <DayClosureModal
+    v-if="showDayClosureModal"
+    :office-id="selectedOfficeId"
+    @closed="showDayClosureModal = false"
+    @done="onDayClosureDone"
+  />
 </template>
 
 <style scoped>
-/* Form Inputs */
-.amount-input,
-.rate-input,
-.notes-textarea,
-.form-select {
-  width: 100%;
-  padding: 0.75rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.5rem;
-  font-size: 1rem;
-  transition: all 0.3s ease;
-  outline: none;
+/* ═══ Design Tokens ═══ */
+:root {
+  --ex-radius: 16px;
+  --ex-border: #e2e8f0;
+  --ex-indigo: #6366f1;
+  --ex-purple: #7c3aed;
+  --ex-green: #16a34a;
+  --ex-red: #dc2626;
+  --ex-amber: #d97706;
+  --ex-shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
+  --ex-shadow-md: 0 4px 16px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
+  --ex-shadow-lg: 0 8px 32px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
+  --ex-shadow-glow-indigo: 0 0 20px rgba(99,102,241,0.15);
+  --ex-shadow-glow-green: 0 0 20px rgba(22,163,74,0.12);
+  --ex-shadow-glow-red: 0 0 20px rgba(220,38,38,0.12);
 }
 
-.form-select {
-  background-color: white;
+/* ═══ Page ═══ */
+.ex-page {
+  width: 100%;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 0 12px;
+}
+
+/* ═══ Overlays ═══ */
+.ex-overlay-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  text-align: center;
+  gap: 16px;
+}
+.ex-overlay-icon {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+.ex-overlay-icon--red { background: linear-gradient(135deg, #ef4444, #dc2626); }
+.ex-overlay-icon--amber { background: linear-gradient(135deg, #f59e0b, #d97706); }
+.ex-overlay-title { font-size: 26px; font-weight: 700; color: #111827; }
+.ex-overlay-desc { font-size: 16px; color: #6b7280; max-width: 400px; }
+.ex-overlay-hint { font-size: 14px; color: #d97706; }
+.ex-overlay-text { font-size: 16px; color: #6b7280; }
+.ex-spinner-wrap { width: 56px; height: 56px; }
+.ex-spinner { width: 100%; height: 100%; color: #6366f1; animation: spin 1s linear infinite; }
+
+/* ═══ Top Bar ═══ */
+.ex-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, rgba(99,102,241,0.04), rgba(124,58,237,0.03));
+  border: 1px solid rgba(99,102,241,0.08);
+  border-radius: var(--ex-radius);
+}
+.ex-topbar-left {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.ex-topbar-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #1e1b4b;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+.ex-topbar-right {
+  display: flex;
+  gap: 6px;
+}
+.ex-select-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ex-select-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+}
+.ex-select {
+  padding: 8px 32px 8px 12px;
+  border: 1px solid var(--ex-border);
+  border-radius: 10px;
+  font-size: 14px;
+  background: white;
   cursor: pointer;
   appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239333ea' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
-  background-position: right 0.5rem center;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236366f1' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 8px center;
   background-repeat: no-repeat;
-  background-size: 1.5em 1.5em;
-  padding-right: 2.5rem;
+  background-size: 1.2em;
+  min-width: 160px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.ex-select:focus { border-color: var(--ex-indigo); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); outline: none; }
+.ex-select:disabled { opacity: 0.5; cursor: not-allowed; background-color: #f9fafb; }
+
+.ex-topbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--ex-border);
+  border-radius: 12px;
+  background: white;
+  color: #64748b;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.25s;
+  box-shadow: var(--ex-shadow-sm);
+  position: relative;
+}
+.ex-topbar-btn:hover:not(:disabled) {
+  border-color: var(--ex-indigo);
+  color: var(--ex-indigo);
+  box-shadow: var(--ex-shadow-glow-indigo);
+  transform: translateY(-1px);
+}
+.ex-topbar-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.ex-countdown {
+  font-size: 9px;
+  color: white;
+  background: var(--ex-indigo);
+  border-radius: 8px;
+  padding: 1px 5px;
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  font-weight: 600;
+  line-height: 1.3;
 }
 
-.amount-input:focus,
-.rate-input:focus,
-.notes-textarea:focus,
-.form-select:focus {
-  border-color: #9333ea;
-  box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.1);
+/* ═══ Warning Banners ═══ */
+.ex-warning-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 20px;
+  border-radius: var(--ex-radius);
+  border: 1px solid rgba(239,68,68,0.2);
+  background: linear-gradient(135deg, #fef2f2, #fff1f2);
+  margin-bottom: 20px;
+  color: #991b1b;
+  box-shadow: 0 2px 8px rgba(239,68,68,0.08);
+}
+.ex-warning-banner--amber {
+  border-color: rgba(245,158,11,0.2);
+  background: linear-gradient(135deg, #fffbeb, #fef9c3);
+  color: #92400e;
+  box-shadow: 0 2px 8px rgba(245,158,11,0.08);
+}
+.ex-warning-title { font-weight: 700; font-size: 14px; }
+.ex-warning-desc { font-size: 13px; opacity: 0.85; margin-top: 2px; }
+
+/* ═══ Buy/Sell Toggle ═══ */
+.ex-type-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+.ex-type-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 20px 16px;
+  border-radius: var(--ex-radius);
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 14px;
+  position: relative;
+  overflow: hidden;
+}
+.ex-type-btn--buy-active {
+  background: linear-gradient(145deg, #dcfce7, #bbf7d0);
+  border-color: #22c55e;
+  color: #15803d;
+  box-shadow: 0 4px 16px rgba(34,197,94,0.2), inset 0 1px 0 rgba(255,255,255,0.5);
+}
+.ex-type-btn--sell-active {
+  background: linear-gradient(145deg, #fee2e2, #fecaca);
+  border-color: #ef4444;
+  color: #b91c1c;
+  box-shadow: 0 4px 16px rgba(239,68,68,0.2), inset 0 1px 0 rgba(255,255,255,0.5);
+}
+.ex-type-btn--inactive {
+  background: white;
+  border-color: var(--ex-border);
+  color: #94a3b8;
+  box-shadow: var(--ex-shadow-sm);
+}
+.ex-type-btn--inactive:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+  box-shadow: var(--ex-shadow-md);
+}
+.ex-type-label { font-weight: 800; font-size: 17px; letter-spacing: -0.01em; }
+.ex-type-desc { font-size: 12px; opacity: 0.75; }
+
+/* ═══ Quick Currency Bar ═══ */
+.ex-quick-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.ex-quick-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.ex-quick-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.ex-chip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border: 1.5px solid var(--ex-border);
+  border-radius: 24px;
+  background: white;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #475569;
+  box-shadow: var(--ex-shadow-sm);
+}
+.ex-chip:hover { transform: translateY(-2px); box-shadow: var(--ex-shadow-md); }
+.ex-chip--usd:hover { border-color: #22c55e; color: #15803d; background: #f0fdf4; }
+.ex-chip--eur:hover { border-color: #3b82f6; color: #1d4ed8; background: #eff6ff; }
+.ex-chip--rub:hover { border-color: #ef4444; color: #b91c1c; background: #fef2f2; }
+.ex-chip--krub:hover { border-color: #8b5cf6; color: #6b46c1; background: #f5f3ff; }
+.ex-chip--usdt:hover { border-color: #14b8a6; color: #0f766e; background: #f0fdfa; }
+.ex-chip--active {
+  box-shadow: 0 0 0 2px #6366f1, 0 4px 12px rgba(99,102,241,0.2);
+  border-color: #6366f1;
+  background: #f5f3ff;
+}
+.ex-chip--active.ex-chip--usd { box-shadow: 0 0 0 2px #22c55e, 0 4px 12px rgba(34,197,94,0.2); border-color: #22c55e; background: #f0fdf4; color: #15803d; }
+.ex-chip--active.ex-chip--eur { box-shadow: 0 0 0 2px #3b82f6, 0 4px 12px rgba(59,130,246,0.2); border-color: #3b82f6; background: #eff6ff; color: #1d4ed8; }
+.ex-chip--active.ex-chip--rub { box-shadow: 0 0 0 2px #ef4444, 0 4px 12px rgba(239,68,68,0.2); border-color: #ef4444; background: #fef2f2; color: #b91c1c; }
+.ex-chip--active.ex-chip--krub { box-shadow: 0 0 0 2px #8b5cf6, 0 4px 12px rgba(139,92,246,0.2); border-color: #8b5cf6; background: #f5f3ff; color: #6b46c1; }
+.ex-chip--active.ex-chip--usdt { box-shadow: 0 0 0 2px #14b8a6, 0 4px 12px rgba(20,184,166,0.2); border-color: #14b8a6; background: #f0fdfa; color: #0f766e; }
+.ex-chip-flag { font-size: 16px; }
+.ex-chip-crypto { font-weight: 800; font-size: 16px; color: #10b981; }
+
+/* ═══ Layout ═══ */
+.ex-layout {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 28px;
+  align-items: start;
+}
+@media (max-width: 1024px) {
+  .ex-layout { grid-template-columns: 1fr; }
 }
 
-.rate-input.custom-rate {
-  background-color: #fef3c7;
+.ex-form-col { display: flex; flex-direction: column; gap: 18px; }
+.ex-summary-col { position: sticky; top: 20px; }
+
+/* ═══ Cards ═══ */
+.ex-card {
+  background: white;
+  border: 1px solid var(--ex-border);
+  border-radius: var(--ex-radius);
+  overflow: hidden;
+  box-shadow: var(--ex-shadow-sm);
+  transition: box-shadow 0.3s;
+}
+.ex-card:hover { box-shadow: var(--ex-shadow-md); }
+.ex-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 22px;
+  border-bottom: 1px solid #f1f5f9;
+  background: linear-gradient(180deg, #fafbff, white);
+}
+.ex-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ex-card-body { padding: 20px 22px; display: flex; flex-direction: column; gap: 18px; }
+
+/* ═══ Exchange Item ═══ */
+.ex-item {
+  border: 1px solid var(--ex-border);
+  border-radius: 14px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+.ex-item--buy {
+  border-left: 4px solid #22c55e;
+  background: linear-gradient(135deg, #fafffe, #f0fdf4);
+}
+.ex-item--sell {
+  border-left: 4px solid #ef4444;
+  background: linear-gradient(135deg, #fffafa, #fef2f2);
+}
+.ex-item:hover {
+  box-shadow: var(--ex-shadow-md);
+  transform: translateY(-1px);
 }
 
-.notes-textarea {
+.ex-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ex-item-badge {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  padding: 5px 12px;
+  border-radius: 8px;
+}
+.ex-item-badge--buy {
+  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+  color: #15803d;
+  box-shadow: 0 1px 4px rgba(22,163,74,0.12);
+}
+.ex-item-badge--sell {
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
+  color: #b91c1c;
+  box-shadow: 0 1px 4px rgba(220,38,38,0.12);
+}
+.ex-item-delete {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.ex-item-delete:hover { background: #fee2e2; color: #ef4444; }
+
+.ex-item-currencies {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 8px;
+  align-items: end;
+}
+@media (max-width: 640px) {
+  .ex-item-currencies { grid-template-columns: 1fr; }
+  .ex-arrow-divider { display: none; }
+}
+.ex-arrow-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 4px;
+  color: #94a3b8;
+  width: 36px;
+  height: 36px;
+  background: #f1f5f9;
+  border-radius: 10px;
+  align-self: end;
+  margin-bottom: 4px;
+  flex-shrink: 0;
+}
+
+.ex-item-numbers {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+}
+@media (max-width: 640px) {
+  .ex-item-numbers { flex-wrap: wrap; }
+}
+
+/* ═══ Fields ═══ */
+.ex-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ex-field--grow { flex: 1; }
+.ex-field--result { flex: 0 0 auto; min-width: 120px; }
+.ex-field-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.ex-field-hint { font-size: 11px; color: #9ca3af; }
+
+.ex-input {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1.5px solid var(--ex-border);
+  border-radius: 12px;
+  font-size: 14px;
+  transition: all 0.25s;
+  outline: none;
+  background: white;
+}
+.ex-input:focus {
+  border-color: var(--ex-indigo);
+  box-shadow: 0 0 0 4px rgba(99,102,241,0.08);
+}
+.ex-input:disabled { opacity: 0.5; background: #f8fafc; }
+.ex-input--mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+.ex-input--custom {
+  background: linear-gradient(135deg, #fffbeb, #fef3c7);
+  border-color: #fbbf24;
+  box-shadow: 0 0 0 3px rgba(251,191,36,0.1);
+}
+
+.ex-result-value {
+  padding: 11px 14px;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  border: 1.5px solid var(--ex-border);
+  border-radius: 12px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+}
+.ex-result-code { font-size: 11px; color: #64748b; font-weight: 600; margin-left: 4px; }
+
+.ex-custom-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #fef3c7;
+  color: #92400e;
+}
+
+/* ═══ WAC ═══ */
+.ex-wac-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 6px 0 0;
+}
+.ex-wac-label { color: #6b7280; }
+.ex-wac-value { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; }
+.ex-wac-value--ok { color: #16a34a; }
+.ex-wac-value--loss { color: #dc2626; }
+.ex-wac-warn {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.ex-wac-block {
+  padding: 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+}
+.ex-wac-block-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #b91c1c;
+  margin-bottom: 8px;
+}
+.ex-wac-override {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #dc2626;
+  font-weight: 500;
+  cursor: pointer;
+}
+.ex-wac-block-info { font-size: 12px; color: #dc2626; }
+.ex-checkbox { width: 16px; height: 16px; accent-color: #dc2626; }
+
+/* ═══ Market Rates ═══ */
+.ex-market-rates {
+  padding-top: 12px;
+  border-top: 1px solid #f3f4f6;
+}
+.ex-market-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+.ex-market-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ex-market-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--ex-border);
+  background: white;
+  font-size: 12px;
+}
+.ex-market-chip--system { background: #ede9fe; border-color: #c4b5fd; }
+.ex-market-chip--low { background: #f0fdf4; border-color: #86efac; }
+.ex-market-chip--high { background: #fef2f2; border-color: #fca5a5; }
+.ex-market-source { font-weight: 600; color: #374151; }
+.ex-market-val { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 500; color: #111827; }
+
+/* ═══ Notes ═══ */
+.ex-notes-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #374151;
+  font-size: 14px;
+}
+.ex-notes-toggle:hover { background: #f9fafb; }
+.ex-notes-toggle-left { display: flex; align-items: center; gap: 8px; }
+.ex-notes-badge { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 10px; background: #dbeafe; color: #1d4ed8; }
+.ex-notes-body { padding: 0 16px 16px; }
+.ex-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--ex-border);
+  border-radius: 10px;
+  font-size: 14px;
   resize: none;
-  min-height: 80px;
+  min-height: 72px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.ex-textarea:focus { border-color: var(--ex-indigo); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+
+/* ═══ Summary Card ═══ */
+.ex-summary-card {
+  border: 1px solid rgba(99,102,241,0.2);
+  box-shadow: var(--ex-shadow-md), var(--ex-shadow-glow-indigo);
+  border-radius: 18px;
+}
+.ex-summary-card:hover { box-shadow: var(--ex-shadow-lg), var(--ex-shadow-glow-indigo); }
+.ex-summary-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 22px;
+  background: linear-gradient(135deg, #6366f1, #7c3aed);
+  color: white;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.ex-summary-body { padding: 18px 22px; display: flex; flex-direction: column; gap: 16px; }
+
+/* Balance Check */
+.ex-balance-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+.ex-balance-check--ok { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; }
+.ex-balance-check--low { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+.ex-balance-title { font-weight: 600; }
+.ex-balance-detail { font-size: 12px; margin-top: 2px; }
+
+/* Summary Section */
+.ex-summary-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #9ca3af;
+  margin-bottom: 8px;
+}
+.ex-summary-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  border-radius: 12px;
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+}
+.ex-summary-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  padding: 6px 4px;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+.ex-summary-row:hover { background: rgba(99,102,241,0.04); }
+.ex-summary-row:last-child { border-bottom: none; }
+.ex-summary-num {
+  font-size: 10px;
+  color: white;
+  background: #94a3b8;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-weight: 700;
+}
+.ex-summary-from, .ex-summary-to { display: flex; align-items: center; gap: 4px; flex: 1; }
+.ex-summary-to { justify-content: flex-end; }
+.ex-summary-amount { font-weight: 700; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13px; }
+.ex-summary-amount--in { color: #16a34a; }
+.ex-summary-amount--out { color: #dc2626; }
+.ex-summary-code { font-size: 11px; font-weight: 600; color: #64748b; }
+
+/* Grand Total */
+.ex-grand-total {
+  background: linear-gradient(145deg, #f5f3ff, #eef2ff, #faf5ff);
+  border: 1px solid rgba(99,102,241,0.15);
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
+}
+.ex-grand-total-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4338ca;
+  margin-bottom: 10px;
+}
+.ex-grand-total-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+.ex-grand-total-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  color: #374151;
+  font-size: 14px;
+}
+.ex-grand-total-val {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 18px;
+  font-weight: 700;
+  color: #4338ca;
+}
+.ex-grand-total-empty { text-align: center; font-size: 13px; color: #9ca3af; padding: 8px 0; }
+.ex-try-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #c4b5fd;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
 }
 
-/* Material Symbols */
+/* ═══ Submit Button ═══ */
+.ex-submit-btn {
+  width: 100%;
+  padding: 16px;
+  border: none;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 800;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: 0.02em;
+  position: relative;
+  overflow: hidden;
+}
+.ex-submit-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 60%);
+  pointer-events: none;
+}
+.ex-submit-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+.ex-submit-btn:active:not(:disabled) { transform: translateY(0); }
+.ex-submit-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.ex-submit-btn--buy {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  box-shadow: 0 4px 16px rgba(22,163,74,0.35);
+}
+.ex-submit-btn--buy:hover:not(:disabled) {
+  box-shadow: 0 8px 28px rgba(22,163,74,0.4);
+}
+.ex-submit-btn--sell {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  box-shadow: 0 4px 16px rgba(220,38,38,0.35);
+}
+.ex-submit-btn--sell:hover:not(:disabled) {
+  box-shadow: 0 8px 28px rgba(220,38,38,0.4);
+}
+
+/* ═══ Buttons ═══ */
+.ex-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.ex-btn--sm { padding: 6px 14px; font-size: 13px; border-radius: 8px; }
+.ex-btn--red { background: linear-gradient(135deg, #ef4444, #dc2626); }
+.ex-btn--red:hover { background: linear-gradient(135deg, #dc2626, #b91c1c); }
+.ex-btn--amber { background: linear-gradient(135deg, #f59e0b, #d97706); }
+.ex-btn--amber:hover { background: linear-gradient(135deg, #d97706, #b45309); }
+.ex-btn--indigo { background: linear-gradient(135deg, #6366f1, #4f46e5); }
+.ex-btn--indigo:hover { background: linear-gradient(135deg, #4f46e5, #4338ca); }
+
+/* ═══ Today Stats ═══ */
+.ex-today-stats {
+  background: linear-gradient(135deg, #f0fdf4, #ecfdf5);
+  border: 1px solid rgba(22,163,74,0.15);
+  border-radius: 12px;
+  padding: 12px 16px;
+  box-shadow: 0 2px 8px rgba(22,163,74,0.06);
+}
+.ex-today-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 0;
+}
+.ex-today-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #374151;
+  font-weight: 500;
+}
+.ex-today-val {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: #15803d;
+}
+.ex-today-val--pos { color: #16a34a; }
+.ex-today-val--neg { color: #dc2626; }
+
+.ex-submit-hint {
+  font-size: 10px;
+  font-weight: 500;
+  opacity: 0.7;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.2);
+  margin-left: 6px;
+}
+
+/* ═══ Receipt Panel ═══ */
+.ex-receipt-panel {
+  margin-top: 12px;
+  background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+  border: 1px solid #86efac;
+  border-radius: var(--ex-radius);
+  overflow: hidden;
+  animation: ex-slide-down 0.25s ease;
+}
+@keyframes ex-slide-down {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.ex-receipt-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #bbf7d0;
+}
+.ex-receipt-panel-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #15803d;
+}
+.ex-receipt-panel-close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 2px;
+  border-radius: 4px;
+  display: flex;
+}
+.ex-receipt-panel-close:hover { background: rgba(0,0,0,0.06); }
+.ex-receipt-panel-body { padding: 8px 14px; }
+.ex-receipt-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: 13px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  color: #1f2937;
+}
+.ex-receipt-rate {
+  margin-left: auto;
+  font-size: 11px;
+  color: #6b7280;
+}
+.ex-receipt-panel-actions {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid #bbf7d0;
+  justify-content: flex-end;
+}
+.ex-btn--ghost {
+  background: transparent;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  transition: all 0.15s;
+}
+.ex-btn--ghost:hover { background: #f3f4f6; color: #374151; }
+
+/* ═══ History ═══ */
+.ex-history { margin-top: 36px; margin-bottom: 28px; }
+
+/* ═══ Icons ═══ */
 .material-symbols-outlined {
-  font-variation-settings: 
-    'FILL' 0,
-    'wght' 400,
-    'GRAD' 0,
-    'opsz' 24;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+.ex-icon-filled {
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+.ex-icon-xs { font-size: 16px; }
+
+/* ═══ Position Bar ═══ */
+.ex-pos-bar {
+  background: linear-gradient(135deg, #fafbff, #f5f3ff);
+  border: 1px solid rgba(99,102,241,0.1);
+  border-radius: var(--ex-radius);
+  margin-bottom: 20px;
+  overflow: hidden;
+  box-shadow: var(--ex-shadow-sm);
+}
+.ex-pos-bar-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-bottom: 1px solid rgba(99,102,241,0.08);
+  font-size: 13px;
+  color: #6b7280;
+}
+.ex-pos-bar-title { font-weight: 700; color: #1e1b4b; letter-spacing: -0.01em; }
+.ex-pos-bar-total {
+  margin-left: auto;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: #4338ca;
+  background: rgba(99,102,241,0.08);
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+.ex-pos-bar-items {
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  padding: 8px 12px;
+}
+.ex-pos-bar-items::-webkit-scrollbar { height: 4px; }
+.ex-pos-bar-items::-webkit-scrollbar-thumb { background: #c4b5fd; border-radius: 2px; }
+.ex-pos-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 20px;
+  border-radius: 12px;
+  min-width: 110px;
+  cursor: pointer;
+  transition: all 0.25s;
+  position: relative;
+}
+.ex-pos-item:hover {
+  background: white;
+  box-shadow: var(--ex-shadow-md);
+  transform: translateY(-2px);
+}
+.ex-pos-top { display: flex; align-items: center; gap: 5px; }
+.ex-pos-code {
+  font-size: 11px;
+  font-weight: 800;
+  color: #4338ca;
+  letter-spacing: 0.5px;
+}
+.ex-pos-balance {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+}
+.ex-pos-details { display: flex; gap: 8px; align-items: center; }
+.ex-pos-wac {
+  font-size: 10px;
+  color: #64748b;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+.ex-pos-pnl {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+.ex-pnl--pos { color: #16a34a; background: rgba(22,163,74,0.08); }
+.ex-pnl--neg { color: #dc2626; background: rgba(220,38,38,0.08); }
+
+/* ═══ Terminal Mode Tabs ═══ */
+.ex-terminal-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  background: #f1f5f9;
+  border-radius: 14px;
+  padding: 4px;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.06);
+}
+.ex-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.ex-tab:hover { color: #334155; background: rgba(255,255,255,0.6); }
+.ex-tab--active {
+  background: white;
+  color: var(--ex-indigo);
+  box-shadow: 0 2px 8px rgba(99,102,241,0.15), 0 1px 3px rgba(0,0,0,0.06);
+}
+.ex-tab--active-arb {
+  background: linear-gradient(135deg, #fffbeb, #fef3c7);
+  color: #92400e;
+  box-shadow: 0 2px 8px rgba(217,119,6,0.15), 0 1px 3px rgba(0,0,0,0.06);
+}
+.ex-tab--active-batch {
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  color: #1e40af;
+  box-shadow: 0 2px 8px rgba(59,130,246,0.15), 0 1px 3px rgba(0,0,0,0.06);
+}
+.ex-tab-key {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0,0,0,0.06);
+  color: #94a3b8;
+  letter-spacing: 0.3px;
 }
 
-/* Animation */
+/* ═══ Arbitrage Header ═══ */
+.ex-arb-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, #fffbeb, #fef3c7);
+  border: 1px solid #fcd34d;
+  border-radius: var(--ex-radius);
+  gap: 12px;
+}
+.ex-arb-info { display: flex; align-items: center; gap: 12px; }
+.ex-arb-title { font-size: 15px; font-weight: 700; color: #92400e; }
+.ex-arb-desc { font-size: 12px; color: #a16207; margin-top: 2px; }
+.ex-arb-margin {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.ex-arb-margin-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #92400e;
+  white-space: nowrap;
+}
+.ex-arb-margin-input {
+  width: 70px;
+  padding: 6px 8px;
+  font-size: 13px;
+  border-radius: 8px;
+  text-align: center;
+}
+.ex-btn--amber {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+.ex-btn--amber:hover { background: linear-gradient(135deg, #d97706, #b45309); }
+.ex-btn--amber:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ═══ Batch Mode ═══ */
+.ex-batch-section { margin-bottom: 20px; }
+.ex-batch-form {
+  background: white;
+  border: 1px solid var(--ex-border);
+  border-radius: var(--ex-radius);
+  padding: 16px;
+}
+.ex-batch-form-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.ex-batch-toggle {
+  display: flex;
+  border: 1px solid var(--ex-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.ex-batch-type-btn {
+  padding: 6px 12px;
+  border: none;
+  background: white;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.ex-batch-type-btn:first-child { border-right: 1px solid var(--ex-border); }
+.ex-batch-type--buy { background: #dcfce7; color: #15803d; }
+.ex-batch-type--sell { background: #fee2e2; color: #b91c1c; }
+.ex-batch-arrow { color: #d1d5db; font-weight: 700; }
+.ex-batch-input { width: 100px; padding: 7px 10px; font-size: 13px; }
+.ex-batch-input--rate { width: 90px; }
+.ex-batch-input--note { width: 120px; flex: 1; min-width: 80px; }
+
+.ex-batch-queue {
+  margin-top: 12px;
+  background: white;
+  border: 1px solid var(--ex-border);
+  border-radius: var(--ex-radius);
+  overflow: hidden;
+}
+.ex-batch-queue-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+.ex-batch-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 13px;
+}
+.ex-batch-item:last-child { border-bottom: none; }
+.ex-batch-item-type {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 6px;
+  border-radius: 4px;
+}
+.ex-batch-item-detail {
+  flex: 1;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-weight: 500;
+  color: #111827;
+}
+.ex-batch-item-rate { color: #6b7280; font-size: 11px; }
+.ex-batch-item-note { font-size: 11px; color: #9ca3af; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ex-batch-totals {
+  display: flex;
+  gap: 12px;
+  padding: 10px 16px;
+  background: #f9fafb;
+  border-top: 1px solid #e5e7eb;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 600;
+}
+.ex-batch-total-item { white-space: nowrap; }
+
+/* ═══ Rate Matrix ═══ */
+.ex-matrix-section { margin-top: 28px; margin-bottom: 8px; }
+.ex-matrix-wrap { overflow-x: auto; padding: 12px 20px 16px; }
+.ex-matrix {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+.ex-matrix th {
+  padding: 10px 14px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 800;
+  color: #4338ca;
+  border-bottom: 2px solid #e2e8f0;
+  letter-spacing: 0.5px;
+}
+.ex-matrix td {
+  padding: 10px 14px;
+  text-align: center;
+  border-bottom: 1px solid #f1f5f9;
+}
+.ex-matrix tbody tr { transition: background 0.15s; }
+.ex-matrix tbody tr:hover { background: #faf5ff; }
+.ex-matrix tbody tr:nth-child(even) { background: #fafbff; }
+.ex-matrix tbody tr:nth-child(even):hover { background: #f5f3ff; }
+.ex-matrix-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 800;
+  color: #1e1b4b;
+  font-size: 12px;
+  text-align: left !important;
+  letter-spacing: 0.3px;
+}
+.ex-matrix-self { background: #f1f5f9 !important; }
+.ex-matrix-dash { color: #cbd5e1; }
+.ex-matrix-cell {
+  cursor: pointer;
+  transition: all 0.2s;
+  border-radius: 8px;
+}
+.ex-matrix-cell:hover {
+  background: #ede9fe !important;
+  box-shadow: inset 0 0 0 1px rgba(99,102,241,0.2);
+}
+.ex-matrix-rate {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-weight: 600;
+  color: #0f172a;
+  font-size: 12px;
+}
+
+/* ═══ Animation ═══ */
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+.animate-spin { animation: spin 1s linear infinite; }
 
-.animate-spin {
-  animation: spin 1s linear infinite;
+@media (max-width: 768px) {
+  .ex-pos-bar-items { flex-wrap: nowrap; }
+  .ex-terminal-tabs { overflow-x: auto; }
+  .ex-batch-form-row { flex-direction: column; align-items: stretch; }
+  .ex-batch-input { width: 100%; }
+  .ex-batch-input--rate { width: 100%; }
+  .ex-batch-input--note { width: 100%; }
+  .ex-tab-key { display: none; }
 }
 </style>

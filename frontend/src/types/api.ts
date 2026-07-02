@@ -180,25 +180,6 @@ export interface User {
   officeId?: number | string
 }
 
-export interface OfficeNode {
-  id: string | number
-  officeName: string
-  officeDescription?: string
-  officeImageUri?: string
-  address?: string
-  phone?: string
-  isActive: boolean
-  officeType: 'Merkez' | 'Sube' | 'Bayi' | string
-  parentOfficeId?: string | null
-  parentOfficeName?: string | null
-  dailyTransactionLimit?: number | null
-  monthlyTransactionLimit?: number | null
-  commissionRate?: number | null
-  vaultCount: number
-  userCount: number
-  children?: OfficeNode[]
-  createdDate: string
-}
 
 export interface OfficeTransfer {
   id: string
