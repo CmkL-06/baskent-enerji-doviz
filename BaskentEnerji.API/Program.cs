@@ -137,9 +137,18 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(key)
     };
 
-    // Token invalidation on password change
     options.Events = new JwtBearerEvents
     {
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["token"];
+            if (!string.IsNullOrEmpty(accessToken) &&
+                context.HttpContext.Request.Path.StartsWithSegments("/api/v1/tg/events"))
+            {
+                context.Token = accessToken;
+            }
+            return Task.CompletedTask;
+        },
         OnTokenValidated = async context =>
         {
             var dbContext = context.HttpContext.RequestServices.GetRequiredService<BaskentEnerji.Data.Contexts.BaskentEnerjiDbContext>();
@@ -222,11 +231,14 @@ builder.Services.AddScoped<IUserOfficeService, UserOfficeService>();
 builder.Services.AddScoped<IExchangeValidationService, ExchangeValidationService>();
 builder.Services.AddScoped<IExchangeReportingService, ExchangeReportingService>();
 builder.Services.AddScoped<IZReportService, ZReportService>();
+builder.Services.AddScoped<IWacService, WacService>();
+builder.Services.AddScoped<IDayClosureService, DayClosureService>();
 builder.Services.AddScoped<IOfficeServiceCommand, OfficeServiceCommand>();
 
 // Office Hierarchy & Transfer Services
 builder.Services.AddScoped<IOfficeHierarchyService, OfficeHierarchyService>();
 builder.Services.AddScoped<IOfficeTransferService, OfficeTransferService>();
+builder.Services.AddScoped<IAlertService, AlertService>();
 
 // Party Account Services
 builder.Services.AddScoped<IPartyService, PartyService>();
@@ -236,7 +248,6 @@ builder.Services.AddScoped<IPartyCreditService, PartyCreditService>();
 builder.Services.AddScoped<IPartyReportingService, PartyReportingService>();
 builder.Services.AddScoped<PartyTransactionIntegration>();
 builder.Services.AddScoped<ICacheClearService, CacheClearService>();
-builder.Services.AddScoped<ZReportService>();
 // Expense Services
 builder.Services.AddScoped<IExpenseDefinitionService, ExpenseDefinitionService>();
 builder.Services.AddScoped<IExpensePaymentService, ExpensePaymentService>();
@@ -247,7 +258,8 @@ builder.Services.AddScoped<ITRC20Service>(provider =>
 {
     var httpClientFactory = provider.GetRequiredService<IHttpClientFactory>();
     var logger = provider.GetRequiredService<ILogger<BinanceService>>();
-    return new BinanceService(httpClientFactory, logger);
+    var configuration = provider.GetRequiredService<IConfiguration>();
+    return new BinanceService(httpClientFactory, logger, configuration);
 });
 
 // Auto Rate Services
@@ -299,26 +311,12 @@ builder.Services.AddScoped<AnomalyDetectionService>();
 builder.Services.AddScoped<AutoRateUpdateService>();
 builder.Services.AddScoped<AutoRateUpdateJob>();
 
+var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowVueApp", builder =>
+    options.AddPolicy("AllowVueApp", policy =>
     {
-        builder.WithOrigins(
-            // Production domainler (sadece HTTPS)
-            "https://baskentenerji.com",
-            "https://www.baskentenerji.com",
-            "https://api.baskentenerji.com",
-            "https://oldapi.baskentenerji.com",
-            "https://tg.moneytransferturkey.com",
-            "https://moneytransferturkey.com",
-            "https://www.moneytransferturkey.com",
-            // Gelistirme ortami
-            "http://localhost:5173",
-            "https://localhost:5173",
-            "http://localhost:5093",
-            "http://127.0.0.1:5173",
-            "http://127.0.0.1:5093"
-        )
+        policy.WithOrigins(corsOrigins)
         .AllowAnyMethod()
         .AllowAnyHeader()
         .AllowCredentials();
@@ -356,6 +354,7 @@ if (!app.Environment.IsDevelopment())
         context.Response.Headers["X-Frame-Options"] = "SAMEORIGIN";
         context.Response.Headers["X-XSS-Protection"] = "1; mode=block";
         context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+        context.Response.Headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'";
         await next();
     });
     app.UseHttpsRedirection();

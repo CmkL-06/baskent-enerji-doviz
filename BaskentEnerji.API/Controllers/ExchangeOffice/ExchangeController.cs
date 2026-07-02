@@ -1,5 +1,7 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using System.Net;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using BaskentEnerji.Business.Exceptions;
 using BaskentEnerji.Business.Infrastructure.ExchangeOffice;
 using BaskentEnerji.Business.Infrastructure.ExchangeOffice.Expense;
 using BaskentEnerji.Business.Infrastructure.ExchangeOffice.Office;
@@ -49,8 +51,11 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         private readonly IExpenseDefinitionService _expenseDefinitionService;
         private readonly IExpensePaymentService _expensePaymentService;
         private readonly ITRC20Service _trc20Service;
+        private readonly IWacService _wacService;
+        private readonly IDayClosureService _dayClosureService;
         private readonly ILogger<ExchangeController> _logger;
         private readonly BaskentEnerjiDbContext _context;
+        private readonly ValidationService _permissionService;
         public ExchangeController(IExchangeServiceCommand command, IExchangeServiceQuery query,
              IVaultService vaultService,
             IExchangeTransactionService transactionService,
@@ -68,8 +73,11 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             IExpenseDefinitionService expenseDefinitionService,
             IExpensePaymentService expensePaymentService,
             ITRC20Service trc20Service,
+            IWacService wacService,
+            IDayClosureService dayClosureService,
             ILogger<ExchangeController> logger,
-            BaskentEnerjiDbContext context)
+            BaskentEnerjiDbContext context,
+            ValidationService permissionService)
         {
             _command = command;
             _query = query;
@@ -89,8 +97,11 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             _expenseDefinitionService = expenseDefinitionService;
             _expensePaymentService = expensePaymentService;
             _trc20Service = trc20Service;
+            _wacService = wacService;
+            _dayClosureService = dayClosureService;
             _logger = logger;
             _context = context;
+            _permissionService = permissionService;
         }
 
 
@@ -131,12 +142,16 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         [HttpPost("currency/delete/{id}")]
         public async Task RemoveCurrencyById(Guid id)
         {
+            if (!await _permissionService.IsAdminAsync())
+                throw new ApiException(HttpStatusCode.Forbidden, "Bu işlem için Admin yetkisi gereklidir.");
             await _command.DeleteCurrency(id);
         }
 
         [HttpPost("currency")]
         public async Task<IActionResult> SaveCurrency([FromBody] rm_savecurrency data)
         {
+            if (!await _permissionService.IsAdminAsync())
+                return StatusCode(403, new { error = "Bu işlem için Admin yetkisi gereklidir." });
             await _command.SaveCurrency(data);
             return Ok(new { message = "Currency saved successfully." });
         }
@@ -153,6 +168,8 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         [HttpPost("rate/delete/{id}")]
         public async Task<IActionResult> DeleteRate(Guid id)
         {
+            if (!await _permissionService.IsAdminAsync())
+                return StatusCode(403, new { error = "Bu işlem için Admin yetkisi gereklidir." });
             await _command.DeleteRate(id);
             return Ok(new { message = "Exchange rate deleted successfully." });
         }
@@ -231,17 +248,23 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         [HttpPost("vault/delete/{id}")]
         public async Task RemoveId(Guid id)
         {
+            if (!await _permissionService.IsAdminAsync())
+                throw new ApiException(HttpStatusCode.Forbidden, "Bu işlem için Admin yetkisi gereklidir.");
             await _vaultService.RemoveVault(id);
         }
 
         [HttpPost("office")]
         public async Task SaveOffice(rm_saveoffice data)
         {
+            if (!await _permissionService.IsOwnerAsync())
+                throw new ApiException(HttpStatusCode.Forbidden, "Bu işlem için Owner yetkisi gereklidir.");
             await _officeServiceCommand.SaveOffice(data);
         }
         [HttpPost("office/delete/{id}")]
         public async Task RemoveOffice(Guid id)
         {
+            if (!await _permissionService.IsOwnerAsync())
+                throw new ApiException(HttpStatusCode.Forbidden, "Bu işlem için Owner yetkisi gereklidir.");
             await _officeServiceCommand.RemoveOffice(id);
         }
 
@@ -253,6 +276,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         {
             try
             {
+                await _permissionService.ValidateOfficeAccessAsync(officeId);
                 var allVaults = await _vaultService.GetAllVaultSummariesAsync();
                 var officeVaults = allVaults.Where(v => v.OfficeId == officeId).ToList();
 
@@ -337,6 +361,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         {
             try
             {
+                await _permissionService.ValidateOfficeAccessAsync(officeId);
                 var rates = await _exchangeRateService.GetAllActiveRatesAsync(officeId);
                 return Ok(rates);
             }
@@ -355,6 +380,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         {
             try
             {
+                await _permissionService.ValidateOfficeAccessAsync(officeId);
                 var rate = await _exchangeRateService.GetCurrentRateAsync(officeId, sourceCurrencyId, targetCurrencyId);
                 if (rate == null)
                     return NotFound(new { error = "Exchange rate not found for this currency pair in the specified office" });
@@ -445,6 +471,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         {
             try
             {
+                await _permissionService.ValidateOfficeAccessAsync(officeId);
                 var history = await _exchangeRateService.GetRateHistoryAsync(
                     officeId,
                     sourceCurrencyId,
@@ -504,6 +531,8 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         [HttpPost("exchange/remove")]
         public async Task removeTransaction([FromBody]rm_removetransaction request)
         {
+            if (!await _permissionService.IsAdminAsync())
+                throw new ApiException(HttpStatusCode.Forbidden, "İşlem silme için Admin yetkisi gereklidir.");
             await _transactionService.RemoveTransaction(request);
         }
 
@@ -584,6 +613,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
                 // Apply additional filters
                 if (officeId.HasValue)
                 {
+                    await _permissionService.ValidateOfficeAccessAsync(officeId.Value);
                     transactions = transactions.Where(t => t.OfficeId == officeId.Value).ToList();
                 }
 
@@ -602,26 +632,36 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
                 var pagedTransactions = transactions
                     .Skip((page - 1) * pageSize)
                     .Take(pageSize)
-                    .Select(t => new
+                    .Select(t =>
                     {
-                        t.Id,
-                        t.TransactionNumber,
-                        t.Type,
-                        t.Status,
-                        t.TransactionDate,
-                        VaultName = t.VaultName,
-                        t.IsCustomRate,
-                        t.Profit,
-                        Details = t.Details.Select(d => new
+                        var sourceDetail = t.Details?.FirstOrDefault(d => d.CurrencyCode != "TRY") ?? t.Details?.FirstOrDefault();
+                        var targetDetail = t.Details?.FirstOrDefault(d => d.CurrencyCode == "TRY") ?? t.Details?.LastOrDefault();
+                        return new
                         {
-                            d.CurrencyId,
-                            CurrencyCode = d.CurrencyCode,
-                            d.Side,
-                            d.Amount,
-                            d.Rate,
-                            d.NetAmount
-                        }),
-                        t.Notes
+                            t.Id,
+                            TransactionReferenceNo = t.TransactionNumber,
+                            t.Type,
+                            TransactionStatus = (int)t.Status,
+                            t.TransactionDate,
+                            OfficeName = t.OfficeName ?? t.VaultName,
+                            t.IsCustomRate,
+                            t.Profit,
+                            SourceCurrencyCode = sourceDetail?.CurrencyCode ?? "",
+                            SourceAmount = sourceDetail?.Amount ?? 0m,
+                            ExchangeRate = sourceDetail?.Rate ?? 0m,
+                            TargetAmount = targetDetail?.NetAmount ?? targetDetail?.Amount ?? 0m,
+                            CustomRate = sourceDetail?.CustomRate,
+                            t.Notes,
+                            Details = t.Details?.Select(d => new
+                            {
+                                d.CurrencyId,
+                                d.CurrencyCode,
+                                d.Side,
+                                d.Amount,
+                                d.Rate,
+                                d.NetAmount
+                            })
+                        };
                     })
                     .ToList();
 
@@ -655,6 +695,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         {
             try
             {
+                await _permissionService.ValidateOfficeAccessAsync(officeId);
                 if (endDate < startDate)
                     return BadRequest(new { error = "End date must be after start date" });
 
@@ -692,6 +733,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         {
             try
             {
+                await _permissionService.ValidateOfficeAccessAsync(officeId);
                 if (month < 1 || month > 12)
                     return BadRequest(new { error = "Invalid month" });
 
@@ -716,6 +758,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         {
             try
             {
+                await _permissionService.ValidateOfficeAccessAsync(officeId);
                 var performance = await _reportingService.GetCurrencyPerformance(officeId, startDate, endDate);
                 return Ok(performance);
             }
@@ -1098,6 +1141,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         {
             try
             {
+                await _permissionService.ValidateOfficeAccessAsync(officeId);
                 var parties = await _partyService.GetPartiesAsync(officeId, type, status);
                 return Ok(parties);
             }
@@ -1307,6 +1351,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         {
             try
             {
+                await _permissionService.ValidateOfficeAccessAsync(officeId);
                 var report = await _partyReportingService.GetAgedReceivablesAsync(officeId, asOfDate ?? DateTime.Today);
                 return Ok(report);
             }
@@ -1327,6 +1372,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             {
                 if (officeId.HasValue)
                 {
+                    await _permissionService.ValidateOfficeAccessAsync(officeId.Value);
                     var summary = await _partyReportingService.GetPartyBalanceSummaryAsync(officeId.Value);
                     return Ok(summary);
                 }
@@ -1568,6 +1614,8 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         {
             try
             {
+                if (officeId.HasValue)
+                    await _permissionService.ValidateOfficeAccessAsync(officeId.Value);
                 var reportDate = date ?? DateTime.Today;
                 var report = await _zReportService.GetDailyZReport(officeId, reportDate);
                 return Ok(report);
@@ -1582,7 +1630,101 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         [HttpPost("endday/{officeId}")]
         public async Task EndDay (Guid officeId)
         {
+          await _permissionService.ValidateOfficeAccessAsync(officeId);
           await  _zReportService.EndDay(officeId);
+        }
+
+        // ==================== WAC Endpoints ====================
+
+        [HttpGet("wac/{vaultId}")]
+        public async Task<ActionResult<Dictionary<Guid, decimal>>> GetAllWacs(Guid vaultId)
+        {
+            var result = await _wacService.GetAllWacsForVaultAsync(vaultId);
+            return Ok(result);
+        }
+
+        [HttpGet("wac/{vaultId}/{currencyId}")]
+        public async Task<ActionResult<decimal>> GetWac(Guid vaultId, Guid currencyId)
+        {
+            var result = await _wacService.GetWacAsync(vaultId, currencyId);
+            return Ok(result);
+        }
+
+        [HttpGet("wac/{vaultId}/history")]
+        public async Task<IActionResult> GetWacHistory(Guid vaultId, [FromQuery] Guid? currencyId = null, [FromQuery] int limit = 50)
+        {
+            var query = _context.CurrencyWacHistories
+                .AsNoTracking()
+                .Include(h => h.Currency)
+                .Where(h => h.VaultId == vaultId);
+
+            if (currencyId.HasValue)
+                query = query.Where(h => h.CurrencyId == currencyId.Value);
+
+            var history = await query
+                .OrderByDescending(h => h.CreatedDate)
+                .Take(limit)
+                .Select(h => new
+                {
+                    h.Id,
+                    h.CurrencyId,
+                    currencyCode = h.Currency.CurrencyCode,
+                    h.OldWac,
+                    h.NewWac,
+                    h.OldQuantity,
+                    h.NewQuantity,
+                    h.TransactionAmount,
+                    h.TransactionRate,
+                    h.TransactionId,
+                    reason = h.Reason.ToString(),
+                    h.CreatedDate
+                })
+                .ToListAsync();
+
+            return Ok(history);
+        }
+
+        // ==================== Day Closure Endpoints ====================
+
+        [HttpGet("day-status/{officeId}")]
+        public async Task<ActionResult<vm_daystatus>> GetDayStatus(Guid officeId)
+        {
+            await _permissionService.ValidateOfficeAccessAsync(officeId);
+            var result = await _dayClosureService.GetDayStatusAsync(officeId);
+            return Ok(result);
+        }
+
+        [HttpPost("day-close")]
+        public async Task<ActionResult<vm_dayclosure>> CloseDay([FromBody] rm_dayclosure request)
+        {
+            var result = await _dayClosureService.CloseDayAsync(request);
+            return Ok(result);
+        }
+
+        [HttpGet("day-closure/{officeId}/{date}")]
+        public async Task<ActionResult<vm_dayclosure>> GetDayClosure(Guid officeId, DateTime date)
+        {
+            await _permissionService.ValidateOfficeAccessAsync(officeId);
+            var result = await _dayClosureService.GetDayClosureAsync(officeId, date);
+            return Ok(result);
+        }
+
+        [HttpGet("day-closure/{officeId}/history")]
+        public async Task<ActionResult<List<vm_dayclosure>>> GetClosureHistory(
+            Guid officeId, [FromQuery] DateTime? start = null, [FromQuery] DateTime? end = null)
+        {
+            await _permissionService.ValidateOfficeAccessAsync(officeId);
+            var result = await _dayClosureService.GetClosureHistoryAsync(officeId, start, end);
+            return Ok(result);
+        }
+
+        [HttpGet("day-closure/consolidated")]
+        public async Task<IActionResult> GetConsolidatedDayClosure([FromQuery] DateTime? date = null)
+        {
+            var businessDate = date ?? TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow,
+                TimeZoneInfo.FindSystemTimeZoneById("Turkey Standard Time")).Date;
+            var result = await _dayClosureService.GetConsolidatedDayClosureAsync(businessDate);
+            return Ok(result);
         }
 
         /// <summary>
@@ -1595,6 +1737,8 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         {
             try
             {
+                if (officeId.HasValue)
+                    await _permissionService.ValidateOfficeAccessAsync(officeId.Value);
                 var startDate = weekStartDate ?? DateTime.Today.AddDays(-(int)DateTime.Today.DayOfWeek);
                 var report = await _zReportService.GetWeeklyZReport(officeId, startDate);
                 return Ok(report);
@@ -1617,6 +1761,8 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         {
             try
             {
+                if (officeId.HasValue)
+                    await _permissionService.ValidateOfficeAccessAsync(officeId.Value);
                 var reportYear = year ?? DateTime.Today.Year;
                 var reportMonth = month ?? DateTime.Today.Month;
                 var report = await _zReportService.GetMonthlyZReport(officeId, reportYear, reportMonth);
@@ -1639,6 +1785,8 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         {
             try
             {
+                if (officeId.HasValue)
+                    await _permissionService.ValidateOfficeAccessAsync(officeId.Value);
                 var reportYear = year ?? DateTime.Today.Year;
                 var report = await _zReportService.GetYearlyZReport(officeId, reportYear);
                 return Ok(report);
@@ -1661,6 +1809,8 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         {
             try
             {
+                if (officeId.HasValue)
+                    await _permissionService.ValidateOfficeAccessAsync(officeId.Value);
                 if (startDate == default || endDate == default)
                 {
                     return BadRequest(new { error = "Start date and end date are required for custom period report" });
@@ -1692,6 +1842,8 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         {
             try
             {
+                if (officeId.HasValue)
+                    await _permissionService.ValidateOfficeAccessAsync(officeId.Value);
                 if (count < 1 || count > 365)
                 {
                     return BadRequest(new { error = "Count must be between 1 and 365" });
@@ -1721,6 +1873,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         {
             try
             {
+                await _permissionService.ValidateOfficeAccessAsync(officeId);
                 var result = await _vaultService.GetVaultBalanceHistoriesByOfficeAsync(officeId, date);
                 return Ok(result);
             }
@@ -1867,6 +2020,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
     {
         try
         {
+            await _permissionService.ValidateOfficeAccessAsync(officeId);
             var users = await _userOfficeService.GetUsersByOfficeAsync(officeId);
             return Ok(users);
         }
@@ -1978,6 +2132,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         {
             try
             {
+                await _permissionService.ValidateOfficeAccessAsync(officeId);
                 var result = await _expenseDefinitionService.GetDefinitionsAsync(officeId, isActive);
                 return Ok(result);
             }
@@ -1998,6 +2153,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         {
             try
             {
+                await _permissionService.ValidateOfficeAccessAsync(officeId);
                 var result = await _expenseDefinitionService.GetDefinitionsByCategoryAsync(officeId, category);
                 return Ok(result);
             }
@@ -2062,6 +2218,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         {
             try
             {
+                await _permissionService.ValidateOfficeAccessAsync(officeId);
                 var result = await _expensePaymentService.GetPaymentsAsync(officeId, startDate, endDate);
                 return Ok(result);
             }
@@ -2128,6 +2285,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         {
             try
             {
+                await _permissionService.ValidateOfficeAccessAsync(officeId);
                 var result = await _expensePaymentService.GetTotalExpensesAsync(officeId, startDate, endDate);
                 return Ok(new { totalExpenses = result });
             }
@@ -2149,6 +2307,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         {
             try
             {
+                await _permissionService.ValidateOfficeAccessAsync(officeId);
                 var result = await _expensePaymentService.GetExpensesByCategoryAsync(officeId, startDate, endDate);
                 return Ok(result);
             }

@@ -1,10 +1,13 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using BaskentEnerji.Data.Contexts;
 using BaskentEnerji.Entity;
 using System;
 using System.Linq;
+using System.Net;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using BaskentEnerji.Business.Exceptions;
 
 namespace BaskentEnerji.Business.Services.Permission
 {
@@ -83,6 +86,21 @@ namespace BaskentEnerji.Business.Services.Permission
             {
                 return false;
             }
+        }
+
+        public async Task ValidateOfficeAccessAsync(Guid officeId)
+        {
+            if (await IsAdminAsync()) return;
+
+            var userId = GetCurrentUserId();
+            if (!userId.HasValue)
+                throw new ApiException(HttpStatusCode.Unauthorized, "Kullanıcı kimliği doğrulanamadı");
+
+            var hasAccess = await _dbContext.User_Offices
+                .AnyAsync(uo => uo.UserId == userId.Value && uo.OfficeId == officeId);
+
+            if (!hasAccess)
+                throw new ApiException(HttpStatusCode.Forbidden, "Bu ofise erişim yetkiniz yok");
         }
 
         private Guid? GetCurrentUserId()

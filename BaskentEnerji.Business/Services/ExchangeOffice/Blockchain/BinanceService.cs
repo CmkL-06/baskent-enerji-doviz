@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
@@ -15,16 +16,20 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Blockchain
     {
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ILogger<BinanceService> _logger;
-        private readonly string _apiKey = "jaAPLL9RHEBb7BWaT608MTGjbs5nUxAetTLMClZvCzP1j1ehXFr2yorQ3Gv0hzA3";
-        private readonly string _apiSecret = "hYDAPupzqvIf8wnUiCkOG2e4DszGzlFxVFcvly50im0VonPFNRqvGBspKJOu7hS6";
-        private readonly string _binanceApiUrl = "https://api.binance.com";
+        private readonly string _apiKey;
+        private readonly string _apiSecret;
+        private readonly string _binanceApiUrl;
 
         public BinanceService(
             IHttpClientFactory httpClientFactory,
-            ILogger<BinanceService> logger)
+            ILogger<BinanceService> logger,
+            IConfiguration configuration)
         {
             _httpClientFactory = httpClientFactory;
             _logger = logger;
+            _apiKey = configuration["Binance:ApiKey"] ?? throw new InvalidOperationException("Binance:ApiKey is not configured");
+            _apiSecret = configuration["Binance:ApiSecret"] ?? throw new InvalidOperationException("Binance:ApiSecret is not configured");
+            _binanceApiUrl = configuration["Binance:BaseUrl"] ?? "https://api.binance.com";
         }
 
         public async Task<object> GetRecentDepositsAsync(string walletAddress = null)
