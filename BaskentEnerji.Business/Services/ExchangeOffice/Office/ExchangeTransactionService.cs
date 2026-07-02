@@ -30,6 +30,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
         private readonly BaskentEnerjiDbContext _context;
         private readonly IMapper _mapper;
         private readonly IVaultService _vaultService;
+        private readonly IWacService _wacService;
         private readonly ValidationService _validationService;
         private readonly PartyTransactionIntegration _partyIntegration;
         private readonly IMemoryCache _memoryCache;
@@ -38,6 +39,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             BaskentEnerjiDbContext context,
             IMapper mapper,
             IVaultService vaultService,
+            IWacService wacService,
             ValidationService validationService,
             PartyTransactionIntegration partyIntegration, IMemoryCache memoryCache
             )
@@ -45,6 +47,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             _context = context;
             _mapper = mapper;
             _vaultService = vaultService;
+            _wacService = wacService;
             _validationService = validationService;
             _partyIntegration = partyIntegration;
             _memoryCache = memoryCache;
@@ -96,6 +99,10 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
                 decimal totalProfit = 0;
 
+                // Pre-fetch all needed currencies to avoid N+1 queries inside loop
+                var allCurrencyIds = request.SelectMany(r => new[] { r.SourceCurrencyId, r.TargetCurrencyId }).Distinct().ToList();
+                var currencyDict = await _context.Currencies.Where(c => allCurrencyIds.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => c);
+
                 // Process each exchange request
                 foreach (var singleRequest in request)
                 {
@@ -110,23 +117,56 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                         throw new InvalidOperationException($"Exchange rate not found for {singleRequest.SourceCurrencyId} to {singleRequest.TargetCurrencyId}");
 
                     // Calculate amounts for this exchange
-                    var rate = singleRequest.CustomRate ??
-                        (singleRequest.IsBuyingFromCustomer ? exchangeRate.BuyRate : exchangeRate.SellRate);
+                    var marketRate = singleRequest.IsBuyingFromCustomer ? exchangeRate.BuyRate : exchangeRate.SellRate;
+                    var rate = singleRequest.CustomRate ?? marketRate;
+
+                    // Validate custom rate is within acceptable bounds (max 20% deviation from market)
+                    if (singleRequest.CustomRate.HasValue && marketRate > 0)
+                    {
+                        var deviation = Math.Abs(rate - marketRate) / marketRate;
+                        if (deviation > 0.20m && !singleRequest.OwnerOverrideLoss)
+                            throw new ApiException(HttpStatusCode.BadRequest, $"Özel kur piyasa kurundan %{deviation * 100:F1} sapıyor. Onay için Owner yetkisi gereklidir.");
+                    }
+
                     var targetAmount = singleRequest.SourceAmount * rate;
                     var netTargetAmount = targetAmount; // No commission deduction
 
-                    // Calculate profit for this exchange (directly using buy/sell rate)
+                    // Calculate profit using WAC (Weighted Average Cost)
                     decimal profit = 0;
+
+                    // Determine which currency is the foreign one (non-TRY)
+                    var sourceCurrencyEntity = currencyDict.GetValueOrDefault(singleRequest.SourceCurrencyId);
+                    var targetCurrencyEntity = currencyDict.GetValueOrDefault(singleRequest.TargetCurrencyId);
+                    var isTrySource = sourceCurrencyEntity?.CurrencyCode == "TRY";
+                    var isTryTarget = targetCurrencyEntity?.CurrencyCode == "TRY";
 
                     if (singleRequest.IsBuyingFromCustomer)
                     {
-                        // Office buys from customer (at BuyRate or custom) and could sell at SellRate
-                        profit = (exchangeRate.SellRate - rate) * singleRequest.SourceAmount;
+                        // Office buys foreign currency from customer → update WAC, no realized profit
+                        if (!isTrySource)
+                        {
+                            await _wacService.RecalculateWacOnPurchaseAsync(vaultId, singleRequest.SourceCurrencyId, singleRequest.SourceAmount, rate, exchangeTransaction.Id);
+                        }
+                        profit = 0;
                     }
                     else
                     {
-                        // Office sells to customer (at SellRate or custom) and could buy at BuyRate
-                        profit = (rate - exchangeRate.BuyRate) * singleRequest.SourceAmount;
+                        // Office sells foreign currency to customer → realized profit = (SellRate - WAC) * Qty
+                        if (!isTrySource)
+                        {
+                            profit = await _wacService.CalculateRealizedProfitAsync(rate, singleRequest.SourceAmount, vaultId, singleRequest.SourceCurrencyId);
+                            var currentWac = await _wacService.GetWacAsync(vaultId, singleRequest.SourceCurrencyId);
+                            var currentBalance = await _context.VaultBalances
+                                .Where(vb => vb.VaultId == vaultId && vb.CurrencyId == singleRequest.SourceCurrencyId)
+                                .Select(vb => vb.Balance)
+                                .FirstOrDefaultAsync();
+                            var newQty = currentBalance - singleRequest.SourceAmount;
+                            await _wacService.AdjustWacQuantityAsync(vaultId, singleRequest.SourceCurrencyId, newQty, Infrastructure.ExchangeOffice.Office.WacAdjustReason.Sale, exchangeTransaction.Id);
+                        }
+                        else
+                        {
+                            profit = (rate - exchangeRate.BuyRate) * singleRequest.SourceAmount;
+                        }
                     }
 
                     totalProfit += profit;
@@ -219,7 +259,6 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 _context.Transactions.Add(exchangeTransaction);
                 await _context.SaveChangesAsync();
 
-                List<Transaction> dbTss = new List<Transaction>(); dbTss =  await _context.Transactions.Where(x => x.TransactionNumber == exchangeTransaction.TransactionNumber).Include(x=> x.Details).ToListAsync();
                 // Update vault balances
 
           
@@ -575,76 +614,97 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
         public async Task RemoveTransaction(rm_removetransaction request)
         {
-            var dbTransaction = _context.Transactions
-                .Include(d => d.Details)
-                .Include(t => t.Vault)
-                .FirstOrDefault(x => x.Id == request.transactionId);
-
-            if (dbTransaction == null)
-                throw new ApiException(HttpStatusCode.NotFound, "Transaction couldn't be found");
-
-            var currentUserId = Guid.Parse(_validationService.GetUserID());
-
-            dbTransaction.IsDeleted = true;
-            dbTransaction.DeletedReason = request.reason;
-            dbTransaction.deletedByUserId = currentUserId;
-            dbTransaction.Status = TransactionStatus.Cancelled;
-            
-            var user = _context.Users.FirstOrDefault(x => x.Id == currentUserId);
-
-            var acLog = new ActionLog
+            using var dbTx = await _context.Database.BeginTransactionAsync();
+            try
             {
-                Id = Guid.NewGuid(),
-                ActionType = ActionType.Transaction,
-                UserId = currentUserId,
-                UserDescription = request.reason,
-                LogType = LogType.Deleted,
-                ContentId = dbTransaction.Id,
-                Description = $"{user?.Username} {LogType.Deleted} {ActionType.Transaction} with this reason : {request.reason}",
-                CreatedDate = DateTime.UtcNow,
-                User = user
-            };
+                var dbTransaction = _context.Transactions
+                    .Include(d => d.Details)
+                    .Include(t => t.Vault)
+                    .FirstOrDefault(x => x.Id == request.transactionId);
 
-            // _context.Logs.Add(acLog); // ActionLog entity henuz tanimlanmadi
+                if (dbTransaction == null)
+                    throw new ApiException(HttpStatusCode.NotFound, "Transaction couldn't be found");
 
-            // Restore vault balances
-            var dbHistories = _context.VaultBalanceHistories
-                .Where(x => x.Description == "Exchange transaction " + dbTransaction.TransactionNumber)
-                .ToList(); 
+                var currentUserId = Guid.Parse(_validationService.GetUserID());
 
-            foreach (var kvp in dbHistories)
-            {
-                kvp.IsDeleted = true;
+                dbTransaction.IsDeleted = true;
+                dbTransaction.DeletedReason = request.reason;
+                dbTransaction.deletedByUserId = currentUserId;
+                dbTransaction.Status = TransactionStatus.Cancelled;
 
-                var dbVaultBalance = _context.VaultBalances
-                    .FirstOrDefault(x => x.VaultId == kvp.VaultId && x.CurrencyId == kvp.CurrencyId);
+                // Restore vault balances
+                var dbHistories = _context.VaultBalanceHistories
+                    .Where(x => x.Description == "Exchange transaction " + dbTransaction.TransactionNumber)
+                    .ToList();
 
-                if (dbVaultBalance != null)
+                foreach (var kvp in dbHistories)
                 {
-                    // Reverse the balance change (if it was added, subtract; if subtracted, add back)
-                    dbVaultBalance.Balance -= kvp.Balance;
-                    dbVaultBalance.LastUpdated = DateTime.Now;
+                    kvp.IsDeleted = true;
+
+                    var dbVaultBalance = _context.VaultBalances
+                        .FirstOrDefault(x => x.VaultId == kvp.VaultId && x.CurrencyId == kvp.CurrencyId);
+
+                    if (dbVaultBalance != null)
+                    {
+                        dbVaultBalance.Balance -= kvp.Balance;
+                        dbVaultBalance.LastUpdated = DateTime.Now;
+                    }
+                }
+
+                // Reverse WAC changes for exchange transactions
+                if (dbTransaction.Type == TransactionType.Exchange && dbTransaction.Details != null)
+                {
+                    var detailCurrencyIds = dbTransaction.Details.Select(d => d.CurrencyId).Distinct().ToList();
+                    var detailCurrencies = await _context.Currencies.Where(c => detailCurrencyIds.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => c);
+
+                    foreach (var detail in dbTransaction.Details)
+                    {
+                        detailCurrencies.TryGetValue(detail.CurrencyId, out var currency);
+                        if (currency == null || currency.CurrencyCode == "TRY") continue;
+
+                        if (detail.Side == TransactionSide.Credit && detail.Amount > 0)
+                        {
+                            await _wacService.ReverseWacOnPurchaseDeleteAsync(
+                                dbTransaction.VaultId, detail.CurrencyId,
+                                Math.Abs(detail.Amount), detail.Rate, dbTransaction.Id);
+                        }
+                        else if (detail.Side == TransactionSide.Debit && detail.Amount > 0)
+                        {
+                            var currentBalance = await _context.VaultBalances
+                                .Where(vb => vb.VaultId == dbTransaction.VaultId && vb.CurrencyId == detail.CurrencyId)
+                                .Select(vb => vb.Balance)
+                                .FirstOrDefaultAsync();
+                            await _wacService.AdjustWacQuantityAsync(
+                                dbTransaction.VaultId, detail.CurrencyId,
+                                currentBalance, WacAdjustReason.TransactionDelete, dbTransaction.Id);
+                        }
+                    }
+                }
+
+                // Restore party account balances if this was a party transaction
+                if (dbTransaction.PartyId.HasValue)
+                {
+                    await RestorePartyAccountBalances(dbTransaction);
+                }
+
+                await _context.SaveChangesAsync();
+                await dbTx.CommitAsync();
+
+                // Clear vault caches to ensure fresh data
+                _vaultService.ClearVaultCaches();
+
+                // Invalidate Z-report cache AFTER commit
+                if (dbTransaction.Vault != null)
+                {
+                    InvalidateZReportCache(dbTransaction.Vault.OfficeId, dbTransaction.TransactionDate);
+                    InvalidateZReportCache(dbTransaction.Vault.OfficeId, DateTime.Today);
+                    InvalidateZReportCache(dbTransaction.Vault.OfficeId, DateTime.Now.Date);
                 }
             }
-            
-            // Restore party account balances if this was a party transaction
-            if (dbTransaction.PartyId.HasValue)
+            catch
             {
-                await RestorePartyAccountBalances(dbTransaction);
-            }
-           
-            await _context.SaveChangesAsync();
-            
-            // Clear vault caches to ensure fresh data
-            _vaultService.ClearVaultCaches();
-            
-            // Invalidate Z-report cache AFTER saving changes
-            if (dbTransaction.Vault != null)
-            {
-                InvalidateZReportCache(dbTransaction.Vault.OfficeId, dbTransaction.TransactionDate);
-                InvalidateZReportCache(dbTransaction.Vault.OfficeId, DateTime.Today);
-                // Also invalidate for DateTime.Now in case of timezone differences
-                InvalidateZReportCache(dbTransaction.Vault.OfficeId, DateTime.Now.Date);
+                await dbTx.RollbackAsync();
+                throw;
             }
         }
         

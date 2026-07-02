@@ -70,7 +70,6 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             try
             {
                 var settings = await _context.Set<ExchangeSettings>()
-                    .AsNoTracking()
                     .OrderBy(s => s.CreatedDate)
                     .FirstOrDefaultAsync();
 

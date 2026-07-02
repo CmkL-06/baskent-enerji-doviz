@@ -26,104 +26,152 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
         public async Task<vm_officetransfer> CreateTransferRequestAsync(
             rm_create_officetransfer model, Guid requestedByUserId)
         {
-            var sourceVault = await _db.Vaults
-                .Include(v => v.Office)
-                .FirstOrDefaultAsync(v => v.Id == model.SourceVaultId)
-                ?? throw new ApiException(HttpStatusCode.NotFound, "Kaynak kasa bulunamadı.");
-
-            var targetVault = await _db.Vaults
-                .Include(v => v.Office)
-                .FirstOrDefaultAsync(v => v.Id == model.TargetVaultId)
-                ?? throw new ApiException(HttpStatusCode.NotFound, "Hedef kasa bulunamadı.");
-
-            if (model.Amount <= 0)
-                throw new ApiException(HttpStatusCode.BadRequest, "Transfer miktarı sıfırdan büyük olmalıdır.");
-
-            // Kaynak kasanın bakiyesini kontrol et
-            var balance = await _db.VaultBalances
-                .FirstOrDefaultAsync(b => b.VaultId == model.SourceVaultId && b.CurrencyId == model.CurrencyId);
-
-            if (balance == null || balance.Balance < model.Amount)
-                throw new ApiException(HttpStatusCode.BadRequest,
-                    $"Kaynak kasada yeterli bakiye yok. Mevcut: {balance?.Balance ?? 0}");
-
-            var transfer = new OfficeTransfer
+            using var tx = await _db.Database.BeginTransactionAsync();
+            try
             {
-                Id = Guid.NewGuid(),
-                CreatedDate = DateTime.UtcNow,
-                SourceVaultId = model.SourceVaultId,
-                TargetVaultId = model.TargetVaultId,
-                CurrencyId = model.CurrencyId,
-                Amount = model.Amount,
-                Notes = model.Notes,
-                RequestedByUserId = requestedByUserId,
-                Status = TransferStatus.Pending
-            };
+                var sourceVault = await _db.Vaults
+                    .Include(v => v.Office)
+                    .FirstOrDefaultAsync(v => v.Id == model.SourceVaultId)
+                    ?? throw new ApiException(HttpStatusCode.NotFound, "Kaynak kasa bulunamadı.");
 
-            await _db.OfficeTransfers.AddAsync(transfer);
-            await _db.SaveChangesAsync();
+                var targetVault = await _db.Vaults
+                    .Include(v => v.Office)
+                    .FirstOrDefaultAsync(v => v.Id == model.TargetVaultId)
+                    ?? throw new ApiException(HttpStatusCode.NotFound, "Hedef kasa bulunamadı.");
 
-            return await GetTransferByIdAsync(transfer.Id)
-                ?? throw new ApiException(HttpStatusCode.InternalServerError, "Transfer oluşturulamadı.");
+                if (model.Amount <= 0)
+                    throw new ApiException(HttpStatusCode.BadRequest, "Transfer miktarı sıfırdan büyük olmalıdır.");
+
+                // UPDLOCK to prevent concurrent transfers from passing balance check simultaneously
+                var balance = await _db.VaultBalances
+                    .FromSqlRaw("SELECT * FROM VaultBalances WITH (UPDLOCK) WHERE VaultId = {0} AND CurrencyId = {1}", model.SourceVaultId, model.CurrencyId)
+                    .FirstOrDefaultAsync();
+
+                if (balance == null || balance.Balance < model.Amount)
+                    throw new ApiException(HttpStatusCode.BadRequest,
+                        $"Kaynak kasada yeterli bakiye yok. Mevcut: {balance?.Balance ?? 0}");
+
+                var autoApprove = sourceVault.Office.TransferApprovalThreshold.HasValue &&
+                                  model.Amount <= sourceVault.Office.TransferApprovalThreshold.Value;
+
+                var transfer = new OfficeTransfer
+                {
+                    Id = Guid.NewGuid(),
+                    CreatedDate = DateTime.UtcNow,
+                    SourceVaultId = model.SourceVaultId,
+                    TargetVaultId = model.TargetVaultId,
+                    CurrencyId = model.CurrencyId,
+                    Amount = model.Amount,
+                    Notes = model.Notes,
+                    RequestedByUserId = requestedByUserId,
+                    Status = autoApprove ? TransferStatus.Completed : TransferStatus.Pending
+                };
+
+                if (autoApprove)
+                {
+                    transfer.ApprovedByUserId = requestedByUserId;
+                    transfer.ProcessedAt = DateTime.UtcNow;
+                    transfer.Notes = (transfer.Notes ?? "") + " [Otomatik onay — eşik altı]";
+
+                    balance.Balance -= model.Amount;
+
+                    var targetBalance = await _db.VaultBalances
+                        .FirstOrDefaultAsync(b => b.VaultId == model.TargetVaultId && b.CurrencyId == model.CurrencyId);
+                    if (targetBalance == null)
+                    {
+                        targetBalance = new VaultBalance
+                        {
+                            Id = Guid.NewGuid(),
+                            VaultId = model.TargetVaultId,
+                            CurrencyId = model.CurrencyId,
+                            Balance = 0,
+                            CreatedDate = DateTime.UtcNow
+                        };
+                        await _db.VaultBalances.AddAsync(targetBalance);
+                    }
+                    targetBalance.Balance += model.Amount;
+                }
+
+                await _db.OfficeTransfers.AddAsync(transfer);
+                await _db.SaveChangesAsync();
+                await tx.CommitAsync();
+
+                return await GetTransferByIdAsync(transfer.Id)
+                    ?? throw new ApiException(HttpStatusCode.InternalServerError, "Transfer oluşturulamadı.");
+            }
+            catch
+            {
+                await tx.RollbackAsync();
+                throw;
+            }
         }
 
         public async Task<vm_officetransfer> ProcessTransferAsync(
             Guid transferId, rm_action_officetransfer action, Guid approvedByUserId)
         {
-            var transfer = await _db.OfficeTransfers
-                .Include(t => t.SourceVault).ThenInclude(v => v.Office)
-                .Include(t => t.TargetVault).ThenInclude(v => v.Office)
-                .FirstOrDefaultAsync(t => t.Id == transferId)
-                ?? throw new ApiException(HttpStatusCode.NotFound, "Transfer bulunamadı.");
-
-            if (transfer.Status != TransferStatus.Pending)
-                throw new ApiException(HttpStatusCode.BadRequest, "Bu transfer zaten işlenmiş.");
-
-            if (action.Approve)
+            using var tx = await _db.Database.BeginTransactionAsync();
+            try
             {
-                // Bakiye kontrolü (tekrar — pending→approve arasında değişmiş olabilir)
-                var sourceBalance = await _db.VaultBalances
-                    .FirstOrDefaultAsync(b => b.VaultId == transfer.SourceVaultId && b.CurrencyId == transfer.CurrencyId);
+                var transfer = await _db.OfficeTransfers
+                    .Include(t => t.SourceVault).ThenInclude(v => v.Office)
+                    .Include(t => t.TargetVault).ThenInclude(v => v.Office)
+                    .FirstOrDefaultAsync(t => t.Id == transferId)
+                    ?? throw new ApiException(HttpStatusCode.NotFound, "Transfer bulunamadı.");
 
-                if (sourceBalance == null || sourceBalance.Balance < transfer.Amount)
-                    throw new ApiException(HttpStatusCode.BadRequest, "Kaynak kasada yeterli bakiye kalmadı.");
+                if (transfer.Status != TransferStatus.Pending)
+                    throw new ApiException(HttpStatusCode.BadRequest, "Bu transfer zaten işlenmiş.");
 
-                // Bakiye hareketi
-                sourceBalance.Balance -= transfer.Amount;
-
-                var targetBalance = await _db.VaultBalances
-                    .FirstOrDefaultAsync(b => b.VaultId == transfer.TargetVaultId && b.CurrencyId == transfer.CurrencyId);
-
-                if (targetBalance == null)
+                if (action.Approve)
                 {
-                    targetBalance = new VaultBalance
+                    var sourceBalance = await _db.VaultBalances
+                        .FromSqlRaw("SELECT * FROM VaultBalances WITH (UPDLOCK) WHERE VaultId = {0} AND CurrencyId = {1}", transfer.SourceVaultId, transfer.CurrencyId)
+                        .FirstOrDefaultAsync();
+
+                    if (sourceBalance == null || sourceBalance.Balance < transfer.Amount)
+                        throw new ApiException(HttpStatusCode.BadRequest, "Kaynak kasada yeterli bakiye kalmadı.");
+
+                    sourceBalance.Balance -= transfer.Amount;
+
+                    var targetBalance = await _db.VaultBalances
+                        .FirstOrDefaultAsync(b => b.VaultId == transfer.TargetVaultId && b.CurrencyId == transfer.CurrencyId);
+
+                    if (targetBalance == null)
                     {
-                        Id = Guid.NewGuid(),
-                        VaultId = transfer.TargetVaultId,
-                        CurrencyId = transfer.CurrencyId,
-                        Balance = 0,
-                        CreatedDate = DateTime.UtcNow
-                    };
-                    await _db.VaultBalances.AddAsync(targetBalance);
+                        targetBalance = new VaultBalance
+                        {
+                            Id = Guid.NewGuid(),
+                            VaultId = transfer.TargetVaultId,
+                            CurrencyId = transfer.CurrencyId,
+                            Balance = 0,
+                            CreatedDate = DateTime.UtcNow
+                        };
+                        await _db.VaultBalances.AddAsync(targetBalance);
+                    }
+
+                    targetBalance.Balance += transfer.Amount;
+
+                    transfer.Status = TransferStatus.Completed;
+                }
+                else
+                {
+                    transfer.Status = TransferStatus.Rejected;
+                    transfer.RejectionReason = action.RejectionReason;
                 }
 
-                targetBalance.Balance += transfer.Amount;
+                transfer.ApprovedByUserId = approvedByUserId;
+                transfer.ProcessedAt = DateTime.UtcNow;
 
-                transfer.Status = TransferStatus.Completed;
+                await _db.SaveChangesAsync();
+                await tx.CommitAsync();
+
+                return await GetTransferByIdAsync(transferId)
+                    ?? throw new ApiException(HttpStatusCode.InternalServerError, "Transfer güncellenemedi.");
             }
-            else
+            catch
             {
-                transfer.Status = TransferStatus.Rejected;
-                transfer.RejectionReason = action.RejectionReason;
+                await tx.RollbackAsync();
+                throw;
             }
-
-            transfer.ApprovedByUserId = approvedByUserId;
-            transfer.ProcessedAt = DateTime.UtcNow;
-
-            await _db.SaveChangesAsync();
-
-            return await GetTransferByIdAsync(transferId)
-                ?? throw new ApiException(HttpStatusCode.InternalServerError, "Transfer güncellenemedi.");
         }
 
         public async Task<List<vm_officetransfer>> GetPendingTransfersAsync()

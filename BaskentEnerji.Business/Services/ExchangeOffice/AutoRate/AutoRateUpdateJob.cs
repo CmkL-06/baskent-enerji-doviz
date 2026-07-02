@@ -38,7 +38,6 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.AutoRate
 
                 // Check if auto-update is enabled
                 var settings = await _context.Set<Entity.Entities.ExchangeOffice.Currency.ExchangeSettings>()
-                    .AsNoTracking()
                     .OrderBy(s => s.CreatedDate)
                     .FirstOrDefaultAsync();
 

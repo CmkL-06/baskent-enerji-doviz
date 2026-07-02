@@ -51,8 +51,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice
             var dbCurrency = await _dbContext.Currencies.FirstOrDefaultAsync(x=> x.CurrencyCode == data.CurrencyCode);
             if (dbCurrency != null)
             {
-                dbCurrency.CurrencyName = dbCurrency.CurrencyName;
-                dbCurrency.CurrencyCode = dbCurrency.CurrencyCode;
+                dbCurrency.CurrencyName = data.CurrencyName;
+                dbCurrency.CurrencyCode = data.CurrencyCode;
             }
             else
             {

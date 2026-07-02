@@ -72,16 +72,16 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
         public async Task<bool> CheckVaultBalanceAsync(Guid vaultId, Guid currencyId, decimal requiredAmount)
         {
+            // Use UPDLOCK when called within a transaction to prevent TOCTOU:
+            // two concurrent transfers both reading sufficient balance then both deducting
             var balance = await _context.VaultBalances
-                .FirstOrDefaultAsync(b => b.VaultId == vaultId && b.CurrencyId == currencyId);
+                .FromSqlRaw("SELECT * FROM VaultBalances WITH (UPDLOCK) WHERE VaultId = {0} AND CurrencyId = {1}", vaultId, currencyId)
+                .FirstOrDefaultAsync();
 
             if (balance == null)
                 return false;
 
-            // Check available balance (total balance minus reserved amount)
-            //var availableBalance = balance.Balance - balance.ReservedAmount;
-            var availableBalance = balance.Balance;
-            return availableBalance >= requiredAmount;
+            return balance.Balance >= requiredAmount;
         }
 
         public async Task<vm_vaultsummary> GetVaultSummaryAsync(Guid vaultId)
@@ -343,9 +343,17 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     .ThenInclude(v => v.Balances)
                         .ThenInclude(b => b.Currency)
                 .Where(o => o.IsActive)
-                .OrderBy(o => o.OfficeName)
+                .OrderBy(o => o.OfficeType)
+                .ThenBy(o => o.OfficeName)
                 .AsSplitQuery()
                 .ToListAsync();
+
+            var userCounts = await _context.User_Offices
+                .AsNoTracking()
+                .Where(uo => uo.IsActive)
+                .GroupBy(uo => uo.OfficeId)
+                .Select(g => new { OfficeId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.OfficeId, x => x.Count);
 
             // Pre-fetch all currencies and their exchange rates
             var allCurrencyCodes = offices
@@ -370,7 +378,11 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 {
                     OfficeId = office.Id,
                     OfficeName = office.OfficeName,
+                    OfficeType = (int)office.OfficeType,
+                    ParentOfficeId = office.ParentOfficeId,
+                    IsActive = office.IsActive,
                     VaultCount = office.Vaults.Count(v => v.IsActive),
+                    UserCount = userCounts.GetValueOrDefault(office.Id, 0),
                     TotalBalancesByCurrency = new Dictionary<string, decimal>()
                 };
 
@@ -431,20 +443,14 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
         public async Task<decimal> CalculateProfitLossAsync(Guid officeId, DateTime startDate, DateTime endDate)
         {
-            var transactions = await _context.Transactions
-                .Include(t => t.Details)
-                .Include(t => t.Vault)
+            return await _context.Transactions
+                .AsNoTracking()
                 .Where(t => t.Vault.OfficeId == officeId &&
                            t.TransactionDate >= startDate &&
                            t.TransactionDate <= endDate &&
                            t.Status == TransactionStatus.Completed &&
                            t.Type == TransactionType.Exchange)
-                .ToListAsync();
-
-            // Sum up the profit from all exchange transactions
-            decimal totalProfitLoss = transactions.Sum(t => t.Profit);
-
-            return totalProfitLoss;
+                .SumAsync(t => t.Profit);
         }
 
         private async Task<decimal> ConvertToBaseCurrencyAsync(Guid currencyId, decimal amount)
@@ -488,8 +494,12 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             // Get vault for later cache invalidation
             var vault = await _context.Vaults.FirstOrDefaultAsync(v => v.Id == data.vaultId);
 
+            // Use UPDLOCK to prevent concurrent read-modify-write race conditions
+            // When called within a transaction (exchange, transfer), this holds a write lock
+            // until the transaction commits, preventing lost updates
             var balance = await _context.VaultBalances
-                .Where(b => b.VaultId == data.vaultId && b.CurrencyId == data.currencyId).Include(x => x.Currency).FirstOrDefaultAsync();
+                .FromSqlRaw("SELECT * FROM VaultBalances WITH (UPDLOCK) WHERE VaultId = {0} AND CurrencyId = {1}", data.vaultId, data.currencyId)
+                .Include(x => x.Currency).FirstOrDefaultAsync();
 
             decimal currentBalance = 0;
 
@@ -757,17 +767,11 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 query = query.Where(vh => vh.CreatedDate >= startDate && vh.CreatedDate < endDate);
             }
 
-            // Order by date descending (newest first)
+            // Order by date descending (newest first), limit to prevent massive loads
             var histories = await query
                 .OrderByDescending(vh => vh.CreatedDate)
+                .Take(500)
                 .ToListAsync();
-
-            // Debug log to check deleted and ghost records
-            var deletedCount = await _context.VaultBalanceHistories
-                .CountAsync(vh => vh.Vault.OfficeId == officeId && vh.IsDeleted == true);
-            var ghostCount = await _context.VaultBalanceHistories
-                .CountAsync(vh => vh.Vault.OfficeId == officeId && vh.IsGhost == true);
-            Console.WriteLine($"[VaultHistory Debug] Total: {histories.Count}, Deleted (excluded): {deletedCount}, Ghost (excluded): {ghostCount}");
 
             // Get user names
             var userIds = histories.Where(h => h.UserId.HasValue).Select(h => h.UserId.Value).Distinct().ToList();
@@ -775,12 +779,6 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 .AsNoTracking()
                 .Where(u => userIds.Contains(u.Id))
                 .ToDictionaryAsync(u => u.Id, u => $"{u.Firstname} {u.Lastname}");
-
-            // Double check no deleted records
-            if (histories.Any(h => h.IsDeleted))
-            {
-                Console.WriteLine($"[CRITICAL ERROR] Found {histories.Count(h => h.IsDeleted)} deleted records that should have been excluded!");
-            }
 
             // Map to response model
             var result = histories.Select(vh => new
@@ -1062,14 +1060,18 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 .OrderByDescending(vc => vc.CountDate)
                 .ToListAsync();
 
+            // Pre-fetch all users in one query instead of N+1
+            var userIds = counts.Select(c => c.UserId).Distinct().ToList();
+            var users = await _context.Users
+                .AsNoTracking()
+                .Where(u => userIds.Contains(u.Id))
+                .ToDictionaryAsync(u => u.Id, u => new { u.Username, Fullname = u.Firstname + " " + u.Lastname });
+
             var result = new List<vm_vaultcount>();
 
             foreach (var count in counts)
             {
-                var user = await _context.Users
-                    .Where(u => u.Id == count.UserId)
-                    .Select(u => new { u.Username, Fullname = u.Firstname + " " + u.Lastname })
-                    .FirstOrDefaultAsync();
+                users.TryGetValue(count.UserId, out var user);
 
                 var vmCount = new vm_vaultcount
                 {

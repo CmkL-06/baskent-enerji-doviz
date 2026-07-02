@@ -15,5 +15,7 @@ namespace BaskentEnerji.Business.Infrastructure.ExchangeOffice.Office
         Task<vm_exchangerate> UpdateCurrentRateAsync(Guid officeId, Guid sourceCurrencyId, Guid targetCurrencyId, decimal buyRate, decimal sellRate);
         Task<List<vm_exchangerate>> GetAllActiveRatesAsync(Guid officeId);
         Task<List<vm_exchangerate>> GetRateHistoryAsync(Guid officeId, Guid sourceCurrencyId, Guid targetCurrencyId, int? limit = 10);
+        Task<int> PushRatesToBranchesAsync(Guid merkezOfficeId);
+        Task<vm_exchangerate?> GetEffectiveRateAsync(Guid officeId, Guid sourceCurrencyId, Guid targetCurrencyId);
     }
 }

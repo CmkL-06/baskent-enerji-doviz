@@ -317,6 +317,7 @@ namespace BaskentEnerji.Business.Services.User
                 userData.Mail = dbUser.Mail;
                 userData.Username = dbUser.Username;
                 userData.Rank = dbUser.Rank;
+                userData.IsEmailVerified = dbUser.IsEmailVerified;
             }
             else if (isAdmin && !isOwner)
             {

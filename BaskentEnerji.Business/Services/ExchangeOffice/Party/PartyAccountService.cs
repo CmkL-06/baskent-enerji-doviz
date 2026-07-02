@@ -76,100 +76,102 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
 
         public async Task<vm_partyaccountentry> CreateManualEntryAsync(rm_partyaccountentry request)
         {
-            // Get the account with party and currency information
-            var account = await _context.PartyAccounts
-                .Include(a => a.Party)
-                .Include(a => a.Currency)
-                .FirstOrDefaultAsync(a => a.Id == request.PartyAccountId);
-                
-            if (account == null)
-                throw new InvalidOperationException("Party account not found");
+            using var tx = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                var account = await _context.PartyAccounts
+                    .Include(a => a.Party)
+                    .Include(a => a.Currency)
+                    .FirstOrDefaultAsync(a => a.Id == request.PartyAccountId);
 
-            var entry = new PartyAccountEntry
-            {
-                PartyAccountId = request.PartyAccountId,
-                EntryNumber = GenerateEntryNumber(),
-                EntryDate = request.EntryDate.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(request.EntryDate, DateTimeKind.Local) : request.EntryDate,
-                Type = request.EntryType,
-                Amount = request.Amount,
-                Description = request.Description,
-                ReferenceNumber = request.ReferenceNumber,
-                DueDate = request.DueDate?.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(request.DueDate.Value, DateTimeKind.Local) : request.DueDate,
-                PaymentStatus = request.PaymentStatus,
-                CreatedByUserId = request.CreatedByUserId
-            };
+                if (account == null)
+                    throw new InvalidOperationException("Party account not found");
 
-            _context.PartyAccountEntries.Add(entry);
-            
-            // Update account balance and calculate running balance
-            decimal vaultAmountChange = 0;
-            if (request.EntryType == EntryType.Debit)
-            {
-                account.Balance += request.Amount;
-                account.TotalDebits += request.Amount;
-                // Debit to party means we gave them money, so vault decreases
-                vaultAmountChange = -request.Amount;
-            }
-            else
-            {
-                account.Balance -= request.Amount;
-                account.TotalCredits += request.Amount;
-                // Credit from party means we received money, so vault increases
-                vaultAmountChange = request.Amount;
-            }
-            
-            // Set running balance to current account balance
-            entry.RunningBalance = account.Balance;
-
-            // Update vault balance if there's a change
-            if (vaultAmountChange != 0 && account.Party != null)
-            {
-                // Get the active vault for the party's office
-                var activeVault = await _context.Vaults
-                    .FirstOrDefaultAsync(v => v.OfficeId == account.Party.OfficeId && v.IsActive);
-                    
-                if (activeVault != null)
+                var entry = new PartyAccountEntry
                 {
-                    var vaultUpdate = new rm_updatevaultbalance
-                    {
-                        vaultId = activeVault.Id,
-                        currencyId = account.CurrencyId,
-                        amount = vaultAmountChange,
-                        description = request.EntryType == EntryType.Debit 
-                            ? $"Cari hesap ödemesi: {account.Party.Name} - {request.Description ?? "Ödeme"}"
-                            : $"Cari hesap tahsilatı: {account.Party.Name} - {request.Description ?? "Tahsilat"}",
-                        isEntireBalance = false,
-                        TransactionType = request.EntryType == EntryType.Debit ? TransactionType.Withdrawal : TransactionType.Deposit
-                    };
-                    await _vaultService.UpdateVaultBalanceAsync(vaultUpdate);
+                    PartyAccountId = request.PartyAccountId,
+                    EntryNumber = GenerateEntryNumber(),
+                    EntryDate = request.EntryDate.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(request.EntryDate, DateTimeKind.Local) : request.EntryDate,
+                    Type = request.EntryType,
+                    Amount = request.Amount,
+                    Description = request.Description,
+                    ReferenceNumber = request.ReferenceNumber,
+                    DueDate = request.DueDate?.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(request.DueDate.Value, DateTimeKind.Local) : request.DueDate,
+                    PaymentStatus = request.PaymentStatus,
+                    CreatedByUserId = request.CreatedByUserId
+                };
+
+                _context.PartyAccountEntries.Add(entry);
+
+                decimal vaultAmountChange = 0;
+                if (request.EntryType == EntryType.Debit)
+                {
+                    account.Balance += request.Amount;
+                    account.TotalDebits += request.Amount;
+                    vaultAmountChange = -request.Amount;
                 }
+                else
+                {
+                    account.Balance -= request.Amount;
+                    account.TotalCredits += request.Amount;
+                    vaultAmountChange = request.Amount;
+                }
+
+                entry.RunningBalance = account.Balance;
+
+                if (vaultAmountChange != 0 && account.Party != null)
+                {
+                    var activeVault = await _context.Vaults
+                        .FirstOrDefaultAsync(v => v.OfficeId == account.Party.OfficeId && v.IsActive);
+
+                    if (activeVault != null)
+                    {
+                        var vaultUpdate = new rm_updatevaultbalance
+                        {
+                            vaultId = activeVault.Id,
+                            currencyId = account.CurrencyId,
+                            amount = vaultAmountChange,
+                            description = request.EntryType == EntryType.Debit
+                                ? $"Cari hesap ödemesi: {account.Party.Name} - {request.Description ?? "Ödeme"}"
+                                : $"Cari hesap tahsilatı: {account.Party.Name} - {request.Description ?? "Tahsilat"}",
+                            isEntireBalance = false,
+                            TransactionType = request.EntryType == EntryType.Debit ? TransactionType.Withdrawal : TransactionType.Deposit
+                        };
+                        await _vaultService.UpdateVaultBalanceAsync(vaultUpdate);
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+                await tx.CommitAsync();
+
+                return MapToViewModel(entry);
             }
-
-            await _context.SaveChangesAsync();
-
-            return MapToViewModel(entry);
+            catch
+            {
+                await tx.RollbackAsync();
+                throw;
+            }
         }
 
         public async Task<vm_partyaccountentry> RecordPaymentAsync(rm_partypayment request)
         {
-            // Party'yi al
+            using var tx = await _context.Database.BeginTransactionAsync();
+            try
+            {
             var party = await _context.Parties.FindAsync(request.PartyId);
             if (party == null)
                 throw new InvalidOperationException("Party not found");
 
-            // TL currency ID'sini al
             var tryCurrency = await _context.Currencies.FirstOrDefaultAsync(c => c.CurrencyCode == "TRY");
             if (tryCurrency == null)
                 throw new InvalidOperationException("TRY currency not found");
 
-            // Party'nin TL hesabını al veya oluştur (her party'nin sadece 1 TL hesabı olacak)
             var account = await _context.PartyAccounts
                 .Include(a => a.Currency)
                 .FirstOrDefaultAsync(a => a.PartyId == request.PartyId && a.CurrencyId == tryCurrency.Id);
 
             if (account == null)
             {
-                // TL hesabı yoksa oluştur
                 account = new PartyAccount
                 {
                     PartyId = request.PartyId,
@@ -297,8 +299,15 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
             }
 
             await _context.SaveChangesAsync();
+            await tx.CommitAsync();
 
             return MapToViewModel(entry);
+            }
+            catch
+            {
+                await tx.RollbackAsync();
+                throw;
+            }
         }
 
         public async Task<List<vm_partyaccountentry>> GetAccountEntriesAsync(Guid accountId, DateTime? fromDate = null, DateTime? toDate = null, PaymentStatus? status = null)

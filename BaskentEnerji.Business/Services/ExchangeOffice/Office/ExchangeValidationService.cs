@@ -1,12 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using BaskentEnerji.Business.Infrastructure.ExchangeOffice.Office;
+using BaskentEnerji.Business.Services.Permission;
 using BaskentEnerji.Data.Contexts;
 using BaskentEnerji.Entity.Modals.RequestModals.ExchangeService.Office;
 using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
@@ -15,22 +13,41 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
     {
         private readonly BaskentEnerjiDbContext _context;
         private readonly IVaultService _vaultService;
+        private readonly IWacService _wacService;
+        private readonly IDayClosureService _dayClosureService;
+        private readonly ValidationService _validationService;
 
-        public ExchangeValidationService(BaskentEnerjiDbContext context, IVaultService vaultService)
+        public ExchangeValidationService(
+            BaskentEnerjiDbContext context,
+            IVaultService vaultService,
+            IWacService wacService,
+            IDayClosureService dayClosureService,
+            ValidationService validationService)
         {
             _context = context;
             _vaultService = vaultService;
+            _wacService = wacService;
+            _dayClosureService = dayClosureService;
+            _validationService = validationService;
         }
 
         public async Task<ExchangeValidationResult> ValidateExchangeTransaction(rm_exchangetransaction request)
         {
             var result = new ExchangeValidationResult();
 
-            // Validate vault exists
+            // Day closure check
             var vault = await _context.Vaults.FindAsync(request.VaultId);
             if (vault == null || !vault.IsActive)
             {
                 result.AddError("Invalid vault");
+                return result;
+            }
+
+            var canTransact = await _dayClosureService.CanTransactAsync(vault.OfficeId);
+            if (!canTransact)
+            {
+                var dayStatus = await _dayClosureService.GetDayStatusAsync(vault.OfficeId);
+                result.AddError(dayStatus.BlockReason ?? "Önceki gün kapanışı yapılmadı. İşlem yapabilmek için gün kapanışı gerekli.");
                 return result;
             }
 
@@ -58,12 +75,38 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     r.TargetCurrencyId == request.TargetCurrencyId &&
                     r.IsActive);
 
-           
-
             if (rate == null)
             {
                 result.AddError("Exchange rate not available for this currency pair");
                 return result;
+            }
+
+            // WAC validation for sell transactions (office selling foreign currency)
+            if (!request.IsBuyingFromCustomer)
+            {
+                var sellRate = request.CustomRate ?? rate.SellRate;
+                var wac = await _wacService.GetWacAsync(request.VaultId, request.SourceCurrencyId);
+
+                if (wac > 0 && sellRate < wac)
+                {
+                    var loss = (wac - sellRate) * request.SourceAmount;
+                    if (!request.OwnerOverrideLoss)
+                    {
+                        var isOwner = await _validationService.IsOwnerAsync();
+                        if (!isOwner)
+                        {
+                            result.AddError($"Satış kuru ({sellRate:F4}) maliyetin ({wac:F4}) altında. Tahmini zarar: {loss:F2} TL. Sadece Patron onaylayabilir.");
+                        }
+                        else
+                        {
+                            result.AddWarning($"UYARI: Maliyetin altında satış. Zarar: {loss:F2} TL.");
+                        }
+                    }
+                    else
+                    {
+                        result.AddWarning($"Patron onayı ile zarar satışı: {loss:F2} TL.");
+                    }
+                }
             }
 
             // Validate vault balance
@@ -106,6 +149,17 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             if (request.SourceVaultId == request.TargetVaultId)
             {
                 result.AddError("Cannot transfer to same vault");
+            }
+
+            // Day closure check for source vault
+            if (sourceVault != null)
+            {
+                var canTransact = await _dayClosureService.CanTransactAsync(sourceVault.OfficeId);
+                if (!canTransact)
+                {
+                    result.AddError("Önceki gün kapanışı yapılmadı. Transfer yapabilmek için gün kapanışı gerekli.");
+                    return result;
+                }
             }
 
             // Validate currency

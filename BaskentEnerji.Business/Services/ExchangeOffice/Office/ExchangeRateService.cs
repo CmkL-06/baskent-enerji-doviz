@@ -2,6 +2,7 @@ using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using BaskentEnerji.Business.Infrastructure.ExchangeOffice.Office;
 using BaskentEnerji.Data.Contexts;
+using BaskentEnerji.Entity;
 using BaskentEnerji.Entity.Entities.ExchangeOffice.Currency;
 using BaskentEnerji.Entity.Modals.ViewModals.ExchangeOFfice;
 using System;
@@ -197,6 +198,110 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 .ToListAsync();
 
             return mapper.Map<List<vm_exchangerate>>(dbRates);
+        }
+
+        public async Task<vm_exchangerate?> GetEffectiveRateAsync(Guid officeId, Guid sourceCurrencyId, Guid targetCurrencyId)
+        {
+            var office = await _context.Offices.AsNoTracking().FirstOrDefaultAsync(o => o.Id == officeId);
+            if (office == null) return null;
+
+            // Önce ofise özel kur ara
+            var rate = await _context.ExchangeRates
+                .AsNoTracking()
+                .Include(r => r.SourceCurrency)
+                .Include(r => r.TargetCurrency)
+                .Where(r => r.OfficeId == officeId &&
+                           r.SourceCurrencyId == sourceCurrencyId &&
+                           r.TargetCurrencyId == targetCurrencyId &&
+                           r.IsActive &&
+                           r.EffectiveFrom <= DateTime.Now &&
+                           (r.EffectiveTo == null || r.EffectiveTo > DateTime.Now))
+                .OrderByDescending(r => r.EffectiveFrom)
+                .FirstOrDefaultAsync();
+
+            // Bulunamazsa ve UseParent modundaysa, parent'tan al
+            if (rate == null && office.RateInheritanceMode == RateInheritanceMode.UseParent && office.ParentOfficeId.HasValue)
+            {
+                return await GetEffectiveRateAsync(office.ParentOfficeId.Value, sourceCurrencyId, targetCurrencyId);
+            }
+
+            // Hâlâ yoksa global kur ara
+            if (rate == null)
+            {
+                rate = await _context.ExchangeRates
+                    .AsNoTracking()
+                    .Include(r => r.SourceCurrency)
+                    .Include(r => r.TargetCurrency)
+                    .Where(r => r.OfficeId == null &&
+                               r.SourceCurrencyId == sourceCurrencyId &&
+                               r.TargetCurrencyId == targetCurrencyId &&
+                               r.IsActive &&
+                               r.EffectiveFrom <= DateTime.Now &&
+                               (r.EffectiveTo == null || r.EffectiveTo > DateTime.Now))
+                    .OrderByDescending(r => r.EffectiveFrom)
+                    .FirstOrDefaultAsync();
+            }
+
+            return rate == null ? null : mapper.Map<vm_exchangerate>(rate);
+        }
+
+        public async Task<int> PushRatesToBranchesAsync(Guid merkezOfficeId)
+        {
+            var merkez = await _context.Offices.AsNoTracking()
+                .FirstOrDefaultAsync(o => o.Id == merkezOfficeId && o.OfficeType == OfficeType.Merkez);
+            if (merkez == null) throw new InvalidOperationException("Merkez ofis bulunamadı");
+
+            var merkezRates = await _context.ExchangeRates
+                .Where(r => r.OfficeId == merkezOfficeId && r.IsActive)
+                .ToListAsync();
+
+            if (!merkezRates.Any()) return 0;
+
+            var branches = await _context.Offices
+                .Where(o => o.ParentOfficeId == merkezOfficeId && o.IsActive && o.RateInheritanceMode == RateInheritanceMode.UseParent)
+                .Select(o => o.Id)
+                .ToListAsync();
+
+            int updated = 0;
+            foreach (var branchId in branches)
+            {
+                foreach (var mRate in merkezRates)
+                {
+                    var existing = await _context.ExchangeRates
+                        .Where(r => r.OfficeId == branchId &&
+                                   r.SourceCurrencyId == mRate.SourceCurrencyId &&
+                                   r.TargetCurrencyId == mRate.TargetCurrencyId &&
+                                   r.IsActive)
+                        .FirstOrDefaultAsync();
+
+                    if (existing != null)
+                    {
+                        if (existing.BuyRate == mRate.BuyRate && existing.SellRate == mRate.SellRate)
+                            continue;
+                        existing.IsActive = false;
+                        existing.EffectiveTo = DateTime.Now;
+                        existing.UpdatedAt = DateTime.Now;
+                    }
+
+                    _context.ExchangeRates.Add(new ExchangeRate
+                    {
+                        Id = Guid.NewGuid(),
+                        OfficeId = branchId,
+                        SourceCurrencyId = mRate.SourceCurrencyId,
+                        TargetCurrencyId = mRate.TargetCurrencyId,
+                        BuyRate = mRate.BuyRate,
+                        SellRate = mRate.SellRate,
+                        EffectiveFrom = DateTime.Now,
+                        IsActive = true,
+                        CreatedDate = DateTime.Now,
+                        UpdatedAt = DateTime.Now
+                    });
+                    updated++;
+                }
+            }
+
+            if (updated > 0) await _context.SaveChangesAsync();
+            return updated;
         }
     }
 }
