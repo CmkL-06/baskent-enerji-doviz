@@ -772,18 +772,28 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     .ThenInclude(b => b.Currency)
                 .Where(x => x.OfficeId == officeId && x.IsActive)
                 .ToListAsync();
-                
-            if (dbActiveVaults.Count == 0) 
+
+            if (dbActiveVaults.Count == 0)
                 throw new ApiException(HttpStatusCode.NotFound, "No active vault found for this office");
+
+            var tryCurrency = await _context.Currencies.AsNoTracking()
+                .FirstOrDefaultAsync(c => c.CurrencyCode == "TRY");
+            var tryCurrencyId = tryCurrency?.Id ?? Guid.Empty;
+
+            var rateDict = await _context.ExchangeRates
+                .Where(r => r.OfficeId == officeId && r.TargetCurrencyId == tryCurrencyId && r.IsActive)
+                .GroupBy(r => r.SourceCurrencyId)
+                .Select(g => g.OrderByDescending(r => r.EffectiveFrom).FirstOrDefault())
+                .ToDictionaryAsync(r => r!.SourceCurrencyId, r => r!.BuyRate);
 
             foreach (var vault in dbActiveVaults)
             {
-                // Calculate this vault's own TRY value
                 decimal vaultValueInTRY = 0;
                 foreach (var balance in vault.Balances)
                 {
-                    var rateToTRY = await GetExchangeRateToTRY(officeId, balance.CurrencyId);
-                    vaultValueInTRY += balance.Balance * rateToTRY;
+                    var rate = balance.CurrencyId == tryCurrencyId ? 1m
+                        : rateDict.GetValueOrDefault(balance.CurrencyId);
+                    vaultValueInTRY += balance.Balance * rate;
                 }
 
                 vault.IsActive = false;
