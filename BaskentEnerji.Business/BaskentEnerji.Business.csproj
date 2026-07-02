@@ -9,7 +9,7 @@
   <ItemGroup>
     <PackageReference Include="AspNetCore.Http.Extensions" Version="2.0.0" />
     <!-- NU1903 suppressed: GHSA-rvv3-g6hj-g44x requires user-controlled expressions, not exploitable in server-side API -->
-    <PackageReference Include="AutoMapper" Version="13.0.1">
+    <PackageReference Include="AutoMapper" Version="16.2.0">
       <NoWarn>NU1903</NoWarn>
     </PackageReference>
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />

@@ -80,7 +80,7 @@ builder.Services.AddDbContext<BaskentEnerjiDbContext>(options =>
     // DO NOT use NoTracking as default - it breaks write operations
     // Instead, use AsNoTracking() explicitly on read-only queries
 });
-builder.Services.AddAutoMapper(typeof(AutoMapperProfile));
+builder.Services.AddAutoMapper(cfg => cfg.AddProfile<AutoMapperProfile>());
 builder.Services.AddSignalR();
 builder.Services.AddMemoryCache();
 
