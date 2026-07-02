@@ -19,14 +19,17 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
     {
         private readonly BaskentEnerjiDbContext _context;
         private readonly IVaultService _vaultService;
+        private readonly IWacService _wacService;
         private readonly ValidationService _validationService;
         private readonly IMemoryCache _memoryCache;
         private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(3);
+        private static readonly TimeZoneInfo TurkeyTz = TimeZoneInfo.FindSystemTimeZoneById("Turkey Standard Time");
 
-        public ZReportService(BaskentEnerjiDbContext context, IVaultService vaultService, ValidationService validationService, IMemoryCache memoryCache)
+        public ZReportService(BaskentEnerjiDbContext context, IVaultService vaultService, IWacService wacService, ValidationService validationService, IMemoryCache memoryCache)
         {
             _context = context;
             _vaultService = vaultService;
+            _wacService = wacService;
             _validationService = validationService;
             _memoryCache = memoryCache;
         }
@@ -34,8 +37,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
         public async Task<vm_zreport> GetDailyZReport(Guid? officeId, DateTime date)
         {
             var startDate = date.Date;
-            var endDate = startDate.AddDays(1);
-            
+            var endDate = startDate.AddDays(1).AddSeconds(-1);
+
             // Check cache first
             var cacheKey = $"ZReport_Daily_{officeId}_{startDate:yyyyMMdd}";
             if (_memoryCache.TryGetValue(cacheKey, out vm_zreport cachedReport))
@@ -46,7 +49,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             var report = await GenerateZReport(officeId, startDate, endDate, ZReportPeriod.Daily);
             
             // Cache the result if it's not today (today's data changes)
-            if (date.Date < DateTime.Today)
+            if (date.Date < TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TurkeyTz).Date)
             {
                 _memoryCache.Set(cacheKey, report, TimeSpan.FromHours(24));
             }
@@ -90,7 +93,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
         public async Task<List<vm_zreport>> GetHistoricalZReports(Guid? officeId, ZReportPeriod period, int count)
         {
             var reports = new List<vm_zreport>();
-            var currentDate = DateTime.UtcNow;
+            var currentDate = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TurkeyTz);
 
             for (int i = 0; i < count; i++)
             {
@@ -130,7 +133,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             var report = new vm_zreport
             {
                 OfficeId = officeId,
-                ReportDate = DateTime.UtcNow,
+                ReportDate = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TurkeyTz),
                 Period = period,
                 PeriodStart = startDate,
                 PeriodEnd = endDate,
@@ -173,7 +176,6 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 .Include(t => t.Details)
                     .ThenInclude(d => d.Currency)
                 .Include(t => t.Vault)
-                .Include(t => t.Party)
                 .Where(t => t.Vault.OfficeId == officeId &&
                           t.TransactionDate >= startDate &&
                           t.TransactionDate <= endDate &&
@@ -189,19 +191,11 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 .Include(vh => vh.Vault)
                 .Where(vh => vh.Vault.OfficeId == officeId &&
                             vh.CreatedDate >= startDate &&
-                            vh.CreatedDate < endDate && 
+                            vh.CreatedDate <= endDate &&
                             !vh.IsDeleted && 
                             !vh.IsGhost)
                 .OrderByDescending(vh => vh.CreatedDate)
                 .ToListAsync();
-                
-            // Debug: Log vault history count and add more details
-            Console.WriteLine($"[Z-Report Debug] Found {vaultHistories.Count} vault histories (excluding ghost entries) for office {officeId} between {startDate:yyyy-MM-dd HH:mm:ss} and {endDate:yyyy-MM-dd HH:mm:ss}");
-            if (vaultHistories.Any())
-            {
-                Console.WriteLine($"[Z-Report Debug] First history date: {vaultHistories.First().CreatedDate:yyyy-MM-dd HH:mm:ss}");
-                Console.WriteLine($"[Z-Report Debug] Last history date: {vaultHistories.Last().CreatedDate:yyyy-MM-dd HH:mm:ss}");
-            }
                 
             // Also prepare balance histories for the report
             var balanceHistoriesForReport = new List<vm_vaultbalancehistory>();
@@ -371,6 +365,30 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 }
             }
 
+            // Pre-fetch data to avoid N+1 queries in loops below
+            var allCurrencies = await _context.Currencies.AsNoTracking().ToDictionaryAsync(c => c.CurrencyCode, c => c);
+            var tryCurrency = allCurrencies.GetValueOrDefault("TRY");
+            var tryCurrencyId = tryCurrency?.Id ?? Guid.Empty;
+
+            var mainVault = await _context.Vaults.AsNoTracking()
+                .FirstOrDefaultAsync(v => v.OfficeId == officeId && v.IsActive && v.Type == Vault.VaultType.Main);
+
+            var allExchangeRates = await _context.ExchangeRates
+                .Where(r => r.OfficeId == officeId && r.TargetCurrencyId == tryCurrencyId && r.IsActive)
+                .GroupBy(r => r.SourceCurrencyId)
+                .Select(g => g.OrderByDescending(r => r.EffectiveFrom).FirstOrDefault())
+                .ToDictionaryAsync(r => r!.SourceCurrencyId, r => r!);
+
+            var wacDict = mainVault != null
+                ? await _wacService.GetAllWacsForVaultAsync(mainVault.Id)
+                : new Dictionary<Guid, decimal>();
+
+            var vaultBalanceDict = mainVault != null
+                ? await _context.VaultBalances.AsNoTracking()
+                    .Where(vb => vb.VaultId == mainVault.Id)
+                    .ToDictionaryAsync(vb => vb.CurrencyId, vb => vb.Balance)
+                : new Dictionary<Guid, decimal>();
+
             // Calculate currency performance metrics
             foreach (var kvp in currencyDetailsMap)
             {
@@ -387,7 +405,6 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 // Assign profit only to foreign currencies (non-TRY)
                 if (currencyCode == "TRY")
                 {
-                    // TRY is the base currency and doesn't generate profit
                     detail.Profit = 0;
                 }
                 else if (transactionProfitsByForeignCurrency.ContainsKey(currencyCode))
@@ -396,7 +413,6 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 }
                 else
                 {
-                    // For currencies without specific profit attribution, calculate traditionally
                     detail.Profit = detail.TotalSellRevenue - detail.TotalBuyCost;
                 }
 
@@ -408,13 +424,23 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 // Net position
                 detail.NetPosition = detail.TotalBoughtAmount - detail.TotalSoldAmount;
 
-                // Get current rates
-                var currentRate = await GetCurrentExchangeRate(officeId, kvp.Key);
-                if (currentRate != null)
+                // Get current rates from pre-fetched data
+                if (allCurrencies.TryGetValue(kvp.Key, out var curr) && curr.Id != tryCurrencyId
+                    && allExchangeRates.TryGetValue(curr.Id, out var currentRate))
                 {
                     detail.CurrentBuyRate = currentRate.BuyRate;
                     detail.CurrentSellRate = currentRate.SellRate;
                     detail.Spread = currentRate.SellRate - currentRate.BuyRate;
+                }
+
+                // WAC data from pre-fetched dictionaries
+                if (currencyCode != "TRY" && allCurrencies.TryGetValue(currencyCode, out var wacCurrency) && mainVault != null)
+                {
+                    detail.Wac = wacDict.GetValueOrDefault(wacCurrency.Id);
+                    detail.CurrentBalance = vaultBalanceDict.GetValueOrDefault(wacCurrency.Id);
+                    detail.RealizedProfit = detail.Profit;
+                    if (detail.Wac > 0 && detail.CurrentBalance > 0 && detail.CurrentSellRate > 0)
+                        detail.UnrealizedProfit = (detail.CurrentSellRate - detail.Wac) * detail.CurrentBalance;
                 }
             }
 
@@ -432,7 +458,9 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             {
                 var currencyCode = account.Currency.CurrencyCode;
                 var balance = account.Balance;
-                var balanceInTRY = Math.Abs(balance) * await GetExchangeRateToTRY(officeId, account.CurrencyId);
+                var rateToTRY = account.CurrencyId == tryCurrencyId ? 1m
+                    : allExchangeRates.TryGetValue(account.CurrencyId, out var rateObj) ? rateObj.BuyRate : 0m;
+                var balanceInTRY = Math.Abs(balance) * rateToTRY;
 
                 if (balance < 0) // We owe to party
                 {
@@ -464,7 +492,9 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             {
                 var currencyCode = balance.Currency.CurrencyCode;
                 cashSummary.VaultBalancesByCurrency[currencyCode] = balance.Balance;
-                var valueInTRY = balance.Balance * await GetExchangeRateToTRY(officeId, balance.CurrencyId);
+                var vbRate = balance.CurrencyId == tryCurrencyId ? 1m
+                    : allExchangeRates.TryGetValue(balance.CurrencyId, out var vbRateObj) ? vbRateObj.BuyRate : 0m;
+                var valueInTRY = balance.Balance * vbRate;
                 cashSummary.TotalVaultValueInTRY += valueInTRY;
                 totalValueInBaseCurrency += valueInTRY;
             }
@@ -475,14 +505,10 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
             foreach (var vaultHistory in vaultHistories)
             {
-                // Get exchange rate to TRY for the currency
-                decimal rateToTRY = 1m;
-                if (vaultHistory.Currency.CurrencyCode != "TRY")
-                {
-                    rateToTRY = await GetExchangeRateToTRY(officeId, vaultHistory.CurrencyId);
-                }
+                decimal histRate = vaultHistory.CurrencyId == tryCurrencyId ? 1m
+                    : allExchangeRates.TryGetValue(vaultHistory.CurrencyId, out var histRateObj) ? histRateObj.BuyRate : 0m;
 
-                decimal amountInTRY = Math.Abs(vaultHistory.Balance) * rateToTRY;
+                decimal amountInTRY = Math.Abs(vaultHistory.Balance) * histRate;
 
                 if (vaultHistory.TransactionType == TransactionType.Deposit)
                 {
@@ -713,7 +739,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 .OrderByDescending(r => r.EffectiveFrom)
                 .FirstOrDefaultAsync();
 
-            return rate?.SellRate ?? 0m;
+            return rate?.BuyRate ?? 0m;
         }
 
         private async Task<Entity.Entities.ExchangeOffice.Currency.ExchangeRate> GetCurrentExchangeRate(Guid officeId, string currencyCode)
@@ -750,15 +776,18 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             if (dbActiveVaults.Count == 0) 
                 throw new ApiException(HttpStatusCode.NotFound, "No active vault found for this office");
 
-            // Get today's Z-report for total value calculation
-            var todayReport = await GetDailyZReport(officeId, DateTime.Now);
-            var totalValueInBaseCurrency = todayReport.Summary?.TotalValueInBaseCurrency ?? 0;
-
             foreach (var vault in dbActiveVaults)
             {
-                // Mark the vault as inactive and save total value in base currency as closing balance
+                // Calculate this vault's own TRY value
+                decimal vaultValueInTRY = 0;
+                foreach (var balance in vault.Balances)
+                {
+                    var rateToTRY = await GetExchangeRateToTRY(officeId, balance.CurrencyId);
+                    vaultValueInTRY += balance.Balance * rateToTRY;
+                }
+
                 vault.IsActive = false;
-                vault.ClosingBalance = totalValueInBaseCurrency;
+                vault.ClosingBalance = vaultValueInTRY;
                 vault.ClosedDate = DateTime.UtcNow;
             }
 

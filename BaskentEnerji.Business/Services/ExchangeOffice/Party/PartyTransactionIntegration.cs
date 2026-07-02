@@ -197,10 +197,11 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
             switch (transactionType)
             {
                 case TransactionType.Exchange:
-                    // Assuming positive amounts are sales (receivables), negative are purchases (payables)
-                    return detail.NetAmount > 0 
-                        ? (EntryType.Debit, detail.NetAmount) 
-                        : (EntryType.Credit, Math.Abs(detail.NetAmount));
+                    // Credit detail = office receives currency from customer → party Credit (we owe them)
+                    // Debit detail = office pays currency to customer → party Debit (they owe us)
+                    return detail.Side == TransactionSide.Credit
+                        ? (EntryType.Credit, detail.NetAmount)
+                        : (EntryType.Debit, detail.NetAmount);
                 
                 case TransactionType.Deposit:
                     // Deposits reduce party payables or create receivables

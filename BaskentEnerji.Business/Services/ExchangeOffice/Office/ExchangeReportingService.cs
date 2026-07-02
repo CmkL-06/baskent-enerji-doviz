@@ -37,6 +37,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
             // Get all transactions for the month
             var transactions = await _context.Transactions
+                .AsNoTracking()
                 .Include(t => t.Details)
                     .ThenInclude(d => d.Currency)
                 .Include(t => t.Vault)
@@ -44,6 +45,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                            t.TransactionDate >= startDate &&
                            t.TransactionDate <= endDate &&
                            t.Status == TransactionStatus.Completed)
+                .AsSplitQuery()
                 .ToListAsync();
 
             // Calculate volumes by currency and track total profit
@@ -60,6 +62,10 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     // Add to total profit
                     totalProfit += transaction.Profit;
 
+                    // Count debit details to distribute profit evenly across currencies
+                    var debitDetails = transaction.Details.Where(d => d.Side == TransactionSide.Debit).ToList();
+                    var profitPerDebit = debitDetails.Count > 0 ? transaction.Profit / debitDetails.Count : 0;
+
                     foreach (var detail in transaction.Details)
                     {
                         var currencyCode = detail.Currency.CurrencyCode;
@@ -71,11 +77,10 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                         }
 
                         volumesByCurrency[currencyCode] += Math.Abs(detail.Amount);
-                        
-                        // Allocate profit to source currency (debit side)
+
                         if (detail.Side == TransactionSide.Debit)
                         {
-                            profitsByCurrency[currencyCode] += transaction.Profit;
+                            profitsByCurrency[currencyCode] += profitPerDebit;
                         }
                     }
                 }
@@ -206,8 +211,14 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
             var currencyPerformance = new Dictionary<Guid, vm_currencyperformance>();
 
+            // Track spread observation counts for correct averaging
+            var spreadCounts = new Dictionary<Guid, int>();
+
             foreach (var transaction in transactions)
             {
+                var debitDetails = transaction.Details.Where(d => d.Side == TransactionSide.Debit).ToList();
+                var profitPerDebit = debitDetails.Count > 0 ? transaction.Profit / debitDetails.Count : 0;
+
                 foreach (var detail in transaction.Details)
                 {
                     if (!currencyPerformance.ContainsKey(detail.CurrencyId))
@@ -221,26 +232,27 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                             TransactionCount = 0,
                             AverageSpread = 0
                         };
+                        spreadCounts[detail.CurrencyId] = 0;
                     }
 
                     var perf = currencyPerformance[detail.CurrencyId];
                     perf.TotalVolume += Math.Abs(detail.Amount);
-                    // Distribute profit proportionally based on the detail's share of transaction
-                    if (detail.Side == TransactionSide.Debit && transaction.Details.Count > 1)
+
+                    if (detail.Side == TransactionSide.Debit)
                     {
-                        // For exchange transactions, attribute profit to the source currency (debit side)
-                        perf.TotalProfit += transaction.Profit;
+                        perf.TotalProfit += profitPerDebit;
                     }
                     perf.TransactionCount++;
 
-                    // Calculate spread if this is a sell side
                     if (detail.Side == TransactionSide.Credit && detail.Rate > 0)
                     {
                         var exchangeRate = await GetCurrentExchangeRate(officeId, detail.CurrencyId);
                         if (exchangeRate != null)
                         {
                             var spread = Math.Abs(exchangeRate.SellRate - exchangeRate.BuyRate);
-                            perf.AverageSpread = (perf.AverageSpread + spread) / 2; // Running average
+                            spreadCounts[detail.CurrencyId]++;
+                            var n = spreadCounts[detail.CurrencyId];
+                            perf.AverageSpread += (spread - perf.AverageSpread) / n;
                         }
                     }
                 }
@@ -344,7 +356,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 .OrderByDescending(r => r.EffectiveFrom)
                 .FirstOrDefaultAsync();
 
-            return rate?.SellRate ?? 0m;
+            return rate?.BuyRate ?? 0m;
         }
 
         private async Task<ExchangeRate> GetCurrentExchangeRate(Guid officeId, Guid currencyId)
