@@ -84,6 +84,12 @@ namespace BaskentEnerji.Entity.Modals.ViewModals.ExchangeOFfice.Office
         public decimal ProfitMargin { get; set; } // Percentage
         public decimal NetPosition { get; set; } // Bought - Sold (inventory change)
         
+        // WAC (Weighted Average Cost)
+        public decimal Wac { get; set; }
+        public decimal RealizedProfit { get; set; }
+        public decimal UnrealizedProfit { get; set; }
+        public decimal CurrentBalance { get; set; }
+
         // Current Rates (for reference)
         public decimal CurrentBuyRate { get; set; }
         public decimal CurrentSellRate { get; set; }

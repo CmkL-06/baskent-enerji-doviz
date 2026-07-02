@@ -26,6 +26,12 @@ namespace BaskentEnerji.Entity.Entities.ExchangeOffice.Office
         public decimal? MonthlyTransactionLimit { get; set; }
         public decimal? CommissionRate { get; set; }
 
+        // Kur yönetimi
+        public RateInheritanceMode RateInheritanceMode { get; set; } = RateInheritanceMode.UseParent;
+
+        // Transfer onay eşiği (bu tutarın altındaki transferler otomatik onaylanır)
+        public decimal? TransferApprovalThreshold { get; set; }
+
         // Navigation
         public ICollection<Vault> Vaults { get; set; }
         public ICollection<User.User> Employees { get; set; }

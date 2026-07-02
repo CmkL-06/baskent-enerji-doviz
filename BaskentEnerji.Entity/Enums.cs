@@ -65,4 +65,26 @@ namespace BaskentEnerji.Entity
         Completed = 3,
         Cancelled = 4,
     }
+
+    public enum RateInheritanceMode
+    {
+        UseParent = 0,  // Merkez kurlarını kullan
+        Custom    = 1,  // Kendi kurlarını belirle
+    }
+
+    public enum AlertType
+    {
+        LowBalance          = 1,
+        UnusualTransaction  = 2,
+        ThresholdBreach     = 3,
+        TransferPending     = 4,
+        DayClosureMissing   = 5,
+    }
+
+    public enum AlertSeverity
+    {
+        Info     = 0,
+        Warning  = 1,
+        Critical = 2,
+    }
 }

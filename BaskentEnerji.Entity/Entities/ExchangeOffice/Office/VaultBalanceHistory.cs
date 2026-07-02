@@ -16,6 +16,8 @@ namespace BaskentEnerji.Entity.Entities.ExchangeOffice.Office
        
         public string? Description { get; set; }
 
+        public Guid? TransferReferenceId { get; set; }
+
         public Vault Vault { get; set; }
         public Currency.Currency Currency { get; set; }
         public bool IsDeleted { get; set; }

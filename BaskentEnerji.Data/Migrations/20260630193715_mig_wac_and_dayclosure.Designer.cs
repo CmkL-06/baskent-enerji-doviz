@@ -4,6 +4,7 @@ using BaskentEnerji.Data.Contexts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BaskentEnerji.Data.Migrations
 {
     [DbContext(typeof(BaskentEnerjiDbContext))]
-    partial class BaskentEnerjiDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260630193715_mig_wac_and_dayclosure")]
+    partial class mig_wac_and_dayclosure
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -3222,365 +3225,6 @@ namespace BaskentEnerji.Data.Migrations
                     b.ToTable("Themes");
                 });
 
-            modelBuilder.Entity("BaskentEnerji.Entity.Entities.Telegram.TgApiQueue", b =>
-                {
-                    b.Property<int>("QueueId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("QueueId"));
-
-                    b.Property<int?>("Attempts")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("LastAttempt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("LastError")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<int?>("MaxAttempts")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Status")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<int?>("TransactionId")
-                        .HasColumnType("int");
-
-                    b.HasKey("QueueId");
-
-                    b.ToTable("TgApiQueue");
-                });
-
-            modelBuilder.Entity("BaskentEnerji.Entity.Entities.Telegram.TgBankProvider", b =>
-                {
-                    b.Property<long>("ProviderId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("AddedBy")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime?>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool?>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.HasKey("ProviderId");
-
-                    b.ToTable("TgBankProviders");
-                });
-
-            modelBuilder.Entity("BaskentEnerji.Entity.Entities.Telegram.TgBotHeartbeat", b =>
-                {
-                    b.Property<string>("BotName")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
-                    b.Property<int?>("ActiveSessions")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("LastHeartbeat")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("LastTransactionAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("BotName");
-
-                    b.ToTable("TgBotHeartbeats");
-                });
-
-            modelBuilder.Entity("BaskentEnerji.Entity.Entities.Telegram.TgChatSession", b =>
-                {
-                    b.Property<int>("SessionId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("SessionId"));
-
-                    b.Property<DateTime?>("ClosedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<long?>("CustomerId")
-                        .HasColumnType("bigint");
-
-                    b.Property<bool?>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<long?>("OperatorId")
-                        .HasColumnType("bigint");
-
-                    b.Property<int?>("TransactionId")
-                        .HasColumnType("int");
-
-                    b.HasKey("SessionId");
-
-                    b.HasIndex("TransactionId");
-
-                    b.ToTable("TgChatSessions");
-                });
-
-            modelBuilder.Entity("BaskentEnerji.Entity.Entities.Telegram.TgCryptoDeposit", b =>
-                {
-                    b.Property<int>("DepositId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("DepositId"));
-
-                    b.Property<decimal?>("Amount")
-                        .HasColumnType("decimal(18,6)");
-
-                    b.Property<int?>("Confirmations")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("DealerId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("DepositTime")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Network")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("Status")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("ToAddress")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<int?>("TransactionId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Txid")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.HasKey("DepositId");
-
-                    b.HasIndex("TransactionId");
-
-                    b.ToTable("TgCryptoDeposits");
-                });
-
-            modelBuilder.Entity("BaskentEnerji.Entity.Entities.Telegram.TgCustomer", b =>
-                {
-                    b.Property<long>("CustomerId")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime?>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("FirstName")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("LanguageCode")
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
-
-                    b.Property<DateTime?>("LastActivity")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("LastName")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("ReferralCode")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("Username")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("CustomerId");
-
-                    b.ToTable("TgCustomers");
-                });
-
-            modelBuilder.Entity("BaskentEnerji.Entity.Entities.Telegram.TgLoginLog", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime?>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("IpAddress")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("PanelType")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<bool>("Success")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Username")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("TgLoginLogs");
-                });
-
-            modelBuilder.Entity("BaskentEnerji.Entity.Entities.Telegram.TgMessage", b =>
-                {
-                    b.Property<int>("MessageId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("MessageId"));
-
-                    b.Property<DateTime?>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("FileType")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("FileUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("MessageText")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<long?>("SenderId")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("SenderType")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<int?>("TransactionId")
-                        .HasColumnType("int");
-
-                    b.HasKey("MessageId");
-
-                    b.HasIndex("TransactionId");
-
-                    b.ToTable("TgMessages");
-                });
-
-            modelBuilder.Entity("BaskentEnerji.Entity.Entities.Telegram.TgOperator", b =>
-                {
-                    b.Property<long>("OperatorId")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime?>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("FirstName")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<bool?>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<bool?>("IsAdmin")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Username")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("OperatorId");
-
-                    b.ToTable("TgOperators");
-                });
-
-            modelBuilder.Entity("BaskentEnerji.Entity.Entities.Telegram.TgTransaction", b =>
-                {
-                    b.Property<int>("TransactionId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TransactionId"));
-
-                    b.Property<decimal?>("Amount")
-                        .HasColumnType("decimal(18,6)");
-
-                    b.Property<long?>("AssignedOperatorId")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("CompletionCode")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<DateTime?>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool?>("CryptoVerified")
-                        .HasColumnType("bit");
-
-                    b.Property<DateTime?>("CryptoVerifiedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Currency")
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
-
-                    b.Property<long?>("CustomerId")
-                        .HasColumnType("bigint");
-
-                    b.Property<decimal?>("ExchangeRate")
-                        .HasColumnType("decimal(18,6)");
-
-                    b.Property<string>("IdempotencyKey")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<bool?>("IsBuy")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("ReferralCode")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("StateData")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Status")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
-                    b.Property<decimal?>("TryAmount")
-                        .HasColumnType("decimal(18,6)");
-
-                    b.Property<string>("Txid")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.HasKey("TransactionId");
-
-                    b.HasIndex("CustomerId");
-
-                    b.ToTable("TgTransactions");
-                });
-
             modelBuilder.Entity("BaskentEnerji.Entity.Entities.User.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3589,9 +3233,6 @@ namespace BaskentEnerji.Data.Migrations
 
                     b.Property<DateTime>("CreatedDate")
                         .HasColumnType("datetime2");
-
-                    b.Property<string>("DealerReferralCode")
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("FirstIp")
                         .HasColumnType("nvarchar(max)");
@@ -3632,9 +3273,6 @@ namespace BaskentEnerji.Data.Migrations
 
                     b.Property<int>("Rank")
                         .HasColumnType("int");
-
-                    b.Property<long?>("TelegramOperatorId")
-                        .HasColumnType("bigint");
 
                     b.Property<string>("Username")
                         .IsRequired()
@@ -4740,46 +4378,6 @@ namespace BaskentEnerji.Data.Migrations
                     b.Navigation("Language");
                 });
 
-            modelBuilder.Entity("BaskentEnerji.Entity.Entities.Telegram.TgChatSession", b =>
-                {
-                    b.HasOne("BaskentEnerji.Entity.Entities.Telegram.TgTransaction", "Transaction")
-                        .WithMany("ChatSessions")
-                        .HasForeignKey("TransactionId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("Transaction");
-                });
-
-            modelBuilder.Entity("BaskentEnerji.Entity.Entities.Telegram.TgCryptoDeposit", b =>
-                {
-                    b.HasOne("BaskentEnerji.Entity.Entities.Telegram.TgTransaction", "Transaction")
-                        .WithMany("CryptoDeposits")
-                        .HasForeignKey("TransactionId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("Transaction");
-                });
-
-            modelBuilder.Entity("BaskentEnerji.Entity.Entities.Telegram.TgMessage", b =>
-                {
-                    b.HasOne("BaskentEnerji.Entity.Entities.Telegram.TgTransaction", "Transaction")
-                        .WithMany("Messages")
-                        .HasForeignKey("TransactionId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("Transaction");
-                });
-
-            modelBuilder.Entity("BaskentEnerji.Entity.Entities.Telegram.TgTransaction", b =>
-                {
-                    b.HasOne("BaskentEnerji.Entity.Entities.Telegram.TgCustomer", "Customer")
-                        .WithMany("Transactions")
-                        .HasForeignKey("CustomerId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("Customer");
-                });
-
             modelBuilder.Entity("BaskentEnerji.Entity.Entities.User.User", b =>
                 {
                     b.HasOne("BaskentEnerji.Entity.Entities.ExchangeOffice.Office.Office", null)
@@ -4915,20 +4513,6 @@ namespace BaskentEnerji.Data.Migrations
                     b.Navigation("ArticleTags");
 
                     b.Navigation("CategoryTags");
-                });
-
-            modelBuilder.Entity("BaskentEnerji.Entity.Entities.Telegram.TgCustomer", b =>
-                {
-                    b.Navigation("Transactions");
-                });
-
-            modelBuilder.Entity("BaskentEnerji.Entity.Entities.Telegram.TgTransaction", b =>
-                {
-                    b.Navigation("ChatSessions");
-
-                    b.Navigation("CryptoDeposits");
-
-                    b.Navigation("Messages");
                 });
 #pragma warning restore 612, 618
         }

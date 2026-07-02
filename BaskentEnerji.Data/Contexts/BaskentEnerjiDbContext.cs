@@ -12,6 +12,7 @@ using BaskentEnerji.Entity.Entities.Site.Menu;
 using BaskentEnerji.Entity.Entities.Site.Page;
 using BaskentEnerji.Entity.Entities.Site.Form;
 using BaskentEnerji.Entity.Entities.Site.Custom;
+using BaskentEnerji.Entity.Entities.Telegram;
 using System;
 
 namespace BaskentEnerji.Data.Contexts
@@ -85,6 +86,102 @@ namespace BaskentEnerji.Data.Contexts
                 .WithMany()
                 .HasForeignKey(t => t.ApprovedByUserId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // DayClosure FK
+            modelBuilder.Entity<DayClosure>()
+                .HasOne(d => d.ClosedByUser)
+                .WithMany()
+                .HasForeignKey(d => d.ClosedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<DayClosure>()
+                .HasOne(d => d.Vault)
+                .WithMany()
+                .HasForeignKey(d => d.VaultId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<DayClosure>()
+                .HasOne(d => d.Office)
+                .WithMany()
+                .HasForeignKey(d => d.OfficeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<DayClosure>()
+                .HasOne(d => d.VaultCount)
+                .WithMany()
+                .HasForeignKey(d => d.VaultCountId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            // DayClosureDetail FK
+            modelBuilder.Entity<DayClosureDetail>()
+                .HasOne(dd => dd.Currency)
+                .WithMany()
+                .HasForeignKey(dd => dd.CurrencyId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // CurrencyWac FK
+            modelBuilder.Entity<CurrencyWac>()
+                .HasOne(w => w.Vault)
+                .WithMany()
+                .HasForeignKey(w => w.VaultId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<CurrencyWac>()
+                .HasOne(w => w.Currency)
+                .WithMany()
+                .HasForeignKey(w => w.CurrencyId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // CurrencyWacHistory FK
+            modelBuilder.Entity<CurrencyWacHistory>()
+                .HasOne(h => h.Vault)
+                .WithMany()
+                .HasForeignKey(h => h.VaultId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<CurrencyWacHistory>()
+                .HasOne(h => h.Currency)
+                .WithMany()
+                .HasForeignKey(h => h.CurrencyId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<CurrencyWacHistory>()
+                .HasOne(h => h.Transaction)
+                .WithMany()
+                .HasForeignKey(h => h.TransactionId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            // OfficeAlert FK
+            modelBuilder.Entity<OfficeAlert>()
+                .HasOne(a => a.Office)
+                .WithMany()
+                .HasForeignKey(a => a.OfficeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Telegram MTT FK'lar
+            modelBuilder.Entity<TgTransaction>()
+                .HasOne(t => t.Customer)
+                .WithMany(c => c.Transactions)
+                .HasForeignKey(t => t.CustomerId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<TgMessage>()
+                .HasOne(m => m.Transaction)
+                .WithMany(t => t.Messages)
+                .HasForeignKey(m => m.TransactionId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<TgChatSession>()
+                .HasOne(s => s.Transaction)
+                .WithMany(t => t.ChatSessions)
+                .HasForeignKey(s => s.TransactionId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<TgCryptoDeposit>()
+                .HasOne(d => d.Transaction)
+                .WithMany(t => t.CryptoDeposits)
+                .HasForeignKey(d => d.TransactionId)
+                .OnDelete(DeleteBehavior.SetNull);
         }
 
         // User
@@ -130,6 +227,11 @@ namespace BaskentEnerji.Data.Contexts
         public DbSet<VaultBalanceSnapshot> VaultBalanceSnapshots { get; set; } = null!;
         public DbSet<VaultBalanceSnapshotDetail> VaultBalanceSnapshotDetails { get; set; } = null!;
         public DbSet<VaultCount> VaultCounts { get; set; } = null!;
+        public DbSet<CurrencyWac> CurrencyWacs { get; set; } = null!;
+        public DbSet<CurrencyWacHistory> CurrencyWacHistories { get; set; } = null!;
+        public DbSet<DayClosure> DayClosures { get; set; } = null!;
+        public DbSet<DayClosureDetail> DayClosureDetails { get; set; } = null!;
+        public DbSet<OfficeAlert> OfficeAlerts { get; set; } = null!;
 
         // ExchangeOffice — Party
         public DbSet<Party> Parties { get; set; } = null!;
@@ -174,5 +276,19 @@ namespace BaskentEnerji.Data.Contexts
 
         // Site — Custom
         public DbSet<Department> Departments { get; set; } = null!;
+
+        // Telegram MTT
+        public DbSet<TgCustomer> TgCustomers { get; set; } = null!;
+        public DbSet<TgTransaction> TgTransactions { get; set; } = null!;
+        public DbSet<TgMessage> TgMessages { get; set; } = null!;
+        public DbSet<TgCryptoDeposit> TgCryptoDeposits { get; set; } = null!;
+        public DbSet<TgChatSession> TgChatSessions { get; set; } = null!;
+        public DbSet<TgBotHeartbeat> TgBotHeartbeats { get; set; } = null!;
+        public DbSet<TgApiQueue> TgApiQueue { get; set; } = null!;
+        public DbSet<TgBankProvider> TgBankProviders { get; set; } = null!;
+        public DbSet<TgOperator> TgOperators { get; set; } = null!;
+        public DbSet<TgLoginLog> TgLoginLogs { get; set; } = null!;
+        public DbSet<TgExchangeRate> TgExchangeRates { get; set; } = null!;
+        public DbSet<TgDealer> TgDealers { get; set; } = null!;
     }
 }
