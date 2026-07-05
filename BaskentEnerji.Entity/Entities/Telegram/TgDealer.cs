@@ -40,5 +40,10 @@ namespace BaskentEnerji.Entity.Entities.Telegram
         public string? ApiSecret { get; set; }
 
         public DateTime CreatedAt { get; set; }
+
+        public Guid? PartyId { get; set; }
+
+        [Column(TypeName = "decimal(5,2)")]
+        public decimal CommissionRate { get; set; } = 1.5m;
     }
 }

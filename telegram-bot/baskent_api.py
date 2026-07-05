@@ -94,6 +94,39 @@ def send_exchange(transaction_id, dealer_vault_id, currency, amount,
         return False
 
 
+def record_dealer_entry(dealer_code, currency, amount, amount_try,
+                        exchange_rate, is_buy, transaction_id=None):
+    """Cari hesaba kayıt düşür (Exchange API'den AYRI, vault'a dokunmaz)"""
+    global _token
+    url = f"{Config.BASKENT_API_URL}/tg/dealer/record-entry"
+    payload = {
+        "dealerCode": dealer_code,
+        "transactionId": transaction_id,
+        "currency": currency,
+        "amount": float(amount),
+        "amountTry": float(amount_try),
+        "exchangeRate": float(exchange_rate),
+        "isBuy": bool(is_buy)
+    }
+    headers = {
+        "Authorization": f"Bearer {_token}",
+        "Content-Type": "application/json"
+    }
+    try:
+        resp = requests.post(url, json=payload, headers=headers, timeout=10)
+        if resp.status_code == 401:
+            if login():
+                headers["Authorization"] = f"Bearer {_token}"
+                resp = requests.post(url, json=payload, headers=headers, timeout=10)
+        if resp.status_code in (200, 201):
+            logger.info(f"[CariHesap] {dealer_code} kayıt başarılı — {currency} {'Alış' if is_buy else 'Satış'}")
+            return True
+        logger.error(f"[CariHesap] Başarısız: {resp.status_code} — {resp.text[:200]}")
+    except Exception as e:
+        logger.error(f"[CariHesap] Hata: {e}")
+    return False
+
+
 def send_exchange_for_transaction(transaction_id, enqueue_on_fail=True):
     """
     DB'den işlem bilgilerini alıp BaşkentEnerji'ye gönder.
@@ -104,11 +137,11 @@ def send_exchange_for_transaction(transaction_id, enqueue_on_fail=True):
         with get_conn() as conn:
             c = conn.cursor()
             c.execute("""
-                SELECT d.vaultId, d.dealer_name, t.isBuy,
-                       t.exchange_rate, t.amount, t.currency
-                FROM Transactions t
-                LEFT JOIN Dealers d ON d.dealer_code = t.referral_code
-                WHERE t.transaction_id = ?
+                SELECT d.VaultId, d.DealerName, t.IsBuy,
+                       t.ExchangeRate, t.Amount, t.Currency
+                FROM TgTransactions t
+                LEFT JOIN TgDealers d ON d.DealerCode = t.ReferralCode
+                WHERE t.TransactionId = ?
             """, transaction_id)
             row = c.fetchone()
 

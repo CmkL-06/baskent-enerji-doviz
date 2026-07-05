@@ -30,6 +30,14 @@ const showNewRateForm = ref(false)
 const apiQueue = ref<any>({ items: [], summary: { pending: 0, failed: 0, success: 0 } })
 const loginLogs = ref<any[]>([])
 
+// Cari Hesap
+const cariSummary = ref<any>({ dealers: [], totals: { totalPayable: 0, totalReceivable: 0, netPosition: 0 } })
+const cariEntries = ref<any>({ dealerCode: '', dealerName: '', balance: 0, balanceType: 'settled', entries: [] })
+const selectedCariDealer = ref<string | null>(null)
+const showPaymentForm = ref(false)
+const paymentForm = ref({ dealerCode: '', amount: 0, description: '', paymentReference: '' })
+const paymentLoading = ref(false)
+
 // Create forms
 const showCreateDealer = ref(false)
 const newDealer = ref({ username: '', name: '' })
@@ -144,6 +152,41 @@ async function loadLoginLogs() {
   } catch (e) { console.error(e) }
 }
 
+async function loadCariSummary() {
+  try {
+    const res = await apiService.getTgCariSummary()
+    cariSummary.value = res ?? cariSummary.value
+  } catch (e) { console.error(e) }
+}
+
+async function loadCariEntries(code: string) {
+  selectedCariDealer.value = code
+  try {
+    const res = await apiService.getTgCariEntries(code)
+    cariEntries.value = res ?? cariEntries.value
+  } catch (e) { console.error(e) }
+}
+
+function openPaymentForm(d: any) {
+  paymentForm.value = { dealerCode: d.dealerCode, amount: Math.abs(d.balance), description: '', paymentReference: '' }
+  showPaymentForm.value = true
+}
+
+async function submitPayment() {
+  if (!paymentForm.value.dealerCode || paymentForm.value.amount <= 0) return
+  paymentLoading.value = true
+  try {
+    await apiService.recordTgPayment(paymentForm.value)
+    showPaymentForm.value = false
+    await loadCariSummary()
+    if (selectedCariDealer.value === paymentForm.value.dealerCode) {
+      await loadCariEntries(paymentForm.value.dealerCode)
+    }
+  } catch (e: any) {
+    alert(e?.response?.data?.message || e?.message || 'Ödeme kaydedilemedi')
+  } finally { paymentLoading.value = false }
+}
+
 async function retryQueue(queueId: number) {
   try {
     await apiService.post(`/tg/admin/baskent-queue/${queueId}/retry`)
@@ -202,6 +245,7 @@ function switchTab(tab: string) {
   else if (tab === 'dealers') loadDealers()
   else if (tab === 'operators') loadOperators()
   else if (tab === 'crypto') loadCryptoDeposits()
+  else if (tab === 'cari') loadCariSummary()
   else if (tab === 'queue') loadApiQueue()
   else if (tab === 'logs') loadLoginLogs()
 }
@@ -249,6 +293,7 @@ onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
         { key: 'dealers', icon: 'storefront', label: 'Bayiler' },
         { key: 'operators', icon: 'support_agent', label: 'Operatörler' },
         { key: 'crypto', icon: 'currency_bitcoin', label: 'Kripto' },
+        { key: 'cari', icon: 'account_balance_wallet', label: 'Cari Hesap' },
         { key: 'queue', icon: 'queue', label: 'API Kuyruk' },
         { key: 'logs', icon: 'history', label: 'Loglar' },
       ]" :key="tab.key"
@@ -630,6 +675,154 @@ onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
       </div>
     </div>
 
+    <!-- ═══════ CARİ HESAP ═══════ -->
+    <div v-else-if="activeTab === 'cari'" class="tg-content">
+      <!-- Özet Kartları -->
+      <div class="stat-grid three" style="margin-bottom:16px">
+        <div class="stat-card accent-green">
+          <div class="stat-icon-wrap green"><span class="material-symbols-outlined">arrow_downward</span></div>
+          <div class="stat-body">
+            <div class="stat-value">₺{{ formatMoney(cariSummary.totals?.totalReceivable) }}</div>
+            <div class="stat-label">Toplam Alacak</div>
+          </div>
+        </div>
+        <div class="stat-card accent-orange">
+          <div class="stat-icon-wrap orange"><span class="material-symbols-outlined">arrow_upward</span></div>
+          <div class="stat-body">
+            <div class="stat-value">₺{{ formatMoney(cariSummary.totals?.totalPayable) }}</div>
+            <div class="stat-label">Toplam Borç</div>
+          </div>
+        </div>
+        <div class="stat-card" :class="{ 'accent-blue': (cariSummary.totals?.netPosition ?? 0) >= 0, 'accent-orange': (cariSummary.totals?.netPosition ?? 0) < 0 }">
+          <div class="stat-icon-wrap" :class="(cariSummary.totals?.netPosition ?? 0) >= 0 ? 'blue' : 'orange'"><span class="material-symbols-outlined">balance</span></div>
+          <div class="stat-body">
+            <div class="stat-value">₺{{ formatMoney(Math.abs(cariSummary.totals?.netPosition ?? 0)) }}</div>
+            <div class="stat-label">Net Pozisyon ({{ (cariSummary.totals?.netPosition ?? 0) >= 0 ? 'Alacak' : 'Borç' }})</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ödeme Formu -->
+      <div v-if="showPaymentForm" class="create-form" style="margin-bottom:16px">
+        <div class="section-title" style="margin:0 0 10px"><span class="material-symbols-outlined">payments</span> Ödeme Kaydı — {{ paymentForm.dealerCode }}</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Tutar (TL)</label>
+            <input v-model.number="paymentForm.amount" type="number" step="0.01" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label>Açıklama</label>
+            <input v-model="paymentForm.description" placeholder="Ödeme notu..." class="form-input" />
+          </div>
+          <div class="form-group" style="flex:0.6">
+            <label>Referans</label>
+            <input v-model="paymentForm.paymentReference" placeholder="Makbuz no..." class="form-input" />
+          </div>
+          <button class="action-sm save" :disabled="paymentLoading" @click="submitPayment">
+            <span class="material-symbols-outlined" style="font-size:14px">check</span>
+            {{ paymentLoading ? 'Kaydediliyor...' : 'Kaydet' }}
+          </button>
+          <button class="action-sm cancel" @click="showPaymentForm = false">İptal</button>
+        </div>
+      </div>
+
+      <!-- Bayi Cari Kartları -->
+      <div v-if="cariSummary.dealers?.length" class="dealer-cards">
+        <div v-for="d in cariSummary.dealers" :key="d.dealerCode" class="dealer-card cari-card">
+          <div class="dealer-card-header">
+            <div class="dealer-card-icon" :class="{ payable: d.balanceType === 'payable', receivable: d.balanceType === 'receivable' }">
+              <span class="material-symbols-outlined">{{ d.balanceType === 'payable' ? 'arrow_upward' : d.balanceType === 'receivable' ? 'arrow_downward' : 'check_circle' }}</span>
+            </div>
+            <div class="dealer-card-info">
+              <div class="dealer-card-name">{{ d.dealerName }}</div>
+              <div class="dealer-card-code"><code>{{ d.dealerCode }}</code></div>
+            </div>
+            <span class="cari-balance-badge" :class="d.balanceType">
+              {{ d.balanceType === 'payable' ? 'Borçlu' : d.balanceType === 'receivable' ? 'Alacaklı' : 'Kapalı' }}
+            </span>
+          </div>
+          <div class="dealer-card-stats">
+            <div class="dealer-stat">
+              <div class="dealer-stat-val" :class="{ 'cari-payable': d.balanceType === 'payable', 'cari-receivable': d.balanceType === 'receivable' }">
+                ₺{{ d.displayBalance }}
+              </div>
+              <div class="dealer-stat-label">Bakiye</div>
+            </div>
+            <div class="dealer-stat">
+              <div class="dealer-stat-val">₺{{ formatMoney(d.totalDebits) }}</div>
+              <div class="dealer-stat-label">Toplam Borç</div>
+            </div>
+            <div class="dealer-stat">
+              <div class="dealer-stat-val">₺{{ formatMoney(d.totalCredits) }}</div>
+              <div class="dealer-stat-label">Toplam Alacak</div>
+            </div>
+            <div class="dealer-stat">
+              <div class="dealer-stat-val">{{ d.transactionCount }}</div>
+              <div class="dealer-stat-label">İşlem</div>
+            </div>
+          </div>
+          <div class="dealer-card-footer">
+            <span class="dealer-card-user">
+              <span class="material-symbols-outlined" style="font-size:14px">percent</span>
+              Komisyon: %{{ d.commissionRate }}
+              <template v-if="d.lastTransaction"> · Son: {{ formatDate(d.lastTransaction) }}</template>
+            </span>
+            <div style="display:flex;gap:6px">
+              <button class="action-sm edit" style="margin:0" @click="loadCariEntries(d.dealerCode)">
+                <span class="material-symbols-outlined" style="font-size:14px">receipt_long</span> Ekstre
+              </button>
+              <button v-if="d.balanceType !== 'settled'" class="action-sm save" style="margin:0" @click="openPaymentForm(d)">
+                <span class="material-symbols-outlined" style="font-size:14px">payments</span> Ödeme
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div v-else class="empty-state">
+        <span class="material-symbols-outlined" style="font-size:48px;color:var(--color-text-secondary,#d1d5db)">account_balance_wallet</span>
+        <div>Cari hesap bağlantısı olan bayi yok</div>
+      </div>
+
+      <!-- Ekstre Detayı -->
+      <div v-if="selectedCariDealer" class="cari-ekstre" style="margin-top:20px">
+        <div class="toolbar">
+          <div class="section-title" style="margin:0">
+            <span class="material-symbols-outlined">receipt_long</span>
+            {{ cariEntries.dealerName }} — Ekstre
+            <span class="cari-balance-badge sm" :class="cariEntries.balanceType" style="margin-left:8px">
+              ₺{{ formatMoney(Math.abs(cariEntries.balance)) }}
+              {{ cariEntries.balanceType === 'payable' ? '(Borç)' : cariEntries.balanceType === 'receivable' ? '(Alacak)' : '' }}
+            </span>
+          </div>
+          <button class="action-sm cancel" @click="selectedCariDealer = null">
+            <span class="material-symbols-outlined" style="font-size:14px">close</span> Kapat
+          </button>
+        </div>
+        <div class="tg-table-wrap" style="margin-top:10px">
+          <table class="tg-table">
+            <thead>
+              <tr><th>Tarih</th><th>Açıklama</th><th>Borç</th><th>Alacak</th><th>Bakiye</th><th>Durum</th><th>Referans</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="e in cariEntries.entries" :key="e.id">
+                <td>{{ formatDate(e.entryDate) }}</td>
+                <td>{{ e.description || '—' }}</td>
+                <td class="cari-debit">{{ e.debit != null ? '₺' + formatMoney(e.debit) : '' }}</td>
+                <td class="cari-credit">{{ e.credit != null ? '₺' + formatMoney(e.credit) : '' }}</td>
+                <td :class="{ 'cari-payable': e.runningBalance < 0, 'cari-receivable': e.runningBalance > 0 }">
+                  ₺{{ formatMoney(Math.abs(e.runningBalance)) }}
+                  <span style="font-size:10px;opacity:0.7">{{ e.runningBalance < 0 ? '(B)' : e.runningBalance > 0 ? '(A)' : '' }}</span>
+                </td>
+                <td><span class="status-badge sm" :style="{ background: e.paymentStatus === 'Paid' ? '#10b981' : e.paymentStatus === 'Pending' ? '#f59e0b' : '#6b7280' }">{{ e.paymentStatus === 'Paid' ? 'Ödendi' : e.paymentStatus === 'Pending' ? 'Bekliyor' : e.paymentStatus }}</span></td>
+                <td><code v-if="e.referenceNumber">{{ e.referenceNumber }}</code><span v-else>—</span></td>
+              </tr>
+              <tr v-if="!cariEntries.entries?.length"><td colspan="7" class="empty-msg">Henüz kayıt yok</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <!-- ═══════ API QUEUE ═══════ -->
     <div v-else-if="activeTab === 'queue'" class="tg-content">
       <div class="stat-grid three" style="margin-bottom:16px">
@@ -865,6 +1058,21 @@ code { background: var(--color-hover, #f3f4f6); padding: 2px 6px; border-radius:
 
 .refresh-indicator { display: flex; align-items: center; gap: 4px; justify-content: center; margin-top: 16px; font-size: 11px; color: var(--color-text-secondary, #9ca3af); }
 .refresh-indicator .material-symbols-outlined { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+
+/* Cari Hesap */
+.cari-card .dealer-card-stats { display: grid; grid-template-columns: repeat(4, 1fr); }
+.cari-card .dealer-card-icon.payable { background: #fff7ed; color: #f59e0b; }
+.cari-card .dealer-card-icon.receivable { background: #ecfdf5; color: #10b981; }
+.cari-balance-badge { padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; color: #fff; }
+.cari-balance-badge.sm { font-size: 10px; padding: 2px 6px; }
+.cari-balance-badge.payable { background: #f59e0b; }
+.cari-balance-badge.receivable { background: #10b981; }
+.cari-balance-badge.settled { background: #6b7280; }
+.cari-payable { color: #f59e0b; font-weight: 600; }
+.cari-receivable { color: #10b981; font-weight: 600; }
+.cari-debit { color: #ef4444; font-weight: 500; }
+.cari-credit { color: #10b981; font-weight: 500; }
+.cari-ekstre { background: var(--color-card, #fff); border: 1px solid var(--color-border, #e5e7eb); border-radius: 10px; padding: 14px; }
 
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

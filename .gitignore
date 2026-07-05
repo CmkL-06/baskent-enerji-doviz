@@ -14,9 +14,11 @@ obj/
 dist/
 .output/
 publish/
+publish-api/
 publish-temp/
 publish-output/
 publish_output/
+publish_temp/
 *.zip
 
 # Package managers

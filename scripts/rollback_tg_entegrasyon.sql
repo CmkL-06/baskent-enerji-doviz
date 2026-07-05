@@ -1,0 +1,98 @@
+-- ============================================================
+-- ROLLBACK SCRIPT: TG-Döviz Entegrasyon
+-- Tarih: 5 Temmuz 2026
+-- Checkpoint commit: 5281b35
+-- DB Backup: mtturkey_exchange_TG_ENTEGRASYON_ONCESI_20260705_223325.bak
+-- ============================================================
+-- Bu script, TG entegrasyon çalışması sırasında yapılan
+-- DB değişikliklerini geri almak için kullanılır.
+-- ============================================================
+
+-- ┌─────────────────────────────────────────────────────┐
+-- │ ADIM 1: TgDealers VaultId geri alma                 │
+-- │ (Faz 1'de VaultId güncellenirse)                    │
+-- └─────────────────────────────────────────────────────┘
+-- UPDATE TgDealers SET VaultId = NULL WHERE DealerId = 1;
+
+-- ┌─────────────────────────────────────────────────────┐
+-- │ ADIM 2: Transaction Source alanı geri alma           │
+-- │ (Faz 3'te eklenirse)                                │
+-- └─────────────────────────────────────────────────────┘
+-- IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+--   WHERE TABLE_NAME='Transactions' AND COLUMN_NAME='Source')
+-- BEGIN
+--   ALTER TABLE Transactions DROP COLUMN Source;
+-- END
+
+-- ┌─────────────────────────────────────────────────────┐
+-- │ ADIM 3: TgApiQueue ExchangeTransactionId geri alma   │
+-- │ (Faz 3'te eklenirse)                                │
+-- └─────────────────────────────────────────────────────┘
+-- IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+--   WHERE TABLE_NAME='TgApiQueue' AND COLUMN_NAME='ExchangeTransactionId')
+-- BEGIN
+--   ALTER TABLE TgApiQueue DROP COLUMN ExchangeTransactionId;
+-- END
+
+-- ┌─────────────────────────────────────────────────────┐
+-- │ TAM GERİ YÜKLEME (Nuclear Option)                   │
+-- │ Tüm DB'yi yedekten geri yükler                      │
+-- └─────────────────────────────────────────────────────┘
+-- NOT: Bu komutu çalıştırmadan önce IIS'i durdurun!
+--   net stop W3SVC
+--
+-- RESTORE DATABASE [mtturkey_exchange]
+-- FROM DISK = 'C:\Program Files\Microsoft SQL Server\MSSQL16.SQLEXPRESS\MSSQL\Backup\mtturkey_exchange_TG_ENTEGRASYON_ONCESI_20260705_223325.bak'
+-- WITH REPLACE;
+--
+-- Sonra IIS'i başlatın:
+--   net start W3SVC
+
+-- ┌─────────────────────────────────────────────────────┐
+-- │ GIT GERİ ALMA                                       │
+-- └─────────────────────────────────────────────────────┘
+-- Kod değişikliklerini geri almak için:
+--   cd C:\inetpub\baskent-enerji-doviz
+--   git log --oneline -10        (commit'leri kontrol et)
+--   git reset --hard 5281b35     (checkpoint'e dön)
+--
+-- Frontend deploy geri alma:
+--   cd C:\inetpub\baskent-enerji-doviz\frontend
+--   npm run build
+--   rm -rf C:\inetpub\wwwroot\frontend\assets
+--   cp -rf dist/assets C:\inetpub\wwwroot\frontend\assets
+--   cp -f dist/index.html C:\inetpub\wwwroot\frontend\index.html
+--
+-- Backend deploy geri alma:
+--   net stop W3SVC
+--   cd C:\inetpub\baskent-enerji-doviz
+--   dotnet publish BaskentEnerji.API -c Release -o publish-output
+--   cp -f publish-output/BaskentEnerji.API.dll C:\inetpub\wwwroot\api\
+--   robocopy publish-output C:\inetpub\wwwroot\api /E /XF appsettings.json appsettings.Development.json web.config BaskentEnerji.API.dll
+--   net start W3SVC
+
+-- ============================================================
+-- MEVCUT DURUM SNAPSHOT (referans için)
+-- ============================================================
+-- TgDealers:
+--   DealerId=1, DealerCode=KARGICAK01, DealerName=Kargıcak Merkez Şube
+--   IsActive=1, Balance=32750.00, VaultId=NULL
+--   CryptoAddress=NULL, CryptoNetwork=NULL, ExchangeName=NULL
+--   ApiKey=NULL, ApiSecret=NULL
+--
+-- Transactions tablosu kolonları:
+--   Id, TransactionNumber, VaultId, CustomerId, UserId, Type,
+--   TransactionDate, Status, Notes, IsDeleted, CreatedDate,
+--   Profit, IsCustomRate, PartyId, DeletedReason, deletedByUserId
+--   (Source alanı YOK — Faz 3'te eklenecek)
+--
+-- Aktif Kasalar:
+--   Kargıcak Kasa: d92a4613-fa6a-4d44-c52c-08de00746aa3
+--   Merkez Kasa:   99a6bff6-54c3-4eb3-912c-b314f3c51b1f
+--
+-- Currency GUID'leri:
+--   TRY:  cd817762-d3f6-4df2-83bc-8a8f9cb476a2
+--   USDT: 19ca1260-52b4-4a67-9d51-8c287c85a193
+--   RUB:  f33d8122-99fa-484c-9a62-53786ffc2458
+--   KRUB: 6a6fa515-fd72-4e70-b22e-56c6d32ea472
+-- ============================================================

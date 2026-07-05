@@ -262,6 +262,11 @@ const apiService = {
   // ── Performans  [ExchangeHierarchyController → /api/v1/exchange/reports/branch-comparison]
   getBranchComparison:  (period = 'daily')    => get('/exchange/reports/branch-comparison', { params: { period } }),
 
+  // ── TG Bayi Cari Hesap  [TelegramDealerController → /api/v1/tg/dealer/...]
+  getTgCariSummary:     ()                             => get('/tg/dealer/cari-summary'),
+  getTgCariEntries:     (code: string)                 => get(`/tg/dealer/${code}/cari-entries`),
+  recordTgPayment:      (data: any)                    => post('/tg/dealer/record-payment', data),
+
   // ── Generic
   get, post, put, delete: del, patch,
 }

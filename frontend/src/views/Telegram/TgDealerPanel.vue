@@ -47,6 +47,8 @@ async function downloadQR() {
 }
 
 const cryptoDeposits = ref<any[]>([])
+const cariData = ref<any>({ balance: 0, balanceType: 'settled', entries: [] })
+const cariLoaded = ref(false)
 
 let refreshInterval: number | null = null
 
@@ -58,8 +60,19 @@ async function loadData() {
     ])
     dashboard.value = dashRes
     cryptoDeposits.value = depositRes?.deposits ?? []
+    if (dashRes?.dealer_code && !cariLoaded.value) {
+      loadCariData(dashRes.dealer_code)
+    }
   } catch (e) { console.error('Dealer dashboard error:', e) }
   finally { loading.value = false }
+}
+
+async function loadCariData(code: string) {
+  try {
+    const res = await apiService.getTgCariEntries(code)
+    cariData.value = res ?? cariData.value
+    cariLoaded.value = true
+  } catch { /* cari hesap henüz yoksa sessiz geç */ }
 }
 
 function formatMoney(n: number | null) {
@@ -213,6 +226,38 @@ onUnmounted(() => {
         </div>
       </div>
 
+      <!-- Cari Hesap -->
+      <div v-if="cariLoaded && cariData.entries?.length > 0" class="cari-section">
+        <div class="section-title" style="margin-top: 0">
+          <span class="material-symbols-outlined">account_balance_wallet</span>
+          Cari Hesap
+          <span class="cari-badge" :class="cariData.balanceType">
+            ₺{{ formatMoney(Math.abs(cariData.balance)) }}
+            {{ cariData.balanceType === 'payable' ? '(Borçlu)' : cariData.balanceType === 'receivable' ? '(Alacaklı)' : '(Kapalı)' }}
+          </span>
+        </div>
+        <div class="tg-table-wrap" style="margin-top: 10px">
+          <table class="tg-table">
+            <thead>
+              <tr><th>Tarih</th><th>Açıklama</th><th>Borç</th><th>Alacak</th><th>Bakiye</th><th>Durum</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="e in cariData.entries.slice(0, 20)" :key="e.id">
+                <td>{{ formatDate(e.entryDate) }}</td>
+                <td>{{ e.description || '—' }}</td>
+                <td class="cari-debit">{{ e.debit != null ? '₺' + formatMoney(e.debit) : '' }}</td>
+                <td class="cari-credit">{{ e.credit != null ? '₺' + formatMoney(e.credit) : '' }}</td>
+                <td :class="{ 'cari-neg': e.runningBalance < 0, 'cari-pos': e.runningBalance > 0 }">
+                  ₺{{ formatMoney(Math.abs(e.runningBalance)) }}
+                  <span style="font-size:10px;opacity:0.7">{{ e.runningBalance < 0 ? '(B)' : e.runningBalance > 0 ? '(A)' : '' }}</span>
+                </td>
+                <td><span class="status-badge" :style="{ background: e.paymentStatus === 'Paid' ? '#10b981' : e.paymentStatus === 'Pending' ? '#f59e0b' : '#6b7280' }">{{ e.paymentStatus === 'Paid' ? 'Ödendi' : e.paymentStatus === 'Pending' ? 'Bekliyor' : e.paymentStatus }}</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- Filter & Transactions -->
       <div class="section-title" style="margin-top: 20px">
         <span class="material-symbols-outlined">receipt_long</span>
@@ -319,6 +364,16 @@ onUnmounted(() => {
 .crypto-stat-val { display: block; font-size: 18px; font-weight: 700; color: var(--color-text, #1f2937); }
 .crypto-stat-label { font-size: 11px; color: var(--color-text-secondary, #6b7280); }
 .txid-cell { font-family: monospace; font-size: 12px; }
+
+.cari-section { margin-top: 16px; padding: 16px; background: var(--color-card, #fff); border: 1px solid var(--color-border, #e5e7eb); border-radius: 10px; }
+.cari-badge { padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; color: #fff; margin-left: 8px; }
+.cari-badge.payable { background: #f59e0b; }
+.cari-badge.receivable { background: #10b981; }
+.cari-badge.settled { background: #6b7280; }
+.cari-debit { color: #ef4444; font-weight: 500; }
+.cari-credit { color: #10b981; font-weight: 500; }
+.cari-neg { color: #f59e0b; font-weight: 600; }
+.cari-pos { color: #10b981; font-weight: 600; }
 
 .refresh-indicator { display: flex; align-items: center; gap: 4px; justify-content: center; margin-top: 16px; font-size: 11px; color: var(--color-text-secondary, #9ca3af); }
 
