@@ -21,6 +21,7 @@ from telegram.ext import (
 from config import Config
 import database as db
 from translations import t
+from baskent_api import record_dealer_entry
 
 logger = logging.getLogger(__name__)
 
@@ -734,17 +735,46 @@ async def _take_customer(query, context, operator_id: int, tid: int, cid: int):
 # ═══════════════════════════════════════════════
 
 async def _complete_transaction(query, context, operator_id: int, tid: int):
+    # Zaten tamamlanmış mı kontrol et (çift tamamlama koruması)
+    trans = db.get_transaction(tid)
+    if trans and trans.get('status') == 'completed':
+        logger.warning(f"İşlem #{tid} zaten tamamlanmış, tekrar tamamlanmayacak")
+        await query.answer("⚠️ Bu işlem zaten tamamlanmış!", show_alert=True)
+        return
+
     # İşlemi tamamla
     db.complete_transaction(tid)
 
     # Dealer bakiyesini düş
     trans = db.get_transaction(tid)
     if trans:
-        amount_try = trans.get('try_amount') or trans.get('amount_try')
         referral_code = trans.get('referral_code')
+        amount_try = trans.get('try_amount') or trans.get('amount_try')
+        if not amount_try and trans.get('amount') and trans.get('exchange_rate'):
+            amount_try = float(trans['amount']) * float(trans['exchange_rate'])
         if amount_try and referral_code:
             db.reduce_dealer_balance(referral_code, float(amount_try))
             logger.info(f"Dealer {referral_code} bakiye düşürüldü: {amount_try} TRY (İşlem #{tid})")
+
+        # Cari hesap kaydı
+        if amount_try and referral_code:
+            try:
+                rate = float(trans.get('exchange_rate') or 0)
+                amt = float(trans.get('amount') or 0)
+                if rate <= 0 or amt <= 0:
+                    logger.warning(f"İşlem #{tid} rate={rate} amount={amt} — cari kayıt atlanıyor")
+                else:
+                    record_dealer_entry(
+                        dealer_code=referral_code,
+                        currency=trans.get('currency', 'USDT'),
+                        amount=amt,
+                        amount_try=float(amount_try),
+                        exchange_rate=rate,
+                        is_buy=True,
+                        transaction_id=tid
+                    )
+            except Exception as e:
+                logger.error(f"Cari hesap kayıt hatası (İşlem #{tid}): {e}")
 
         cid = trans.get('customer_id')
         cust_name = trans.get('first_name', 'Müşteri')

@@ -24,7 +24,7 @@ from telegram.ext import (
 from config import Config
 from translations import t
 import database as db
-from baskent_api import send_exchange_for_transaction
+from baskent_api import send_exchange_for_transaction, record_dealer_entry
 
 logger = logging.getLogger(__name__)
 
@@ -246,6 +246,12 @@ async def _approve_payment(query, tid: int, provider_id: int):
         await query.answer("❌ İşlem bulunamadı!", show_alert=True)
         return
 
+    # Zaten tamamlanmış mı kontrol et (çift onay koruması)
+    if trans.get('status') == 'completed':
+        logger.warning(f"İşlem #{tid} zaten tamamlanmış, tekrar onaylanmayacak")
+        await query.answer("⚠️ Bu ödeme zaten onaylanmış!", show_alert=True)
+        return
+
     # Mevcut completion_code varsa onu kullan, yoksa yeni üret
     completion_code = trans.get('completion_code')
     if not completion_code:
@@ -271,6 +277,26 @@ async def _approve_payment(query, tid: int, provider_id: int):
         send_exchange_for_transaction(tid)
     except Exception as e:
         logger.error(f"BaşkentEnerji API hatası (İşlem #{tid}): {e}")
+
+    # Cari hesap kaydı
+    if try_amount and referral_code:
+        try:
+            rate = float(trans.get('exchange_rate') or 0)
+            amount = float(trans.get('amount') or 0)
+            if rate <= 0 or amount <= 0:
+                logger.warning(f"İşlem #{tid} rate={rate} amount={amount} — cari kayıt atlanıyor")
+            else:
+                record_dealer_entry(
+                    dealer_code=referral_code,
+                    currency=trans.get('currency', 'RUBLE'),
+                    amount=amount,
+                    amount_try=float(try_amount),
+                    exchange_rate=rate,
+                    is_buy=True,
+                    transaction_id=tid
+                )
+        except Exception as e:
+            logger.error(f"Cari hesap kayıt hatası (İşlem #{tid}): {e}")
 
     # Kanal mesajını güncelle
     try:

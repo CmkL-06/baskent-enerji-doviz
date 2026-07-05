@@ -26,7 +26,7 @@ from translations import t
 import database as db
 from exchange_rates import get_rates
 from crypto_exchanges import BinanceAPI
-from baskent_api import send_exchange_for_transaction, process_queue as baskent_queue_processor
+from baskent_api import send_exchange_for_transaction, record_dealer_entry, process_queue as baskent_queue_processor
 
 logger = logging.getLogger(__name__)
 
@@ -855,6 +855,13 @@ def _get_dealer_from_transaction(transaction_id: int) -> dict | None:
 
 async def _complete_usdt(context, user_id, transaction_id, txid, confirmations,
                          completion_code, lang):
+    # Zaten tamamlanmış mı kontrol et (çift tamamlama koruması)
+    trans = db.get_transaction(transaction_id)
+    if trans and trans.get('status') == 'completed':
+        logger.warning(f"İşlem #{transaction_id} zaten tamamlanmış, tekrar tamamlanmayacak")
+        set_state(user_id, 'completed', transaction_id)
+        return
+
     # CryptoDeposit güncelle
     db.update_crypto_deposit(txid=txid, confirmations=confirmations, status='confirmed')
 
@@ -865,9 +872,11 @@ async def _complete_usdt(context, user_id, transaction_id, txid, confirmations,
 
     # Dealer bakiye düş
     trans = db.get_transaction(transaction_id)
-    if trans:
-        rates = get_rates()
-        rate = rates.get('USDT', Config.DEFAULT_USDT_RATE)
+    if trans and trans.get('referral_code'):
+        rate = float(trans.get('exchange_rate') or 0)
+        if rate <= 0:
+            rates = get_rates()
+            rate = rates.get('USDT', Config.DEFAULT_USDT_RATE)
         amount_try = float(trans['amount']) * rate
         db.reduce_dealer_balance(trans['referral_code'], amount_try)
 
@@ -876,6 +885,21 @@ async def _complete_usdt(context, user_id, transaction_id, txid, confirmations,
         send_exchange_for_transaction(transaction_id)
     except Exception as e:
         logger.error(f"BaşkentEnerji API hatası: {e}")
+
+    # Cari hesap kaydı
+    if trans and trans.get('referral_code'):
+        try:
+            record_dealer_entry(
+                dealer_code=trans['referral_code'],
+                currency='USDT',
+                amount=float(trans['amount']),
+                amount_try=amount_try,
+                exchange_rate=rate,
+                is_buy=True,
+                transaction_id=transaction_id
+            )
+        except Exception as e:
+            logger.error(f"Cari hesap kayıt hatası: {e}")
 
     set_state(user_id, 'completed', transaction_id)
 
