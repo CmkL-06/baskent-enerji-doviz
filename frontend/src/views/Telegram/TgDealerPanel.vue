@@ -104,7 +104,8 @@ onUnmounted(() => {
           <span class="material-symbols-outlined" style="font-size: 28px; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">storefront</span>
           <div>
             <div class="dealer-name">{{ dashboard.dealer_name }}</div>
-            <div class="dealer-code">Bayi Kodu: <code>{{ dashboard.dealer_code }}</code></div>
+            <div class="dealer-code">Bayi Kodu: <code>{{ dashboard.dealer_code || '—' }}</code></div>
+            <div v-if="dashboard.staff_name && dashboard.staff_name !== dashboard.dealer_name" class="dealer-staff">Personel: {{ dashboard.staff_name }}</div>
           </div>
         </div>
       </div>
@@ -272,6 +273,7 @@ onUnmounted(() => {
 .dealer-name { font-size: 18px; font-weight: 700; color: var(--color-text, #1f2937); }
 .dealer-code { font-size: 13px; color: var(--color-text-secondary, #6b7280); }
 .dealer-code code { background: var(--color-hover, #f3f4f6); padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+.dealer-staff { font-size: 12px; color: var(--color-text-secondary, #9ca3af); margin-top: 2px; }
 
 .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
 .summary-card { padding: 16px; background: var(--color-card, #fff); border: 1px solid var(--color-border, #e5e7eb); border-radius: 10px; text-align: center; }

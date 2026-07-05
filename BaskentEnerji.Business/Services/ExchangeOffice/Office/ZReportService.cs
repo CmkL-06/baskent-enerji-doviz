@@ -238,7 +238,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             var summary = new vm_zreport_summary
             {
                 TotalTransactions = transactions.Count,
-                TotalExchangeTransactions = transactions.Count(t => t.Type == TransactionType.Exchange),
+                TotalExchangeTransactions = transactions.Count(t => t.Type == TransactionType.Exchange || t.Type == TransactionType.Buy),
                 TotalDepositTransactions = transactions.Count(t => t.Type == TransactionType.Deposit),
                 TotalWithdrawalTransactions = transactions.Count(t => t.Type == TransactionType.Withdrawal),
                 TotalVolumesByCurrency = new Dictionary<string, decimal>(),
@@ -267,7 +267,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             foreach (var transaction in transactions)
             {
                 // Add to total profit
-                if (transaction.Type == TransactionType.Exchange)
+                if (transaction.Type == TransactionType.Exchange || transaction.Type == TransactionType.Buy)
                 {
                     summary.TotalProfit += transaction.Profit;
 
@@ -309,7 +309,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     summary.TotalVolumesByCurrency[currencyCode] += amount;
 
                     // For exchange transactions
-                    if (transaction.Type == TransactionType.Exchange)
+                    if (transaction.Type == TransactionType.Exchange || transaction.Type == TransactionType.Buy)
                     {
                         // Correct interpretation from exchange office perspective:
                         // Debit = We are giving out/selling this currency
@@ -351,7 +351,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
             // Allocate transaction profits to foreign currencies only
             var transactionProfitsByForeignCurrency = new Dictionary<string, decimal>();
-            foreach (var transaction in transactions.Where(t => t.Type == TransactionType.Exchange))
+            foreach (var transaction in transactions.Where(t => t.Type == TransactionType.Exchange || t.Type == TransactionType.Buy))
             {
                 // Find the foreign currency in this transaction (non-TRY)
                 var foreignCurrencyDetail = transaction.Details.FirstOrDefault(d => d.Currency.CurrencyCode != "TRY");
@@ -585,6 +585,12 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 var officeReport = new vm_zreport();
                 await GenerateSingleOfficeReport(officeReport, office.Id, startDate, endDate);
 
+                // Check vault status for this office
+                var officeVault = await _context.Vaults
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(v => v.OfficeId == office.Id && v.IsActive);
+                var officeVaultOpen = officeVault != null;
+
                 // Create office summary
                 var officeSummary = new vm_zreport_office_summary
                 {
@@ -593,8 +599,11 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     Profit = officeReport.Summary?.TotalProfit ?? 0,
                     TransactionCount = officeReport.Summary?.TotalTransactions ?? 0,
                     VolumeInTRY = officeReport.Summary?.TotalForeignCurrencyProcessed ?? 0,
-                    IsVaultOpen = officeReport.IsVaultOpen
+                    IsVaultOpen = officeVaultOpen
                 };
+
+                if (officeVaultOpen)
+                    report.IsVaultOpen = true;
 
                 report.OfficeBreakdown.Add(officeSummary);
 

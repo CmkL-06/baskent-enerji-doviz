@@ -38,6 +38,7 @@ export const useAuthStore = defineStore('auth', () => {
       localStorage.setItem('token', jwt)
       localStorage.setItem('user', JSON.stringify(info))
       localStorage.setItem('uiStyle', 'modern')
+      await loadUserOffices()
       await router.push('/ihtiyar/dashboard')
     } catch (err: any) {
       error.value = err.response?.data?.message || err.message || 'Giriş başarısız'
@@ -55,6 +56,15 @@ export const useAuthStore = defineStore('auth', () => {
     router.push('/login')
   }
 
+  async function loadUserOffices() {
+    try {
+      const data = await apiService.getMyOfficeAccess()
+      userOffices.value = Array.isArray(data) ? data : []
+    } catch {
+      userOffices.value = []
+    }
+  }
+
   function initialize() {
     const t = localStorage.getItem('token')
     const u = localStorage.getItem('user')
@@ -64,5 +74,5 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { token, user, isLoading, error, isAuthenticated, isOwner, isAdmin, isModerator, userOffices, login, logout, initialize }
+  return { token, user, isLoading, error, isAuthenticated, isOwner, isAdmin, isModerator, userOffices, login, logout, initialize, loadUserOffices }
 })

@@ -89,6 +89,7 @@ builder.Services.AddControllers()
     {
         // Don't ignore null values - we need them for floatingContactJson
         // options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
         options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
         options.JsonSerializerOptions.MaxDepth = 32;
         options.JsonSerializerOptions.WriteIndented = true;

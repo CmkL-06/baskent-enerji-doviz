@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useExchangeStore } from '@/stores/exchange'
 import apiService from '@/services/apiservice'
+import AppKpiCard from '@/components/common/AppKpiCard.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -110,16 +111,16 @@ const umCreateMode = ref(false)
 const umUserOffices = ref<any[]>([])
 
 const RANKS = [
-  { value: 0, label: 'Yasaklı', color: '#ef4444', bg: '#fef2f2', ring: '#fca5a5' },
-  { value: 1, label: 'Kullanıcı', color: '#6b7280', bg: '#f9fafb', ring: '#d1d5db' },
-  { value: 2, label: 'Müşteri', color: '#0ea5e9', bg: '#f0f9ff', ring: '#7dd3fc' },
-  { value: 50, label: 'Personel', color: '#8b5cf6', bg: '#f5f3ff', ring: '#c4b5fd' },
-  { value: 99, label: 'Admin', color: '#dc2626', bg: '#fef2f2', ring: '#fca5a5' },
-  { value: 100, label: 'Owner', color: '#d97706', bg: '#fffbeb', ring: '#fcd34d' },
+  { value: 0, label: 'Yasaklı', key: 'Banned', color: '#ef4444', bg: '#fef2f2', ring: '#fca5a5' },
+  { value: 1, label: 'Kullanıcı', key: 'User', color: '#6b7280', bg: '#f9fafb', ring: '#d1d5db' },
+  { value: 2, label: 'Müşteri', key: 'Customer', color: '#0ea5e9', bg: '#f0f9ff', ring: '#7dd3fc' },
+  { value: 50, label: 'Personel', key: 'Staff', color: '#8b5cf6', bg: '#f5f3ff', ring: '#c4b5fd' },
+  { value: 99, label: 'Admin', key: 'Admin', color: '#dc2626', bg: '#fef2f2', ring: '#fca5a5' },
+  { value: 100, label: 'Owner', key: 'Owner', color: '#d97706', bg: '#fffbeb', ring: '#fcd34d' },
 ]
 
-function rankInfo(rank: any) { return RANKS.find(r => r.label === rank || r.value === rank) ?? RANKS[1] }
-function rankValue(rank: any) { return typeof rank === 'number' ? rank : (RANKS.find(r => r.label === rank)?.value ?? 1) }
+function rankInfo(rank: any) { return RANKS.find(r => r.label === rank || r.value === rank || r.key === rank) ?? RANKS[1] }
+function rankValue(rank: any) { return typeof rank === 'number' ? rank : (RANKS.find(r => r.label === rank || r.key === rank)?.value ?? 1) }
 function avatarColor(name: string) {
   const colors = ['#6366f1','#8b5cf6','#ec4899','#f97316','#14b8a6','#0ea5e9','#84cc16','#ef4444']
   return colors[(name?.charCodeAt(0) ?? 0) % colors.length]
@@ -227,6 +228,33 @@ async function umToggleOffice(office: any) {
 }
 
 // Dashboard data
+// Recent transactions
+const recentTx = ref<any[]>([])
+const recentTxLoading = ref(false)
+
+async function loadRecentTx() {
+  recentTxLoading.value = true
+  try {
+    const res = await apiService.getTransactionHistory({ pageSize: 10, page: 1 })
+    recentTx.value = (res?.items ?? res?.data ?? res ?? []).slice(0, 10)
+  } catch { recentTx.value = [] }
+  finally { recentTxLoading.value = false }
+}
+
+function txTypeLabel(t: any) {
+  const type = (t?.transactionType ?? t?.type ?? '').toString().toLowerCase()
+  if (type.includes('buy') || type === '0') return { label: 'Alış', cls: 'tx-buy' }
+  if (type.includes('sell') || type === '1') return { label: 'Satış', cls: 'tx-sell' }
+  return { label: type || '—', cls: '' }
+}
+
+function txTime(t: any) {
+  const d = t?.createdAt ?? t?.transactionDate
+  if (!d) return '—'
+  const dt = new Date(d)
+  return dt.toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
+
 const sum = computed(() => dashboard.value?.summary ?? {})
 
 const topCurrencies = computed(() =>
@@ -287,7 +315,7 @@ const adminQuickLinks = computed(() => {
 async function load() {
   isLoading.value = true
   try {
-    const calls: Promise<any>[] = [apiService.getDashboardData()]
+    const calls: Promise<any>[] = [apiService.getDashboardData(), loadRecentTx()]
     if (authStore.isOwner) calls.push(loadOffices())
     const [db] = await Promise.all(calls)
     dashboard.value = db
@@ -309,12 +337,17 @@ onUnmounted(() => clearInterval(timer))
 
     <template v-else>
       <!-- Header -->
-      <div class="db-header">
-        <div>
-          <h1 class="db-title">Hoş Geldiniz, {{ authStore.user?.firstname ?? authStore.user?.username }}</h1>
-          <p class="db-date">{{ dateStr }}</p>
+      <div class="db-hero">
+        <div class="db-hero-content">
+          <div class="db-hero-icon">
+            <span class="material-symbols-outlined">monitoring</span>
+          </div>
+          <div class="db-hero-text">
+            <h1 class="db-hero-title">Hoş Geldiniz, {{ authStore.user?.firstname ?? authStore.user?.username }}</h1>
+            <p class="db-hero-sub">{{ dateStr }} · Kontrol Paneli</p>
+          </div>
         </div>
-        <button class="refresh-btn" @click="load">
+        <button class="db-hero-refresh" @click="load">
           <span class="material-symbols-outlined">refresh</span> Yenile
         </button>
       </div>
@@ -322,13 +355,7 @@ onUnmounted(() => clearInterval(timer))
       <!-- ═══════════════════════════ STAFF VIEW ═══ -->
       <template v-if="!authStore.isAdmin">
         <div class="kpi-grid-small">
-          <div v-for="k in staffKpi" :key="k.label" class="kpi-card" :style="{'--kc':k.color,'--kb':k.bg}">
-            <div class="kpi-icon"><span class="material-symbols-outlined">{{ k.icon }}</span></div>
-            <div class="kpi-body">
-              <p class="kpi-label">{{ k.label }}</p>
-              <p class="kpi-value">{{ k.value }} <span class="kpi-unit">{{ k.unit }}</span></p>
-            </div>
-          </div>
+          <AppKpiCard v-for="k in staffKpi" :key="k.label" :icon="k.icon" :label="k.label" :value="k.value" :unit="k.unit" :color="k.color" :bg="k.bg" />
         </div>
 
       </template>
@@ -337,13 +364,7 @@ onUnmounted(() => clearInterval(timer))
       <template v-else>
         <!-- KPI Cards -->
         <div class="kpi-grid">
-          <div v-for="k in adminKpi" :key="k.label" class="kpi-card" :style="{'--kc':k.color,'--kb':k.bg}">
-            <div class="kpi-icon"><span class="material-symbols-outlined">{{ k.icon }}</span></div>
-            <div class="kpi-body">
-              <p class="kpi-label">{{ k.label }}</p>
-              <p class="kpi-value" :style="{color:k.color}">{{ k.value }} <span class="kpi-unit">{{ k.unit }}</span></p>
-            </div>
-          </div>
+          <AppKpiCard v-for="k in adminKpi" :key="k.label" :icon="k.icon" :label="k.label" :value="k.value" :unit="k.unit" :color="k.color" :bg="k.bg" />
         </div>
 
         <!-- Tab Navigation (Owner gets extra tabs) -->
@@ -364,9 +385,39 @@ onUnmounted(() => clearInterval(timer))
 
         <!-- ── Tab: Genel Bakış ── -->
         <template v-if="activeTab === 'overview'">
-          <!-- Currency Distribution -->
-          <div class="db-row" v-if="authStore.isOwner && topCurrencies.length">
+          <!-- Quick Links -->
+          <div class="ql-grid">
+            <button v-for="q in adminQuickLinks" :key="q.p" class="ql-btn" @click="router.push(q.p)">
+              <span class="material-symbols-outlined ql-icon">{{ q.i }}</span>
+              <span class="ql-label">{{ q.l }}</span>
+            </button>
+          </div>
+
+          <div class="db-two-col" :class="{ 'single-col': !(authStore.isOwner && topCurrencies.length) }">
+            <!-- Recent Transactions -->
             <div class="panel">
+              <div class="panel-header">
+                <span class="material-symbols-outlined">history</span><h3>Son İşlemler</h3>
+                <button class="see-all" @click="router.push('/ihtiyar/exchange-v2')">Tümü <span class="material-symbols-outlined">chevron_right</span></button>
+              </div>
+              <div v-if="recentTxLoading" class="state-msg"><span class="material-symbols-outlined spin">progress_activity</span></div>
+              <div v-else-if="!recentTx.length" class="state-msg">
+                <span class="material-symbols-outlined">receipt_long</span> Henüz işlem yok
+              </div>
+              <div v-else class="rtx-list">
+                <div v-for="tx in recentTx" :key="tx.id" class="rtx-row">
+                  <span class="rtx-type" :class="txTypeLabel(tx).cls">{{ txTypeLabel(tx).label }}</span>
+                  <span class="rtx-curr">{{ tx.sourceCurrencyCode ?? tx.currencyCode ?? '—' }}</span>
+                  <span class="rtx-amount">{{ fmtMoney(tx.sourceAmount ?? tx.amount) }}</span>
+                  <span class="rtx-rate">@ {{ fmtNum(tx.exchangeRate ?? tx.rate, 4) }}</span>
+                  <span class="rtx-try">{{ fmtMoney(tx.targetAmount ?? tx.totalTry) }} ₺</span>
+                  <span class="rtx-time">{{ txTime(tx) }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Currency Distribution -->
+            <div class="panel" v-if="authStore.isOwner && topCurrencies.length">
               <div class="panel-header">
                 <span class="material-symbols-outlined">pie_chart</span><h3>Döviz Dağılımı</h3>
                 <button class="see-all" @click="router.push('/ihtiyar/vaults')">Detay <span class="material-symbols-outlined">chevron_right</span></button>
@@ -743,49 +794,110 @@ onUnmounted(() => clearInterval(timer))
 </template>
 
 <style scoped>
-.db { padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+.db { padding: 24px; display: flex; flex-direction: column; gap: 20px; min-height: 100vh; }
 .db-loading { display:flex; flex-direction:column; align-items:center; justify-content:center; height:60vh; gap:16px; color:#64748b; }
 .spinner { width:40px; height:40px; border:3px solid #e2e8f0; border-top-color:#6366f1; border-radius:50%; animation:spin .8s linear infinite; }
 @keyframes spin { to { transform:rotate(360deg); } }
-.db-header { display:flex; align-items:center; justify-content:space-between; }
-.db-title { font-size:1.4rem; font-weight:700; margin:0; color:#0f172a; }
-.db-date  { font-size:.875rem; color:#64748b; margin:4px 0 0; }
-.refresh-btn { display:flex; align-items:center; gap:6px; padding:8px 16px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; cursor:pointer; font-size:14px; font-weight:500; transition:.15s; }
-.refresh-btn:hover { background:#e2e8f0; }
-.refresh-btn-sm { display:flex; align-items:center; padding:6px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; cursor:pointer; margin-left:auto; }
-.refresh-btn-sm:hover { background:#e2e8f0; }
+
+/* ═══ Hero Header ═══ */
+.db-hero {
+  display:flex; align-items:center; justify-content:space-between;
+  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4338ca 100%);
+  border-radius: 18px;
+  padding: 24px 28px;
+  box-shadow: 0 8px 32px -8px rgba(30,27,75,0.4);
+  position: relative;
+  overflow: hidden;
+}
+.db-hero::before {
+  content: '';
+  position: absolute;
+  top: -50%; right: -10%;
+  width: 300px; height: 300px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(129,140,248,0.15), transparent 70%);
+}
+.db-hero::after {
+  content: '';
+  position: absolute;
+  bottom: -40%; left: 20%;
+  width: 200px; height: 200px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(99,102,241,0.1), transparent 70%);
+}
+.db-hero-content { display:flex; align-items:center; gap:16px; position:relative; z-index:1; }
+.db-hero-icon {
+  width: 52px; height: 52px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 16px;
+  backdrop-filter: blur(8px);
+}
+.db-hero-icon .material-symbols-outlined { font-size: 26px; color: #c7d2fe; }
+.db-hero-text { position:relative; z-index:1; }
+.db-hero-title { font-size: 1.5rem; font-weight: 800; margin: 0; color: #fff; letter-spacing: -0.01em; }
+.db-hero-sub { font-size: 13px; color: #a5b4fc; margin: 4px 0 0; font-weight: 500; }
+.db-hero-refresh {
+  display:flex; align-items:center; gap:6px;
+  padding: 10px 20px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 12px;
+  cursor:pointer; font-size:13px; font-weight:600;
+  color: #c7d2fe;
+  transition: all .2s;
+  position:relative; z-index:1;
+  backdrop-filter: blur(8px);
+}
+.db-hero-refresh:hover { background:rgba(255,255,255,0.2); color:#fff; transform:translateY(-1px); }
+.db-hero-refresh .material-symbols-outlined { font-size:18px; }
+
+.refresh-btn-sm { display:flex; align-items:center; padding:6px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; cursor:pointer; margin-left:auto; transition:all .2s; }
+.refresh-btn-sm:hover { background:#e2e8f0; transform:rotate(90deg); }
 .refresh-btn-sm .material-symbols-outlined { font-size:18px; color:#64748b; }
 
 /* KPI */
-.kpi-grid       { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; }
-.kpi-grid-small { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; max-width:400px; }
-.kpi-card { background:var(--kb); border:1px solid rgba(0,0,0,.06); border-radius:14px; padding:16px; display:flex; align-items:center; gap:12px; transition:.15s; }
-.kpi-card:hover { transform:translateY(-2px); box-shadow:0 4px 16px rgba(0,0,0,.08); }
-.kpi-icon { width:42px; height:42px; display:flex; align-items:center; justify-content:center; border-radius:10px; background:white; flex-shrink:0; }
-.kpi-icon .material-symbols-outlined { font-size:22px; color:var(--kc); }
-.kpi-label { font-size:10px; color:#6b7280; margin:0 0 3px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
-.kpi-value { font-size:17px; font-weight:800; color:#111; margin:0; }
-.kpi-unit  { font-size:11px; font-weight:400; color:#9ca3af; }
+.kpi-grid       { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:14px; }
+.kpi-grid-small { display:grid; grid-template-columns:repeat(2,1fr); gap:14px; max-width:400px; }
 
 /* Tabs */
-.db-tabs { display:flex; gap:6px; padding:4px; background:#f1f5f9; border-radius:12px; }
+.db-tabs {
+  display:flex; gap:4px; padding:5px;
+  background: linear-gradient(135deg, #f1f5f9, #eef2ff);
+  border-radius:16px;
+  border: 1px solid #e5e7eb;
+}
 .db-tab {
   display:flex; align-items:center; gap:7px;
-  padding:10px 20px; background:none; border:none;
-  border-radius:9px;
-  cursor:pointer; font-size:13px; color:#64748b; font-weight:500;
-  transition:all .2s ease;
+  padding:12px 22px; background:none; border:none;
+  border-radius:12px;
+  cursor:pointer; font-size:13px; color:#64748b; font-weight:600;
+  transition:all .25s cubic-bezier(.4,0,.2,1);
   position:relative;
 }
-.db-tab:hover { color:#4f46e5; background:rgba(99,102,241,.06); }
-.db-tab.active { color:#4f46e5; background:#fff; font-weight:600; box-shadow:0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04); }
+.db-tab:hover { color:#4f46e5; background:rgba(99,102,241,.08); }
+.db-tab.active {
+  color:#4338ca; background:#fff; font-weight:700;
+  box-shadow:0 2px 8px rgba(99,102,241,.15), 0 1px 3px rgba(0,0,0,.06);
+}
 .db-tab .material-symbols-outlined { font-size:18px; }
 
 /* Panels */
-.panel { background:#fff; border:1px solid #e5e7eb; border-radius:14px; overflow:hidden; }
-.panel-header { display:flex; align-items:center; gap:8px; padding:14px 18px; border-bottom:1px solid #f3f4f6; }
-.panel-header h3 { margin:0; font-size:14px; font-weight:700; color:#111; flex:1; }
-.panel-header .material-symbols-outlined { font-size:20px; color:#6366f1; }
+.panel {
+  background:#fff; border:1px solid #e5e7eb; border-radius:18px; overflow:hidden;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+  transition: box-shadow .3s cubic-bezier(.4,0,.2,1);
+}
+.panel:hover { box-shadow: 0 4px 20px rgba(99,102,241,0.08); }
+.panel-header {
+  display:flex; align-items:center; gap:10px;
+  padding:16px 20px;
+  border-bottom:1px solid #f1f5f9;
+  background: linear-gradient(135deg, #fafbfe, #f5f3ff);
+}
+.panel-header h3 { margin:0; font-size:15px; font-weight:800; color:#1e1b4b; flex:1; }
+.panel-header .material-symbols-outlined { font-size:22px; color:#6366f1; }
 
 .db-row { display:flex; flex-direction:column; gap:16px; }
 
@@ -799,15 +911,35 @@ onUnmounted(() => clearInterval(timer))
 .action-btn.remove:hover { background:#fee2e2; }
 
 /* Currency distribution */
-.curr-list { padding:12px 16px; display:flex; flex-direction:column; gap:8px; }
-.curr-row  { display:flex; align-items:center; gap:8px; }
-.curr-code { font-weight:700; font-size:13px; color:#374151; width:52px; flex-shrink:0; }
-.cr-bar-wrap { flex:1; background:#f3f4f6; border-radius:4px; height:8px; }
-.cr-bar { height:8px; border-radius:4px; background:linear-gradient(90deg,#6366f1,#8b5cf6); transition:width .4s; }
-.curr-try { font-size:13px; color:#374151; font-weight:600; width:110px; text-align:right; }
+.curr-list { padding:14px 18px; display:flex; flex-direction:column; gap:10px; }
+.curr-row  {
+  display:flex; align-items:center; gap:10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  transition: background .2s;
+}
+.curr-row:hover { background: #f8fafc; }
+.curr-code {
+  font-weight:800; font-size:13px; color:#1e1b4b; width:52px; flex-shrink:0;
+  letter-spacing: 0.3px;
+}
+.cr-bar-wrap { flex:1; background:#f1f5f9; border-radius:6px; height:10px; }
+.cr-bar {
+  height:10px; border-radius:6px;
+  background:linear-gradient(90deg,#6366f1,#818cf8,#a78bfa);
+  transition:width .6s cubic-bezier(.4,0,.2,1);
+  box-shadow: 0 2px 8px -2px rgba(99,102,241,0.3);
+}
+.curr-try { font-size:13px; color:#1e1b4b; font-weight:700; width:120px; text-align:right; font-family:'JetBrains Mono',ui-monospace,monospace; }
 
-.see-all { display:flex; align-items:center; gap:2px; background:none; border:none; cursor:pointer; color:#6366f1; font-size:13px; font-weight:600; padding:4px 8px; border-radius:6px; margin-left:auto; }
-.see-all:hover { background:#ede9fe; }
+.see-all {
+  display:flex; align-items:center; gap:3px;
+  background:none; border:none; cursor:pointer;
+  color:#6366f1; font-size:13px; font-weight:700;
+  padding:5px 10px; border-radius:8px; margin-left:auto;
+  transition: all .2s;
+}
+.see-all:hover { background:#eef2ff; color:#4338ca; }
 .see-all .material-symbols-outlined { font-size:16px; }
 
 /* ═══ Shared Section Stats — modern ═══ */
@@ -815,14 +947,16 @@ onUnmounted(() => clearInterval(timer))
 .sec-stat-card {
   position:relative; overflow:hidden;
   background:#fff; border:1px solid #eef0f4; border-radius:18px;
-  padding:20px; transition:transform .25s cubic-bezier(.4,0,.2,1), box-shadow .25s;
+  padding:22px; transition:transform .3s cubic-bezier(.4,0,.2,1), box-shadow .3s, border-color .3s;
 }
 .sec-stat-card::after {
   content:''; position:absolute; right:-20px; top:-20px;
-  width:90px; height:90px; border-radius:50%;
-  background:var(--sc-glow,rgba(99,102,241,.08)); filter:blur(4px);
+  width:100px; height:100px; border-radius:50%;
+  background:var(--sc-glow,rgba(99,102,241,.08)); filter:blur(6px);
+  transition: transform .3s;
 }
-.sec-stat-card:hover { transform:translateY(-3px); box-shadow:0 12px 28px -8px rgba(30,41,59,.16); }
+.sec-stat-card:hover { transform:translateY(-4px); box-shadow:0 16px 32px -8px rgba(30,41,59,.18); border-color:#c7d2fe; }
+.sec-stat-card:hover::after { transform: scale(1.3); }
 .sec-stat-icon { position:relative; z-index:1; width:44px; height:44px; border-radius:13px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 10px -3px var(--sc-glow,rgba(99,102,241,.3)); }
 .sec-stat-icon .material-symbols-outlined { font-size:23px; color:#fff; }
 .sec-stat-icon.blue   { background:linear-gradient(135deg,#3b82f6,#60a5fa); --sc-glow:rgba(59,130,246,.28); }
@@ -835,16 +969,20 @@ onUnmounted(() => clearInterval(timer))
 .sec-stat-lbl  { position:relative; z-index:1; font-size:12px; color:#64748b; margin-top:4px; font-weight:600; }
 
 /* ═══ Office Cards — modern grid ═══ */
-.o-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; padding:18px; }
+.o-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:18px; padding:20px; }
 .o-card {
   position:relative; overflow:hidden;
-  background:#fff; border:1px solid #eef0f4; border-radius:18px; padding:18px;
-  transition:transform .25s cubic-bezier(.4,0,.2,1), box-shadow .25s, border-color .25s;
+  background:#fff; border:1px solid #eef0f4; border-radius:20px; padding:20px;
+  transition: all .3s cubic-bezier(.4,0,.2,1);
 }
-.o-card:hover { transform:translateY(-3px); box-shadow:0 16px 32px -12px rgba(30,41,59,.2); border-color:#c7d2fe; }
+.o-card:hover { transform:translateY(-4px); box-shadow:0 20px 40px -12px rgba(30,41,59,.18); border-color:#c7d2fe; }
 /* Merkez kartı özel — altın vurgulu, öne çıkar */
-.o-card.merkez { border-color:#fcd34d; box-shadow:0 8px 24px -10px rgba(245,158,11,.28); }
-.o-card.merkez:hover { border-color:#fbbf24; box-shadow:0 16px 34px -12px rgba(245,158,11,.4); }
+.o-card.merkez {
+  border-color:#fcd34d;
+  box-shadow:0 8px 24px -10px rgba(245,158,11,.28);
+  background: linear-gradient(135deg, #fff 85%, #fffbeb 100%);
+}
+.o-card.merkez:hover { border-color:#fbbf24; box-shadow:0 20px 40px -12px rgba(245,158,11,.4); }
 .o-card-accent { position:absolute; top:0; left:0; right:0; height:4px; background:linear-gradient(90deg,#6366f1,#8b5cf6,#ec4899); }
 .o-card-accent.merkez { background:linear-gradient(90deg,#f59e0b,#fbbf24,#fcd34d); }
 .o-avatar.merkez { background:linear-gradient(135deg,#f59e0b,#fbbf24); box-shadow:0 6px 14px -4px rgba(245,158,11,.5); }
@@ -871,7 +1009,8 @@ onUnmounted(() => clearInterval(timer))
 
 .currency-badge { display:inline-flex; align-items:center; padding:4px 10px; background:#eef2ff; color:#4f46e5; border-radius:8px; font-size:11px; font-weight:700; }
 
-.state-msg { display:flex; align-items:center; justify-content:center; gap:8px; padding:40px; color:#94a3b8; font-size:14px; }
+.state-msg { display:flex; align-items:center; justify-content:center; gap:10px; padding:48px 20px; color:#94a3b8; font-size:14px; font-weight:500; }
+.state-msg .material-symbols-outlined { font-size:24px; opacity:0.6; }
 .state-msg.error { color:#ef4444; }
 .spin { animation:spin 1s linear infinite; }
 .dimmed { color:#9ca3af; font-size:12px; }
@@ -982,6 +1121,77 @@ onUnmounted(() => clearInterval(timer))
 
 .panel-badge { font-size:11px; background:#ede9fe; color:#6366f1; padding:2px 8px; border-radius:12px; font-weight:600; }
 
+/* ═══ Quick Links ═══ */
+.ql-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:12px; }
+.ql-btn {
+  display:flex; flex-direction:column; align-items:center; gap:10px;
+  padding:20px 10px; background:#fff; border:1px solid #eef0f4; border-radius:16px;
+  cursor:pointer;
+  transition: all .3s cubic-bezier(.4,0,.2,1);
+  position: relative;
+  overflow: hidden;
+}
+.ql-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(99,102,241,0.04), rgba(139,92,246,0.06));
+  opacity: 0;
+  transition: opacity .3s;
+}
+.ql-btn:hover {
+  transform:translateY(-4px);
+  box-shadow: 0 12px 28px -8px rgba(99,102,241,0.2);
+  border-color:#c7d2fe;
+}
+.ql-btn:hover::before { opacity:1; }
+.ql-icon {
+  font-size:28px;
+  color:#6366f1;
+  width:48px; height:48px;
+  display:flex; align-items:center; justify-content:center;
+  background: linear-gradient(135deg, #eef2ff, #e0e7ff);
+  border-radius:14px;
+  position:relative; z-index:1;
+  transition: all .3s;
+}
+.ql-btn:hover .ql-icon {
+  background: linear-gradient(135deg, #6366f1, #818cf8);
+  color: #fff;
+  box-shadow: 0 6px 16px -4px rgba(99,102,241,0.4);
+}
+.ql-label { font-size:12px; font-weight:700; color:#374151; text-align:center; position:relative; z-index:1; }
+
+/* ═══ Two-column layout ═══ */
+.db-two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.db-two-col.single-col { grid-template-columns:1fr; }
+@media(max-width:900px) { .db-two-col { grid-template-columns:1fr; } }
+
+/* ═══ Recent Transactions ═══ */
+.rtx-list { display:flex; flex-direction:column; }
+.rtx-row {
+  display:grid; grid-template-columns:56px 52px 1fr 90px 1fr 80px;
+  align-items:center; gap:8px;
+  padding:12px 18px;
+  border-bottom:1px solid #f3f4f6;
+  font-size:13px;
+  transition: all .2s;
+}
+.rtx-row:last-child { border-bottom:none; }
+.rtx-row:hover { background: linear-gradient(135deg, #fafbfe, #f5f3ff); }
+.rtx-type {
+  padding:4px 12px; border-radius:8px;
+  font-size:11px; font-weight:700; text-align:center;
+  letter-spacing: 0.3px;
+}
+.tx-buy { background: linear-gradient(135deg, #ecfdf5, #d1fae5); color:#059669; border:1px solid rgba(5,150,105,0.15); }
+.tx-sell { background: linear-gradient(135deg, #fef2f2, #fee2e2); color:#dc2626; border:1px solid rgba(220,38,38,0.15); }
+.rtx-curr { font-weight:800; color:#1e1b4b; letter-spacing:0.3px; }
+.rtx-amount { font-weight:700; color:#0f172a; text-align:right; font-family:'JetBrains Mono',ui-monospace,monospace; }
+.rtx-rate { font-size:11px; color:#94a3b8; font-family:'JetBrains Mono',ui-monospace,monospace; }
+.rtx-try { font-weight:700; color:#4338ca; text-align:right; font-family:'JetBrains Mono',ui-monospace,monospace; }
+.rtx-time { font-size:11px; color:#94a3b8; text-align:right; }
+
 @media(max-width:600px) {
   .db { padding:16px; gap:16px; }
   .kpi-grid { grid-template-columns:repeat(2,1fr); }
@@ -989,5 +1199,12 @@ onUnmounted(() => clearInterval(timer))
   .o-grid { grid-template-columns:1fr; padding:14px; }
   .um-layout { grid-template-columns:1fr; }
   .um-field-row { grid-template-columns:1fr; }
+  .ql-grid { grid-template-columns:repeat(3,1fr); }
+  .ql-icon { width:40px; height:40px; font-size:22px; border-radius:12px; }
+  .rtx-row { grid-template-columns:56px 48px 1fr 80px; }
+  .rtx-rate, .rtx-time { display:none; }
+  .db-hero { padding:18px 20px; border-radius:14px; }
+  .db-hero-title { font-size:1.2rem; }
+  .db-hero-icon { width:42px; height:42px; border-radius:12px; }
 }
 </style>

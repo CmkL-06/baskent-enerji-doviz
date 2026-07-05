@@ -53,7 +53,7 @@ const batchType = ref<'buy' | 'sell'>('buy')
 const batchNote = ref('')
 
 // Popular currencies for quick access
-const popularCurrencies = ['USD', 'EUR', 'RUB', 'KRUB', 'USDT']
+const popularCurrencies = ['USD', 'EUR', 'RUB', 'GBP', 'KRUB', 'USDT']
 
 // Types
 interface ExchangeItem {
@@ -466,8 +466,10 @@ const positionData = computed(() => {
       }
     })
     .sort((a: any, b: any) => {
-      const aPinned = pinned.has(a.code) ? 0 : 1
-      const bPinned = pinned.has(b.code) ? 0 : 1
+      const aIdx = popularCurrencies.indexOf(a.code)
+      const bIdx = popularCurrencies.indexOf(b.code)
+      const aPinned = aIdx >= 0 ? aIdx : 999
+      const bPinned = bIdx >= 0 ? bIdx : 999
       if (aPinned !== bPinned) return aPinned - bPinned
       return Math.abs(b.marketValue) - Math.abs(a.marketValue)
     })
@@ -1456,39 +1458,39 @@ onMounted(async () => {
   
   isInitialLoading.value = true
   try {
-    // Load user offices if not already loaded
-    if (!authStore.isAdmin && authStore.user?.id && authStore.userOffices.length === 0) {
+    // Load offices — non-admin/non-owner users see only assigned offices
+    const isFullAccess = authStore.isAdmin || authStore.isOwner
+    let officesData: any
+
+    if (!isFullAccess) {
       try {
-        const offices = await apiService.getUserOffices(authStore.user.id)
-        authStore.userOffices = offices
-      } catch (err) {
-        console.error('Failed to load user offices:', err)
+        const myOffices = await apiService.getMyOfficeAccess()
+        const list = Array.isArray(myOffices) ? myOffices : []
+        authStore.userOffices = list
+        if (list.length > 0) {
+          officesData = list.map((o: any) => ({
+            id: o.officeId || o.id,
+            officeId: o.officeId || o.id,
+            officeName: o.officeName
+          }))
+        } else {
+          officesData = await apiService.getOffices()
+        }
+      } catch {
+        officesData = await apiService.getOffices()
       }
-    }
-    
-    // Load initial data
-    let officesData
-    
-    if (!authStore.isAdmin && authStore.userOffices.length > 0) {
-      officesData = authStore.userOffices.map(office => ({
-        id: office.id || office.officeId,
-        officeId: office.officeId || office.id,
-        officeName: office.officeName
-      }))
     } else {
       officesData = await apiService.getOffices()
     }
     
-    const [currenciesData, vaultsDataRes, ratesData] = await Promise.all([
+    const [currenciesData, vaultsDataRes] = await Promise.all([
       apiService.getCurrencies(),
-      apiService.getVaults(),
-      apiService.getExchangeRates()
+      apiService.getVaults()
     ])
-    
+
     currencies.value = currenciesData
     exchangeStore.offices = officesData
     exchangeStore.vaults = vaultsDataRes
-    exchangeStore.exchangeRates = ratesData
     
     // Find TRY currency
     const tryCurrency = currencies.value.find(c => c.currencyCode === 'TRY')
@@ -1661,10 +1663,16 @@ watch(() => exchangeItems.value.map(item => ({
     <!-- Top Bar: Office/Vault + Actions -->
     <div class="ex-topbar">
       <div class="ex-topbar-left">
-        <h2 class="ex-topbar-title">MoneyTransferTurkey Döviz Ofisi Yönetim Paneli</h2>
+        <div class="ex-topbar-icon">
+          <span class="material-symbols-outlined ex-icon-filled">currency_exchange</span>
+        </div>
+        <div>
+          <h2 class="ex-topbar-title">Döviz İşlem Terminali</h2>
+          <p class="ex-topbar-subtitle">Alış · Satış · Arbitraj · Toplu İşlem</p>
+        </div>
       </div>
       <div class="ex-topbar-right">
-        <button @click="refreshRates" :disabled="!selectedOfficeId || loadingExternalRates" class="ex-topbar-btn" title="Kurları Yenile">
+        <button @click="refreshRates" :disabled="!selectedOfficeId || loadingExternalRates" class="ex-topbar-btn" :class="{ 'ex-topbar-btn--syncing': loadingExternalRates }" title="Kurları Yenile">
           <span class="material-symbols-outlined" :class="{ 'animate-spin': loadingExternalRates }">sync</span>
           <span v-if="refreshCountdown < 60" class="ex-countdown">{{ refreshCountdown }}s</span>
         </button>
@@ -1704,29 +1712,29 @@ watch(() => exchangeItems.value.map(item => ({
 
     <!-- ═══ Position Bar ═══ -->
     <div v-if="positionData.length > 0" class="ex-pos-bar">
-      <div class="ex-pos-bar-header">
-        <span class="material-symbols-outlined ex-icon-filled" style="font-size:16px">account_balance_wallet</span>
-        <span class="ex-pos-bar-title">Pozisyonlar</span>
-        <span class="ex-pos-bar-total">
-          Toplam: {{ formatNumber(totalPositionValue) }} ₺
-          <span :class="totalUnrealizedPnl >= 0 ? 'ex-pnl--pos' : 'ex-pnl--neg'">
-            ({{ totalUnrealizedPnl >= 0 ? '+' : '' }}{{ formatNumber(totalUnrealizedPnl) }} ₺)
-          </span>
-        </span>
-      </div>
-      <div class="ex-pos-bar-items">
-        <div v-for="pos in positionData" :key="pos.currencyId" class="ex-pos-item" @click="selectQuickCurrency(pos.code)">
-          <div class="ex-pos-top">
-            <i v-if="getCurrencyCountryCode(pos.code)" :class="`fi fi-${getCurrencyCountryCode(pos.code)}`" style="font-size:14px"></i>
+      <div class="ex-pos-bar-strip">
+        <div class="ex-pos-bar-label">
+          <span class="material-symbols-outlined ex-icon-filled">account_balance_wallet</span>
+          <span>Pozisyonlar</span>
+        </div>
+        <div class="ex-pos-bar-items">
+          <div v-for="pos in positionData" :key="pos.currencyId" class="ex-pos-item" @click="selectQuickCurrency(pos.code)">
+            <i v-if="getCurrencyCountryCode(pos.code)" :class="`fi fi-${getCurrencyCountryCode(pos.code)}`" class="ex-pos-flag"></i>
             <span class="ex-pos-code">{{ pos.code }}</span>
-          </div>
-          <div class="ex-pos-balance">{{ formatNumber(pos.balance) }}</div>
-          <div class="ex-pos-details">
-            <span class="ex-pos-wac">WAC: {{ formatNumber(pos.wac, 2) }}</span>
+            <span class="ex-pos-balance">{{ formatNumber(pos.balance) }}</span>
+            <span class="ex-pos-sep">·</span>
+            <span class="ex-pos-wac">{{ formatNumber(pos.wac, 2) }}</span>
             <span :class="pos.unrealizedPnl >= 0 ? 'ex-pnl--pos' : 'ex-pnl--neg'" class="ex-pos-pnl">
               {{ pos.unrealizedPnl >= 0 ? '+' : '' }}{{ formatNumber(pos.unrealizedPnl, 0) }}₺
             </span>
           </div>
+        </div>
+        <div class="ex-pos-bar-total">
+          <span class="ex-pos-bar-total-label">Σ</span>
+          <span class="ex-pos-bar-total-val">{{ formatNumber(totalPositionValue) }} ₺</span>
+          <span :class="totalUnrealizedPnl >= 0 ? 'ex-pnl--pos' : 'ex-pnl--neg'" class="ex-pos-pnl">
+            {{ totalUnrealizedPnl >= 0 ? '+' : '' }}{{ formatNumber(totalUnrealizedPnl) }}₺
+          </span>
         </div>
       </div>
     </div>
@@ -1772,26 +1780,6 @@ watch(() => exchangeItems.value.map(item => ({
         </button>
       </div>
 
-      <div class="ex-quick-bar">
-        <span class="ex-quick-title">
-          <span class="material-symbols-outlined ex-icon-filled ex-icon-xs">flash_on</span>
-          {{ t('exchange.quickSelect.title') }}
-        </span>
-        <div class="ex-quick-chips">
-          <button
-            v-for="currency in popularCurrencies"
-            :key="currency"
-            @click="selectQuickCurrency(currency)"
-            class="ex-chip"
-            :class="[`ex-chip--${currency.toLowerCase()}`, { 'ex-chip--active': activeQuickCurrency === currency }]"
-          >
-            <span v-if="currency === 'KRUB'" class="material-symbols-outlined ex-icon-filled" style="font-size:16px;color:#6b46c1">credit_card</span>
-            <span v-else-if="currency === 'USDT'" class="ex-chip-crypto">₮</span>
-            <i v-else :class="`fi fi-${currency === 'USD' ? 'us' : currency === 'EUR' ? 'eu' : 'ru'}`" class="ex-chip-flag"></i>
-            <span>{{ currency }}</span>
-          </button>
-        </div>
-      </div>
     </template>
 
     <!-- ═══ Arbitrage Mode Header ═══ -->
@@ -2289,7 +2277,8 @@ watch(() => exchangeItems.value.map(item => ({
   width: 100%;
   max-width: 1320px;
   margin: 0 auto;
-  padding: 0 12px;
+  padding: 0 16px;
+  min-height: 100vh;
 }
 
 /* ═══ Overlays ═══ */
@@ -2328,23 +2317,44 @@ watch(() => exchangeItems.value.map(item => ({
   gap: 16px;
   margin-bottom: 24px;
   flex-wrap: wrap;
-  padding: 16px 20px;
-  background: linear-gradient(135deg, rgba(99,102,241,0.04), rgba(124,58,237,0.03));
-  border: 1px solid rgba(99,102,241,0.08);
+  padding: 18px 24px;
+  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4338ca 100%);
+  border: 1px solid rgba(99,102,241,0.2);
   border-radius: var(--ex-radius);
+  box-shadow: 0 4px 24px rgba(30,27,75,0.15), inset 0 1px 0 rgba(255,255,255,0.08);
 }
 .ex-topbar-left {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   flex-wrap: wrap;
   align-items: center;
 }
+.ex-topbar-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.12);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #a5b4fc;
+  font-size: 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
 .ex-topbar-title {
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: #1e1b4b;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #fff;
   margin: 0;
   letter-spacing: -0.02em;
+}
+.ex-topbar-subtitle {
+  font-size: 0.78rem;
+  color: #a5b4fc;
+  margin: 2px 0 0;
+  font-weight: 500;
+  letter-spacing: 0.3px;
 }
 .ex-topbar-right {
   display: flex;
@@ -2389,57 +2399,68 @@ watch(() => exchangeItems.value.map(item => ({
   width: 40px;
   height: 40px;
   padding: 0;
-  border: 1px solid var(--ex-border);
+  border: 1px solid rgba(255,255,255,0.15);
   border-radius: 12px;
-  background: white;
-  color: #64748b;
+  background: rgba(255,255,255,0.1);
+  backdrop-filter: blur(8px);
+  color: #c7d2fe;
   font-size: 14px;
   cursor: pointer;
   transition: all 0.25s;
-  box-shadow: var(--ex-shadow-sm);
   position: relative;
 }
 .ex-topbar-btn:hover:not(:disabled) {
-  border-color: var(--ex-indigo);
-  color: var(--ex-indigo);
-  box-shadow: var(--ex-shadow-glow-indigo);
+  background: rgba(255,255,255,0.2);
+  color: #fff;
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 }
-.ex-topbar-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.ex-topbar-btn--syncing {
+  background: rgba(99,102,241,0.3);
+  color: #a5b4fc;
+}
+.ex-topbar-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 .ex-countdown {
   font-size: 9px;
-  color: white;
-  background: var(--ex-indigo);
+  color: #1e1b4b;
+  background: #a5b4fc;
   border-radius: 8px;
   padding: 1px 5px;
   position: absolute;
   top: -6px;
   right: -6px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.3;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
 }
 
 /* ═══ Warning Banners ═══ */
 .ex-warning-banner {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 14px 20px;
+  gap: 16px;
+  padding: 16px 22px;
   border-radius: var(--ex-radius);
-  border: 1px solid rgba(239,68,68,0.2);
-  background: linear-gradient(135deg, #fef2f2, #fff1f2);
+  border: 1px solid rgba(239,68,68,0.25);
+  background: linear-gradient(135deg, #fef2f2 0%, #fff1f2 50%, #fce7f3 100%);
   margin-bottom: 20px;
   color: #991b1b;
-  box-shadow: 0 2px 8px rgba(239,68,68,0.08);
+  box-shadow: 0 4px 16px rgba(239,68,68,0.1);
+  animation: ex-fade-in 0.4s ease;
 }
 .ex-warning-banner--amber {
-  border-color: rgba(245,158,11,0.2);
-  background: linear-gradient(135deg, #fffbeb, #fef9c3);
+  border-color: rgba(245,158,11,0.25);
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 50%, #fde68a33 100%);
   color: #92400e;
-  box-shadow: 0 2px 8px rgba(245,158,11,0.08);
+  box-shadow: 0 4px 16px rgba(245,158,11,0.1);
 }
-.ex-warning-title { font-weight: 700; font-size: 14px; }
-.ex-warning-desc { font-size: 13px; opacity: 0.85; margin-top: 2px; }
+.ex-warning-title { font-weight: 800; font-size: 14px; letter-spacing: -0.01em; }
+.ex-warning-desc { font-size: 13px; opacity: 0.8; margin-top: 3px; line-height: 1.4; }
+
+@keyframes ex-fade-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 
 /* ═══ Buy/Sell Toggle ═══ */
 .ex-type-toggle {
@@ -2452,27 +2473,42 @@ watch(() => exchangeItems.value.map(item => ({
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 20px 16px;
+  gap: 8px;
+  padding: 24px 16px;
   border-radius: var(--ex-radius);
   border: 2px solid transparent;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   font-size: 14px;
   position: relative;
   overflow: hidden;
+}
+.ex-type-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.5s;
 }
 .ex-type-btn--buy-active {
   background: linear-gradient(145deg, #dcfce7, #bbf7d0);
   border-color: #22c55e;
   color: #15803d;
-  box-shadow: 0 4px 16px rgba(34,197,94,0.2), inset 0 1px 0 rgba(255,255,255,0.5);
+  box-shadow: 0 6px 24px rgba(34,197,94,0.25), inset 0 1px 0 rgba(255,255,255,0.6);
+  animation: ex-pulse-green 2s ease-in-out infinite;
+}
+.ex-type-btn--buy-active .material-symbols-outlined {
+  font-size: 28px;
 }
 .ex-type-btn--sell-active {
   background: linear-gradient(145deg, #fee2e2, #fecaca);
   border-color: #ef4444;
   color: #b91c1c;
-  box-shadow: 0 4px 16px rgba(239,68,68,0.2), inset 0 1px 0 rgba(255,255,255,0.5);
+  box-shadow: 0 6px 24px rgba(239,68,68,0.25), inset 0 1px 0 rgba(255,255,255,0.6);
+  animation: ex-pulse-red 2s ease-in-out infinite;
+}
+.ex-type-btn--sell-active .material-symbols-outlined {
+  font-size: 28px;
 }
 .ex-type-btn--inactive {
   background: white;
@@ -2483,65 +2519,85 @@ watch(() => exchangeItems.value.map(item => ({
 .ex-type-btn--inactive:hover {
   background: #f8fafc;
   border-color: #cbd5e1;
-  transform: translateY(-1px);
+  transform: translateY(-2px);
   box-shadow: var(--ex-shadow-md);
 }
-.ex-type-label { font-weight: 800; font-size: 17px; letter-spacing: -0.01em; }
+.ex-type-label { font-weight: 800; font-size: 19px; letter-spacing: -0.01em; }
 .ex-type-desc { font-size: 12px; opacity: 0.75; }
+
+@keyframes ex-pulse-green {
+  0%, 100% { box-shadow: 0 6px 24px rgba(34,197,94,0.25), inset 0 1px 0 rgba(255,255,255,0.6); }
+  50% { box-shadow: 0 6px 32px rgba(34,197,94,0.35), inset 0 1px 0 rgba(255,255,255,0.6); }
+}
+@keyframes ex-pulse-red {
+  0%, 100% { box-shadow: 0 6px 24px rgba(239,68,68,0.25), inset 0 1px 0 rgba(255,255,255,0.6); }
+  50% { box-shadow: 0 6px 32px rgba(239,68,68,0.35), inset 0 1px 0 rgba(255,255,255,0.6); }
+}
 
 /* ═══ Quick Currency Bar ═══ */
 .ex-quick-bar {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: 14px;
+  margin-bottom: 22px;
+  padding: 14px 20px;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  border: 1px solid #e2e8f0;
+  border-radius: var(--ex-radius);
   flex-wrap: wrap;
 }
 .ex-quick-title {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  color: #6366f1;
   white-space: nowrap;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.8px;
 }
 .ex-quick-chips { display: flex; gap: 8px; flex-wrap: wrap; }
 .ex-chip {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 8px 16px;
-  border: 1.5px solid var(--ex-border);
-  border-radius: 24px;
+  gap: 8px;
+  padding: 10px 18px;
+  border: 2px solid #e2e8f0;
+  border-radius: 28px;
   background: white;
   font-weight: 700;
   font-size: 13px;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   color: #475569;
-  box-shadow: var(--ex-shadow-sm);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
 }
-.ex-chip:hover { transform: translateY(-2px); box-shadow: var(--ex-shadow-md); }
-.ex-chip--usd:hover { border-color: #22c55e; color: #15803d; background: #f0fdf4; }
-.ex-chip--eur:hover { border-color: #3b82f6; color: #1d4ed8; background: #eff6ff; }
-.ex-chip--rub:hover { border-color: #ef4444; color: #b91c1c; background: #fef2f2; }
-.ex-chip--krub:hover { border-color: #8b5cf6; color: #6b46c1; background: #f5f3ff; }
-.ex-chip--usdt:hover { border-color: #14b8a6; color: #0f766e; background: #f0fdfa; }
+.ex-chip:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,0.1); }
+.ex-chip--usd { border-color: rgba(34,197,94,0.3); }
+.ex-chip--usd:hover { border-color: #22c55e; color: #15803d; background: linear-gradient(135deg, #f0fdf4, #dcfce7); box-shadow: 0 6px 20px rgba(34,197,94,0.2); }
+.ex-chip--eur { border-color: rgba(59,130,246,0.3); }
+.ex-chip--eur:hover { border-color: #3b82f6; color: #1d4ed8; background: linear-gradient(135deg, #eff6ff, #dbeafe); box-shadow: 0 6px 20px rgba(59,130,246,0.2); }
+.ex-chip--rub { border-color: rgba(239,68,68,0.3); }
+.ex-chip--rub:hover { border-color: #ef4444; color: #b91c1c; background: linear-gradient(135deg, #fef2f2, #fee2e2); box-shadow: 0 6px 20px rgba(239,68,68,0.2); }
+.ex-chip--krub { border-color: rgba(139,92,246,0.3); }
+.ex-chip--krub:hover { border-color: #8b5cf6; color: #6b46c1; background: linear-gradient(135deg, #f5f3ff, #ede9fe); box-shadow: 0 6px 20px rgba(139,92,246,0.2); }
+.ex-chip--usdt { border-color: rgba(20,184,166,0.3); }
+.ex-chip--usdt:hover { border-color: #14b8a6; color: #0f766e; background: linear-gradient(135deg, #f0fdfa, #ccfbf1); box-shadow: 0 6px 20px rgba(20,184,166,0.2); }
 .ex-chip--active {
-  box-shadow: 0 0 0 2px #6366f1, 0 4px 12px rgba(99,102,241,0.2);
+  box-shadow: 0 0 0 2px #6366f1, 0 4px 16px rgba(99,102,241,0.25);
   border-color: #6366f1;
-  background: #f5f3ff;
+  background: linear-gradient(135deg, #eef2ff, #e0e7ff);
+  color: #4338ca;
+  transform: translateY(-2px);
 }
-.ex-chip--active.ex-chip--usd { box-shadow: 0 0 0 2px #22c55e, 0 4px 12px rgba(34,197,94,0.2); border-color: #22c55e; background: #f0fdf4; color: #15803d; }
-.ex-chip--active.ex-chip--eur { box-shadow: 0 0 0 2px #3b82f6, 0 4px 12px rgba(59,130,246,0.2); border-color: #3b82f6; background: #eff6ff; color: #1d4ed8; }
-.ex-chip--active.ex-chip--rub { box-shadow: 0 0 0 2px #ef4444, 0 4px 12px rgba(239,68,68,0.2); border-color: #ef4444; background: #fef2f2; color: #b91c1c; }
-.ex-chip--active.ex-chip--krub { box-shadow: 0 0 0 2px #8b5cf6, 0 4px 12px rgba(139,92,246,0.2); border-color: #8b5cf6; background: #f5f3ff; color: #6b46c1; }
-.ex-chip--active.ex-chip--usdt { box-shadow: 0 0 0 2px #14b8a6, 0 4px 12px rgba(20,184,166,0.2); border-color: #14b8a6; background: #f0fdfa; color: #0f766e; }
-.ex-chip-flag { font-size: 16px; }
-.ex-chip-crypto { font-weight: 800; font-size: 16px; color: #10b981; }
+.ex-chip--active.ex-chip--usd { box-shadow: 0 0 0 2px #22c55e, 0 4px 16px rgba(34,197,94,0.25); border-color: #22c55e; background: linear-gradient(135deg, #f0fdf4, #dcfce7); color: #15803d; }
+.ex-chip--active.ex-chip--eur { box-shadow: 0 0 0 2px #3b82f6, 0 4px 16px rgba(59,130,246,0.25); border-color: #3b82f6; background: linear-gradient(135deg, #eff6ff, #dbeafe); color: #1d4ed8; }
+.ex-chip--active.ex-chip--rub { box-shadow: 0 0 0 2px #ef4444, 0 4px 16px rgba(239,68,68,0.25); border-color: #ef4444; background: linear-gradient(135deg, #fef2f2, #fee2e2); color: #b91c1c; }
+.ex-chip--active.ex-chip--krub { box-shadow: 0 0 0 2px #8b5cf6, 0 4px 16px rgba(139,92,246,0.25); border-color: #8b5cf6; background: linear-gradient(135deg, #f5f3ff, #ede9fe); color: #6b46c1; }
+.ex-chip--active.ex-chip--usdt { box-shadow: 0 0 0 2px #14b8a6, 0 4px 16px rgba(20,184,166,0.25); border-color: #14b8a6; background: linear-gradient(135deg, #f0fdfa, #ccfbf1); color: #0f766e; }
+.ex-chip-flag { font-size: 20px; }
+.ex-chip-crypto { font-weight: 800; font-size: 20px; color: #10b981; }
 
 /* ═══ Layout ═══ */
 .ex-layout {
@@ -2563,27 +2619,28 @@ watch(() => exchangeItems.value.map(item => ({
   border: 1px solid var(--ex-border);
   border-radius: var(--ex-radius);
   overflow: hidden;
-  box-shadow: var(--ex-shadow-sm);
-  transition: box-shadow 0.3s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.ex-card:hover { box-shadow: var(--ex-shadow-md); }
+.ex-card:hover { box-shadow: 0 8px 28px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04); }
 .ex-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 22px;
+  padding: 18px 22px;
   border-bottom: 1px solid #f1f5f9;
-  background: linear-gradient(180deg, #fafbff, white);
+  background: linear-gradient(180deg, #fafbff 0%, #fff 100%);
 }
 .ex-card-title {
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 800;
   color: #0f172a;
   display: flex;
   align-items: center;
   gap: 8px;
+  letter-spacing: -0.02em;
 }
-.ex-card-body { padding: 20px 22px; display: flex; flex-direction: column; gap: 18px; }
+.ex-card-body { padding: 20px 22px; display: flex; flex-direction: column; gap: 18px; background: #fafbfe; }
 
 /* ═══ Exchange Item ═══ */
 .ex-item {
@@ -2661,11 +2718,12 @@ watch(() => exchangeItems.value.map(item => ({
   align-items: center;
   justify-content: center;
   padding-bottom: 4px;
-  color: #94a3b8;
-  width: 36px;
-  height: 36px;
-  background: #f1f5f9;
-  border-radius: 10px;
+  color: white;
+  width: 38px;
+  height: 38px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-radius: 50%;
+  box-shadow: 0 3px 10px rgba(99,102,241,0.3);
   align-self: end;
   margin-bottom: 4px;
   flex-shrink: 0;
@@ -2685,31 +2743,34 @@ watch(() => exchangeItems.value.map(item => ({
 .ex-field--grow { flex: 1; }
 .ex-field--result { flex: 0 0 auto; min-width: 120px; }
 .ex-field-label {
-  font-size: 12px;
-  font-weight: 500;
-  color: #6b7280;
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
   display: flex;
   align-items: center;
   gap: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
 }
-.ex-field-hint { font-size: 11px; color: #9ca3af; }
+.ex-field-hint { font-size: 10px; color: #94a3b8; text-transform: none; letter-spacing: 0; }
 
 .ex-input {
   width: 100%;
-  padding: 11px 14px;
-  border: 1.5px solid var(--ex-border);
+  padding: 12px 16px;
+  border: 1.5px solid #dde1e8;
   border-radius: 12px;
-  font-size: 14px;
+  font-size: 15px;
   transition: all 0.25s;
   outline: none;
   background: white;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.04);
 }
 .ex-input:focus {
   border-color: var(--ex-indigo);
-  box-shadow: 0 0 0 4px rgba(99,102,241,0.08);
+  box-shadow: 0 0 0 4px rgba(99,102,241,0.1), inset 0 1px 2px rgba(0,0,0,0.02);
 }
-.ex-input:disabled { opacity: 0.5; background: #f8fafc; }
-.ex-input--mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+.ex-input:disabled { opacity: 0.5; background: #f1f5f9; }
+.ex-input--mono { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; }
 .ex-input--custom {
   background: linear-gradient(135deg, #fffbeb, #fef3c7);
   border-color: #fbbf24;
@@ -2718,13 +2779,13 @@ watch(() => exchangeItems.value.map(item => ({
 
 .ex-result-value {
   padding: 11px 14px;
-  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-  border: 1.5px solid var(--ex-border);
+  background: linear-gradient(135deg, #eef2ff, #e0e7ff);
+  border: 1.5px solid #c7d2fe;
   border-radius: 12px;
   font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
-  color: #0f172a;
+  color: #312e81;
   white-space: nowrap;
 }
 .ex-result-code { font-size: 11px; color: #64748b; font-weight: 600; margin-left: 4px; }
@@ -2824,47 +2885,59 @@ watch(() => exchangeItems.value.map(item => ({
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: 12px 16px;
+  padding: 14px 20px;
   border: none;
   background: transparent;
   cursor: pointer;
   color: #374151;
   font-size: 14px;
+  font-weight: 600;
+  transition: background 0.2s;
 }
-.ex-notes-toggle:hover { background: #f9fafb; }
+.ex-notes-toggle:hover { background: linear-gradient(135deg, #f8fafc, #f1f5f9); }
 .ex-notes-toggle-left { display: flex; align-items: center; gap: 8px; }
-.ex-notes-badge { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 10px; background: #dbeafe; color: #1d4ed8; }
-.ex-notes-body { padding: 0 16px 16px; }
+.ex-notes-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+  color: #1d4ed8;
+  letter-spacing: 0.3px;
+}
+.ex-notes-body { padding: 0 20px 16px; }
 .ex-textarea {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--ex-border);
-  border-radius: 10px;
+  padding: 12px 14px;
+  border: 1.5px solid #dde1e8;
+  border-radius: 12px;
   font-size: 14px;
   resize: none;
   min-height: 72px;
   outline: none;
-  transition: border-color 0.2s;
+  transition: all 0.25s;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.04);
 }
-.ex-textarea:focus { border-color: var(--ex-indigo); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+.ex-textarea:focus { border-color: var(--ex-indigo); box-shadow: 0 0 0 4px rgba(99,102,241,0.1), inset 0 1px 2px rgba(0,0,0,0.02); }
 
 /* ═══ Summary Card ═══ */
 .ex-summary-card {
-  border: 1px solid rgba(99,102,241,0.2);
-  box-shadow: var(--ex-shadow-md), var(--ex-shadow-glow-indigo);
-  border-radius: 18px;
+  border: 1px solid rgba(99,102,241,0.25);
+  box-shadow: 0 8px 32px rgba(99,102,241,0.12), 0 2px 6px rgba(0,0,0,0.04);
+  border-radius: 20px;
 }
-.ex-summary-card:hover { box-shadow: var(--ex-shadow-lg), var(--ex-shadow-glow-indigo); }
+.ex-summary-card:hover { box-shadow: 0 12px 40px rgba(99,102,241,0.18), 0 2px 8px rgba(0,0,0,0.06); }
 .ex-summary-header {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 16px 22px;
-  background: linear-gradient(135deg, #6366f1, #7c3aed);
+  padding: 18px 22px;
+  background: linear-gradient(135deg, #4338ca 0%, #6366f1 40%, #7c3aed 100%);
   color: white;
-  font-size: 15px;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 800;
   letter-spacing: -0.01em;
+  box-shadow: inset 0 -1px 0 rgba(0,0,0,0.1);
 }
 .ex-summary-body { padding: 18px 22px; display: flex; flex-direction: column; gap: 16px; }
 
@@ -2915,14 +2988,15 @@ watch(() => exchangeItems.value.map(item => ({
 .ex-summary-num {
   font-size: 10px;
   color: white;
-  background: #94a3b8;
-  width: 20px;
-  height: 20px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  width: 22px;
+  height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
-  font-weight: 700;
+  border-radius: 7px;
+  font-weight: 800;
+  box-shadow: 0 2px 4px rgba(99,102,241,0.3);
 }
 .ex-summary-from, .ex-summary-to { display: flex; align-items: center; gap: 4px; flex: 1; }
 .ex-summary-to { justify-content: flex-end; }
@@ -2964,9 +3038,10 @@ watch(() => exchangeItems.value.map(item => ({
 }
 .ex-grand-total-val {
   font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: 18px;
-  font-weight: 700;
-  color: #4338ca;
+  font-size: 20px;
+  font-weight: 800;
+  color: #312e81;
+  text-shadow: 0 1px 2px rgba(49,46,129,0.1);
 }
 .ex-grand-total-empty { text-align: center; font-size: 13px; color: #9ca3af; padding: 8px 0; }
 .ex-try-total {
@@ -2984,21 +3059,22 @@ watch(() => exchangeItems.value.map(item => ({
 /* ═══ Submit Button ═══ */
 .ex-submit-btn {
   width: 100%;
-  padding: 16px;
+  padding: 18px;
   border: none;
-  border-radius: 14px;
-  font-size: 15px;
+  border-radius: 16px;
+  font-size: 16px;
   font-weight: 800;
   color: white;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   letter-spacing: 0.02em;
   position: relative;
   overflow: hidden;
+  text-transform: uppercase;
 }
 .ex-submit-btn::after {
   content: '';
@@ -3017,14 +3093,16 @@ watch(() => exchangeItems.value.map(item => ({
   box-shadow: 0 4px 16px rgba(22,163,74,0.35);
 }
 .ex-submit-btn--buy:hover:not(:disabled) {
-  box-shadow: 0 8px 28px rgba(22,163,74,0.4);
+  box-shadow: 0 8px 32px rgba(22,163,74,0.45);
+  background: linear-gradient(135deg, #16a34a, #15803d);
 }
 .ex-submit-btn--sell {
   background: linear-gradient(135deg, #ef4444, #dc2626);
   box-shadow: 0 4px 16px rgba(220,38,38,0.35);
 }
 .ex-submit-btn--sell:hover:not(:disabled) {
-  box-shadow: 0 8px 28px rgba(220,38,38,0.4);
+  box-shadow: 0 8px 32px rgba(220,38,38,0.45);
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
 }
 
 /* ═══ Buttons ═══ */
@@ -3036,26 +3114,29 @@ watch(() => exchangeItems.value.map(item => ({
   border: none;
   border-radius: 12px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   color: white;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: 0.01em;
 }
-.ex-btn--sm { padding: 6px 14px; font-size: 13px; border-radius: 8px; }
-.ex-btn--red { background: linear-gradient(135deg, #ef4444, #dc2626); }
-.ex-btn--red:hover { background: linear-gradient(135deg, #dc2626, #b91c1c); }
-.ex-btn--amber { background: linear-gradient(135deg, #f59e0b, #d97706); }
-.ex-btn--amber:hover { background: linear-gradient(135deg, #d97706, #b45309); }
-.ex-btn--indigo { background: linear-gradient(135deg, #6366f1, #4f46e5); }
-.ex-btn--indigo:hover { background: linear-gradient(135deg, #4f46e5, #4338ca); }
+.ex-btn:hover { transform: translateY(-1px); }
+.ex-btn:active { transform: translateY(0); }
+.ex-btn--sm { padding: 8px 16px; font-size: 13px; border-radius: 10px; }
+.ex-btn--red { background: linear-gradient(135deg, #ef4444, #dc2626); box-shadow: 0 3px 10px rgba(220,38,38,0.25); }
+.ex-btn--red:hover { background: linear-gradient(135deg, #dc2626, #b91c1c); box-shadow: 0 6px 16px rgba(220,38,38,0.3); }
+.ex-btn--amber { background: linear-gradient(135deg, #f59e0b, #d97706); box-shadow: 0 3px 10px rgba(217,119,6,0.25); }
+.ex-btn--amber:hover { background: linear-gradient(135deg, #d97706, #b45309); box-shadow: 0 6px 16px rgba(217,119,6,0.3); }
+.ex-btn--indigo { background: linear-gradient(135deg, #6366f1, #4f46e5); box-shadow: 0 3px 10px rgba(79,70,229,0.25); }
+.ex-btn--indigo:hover { background: linear-gradient(135deg, #4f46e5, #4338ca); box-shadow: 0 6px 16px rgba(79,70,229,0.3); }
 
 /* ═══ Today Stats ═══ */
 .ex-today-stats {
-  background: linear-gradient(135deg, #f0fdf4, #ecfdf5);
-  border: 1px solid rgba(22,163,74,0.15);
-  border-radius: 12px;
-  padding: 12px 16px;
-  box-shadow: 0 2px 8px rgba(22,163,74,0.06);
+  background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 50%, #d1fae5 100%);
+  border: 1px solid rgba(22,163,74,0.2);
+  border-radius: 14px;
+  padding: 14px 18px;
+  box-shadow: 0 4px 12px rgba(22,163,74,0.08);
 }
 .ex-today-row {
   display: flex;
@@ -3175,72 +3256,77 @@ watch(() => exchangeItems.value.map(item => ({
 
 /* ═══ Position Bar ═══ */
 .ex-pos-bar {
-  background: linear-gradient(135deg, #fafbff, #f5f3ff);
-  border: 1px solid rgba(99,102,241,0.1);
+  background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%);
+  border: 1px solid rgba(99,102,241,0.2);
   border-radius: var(--ex-radius);
   margin-bottom: 20px;
-  overflow: hidden;
-  box-shadow: var(--ex-shadow-sm);
+  box-shadow: 0 4px 20px rgba(15,23,42,0.2);
 }
-.ex-pos-bar-header {
+.ex-pos-bar-strip {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.ex-pos-bar-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 18px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #a5b4fc;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-right: 1px solid rgba(255,255,255,0.06);
+  flex-shrink: 0;
+}
+.ex-pos-bar-label .material-symbols-outlined { font-size: 18px; }
+.ex-pos-bar-items {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  flex: 1;
+  padding: 6px 4px;
+}
+.ex-pos-bar-items::-webkit-scrollbar { height: 3px; }
+.ex-pos-bar-items::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 2px; }
+.ex-pos-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 20px;
-  border-bottom: 1px solid rgba(99,102,241,0.08);
-  font-size: 13px;
-  color: #6b7280;
-}
-.ex-pos-bar-title { font-weight: 700; color: #1e1b4b; letter-spacing: -0.01em; }
-.ex-pos-bar-total {
-  margin-left: auto;
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: 13px;
-  font-weight: 700;
-  color: #4338ca;
-  background: rgba(99,102,241,0.08);
-  padding: 4px 12px;
-  border-radius: 20px;
-}
-.ex-pos-bar-items {
-  display: flex;
-  gap: 0;
-  overflow-x: auto;
-  padding: 8px 12px;
-}
-.ex-pos-bar-items::-webkit-scrollbar { height: 4px; }
-.ex-pos-bar-items::-webkit-scrollbar-thumb { background: #c4b5fd; border-radius: 2px; }
-.ex-pos-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 12px 20px;
-  border-radius: 12px;
-  min-width: 110px;
+  padding: 10px 16px;
+  border-radius: 10px;
   cursor: pointer;
-  transition: all 0.25s;
-  position: relative;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid transparent;
+  flex-shrink: 0;
 }
 .ex-pos-item:hover {
-  background: white;
-  box-shadow: var(--ex-shadow-md);
-  transform: translateY(-2px);
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(99,102,241,0.3);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  transform: translateY(-1px);
 }
-.ex-pos-top { display: flex; align-items: center; gap: 5px; }
+.ex-pos-flag { font-size: 18px; flex-shrink: 0; }
 .ex-pos-code {
   font-size: 11px;
   font-weight: 800;
-  color: #4338ca;
+  color: #a5b4fc;
   letter-spacing: 0.5px;
+  min-width: 32px;
 }
 .ex-pos-balance {
   font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
-  color: #111827;
+  color: #f1f5f9;
 }
-.ex-pos-details { display: flex; gap: 8px; align-items: center; }
+.ex-pos-sep { color: rgba(255,255,255,0.15); font-size: 14px; }
 .ex-pos-wac {
   font-size: 10px;
   color: #64748b;
@@ -3249,21 +3335,42 @@ watch(() => exchangeItems.value.map(item => ({
 .ex-pos-pnl {
   font-size: 10px;
   font-weight: 700;
-  padding: 1px 6px;
+  padding: 2px 8px;
   border-radius: 6px;
 }
-.ex-pnl--pos { color: #16a34a; background: rgba(22,163,74,0.08); }
-.ex-pnl--neg { color: #dc2626; background: rgba(220,38,38,0.08); }
+.ex-pos-bar-total {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px;
+  border-left: 1px solid rgba(255,255,255,0.06);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.ex-pos-bar-total-label {
+  font-size: 14px;
+  font-weight: 800;
+  color: #818cf8;
+}
+.ex-pos-bar-total-val {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: #e0e7ff;
+}
+.ex-pnl--pos { color: #4ade80; background: rgba(74,222,128,0.12); }
+.ex-pnl--neg { color: #f87171; background: rgba(248,113,113,0.12); }
 
 /* ═══ Terminal Mode Tabs ═══ */
 .ex-terminal-tabs {
   display: flex;
   gap: 4px;
-  margin-bottom: 20px;
-  background: #f1f5f9;
-  border-radius: 14px;
-  padding: 4px;
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.06);
+  margin-bottom: 22px;
+  background: linear-gradient(135deg, #e2e8f0, #f1f5f9);
+  border-radius: 16px;
+  padding: 5px;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.06);
+  border: 1px solid #e2e8f0;
 }
 .ex-tab {
   flex: 1;
@@ -3271,9 +3378,9 @@ watch(() => exchangeItems.value.map(item => ({
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 12px 20px;
+  padding: 14px 20px;
   border: none;
-  border-radius: 12px;
+  border-radius: 13px;
   background: transparent;
   font-size: 13px;
   font-weight: 600;
@@ -3281,21 +3388,24 @@ watch(() => exchangeItems.value.map(item => ({
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.ex-tab:hover { color: #334155; background: rgba(255,255,255,0.6); }
+.ex-tab:hover { color: #334155; background: rgba(255,255,255,0.7); }
 .ex-tab--active {
   background: white;
   color: var(--ex-indigo);
-  box-shadow: 0 2px 8px rgba(99,102,241,0.15), 0 1px 3px rgba(0,0,0,0.06);
+  box-shadow: 0 2px 12px rgba(99,102,241,0.2), 0 1px 3px rgba(0,0,0,0.06);
+  font-weight: 700;
 }
 .ex-tab--active-arb {
   background: linear-gradient(135deg, #fffbeb, #fef3c7);
   color: #92400e;
-  box-shadow: 0 2px 8px rgba(217,119,6,0.15), 0 1px 3px rgba(0,0,0,0.06);
+  box-shadow: 0 2px 12px rgba(217,119,6,0.2), 0 1px 3px rgba(0,0,0,0.06);
+  font-weight: 700;
 }
 .ex-tab--active-batch {
   background: linear-gradient(135deg, #eff6ff, #dbeafe);
   color: #1e40af;
-  box-shadow: 0 2px 8px rgba(59,130,246,0.15), 0 1px 3px rgba(0,0,0,0.06);
+  box-shadow: 0 2px 12px rgba(59,130,246,0.2), 0 1px 3px rgba(0,0,0,0.06);
+  font-weight: 700;
 }
 .ex-tab-key {
   font-size: 9px;
@@ -3455,53 +3565,64 @@ watch(() => exchangeItems.value.map(item => ({
 .ex-matrix {
   width: 100%;
   border-collapse: separate;
-  border-spacing: 0;
+  border-spacing: 3px;
   font-size: 13px;
 }
 .ex-matrix th {
-  padding: 10px 14px;
+  padding: 12px 14px;
   text-align: center;
   font-size: 11px;
   font-weight: 800;
-  color: #4338ca;
-  border-bottom: 2px solid #e2e8f0;
+  color: #fff;
+  background: linear-gradient(135deg, #4338ca, #6366f1);
+  border-radius: 8px;
   letter-spacing: 0.5px;
 }
+.ex-matrix th:first-child { background: transparent; }
 .ex-matrix td {
   padding: 10px 14px;
   text-align: center;
-  border-bottom: 1px solid #f1f5f9;
+  border-radius: 8px;
+  transition: all 0.2s;
 }
 .ex-matrix tbody tr { transition: background 0.15s; }
-.ex-matrix tbody tr:hover { background: #faf5ff; }
-.ex-matrix tbody tr:nth-child(even) { background: #fafbff; }
-.ex-matrix tbody tr:nth-child(even):hover { background: #f5f3ff; }
+.ex-matrix tbody tr:hover td { background: #f5f3ff; }
+.ex-matrix tbody tr:nth-child(even) td { background: #fafbff; }
+.ex-matrix tbody tr:nth-child(even):hover td { background: #ede9fe; }
 .ex-matrix-label {
   display: flex;
   align-items: center;
   gap: 6px;
   font-weight: 800;
-  color: #1e1b4b;
+  color: #fff;
   font-size: 12px;
   text-align: left !important;
   letter-spacing: 0.3px;
+  background: linear-gradient(135deg, #312e81, #4338ca) !important;
+  border-radius: 8px;
+  padding: 10px 14px;
 }
-.ex-matrix-self { background: #f1f5f9 !important; }
-.ex-matrix-dash { color: #cbd5e1; }
+.ex-matrix-self { background: #e2e8f0 !important; }
+.ex-matrix-dash { color: #94a3b8; font-size: 16px; }
 .ex-matrix-cell {
   cursor: pointer;
   transition: all 0.2s;
   border-radius: 8px;
+  background: #fff;
+  border: 1px solid #f1f5f9;
 }
 .ex-matrix-cell:hover {
-  background: #ede9fe !important;
-  box-shadow: inset 0 0 0 1px rgba(99,102,241,0.2);
+  background: #4338ca !important;
+  box-shadow: 0 4px 12px rgba(67,56,202,0.3);
+  transform: scale(1.05);
 }
+.ex-matrix-cell:hover .ex-matrix-rate { color: #fff; }
 .ex-matrix-rate {
   font-family: 'JetBrains Mono', ui-monospace, monospace;
   font-weight: 600;
   color: #0f172a;
   font-size: 12px;
+  transition: color 0.2s;
 }
 
 /* ═══ Animation ═══ */

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import AppPageHeader from '@/components/common/AppPageHeader.vue'
 
 const router = useRouter()
 
@@ -40,15 +41,7 @@ const toggleTicker = () => {
 <template>
   <div class="modern-settings">
     <!-- Header -->
-    <div class="page-header">
-      <div class="header-content">
-        <h1 class="page-title">
-          <span class="material-symbols-outlined">settings</span>
-          Ayarlar
-        </h1>
-        <p class="page-subtitle">Uygulama ayarlarını buradan yönetebilirsiniz</p>
-      </div>
-    </div>
+    <AppPageHeader icon="settings" title="Ayarlar" subtitle="Uygulama ayarlarını buradan yönetebilirsiniz" />
 
     <!-- Success Message -->
     <div v-if="showSuccessMessage" class="success-alert">
@@ -152,37 +145,6 @@ const toggleTicker = () => {
 .modern-settings {
   max-width: 1200px;
   margin: 0 auto;
-}
-
-/* Header */
-.page-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 16px;
-  padding: 2rem;
-  margin-bottom: 2rem;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-}
-
-.header-content {
-  color: white;
-}
-
-.page-title {
-  font-size: 2rem;
-  font-weight: 700;
-  margin-bottom: 0.5rem;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.page-title .material-symbols-outlined {
-  font-size: 2.5rem;
-}
-
-.page-subtitle {
-  font-size: 1.1rem;
-  opacity: 0.9;
 }
 
 /* Success Alert */
@@ -376,14 +338,6 @@ input:checked + .toggle-slider:before {
 
 /* Responsive */
 @media (max-width: 768px) {
-  .page-header {
-    padding: 1.5rem;
-  }
-  
-  .page-title {
-    font-size: 1.5rem;
-  }
-  
   .setting-content {
     flex-direction: column;
     align-items: flex-start;

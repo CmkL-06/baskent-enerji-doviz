@@ -449,7 +449,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                            t.TransactionDate >= startDate &&
                            t.TransactionDate <= endDate &&
                            t.Status == TransactionStatus.Completed &&
-                           t.Type == TransactionType.Exchange)
+                           (t.Type == TransactionType.Exchange || t.Type == TransactionType.Buy))
                 .SumAsync(t => t.Profit);
         }
 
@@ -525,12 +525,12 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             balance.LastUpdated = DateTime.UtcNow;
             TransactionType iType;
 
-            if (data.TransactionType != TransactionType.Exchange)
+            if (data.TransactionType != TransactionType.Exchange && data.TransactionType != TransactionType.Buy)
             {
                 if (data.isEntireBalance)
                 {
                     iType = TransactionType.Adjustment;
-                    data.description = $"{balance.Currency.CurrencyName} elle dÃ¼zeltildi {currentBalance:0.00} -> {balance.Balance:0.00} ({balance.Balance - currentBalance:0.00}) ";
+                    data.description = $"{balance.Currency.CurrencyName} elle düzeltildi {currentBalance:0.00} -> {balance.Balance:0.00} ({balance.Balance - currentBalance:0.00}) ";
                 }
                 else if (data.amount > 0)
                 {
@@ -543,7 +543,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             }
             else
             {
-                iType = TransactionType.Exchange;
+                iType = data.TransactionType ?? TransactionType.Exchange;
             }
 
 

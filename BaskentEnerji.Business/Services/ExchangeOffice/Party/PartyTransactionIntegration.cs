@@ -197,6 +197,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
             switch (transactionType)
             {
                 case TransactionType.Exchange:
+                case TransactionType.Buy:
                     // Credit detail = office receives currency from customer → party Credit (we owe them)
                     // Debit detail = office pays currency to customer → party Debit (they owe us)
                     return detail.Side == TransactionSide.Credit

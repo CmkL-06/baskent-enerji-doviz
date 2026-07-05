@@ -57,7 +57,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
             foreach (var transaction in transactions)
             {
-                if (transaction.Type == TransactionType.Exchange)
+                if (transaction.Type == TransactionType.Exchange || transaction.Type == TransactionType.Buy)
                 {
                     // Add to total profit
                     totalProfit += transaction.Profit;
@@ -103,7 +103,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     .Where(t => t.TransactionDate.Date == date.Date)
                     .ToList();
 
-                var exchangeTransactions = dayTransactions.Where(t => t.Type == TransactionType.Exchange).ToList();
+                var exchangeTransactions = dayTransactions.Where(t => t.Type == TransactionType.Exchange || t.Type == TransactionType.Buy).ToList();
                 var depositTransactions = dayTransactions.Where(t => t.Type == TransactionType.Deposit).ToList();
                 var withdrawalTransactions = dayTransactions.Where(t => t.Type == TransactionType.Withdrawal).ToList();
 
@@ -159,7 +159,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 statistics.AverageDailyProfit = dailyPerformance.Average(d => d.Profit);
                 statistics.DaysWithProfit = profitDays.Count;
                 statistics.DaysWithLoss = lossDays.Count;
-                statistics.TotalExchangeTransactions = transactions.Count(t => t.Type == TransactionType.Exchange);
+                statistics.TotalExchangeTransactions = transactions.Count(t => t.Type == TransactionType.Exchange || t.Type == TransactionType.Buy);
                 statistics.TotalDeposits = totalDeposits;
                 statistics.TotalWithdrawals = totalWithdrawals;
                 
@@ -206,7 +206,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                            t.TransactionDate >= startDate &&
                            t.TransactionDate <= endDate &&
                            t.Status == TransactionStatus.Completed &&
-                           t.Type == TransactionType.Exchange)
+                           (t.Type == TransactionType.Exchange || t.Type == TransactionType.Buy))
                 .ToListAsync();
 
             var currencyPerformance = new Dictionary<Guid, vm_currencyperformance>();

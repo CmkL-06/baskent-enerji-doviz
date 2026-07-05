@@ -3,6 +3,8 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useExchangeStore } from '@/stores/exchange'
 import apiService from '@/services/apiservice'
+import AppKpiCard from '@/components/common/AppKpiCard.vue'
+import AppPageHeader from '@/components/common/AppPageHeader.vue'
 
 const authStore = useAuthStore()
 const exchangeStore = useExchangeStore()
@@ -139,24 +141,17 @@ onMounted(async () => {
 
 <template>
   <div class="io-wrap">
-    <div class="io-header">
-      <h1>Ofislerarası Transfer</h1>
+    <AppPageHeader icon="swap_horiz" title="Ofislerarası Transfer">
       <button class="btn-primary" @click="openCreateModal">
         <span class="material-symbols-outlined">swap_horiz</span>
         Yeni Transfer
       </button>
-    </div>
+    </AppPageHeader>
 
     <!-- KPI -->
     <div class="kpi-grid">
-      <div class="kpi-card kpi-orange">
-        <div class="kpi-label">Bekleyen</div>
-        <div class="kpi-value">{{ pendingTransfers.length }}</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Toplam Transfer</div>
-        <div class="kpi-value">{{ officeTransfers.length }}</div>
-      </div>
+      <AppKpiCard icon="pending_actions" label="Bekleyen" :value="pendingTransfers.length" color="#d97706" bg="#fffbeb" />
+      <AppKpiCard icon="sync_alt" label="Toplam Transfer" :value="officeTransfers.length" color="#6366f1" bg="#eef2ff" />
     </div>
 
     <!-- Tabs -->
@@ -361,8 +356,6 @@ onMounted(async () => {
 
 <style scoped>
 .io-wrap { padding: 24px; max-width: 1400px; margin: 0 auto; }
-.io-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.io-header h1 { font-size: 22px; font-weight: 700; color: #1a1a2e; margin: 0; }
 
 .btn-primary {
   display: inline-flex; align-items: center; gap: 6px;
@@ -389,10 +382,6 @@ onMounted(async () => {
 .icon-btn .material-symbols-outlined { font-size: 18px; }
 
 .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 20px; }
-.kpi-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px 20px; }
-.kpi-label { font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
-.kpi-value { font-size: 20px; font-weight: 700; color: #1a1a2e; }
-.kpi-orange .kpi-value { color: #d97706; }
 
 .tab-bar { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid #e5e7eb; }
 .tab-btn {
@@ -465,7 +454,6 @@ onMounted(async () => {
 
 @media (max-width: 768px) {
   .io-wrap { padding: 12px; }
-  .io-header { flex-direction: column; gap: 12px; align-items: flex-start; }
   .detail-grid { grid-template-columns: 1fr; }
 }
 </style>

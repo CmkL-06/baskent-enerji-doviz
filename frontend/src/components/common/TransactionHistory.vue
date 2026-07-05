@@ -29,6 +29,7 @@ const totalCount = ref(0)
 const filterType = ref<string>('')
 const deleteConfirmId = ref<string | null>(null)
 const isDeleting = ref(false)
+const selectedTx = ref<any>(null)
 
 const formatNumber = (value: number, decimals = 2) => {
   return new Intl.NumberFormat('tr-TR', {
@@ -47,10 +48,22 @@ const formatDate = (dateStr: string) => {
   return d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })
 }
 
+const formatFullDate = (dateStr: string) => {
+  const d = new Date(dateStr)
+  return d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' +
+         d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+}
+
 const getFlagClass = (code: string) => {
   const cc = getCurrencyCountryCode(code)
   return cc ? `fi fi-${cc}` : ''
 }
+
+const txTypeLabel = (tx: any) => {
+  return tx.type === 0 || tx.type === 'Buy' ? 'Alış' : 'Satış'
+}
+
+const isBuy = (tx: any) => tx.type === 0 || tx.type === 'Buy'
 
 async function loadTransactions() {
   if (!props.officeId) return
@@ -91,12 +104,83 @@ async function deleteTransaction(id: string) {
     await apiService.removeTransaction(id)
     notification.success('İşlem başarıyla silindi')
     deleteConfirmId.value = null
+    selectedTx.value = null
     await loadTransactions()
   } catch (err: any) {
     notification.error(`Silme hatası: ${err.response?.data?.message || err.message}`)
   } finally {
     isDeleting.value = false
   }
+}
+
+function openDetail(tx: any) {
+  selectedTx.value = tx
+}
+
+function closeDetail() {
+  selectedTx.value = null
+}
+
+function printReceipt(tx: any) {
+  const printWindow = window.open('', '_blank', 'width=400,height=600')
+  if (!printWindow) return
+
+  const typeLabel = txTypeLabel(tx)
+  const source = tx.sourceCurrencyCode || ''
+  const target = tx.targetCurrencyCode || ''
+  const rate = tx.exchangeRate || 0
+
+  printWindow.document.write(`<!DOCTYPE html><html><head><title>Fiş — ${tx.transactionReferenceNo || ''}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI',sans-serif;width:320px;margin:0 auto;padding:20px;color:#111}
+  .header{text-align:center;border-bottom:2px dashed #999;padding-bottom:12px;margin-bottom:12px}
+  .header h2{font-size:16px;margin-bottom:4px}
+  .header p{font-size:11px;color:#666}
+  .row{display:flex;justify-content:space-between;padding:5px 0;font-size:13px}
+  .row .label{color:#666}
+  .row .value{font-weight:600;text-align:right}
+  .divider{border-top:1px dashed #ccc;margin:10px 0}
+  .amount-box{background:#f5f5f5;border-radius:8px;padding:12px;margin:10px 0;text-align:center}
+  .amount-box .big{font-size:22px;font-weight:700}
+  .amount-box .small{font-size:11px;color:#666;margin-top:2px}
+  .footer{text-align:center;font-size:10px;color:#999;margin-top:16px;border-top:2px dashed #999;padding-top:12px}
+  @media print{body{padding:10px}}
+</style></head><body>
+<div class="header">
+  <h2>BAŞKENT ENERJİ</h2>
+  <p>Döviz Alım Satım</p>
+  <p style="margin-top:6px;font-size:12px;font-weight:600">${typeLabel} İşlemi</p>
+</div>
+
+<div class="row"><span class="label">Fiş No:</span><span class="value">${tx.transactionReferenceNo || '-'}</span></div>
+<div class="row"><span class="label">Tarih:</span><span class="value">${formatFullDate(tx.transactionDate)}</span></div>
+<div class="row"><span class="label">Personel:</span><span class="value">${tx.username || '-'}</span></div>
+<div class="row"><span class="label">Şube:</span><span class="value">${tx.officeName || '-'}</span></div>
+
+<div class="divider"></div>
+
+<div class="row"><span class="label">Kaynak:</span><span class="value">${formatNumber(tx.sourceAmount)} ${source}</span></div>
+<div class="row"><span class="label">Kur:</span><span class="value">${formatNumber(rate, 4)}</span></div>
+${tx.customRate ? `<div class="row"><span class="label">Özel Kur:</span><span class="value">${formatNumber(tx.customRate, 4)}</span></div>` : ''}
+<div class="row"><span class="label">Hedef:</span><span class="value">${formatNumber(tx.targetAmount)} ${target}</span></div>
+
+${tx.profit ? `<div class="divider"></div><div class="row"><span class="label">Kar:</span><span class="value" style="color:${tx.profit > 0 ? '#16a34a' : '#dc2626'}">${tx.profit > 0 ? '+' : ''}${formatNumber(tx.profit)} ₺</span></div>` : ''}
+
+<div class="amount-box">
+  <div class="big">${formatNumber(tx.targetAmount)} ${target}</div>
+  <div class="small">${formatNumber(tx.sourceAmount)} ${source} × ${formatNumber(rate, 4)}</div>
+</div>
+
+${tx.notes ? `<div class="divider"></div><div class="row"><span class="label">Not:</span><span class="value">${tx.notes}</span></div>` : ''}
+
+<div class="footer">
+  <p>Başkent Enerji Döviz</p>
+  <p style="margin-top:4px">${new Date().toLocaleDateString('tr-TR')} ${new Date().toLocaleTimeString('tr-TR')}</p>
+</div>
+</body></html>`)
+  printWindow.document.close()
+  setTimeout(() => { printWindow.print(); printWindow.close() }, 400)
 }
 
 function printAllTransactions() {
@@ -109,15 +193,13 @@ function printAllTransactions() {
 
   let rows = ''
   transactions.value.forEach(tx => {
-    const details = tx.details || []
-    const source = details.find((d: any) => d.side === 'Source' || d.side === 0)
-    const target = details.find((d: any) => d.side === 'Target' || d.side === 1)
     rows += `<tr>
-      <td style="padding:8px;border-bottom:1px solid #eee;font-size:12px">${formatTime(tx.transactionDate)}</td>
-      <td style="padding:8px;border-bottom:1px solid #eee">${tx.type === 0 || tx.type === 'Buy' ? 'Alış' : 'Satış'}</td>
-      <td style="padding:8px;border-bottom:1px solid #eee;font-family:monospace">${source ? formatNumber(source.amount) + ' ' + source.currencyCode : '-'}</td>
-      <td style="padding:8px;border-bottom:1px solid #eee;font-family:monospace">${source?.rate ? formatNumber(source.rate, 4) : '-'}</td>
-      <td style="padding:8px;border-bottom:1px solid #eee;font-family:monospace">${target ? formatNumber(target.amount) + ' ' + target.currencyCode : '-'}</td>
+      <td style="padding:8px;border-bottom:1px solid #eee;font-size:12px">${formatDate(tx.transactionDate)} ${formatTime(tx.transactionDate)}</td>
+      <td style="padding:8px;border-bottom:1px solid #eee"><span style="padding:2px 6px;border-radius:4px;font-size:11px;font-weight:600;background:${isBuy(tx) ? '#dcfce7' : '#fee2e2'};color:${isBuy(tx) ? '#15803d' : '#b91c1c'}">${txTypeLabel(tx)}</span></td>
+      <td style="padding:8px;border-bottom:1px solid #eee;font-family:monospace">${formatNumber(tx.sourceAmount)} ${tx.sourceCurrencyCode || '-'}</td>
+      <td style="padding:8px;border-bottom:1px solid #eee;font-family:monospace">${tx.exchangeRate ? formatNumber(tx.exchangeRate, 4) : '-'}</td>
+      <td style="padding:8px;border-bottom:1px solid #eee;font-family:monospace">${formatNumber(tx.targetAmount)} ${tx.targetCurrencyCode || '-'}</td>
+      <td style="padding:8px;border-bottom:1px solid #eee;font-size:12px">${tx.username || '-'}</td>
       <td style="padding:8px;border-bottom:1px solid #eee;font-family:monospace">${tx.profit ? formatNumber(tx.profit) : '-'}</td>
     </tr>`
   })
@@ -127,7 +209,7 @@ function printAllTransactions() {
     table{width:100%;border-collapse:collapse}th{text-align:left;padding:10px 8px;border-bottom:2px solid #333;font-size:13px}
     @media print{body{padding:10px}}</style></head><body>
     <h2>İşlem Geçmişi — ${props.selectedDate || new Date().toLocaleDateString('tr-TR')}</h2>
-    <table><thead><tr><th>Saat</th><th>Tür</th><th>Kaynak</th><th>Kur</th><th>Hedef</th><th>Kar</th></tr></thead>
+    <table><thead><tr><th>Saat</th><th>Tür</th><th>Kaynak</th><th>Kur</th><th>Hedef</th><th>Personel</th><th>Kar</th></tr></thead>
     <tbody>${rows}</tbody></table></body></html>`)
   printWindow.document.close()
   setTimeout(() => { printWindow.print(); printWindow.close() }, 300)
@@ -192,60 +274,49 @@ defineExpose({ loadTransactions, printAllTransactions })
       <table class="th-table">
         <thead>
           <tr>
-            <th class="th-col-time">Saat</th>
-            <th class="th-col-type">Tür</th>
-            <th>Kaynak</th>
-            <th class="th-col-rate">Kur</th>
-            <th>Hedef</th>
-            <th class="th-col-profit">Kar</th>
-            <th v-if="showActions" class="th-col-actions"></th>
+            <th class="th-col-time">SAAT</th>
+            <th class="th-col-type">TÜR</th>
+            <th>KAYNAK</th>
+            <th class="th-col-rate">KUR</th>
+            <th>HEDEF</th>
+            <th class="th-col-user">PERSONEL</th>
+            <th class="th-col-profit">KAR</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="tx in transactions" :key="tx.id" class="th-row" :class="{ 'th-row--deleting': deleteConfirmId === tx.id }">
+          <tr v-for="tx in transactions" :key="tx.id" class="th-row" :class="{ 'th-row--deleting': deleteConfirmId === tx.id }" @click="openDetail(tx)">
             <td class="th-cell-time">{{ formatDate(tx.transactionDate) }} {{ formatTime(tx.transactionDate) }}</td>
             <td>
-              <span class="th-type-badge" :class="tx.type === 0 || tx.type === 'Buy' ? 'th-type-badge--buy' : 'th-type-badge--sell'">
-                {{ tx.type === 0 || tx.type === 'Buy' ? 'Alış' : 'Satış' }}
+              <span class="th-type-badge" :class="isBuy(tx) ? 'th-type-badge--buy' : 'th-type-badge--sell'">
+                {{ txTypeLabel(tx) }}
               </span>
             </td>
             <td>
-              <div v-for="d in (tx.details || []).filter((d: any) => d.side === 'Source' || d.side === 0)" :key="d.currencyId" class="th-currency-cell">
-                <i v-if="getFlagClass(d.currencyCode)" :class="getFlagClass(d.currencyCode)" class="th-flag"></i>
-                <span class="th-amount">{{ formatNumber(d.amount) }}</span>
-                <span class="th-code">{{ d.currencyCode }}</span>
+              <div class="th-currency-cell">
+                <i v-if="getFlagClass(tx.sourceCurrencyCode)" :class="getFlagClass(tx.sourceCurrencyCode)" class="th-flag"></i>
+                <span class="th-amount">{{ formatNumber(tx.sourceAmount) }}</span>
+                <span class="th-code">{{ tx.sourceCurrencyCode }}</span>
               </div>
             </td>
             <td class="th-cell-rate">
-              <template v-for="d in (tx.details || []).filter((d: any) => d.side === 'Source' || d.side === 0)" :key="d.currencyId">
-                <span class="th-rate">{{ d.rate ? formatNumber(d.rate, 4) : '-' }}</span>
-                <span v-if="tx.isCustomRate" class="th-custom-badge">Ö</span>
-              </template>
+              <span class="th-rate">{{ tx.exchangeRate ? formatNumber(tx.exchangeRate, 4) : '-' }}</span>
+              <span v-if="tx.isCustomRate" class="th-custom-badge">Ö</span>
             </td>
             <td>
-              <div v-for="d in (tx.details || []).filter((d: any) => d.side === 'Target' || d.side === 1)" :key="d.currencyId" class="th-currency-cell">
-                <i v-if="getFlagClass(d.currencyCode)" :class="getFlagClass(d.currencyCode)" class="th-flag"></i>
-                <span class="th-amount">{{ formatNumber(d.amount) }}</span>
-                <span class="th-code">{{ d.currencyCode }}</span>
+              <div class="th-currency-cell">
+                <i v-if="getFlagClass(tx.targetCurrencyCode)" :class="getFlagClass(tx.targetCurrencyCode)" class="th-flag"></i>
+                <span class="th-amount">{{ formatNumber(tx.targetAmount) }}</span>
+                <span class="th-code">{{ tx.targetCurrencyCode }}</span>
               </div>
+            </td>
+            <td class="th-cell-user">
+              <span class="th-username">{{ tx.username || '-' }}</span>
             </td>
             <td class="th-cell-profit">
               <span v-if="tx.profit" :class="tx.profit > 0 ? 'th-profit--pos' : 'th-profit--neg'">
                 {{ tx.profit > 0 ? '+' : '' }}{{ formatNumber(tx.profit) }}
               </span>
               <span v-else class="th-profit--zero">-</span>
-            </td>
-            <td v-if="showActions" class="th-cell-actions">
-              <template v-if="deleteConfirmId === tx.id">
-                <button @click="deleteTransaction(tx.id)" :disabled="isDeleting" class="th-del-confirm">
-                  <span class="material-symbols-outlined" style="font-size:16px">{{ isDeleting ? 'refresh' : 'check' }}</span>
-                  Sil
-                </button>
-                <button @click="deleteConfirmId = null" class="th-del-cancel">İptal</button>
-              </template>
-              <button v-else-if="authStore.isAdmin || authStore.isOwner" @click="deleteConfirmId = tx.id" class="th-del-btn" title="İşlemi Sil">
-                <span class="material-symbols-outlined" style="font-size:16px">delete</span>
-              </button>
             </td>
           </tr>
         </tbody>
@@ -262,6 +333,109 @@ defineExpose({ loadTransactions, printAllTransactions })
         <span class="material-symbols-outlined" style="font-size:18px">chevron_right</span>
       </button>
     </div>
+
+    <!-- Detail Modal -->
+    <Teleport to="body">
+      <div v-if="selectedTx" class="th-overlay" @click.self="closeDetail">
+        <div class="th-detail-card">
+          <div class="th-detail-header">
+            <div>
+              <h3 class="th-detail-title">İşlem Detayı</h3>
+              <span class="th-detail-ref">{{ selectedTx.transactionReferenceNo }}</span>
+            </div>
+            <div class="th-detail-header-right">
+              <button @click="printReceipt(selectedTx)" class="th-print-btn" title="Fiş Yazdır">
+                <span class="material-symbols-outlined" style="font-size:18px">receipt_long</span>
+                Fiş Yazdır
+              </button>
+              <button @click="closeDetail" class="th-close-btn">
+                <span class="material-symbols-outlined" style="font-size:20px">close</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="th-detail-body">
+            <div class="th-detail-type-row">
+              <span class="th-type-badge th-type-badge--lg" :class="isBuy(selectedTx) ? 'th-type-badge--buy' : 'th-type-badge--sell'">
+                {{ txTypeLabel(selectedTx) }}
+              </span>
+              <span class="th-detail-date">{{ formatFullDate(selectedTx.transactionDate) }}</span>
+            </div>
+
+            <div class="th-detail-amounts">
+              <div class="th-detail-amount-box">
+                <div class="th-detail-amount-label">Kaynak</div>
+                <div class="th-detail-amount-value">
+                  <i v-if="getFlagClass(selectedTx.sourceCurrencyCode)" :class="getFlagClass(selectedTx.sourceCurrencyCode)" class="th-flag"></i>
+                  {{ formatNumber(selectedTx.sourceAmount) }} {{ selectedTx.sourceCurrencyCode }}
+                </div>
+              </div>
+              <div class="th-detail-arrow">
+                <span class="material-symbols-outlined">arrow_forward</span>
+              </div>
+              <div class="th-detail-amount-box">
+                <div class="th-detail-amount-label">Hedef</div>
+                <div class="th-detail-amount-value">
+                  <i v-if="getFlagClass(selectedTx.targetCurrencyCode)" :class="getFlagClass(selectedTx.targetCurrencyCode)" class="th-flag"></i>
+                  {{ formatNumber(selectedTx.targetAmount) }} {{ selectedTx.targetCurrencyCode }}
+                </div>
+              </div>
+            </div>
+
+            <div class="th-detail-info-grid">
+              <div class="th-detail-info-item">
+                <span class="th-detail-info-label">Kur</span>
+                <span class="th-detail-info-value">{{ selectedTx.exchangeRate ? formatNumber(selectedTx.exchangeRate, 4) : '-' }}</span>
+              </div>
+              <div v-if="selectedTx.customRate" class="th-detail-info-item">
+                <span class="th-detail-info-label">Özel Kur</span>
+                <span class="th-detail-info-value th-detail-custom">{{ formatNumber(selectedTx.customRate, 4) }}</span>
+              </div>
+              <div class="th-detail-info-item">
+                <span class="th-detail-info-label">Personel</span>
+                <span class="th-detail-info-value">{{ selectedTx.username || '-' }}</span>
+              </div>
+              <div class="th-detail-info-item">
+                <span class="th-detail-info-label">Şube</span>
+                <span class="th-detail-info-value">{{ selectedTx.officeName || '-' }}</span>
+              </div>
+              <div v-if="selectedTx.profit" class="th-detail-info-item">
+                <span class="th-detail-info-label">Kar</span>
+                <span class="th-detail-info-value" :class="selectedTx.profit > 0 ? 'th-profit--pos' : 'th-profit--neg'">
+                  {{ selectedTx.profit > 0 ? '+' : '' }}{{ formatNumber(selectedTx.profit) }} ₺
+                </span>
+              </div>
+              <div v-if="selectedTx.notes" class="th-detail-info-item th-detail-info-full">
+                <span class="th-detail-info-label">Not</span>
+                <span class="th-detail-info-value">{{ selectedTx.notes }}</span>
+              </div>
+            </div>
+
+            <div v-if="selectedTx.isDeleted" class="th-detail-deleted-banner">
+              <span class="material-symbols-outlined" style="font-size:16px">delete</span>
+              Silinmiş — {{ selectedTx.deletedBy || '' }} {{ selectedTx.deletedReason ? `(${selectedTx.deletedReason})` : '' }}
+            </div>
+          </div>
+
+          <div v-if="showActions && !selectedTx.isDeleted && (authStore.isAdmin || authStore.isOwner)" class="th-detail-footer">
+            <template v-if="deleteConfirmId === selectedTx.id">
+              <span style="font-size:13px;color:#6b7280">Bu işlemi silmek istediğinize emin misiniz?</span>
+              <div style="display:flex;gap:8px">
+                <button @click="deleteTransaction(selectedTx.id)" :disabled="isDeleting" class="th-detail-del-confirm">
+                  <span class="material-symbols-outlined" style="font-size:16px">{{ isDeleting ? 'refresh' : 'check' }}</span>
+                  Evet, Sil
+                </button>
+                <button @click="deleteConfirmId = null" class="th-detail-del-cancel">İptal</button>
+              </div>
+            </template>
+            <button v-else @click="deleteConfirmId = selectedTx.id" class="th-detail-del-btn">
+              <span class="material-symbols-outlined" style="font-size:16px">delete</span>
+              İşlemi Sil
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -368,7 +542,6 @@ defineExpose({ loadTransactions, printAllTransactions })
   padding: 10px 12px;
   font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
   letter-spacing: 0.5px;
   color: #9ca3af;
   background: #fafafa;
@@ -378,14 +551,15 @@ defineExpose({ loadTransactions, printAllTransactions })
 .th-col-time { width: 110px; }
 .th-col-type { width: 60px; }
 .th-col-rate { width: 90px; }
+.th-col-user { width: 110px; }
 .th-col-profit { width: 90px; }
-.th-col-actions { width: 80px; }
 
 .th-row td {
   padding: 10px 12px;
   border-bottom: 1px solid #f3f4f6;
   vertical-align: middle;
 }
+.th-row { cursor: pointer; transition: background 0.15s; }
 .th-row:hover { background: #fafafe; }
 .th-row--deleting { background: #fef2f2; }
 .th-row:last-child td { border-bottom: none; }
@@ -406,6 +580,7 @@ defineExpose({ loadTransactions, printAllTransactions })
 }
 .th-type-badge--buy { background: #dcfce7; color: #15803d; }
 .th-type-badge--sell { background: #fee2e2; color: #b91c1c; }
+.th-type-badge--lg { font-size: 13px; padding: 5px 14px; }
 
 .th-currency-cell {
   display: flex;
@@ -442,6 +617,19 @@ defineExpose({ loadTransactions, printAllTransactions })
   color: #92400e;
 }
 
+.th-cell-user {
+  max-width: 120px;
+}
+.th-username {
+  font-size: 12px;
+  color: #374151;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
 .th-cell-profit { text-align: right; }
 .th-profit--pos {
   font-family: 'JetBrains Mono', ui-monospace, monospace;
@@ -454,48 +642,6 @@ defineExpose({ loadTransactions, printAllTransactions })
   color: #dc2626;
 }
 .th-profit--zero { color: #d1d5db; }
-
-.th-cell-actions {
-  text-align: center;
-  white-space: nowrap;
-}
-.th-del-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: #9ca3af;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.th-del-btn:hover { background: #fee2e2; color: #ef4444; }
-.th-del-confirm {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 3px 8px;
-  border: none;
-  border-radius: 5px;
-  background: #ef4444;
-  color: white;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.th-del-cancel {
-  padding: 3px 8px;
-  border: none;
-  border-radius: 5px;
-  background: #f3f4f6;
-  color: #6b7280;
-  font-size: 11px;
-  cursor: pointer;
-  margin-left: 4px;
-}
 
 .th-pagination {
   display: flex;
@@ -526,6 +672,216 @@ defineExpose({ loadTransactions, printAllTransactions })
   font-weight: 500;
 }
 
+/* Detail Modal */
+.th-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+}
+.th-detail-card {
+  background: white;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 520px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  overflow: hidden;
+}
+
+.th-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  border-bottom: 1px solid #f3f4f6;
+}
+.th-detail-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #111827;
+}
+.th-detail-ref {
+  font-size: 12px;
+  color: #9ca3af;
+  font-family: 'JetBrains Mono', monospace;
+}
+.th-detail-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.th-print-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  border: 1px solid #6366f1;
+  border-radius: 8px;
+  background: white;
+  color: #6366f1;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.th-print-btn:hover { background: #6366f1; color: white; }
+.th-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: #f3f4f6;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.th-close-btn:hover { background: #e5e7eb; color: #111827; }
+
+.th-detail-body {
+  padding: 20px 24px;
+}
+.th-detail-type-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.th-detail-date {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.th-detail-amounts {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.th-detail-amount-box {
+  flex: 1;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 14px;
+  text-align: center;
+}
+.th-detail-amount-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #9ca3af;
+  margin-bottom: 6px;
+}
+.th-detail-amount-value {
+  font-size: 17px;
+  font-weight: 700;
+  color: #111827;
+  font-family: 'JetBrains Mono', monospace;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.th-detail-arrow {
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.th-detail-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.th-detail-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.th-detail-info-full { grid-column: span 2; }
+.th-detail-info-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #9ca3af;
+}
+.th-detail-info-value {
+  font-size: 14px;
+  font-weight: 500;
+  color: #111827;
+}
+.th-detail-custom {
+  color: #92400e;
+}
+
+.th-detail-deleted-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.th-detail-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  border-top: 1px solid #f3f4f6;
+  background: #fafafa;
+}
+.th-detail-del-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: white;
+  color: #dc2626;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.th-detail-del-btn:hover { background: #fef2f2; }
+.th-detail-del-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  border: none;
+  border-radius: 8px;
+  background: #dc2626;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.th-detail-del-cancel {
+  padding: 6px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: white;
+  color: #6b7280;
+  font-size: 12px;
+  cursor: pointer;
+}
+
 .material-symbols-outlined {
   font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
@@ -539,7 +895,12 @@ defineExpose({ loadTransactions, printAllTransactions })
   .th-table { font-size: 12px; }
   .th-table thead th { padding: 8px; }
   .th-row td { padding: 8px; }
-  .th-col-profit, .th-col-actions { display: none; }
-  .th-cell-profit, .th-cell-actions { display: none; }
+  .th-col-user { display: none; }
+  .th-cell-user { display: none; }
+  .th-col-profit { display: none; }
+  .th-cell-profit { display: none; }
+  .th-detail-card { max-width: 100%; }
+  .th-detail-amounts { flex-direction: column; }
+  .th-detail-arrow { transform: rotate(90deg); }
 }
 </style>

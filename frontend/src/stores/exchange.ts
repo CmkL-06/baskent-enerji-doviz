@@ -45,7 +45,6 @@ export const useExchangeStore = defineStore('exchange', () => {
     try {
       const data = await apiService.getOffices()
       offices.value = Array.isArray(data) ? data : (data?.items ?? data?.data ?? [])
-      // Pick first office as selected if none selected yet
       if (!selectedOffice.value && offices.value.length > 0) {
         selectedOffice.value = offices.value[0]
       }

@@ -1,8 +1,508 @@
-﻿<template>
-  <div class="placeholder-stub">
-    <span>Kasa Sayım Modalı - Yapım aşamasında</span>
-  </div>
+<script setup lang="ts">
+import { ref, computed, nextTick, watch } from 'vue'
+import apiService from '@/services/apiservice'
+
+const props = defineProps<{
+  vaultId: string
+  vaultName: string
+  vaultBalances: any[]
+  isManual: boolean
+}>()
+
+const emit = defineEmits<{
+  complete: []
+  'waiting-customer': []
+}>()
+
+const visible = ref(false)
+const submitting = ref(false)
+const error = ref('')
+const success = ref(false)
+const countInputs = ref<Record<string, string>>({})
+const lastCount = ref<any>(null)
+const loadingLastCount = ref(false)
+const addedCurrencies = ref<Set<string>>(new Set())
+const showAddMenu = ref(false)
+
+const activeCurrencies = computed(() => {
+  if (!props.vaultBalances?.length) return []
+  return props.vaultBalances
+    .filter((b: any) => b.balance !== 0 || addedCurrencies.value.has(b.currencyId))
+    .map((b: any) => ({
+      currencyId: b.currencyId,
+      currencyCode: b.currencyCode || '',
+      currencyName: b.currencyName || '',
+      systemBalance: b.balance ?? 0,
+    }))
+    .filter((r: any) => r.currencyCode)
+    .sort((a: any, b: any) => {
+      if (a.currencyCode === 'TRY') return -1
+      if (b.currencyCode === 'TRY') return 1
+      return a.currencyCode.localeCompare(b.currencyCode)
+    })
+})
+
+const inactiveCurrencies = computed(() => {
+  if (!props.vaultBalances?.length) return []
+  return props.vaultBalances
+    .filter((b: any) => b.balance === 0 && !addedCurrencies.value.has(b.currencyId))
+    .map((b: any) => ({
+      currencyId: b.currencyId,
+      currencyCode: b.currencyCode || '',
+      currencyName: b.currencyName || '',
+    }))
+    .filter((r: any) => r.currencyCode)
+    .sort((a: any, b: any) => a.currencyCode.localeCompare(b.currencyCode))
+})
+
+function getLastCountAmount(currencyId: string): number | null {
+  if (!lastCount.value?.countDetails) return null
+  const detail = lastCount.value.countDetails.find((d: any) => d.currencyId === currencyId)
+  return detail ? detail.actualAmount : null
+}
+
+async function open(_force = false) {
+  error.value = ''
+  success.value = false
+  submitting.value = false
+  countInputs.value = {}
+  addedCurrencies.value = new Set()
+  showAddMenu.value = false
+  visible.value = true
+
+  loadingLastCount.value = true
+  try {
+    const counts = await apiService.getVaultCounts(props.vaultId)
+    const items = Array.isArray(counts) ? counts : (counts?.items ?? counts?.data ?? [])
+    lastCount.value = items.length > 0 ? items[0] : null
+  } catch {
+    lastCount.value = null
+  } finally {
+    loadingLastCount.value = false
+  }
+
+  nextTick(() => {
+    const firstInput = document.querySelector('.vcm-input') as HTMLInputElement
+    firstInput?.focus()
+  })
+}
+
+function close() {
+  visible.value = false
+  showAddMenu.value = false
+}
+
+function addCurrency(currencyId: string) {
+  addedCurrencies.value = new Set([...addedCurrencies.value, currencyId])
+  showAddMenu.value = false
+  nextTick(() => {
+    const inputs = document.querySelectorAll('.vcm-input') as NodeListOf<HTMLInputElement>
+    inputs[inputs.length - 1]?.focus()
+  })
+}
+
+function removeCurrency(currencyId: string) {
+  const s = new Set(addedCurrencies.value)
+  s.delete(currencyId)
+  addedCurrencies.value = s
+  delete countInputs.value[currencyId]
+}
+
+function getInputValue(currencyId: string): number {
+  const raw = countInputs.value[currencyId] || ''
+  const val = parseFloat(raw.replace(',', '.'))
+  return isNaN(val) ? 0 : val
+}
+
+const allFilled = computed(() => {
+  return activeCurrencies.value.every((row: any) => {
+    const raw = countInputs.value[row.currencyId]
+    return raw !== undefined && raw !== '' && !isNaN(parseFloat(String(raw).replace(',', '.')))
+  })
+})
+
+function getDiff(row: any): number {
+  const actual = getInputValue(row.currencyId)
+  return actual - row.systemBalance
+}
+
+function getLastDiff(row: any): number | null {
+  const lastAmt = getLastCountAmount(row.currencyId)
+  if (lastAmt === null) return null
+  return row.systemBalance - lastAmt
+}
+
+async function submit() {
+  if (!allFilled.value) {
+    error.value = 'Tüm döviz miktarlarını giriniz'
+    return
+  }
+  submitting.value = true
+  error.value = ''
+  try {
+    await apiService.submitVaultCount({
+      vaultId: props.vaultId,
+      isManual: props.isManual,
+      countDetails: activeCurrencies.value.map((row: any) => ({
+        currencyId: row.currencyId,
+        actualAmount: getInputValue(row.currencyId),
+      })),
+    })
+    success.value = true
+    setTimeout(() => {
+      visible.value = false
+      emit('complete')
+    }, 1500)
+  } catch (e: any) {
+    error.value = e?.response?.data?.error || e?.message || 'Kasa sayımı gönderilemedi'
+  } finally {
+    submitting.value = false
+  }
+}
+
+function fmt(n: number): string {
+  return n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function fmtDiff(n: number): string {
+  return (n > 0 ? '+' : '') + fmt(n)
+}
+
+function formatDate(d: string): string {
+  if (!d) return ''
+  const dt = new Date(d)
+  return dt.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+defineExpose({ open, close })
+</script>
+
+<template>
+  <Teleport to="body">
+    <Transition name="vcm-fade">
+      <div v-if="visible" class="vcm-backdrop" @click.self="close">
+        <div class="vcm-modal" @click.stop>
+          <!-- Header -->
+          <div class="vcm-header">
+            <div class="vcm-header-left">
+              <div class="vcm-header-icon">
+                <span class="material-symbols-outlined">inventory</span>
+              </div>
+              <div>
+                <h2 class="vcm-title">Kasa Sayımı</h2>
+                <p class="vcm-subtitle">{{ vaultName }}</p>
+              </div>
+            </div>
+            <button class="vcm-close" @click="close">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
+
+          <!-- Success State -->
+          <div v-if="success" class="vcm-success">
+            <span class="material-symbols-outlined vcm-success-icon">check_circle</span>
+            <p class="vcm-success-text">Kasa sayımı başarıyla kaydedildi!</p>
+          </div>
+
+          <template v-else>
+            <!-- Last Count Info -->
+            <div v-if="lastCount" class="vcm-last-count">
+              <span class="material-symbols-outlined">history</span>
+              <span>Son sayım: <strong>{{ formatDate(lastCount.countDate) }}</strong></span>
+              <span v-if="lastCount.hasDiscrepancy" class="vcm-badge vcm-badge--red">Farklı</span>
+              <span v-else class="vcm-badge vcm-badge--green">Eşleşti</span>
+            </div>
+
+            <!-- Body -->
+            <div class="vcm-body">
+              <!-- Currency Rows -->
+              <div v-for="row in activeCurrencies" :key="row.currencyId" class="vcm-row">
+                <div class="vcm-row-header">
+                  <div class="vcm-currency">
+                    <span class="vcm-currency-code">{{ row.currencyCode }}</span>
+                    <span class="vcm-currency-name">{{ row.currencyName }}</span>
+                  </div>
+                  <button
+                    v-if="row.systemBalance === 0"
+                    class="vcm-remove-btn"
+                    @click="removeCurrency(row.currencyId)"
+                    title="Kaldır"
+                  >
+                    <span class="material-symbols-outlined">close</span>
+                  </button>
+                </div>
+
+                <div class="vcm-row-body">
+                  <div class="vcm-col">
+                    <label class="vcm-label">Sistem</label>
+                    <div class="vcm-system-val">{{ fmt(row.systemBalance) }}</div>
+                  </div>
+
+                  <div class="vcm-col vcm-col--input">
+                    <label class="vcm-label">Sayılan</label>
+                    <input
+                      v-model="countInputs[row.currencyId]"
+                      type="text"
+                      inputmode="decimal"
+                      class="vcm-input"
+                      :placeholder="fmt(row.systemBalance)"
+                      @keydown.enter="submit"
+                    />
+                  </div>
+
+                  <div class="vcm-col vcm-col--diff">
+                    <label class="vcm-label">Fark</label>
+                    <div v-if="countInputs[row.currencyId] !== '' && countInputs[row.currencyId] !== undefined" class="vcm-diff-val" :class="{
+                      'vcm-pos': getDiff(row) > 0.01,
+                      'vcm-neg': getDiff(row) < -0.01,
+                      'vcm-ok': Math.abs(getDiff(row)) <= 0.01
+                    }">{{ fmtDiff(getDiff(row)) }}</div>
+                    <div v-else class="vcm-diff-val vcm-empty">—</div>
+                  </div>
+
+                  <div v-if="lastCount" class="vcm-col vcm-col--last">
+                    <label class="vcm-label">Son Sayımdan Bu Yana</label>
+                    <div v-if="getLastDiff(row) !== null" class="vcm-diff-val" :class="{
+                      'vcm-pos': getLastDiff(row)! > 0.01,
+                      'vcm-neg': getLastDiff(row)! < -0.01,
+                      'vcm-ok': Math.abs(getLastDiff(row)!) <= 0.01
+                    }">{{ fmtDiff(getLastDiff(row)!) }}</div>
+                    <div v-else class="vcm-diff-val vcm-empty">—</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Add Currency Button -->
+              <div v-if="inactiveCurrencies.length > 0" class="vcm-add-section">
+                <button class="vcm-add-btn" @click="showAddMenu = !showAddMenu">
+                  <span class="material-symbols-outlined">add_circle</span>
+                  Para Birimi Ekle
+                </button>
+                <div v-if="showAddMenu" class="vcm-add-menu">
+                  <button
+                    v-for="curr in inactiveCurrencies"
+                    :key="curr.currencyId"
+                    class="vcm-add-item"
+                    @click="addCurrency(curr.currencyId)"
+                  >
+                    <span class="vcm-add-item-code">{{ curr.currencyCode }}</span>
+                    <span class="vcm-add-item-name">{{ curr.currencyName }}</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Error -->
+              <div v-if="error" class="vcm-error">
+                <span class="material-symbols-outlined">error</span>
+                <span>{{ error }}</span>
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="vcm-footer">
+              <button class="vcm-btn vcm-btn--ghost" @click="$emit('waiting-customer')">
+                <span class="material-symbols-outlined">person</span>
+                Müşteri Bekliyor
+              </button>
+              <div class="vcm-footer-right">
+                <button class="vcm-btn vcm-btn--secondary" @click="close">İptal</button>
+                <button class="vcm-btn vcm-btn--primary" :disabled="!allFilled || submitting" @click="submit">
+                  <svg v-if="submitting" class="vcm-spin" viewBox="0 0 24 24" width="18" height="18">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" opacity=".3"/>
+                    <path d="M12 2a10 10 0 019.95 9" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round"/>
+                  </svg>
+                  <span v-else class="material-symbols-outlined">check</span>
+                  Sayımı Kaydet
+                </button>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
+
 <style scoped>
-.placeholder-stub { padding: 20px; color: #9ca3af; font-size: 14px; text-align: center; }
+.vcm-backdrop {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(0,0,0,.5); backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.vcm-modal {
+  background: #fff; border-radius: 20px; width: 100%; max-width: 580px;
+  max-height: 90vh; display: flex; flex-direction: column;
+  box-shadow: 0 25px 80px rgba(0,0,0,.25);
+  overflow: hidden;
+}
+
+/* Header */
+.vcm-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 24px; border-bottom: 1px solid #f1f5f9;
+  flex-shrink: 0;
+}
+.vcm-header-left { display: flex; align-items: center; gap: 12px; }
+.vcm-header-icon {
+  width: 44px; height: 44px; border-radius: 12px;
+  background: linear-gradient(135deg, #fee2e2, #fecaca); color: #dc2626;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px;
+}
+.vcm-title { font-size: 17px; font-weight: 700; color: #0f172a; margin: 0; }
+.vcm-subtitle { font-size: 12px; color: #94a3b8; margin: 2px 0 0; }
+.vcm-close {
+  background: none; border: none; cursor: pointer;
+  color: #94a3b8; padding: 6px; border-radius: 8px; transition: all .15s;
+}
+.vcm-close:hover { background: #f1f5f9; color: #334155; }
+
+/* Last Count Banner */
+.vcm-last-count {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 24px; background: #f8fafc; border-bottom: 1px solid #f1f5f9;
+  font-size: 12px; color: #64748b; flex-shrink: 0;
+}
+.vcm-last-count .material-symbols-outlined { font-size: 16px; }
+.vcm-badge {
+  font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 99px;
+  text-transform: uppercase; letter-spacing: .3px;
+}
+.vcm-badge--green { background: #dcfce7; color: #15803d; }
+.vcm-badge--red { background: #fee2e2; color: #dc2626; }
+
+/* Body */
+.vcm-body {
+  flex: 1; overflow-y: auto; padding: 16px 24px;
+  min-height: 0;
+}
+
+/* Currency Row */
+.vcm-row {
+  padding: 14px 0; border-bottom: 1px solid #f1f5f9;
+}
+.vcm-row:last-of-type { border-bottom: none; }
+
+.vcm-row-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.vcm-currency { display: flex; align-items: baseline; gap: 8px; }
+.vcm-currency-code { font-size: 15px; font-weight: 800; color: #0f172a; }
+.vcm-currency-name { font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: .3px; }
+
+.vcm-remove-btn {
+  background: none; border: none; cursor: pointer;
+  color: #cbd5e1; padding: 2px; border-radius: 6px; transition: all .15s;
+}
+.vcm-remove-btn .material-symbols-outlined { font-size: 16px; }
+.vcm-remove-btn:hover { color: #ef4444; background: #fef2f2; }
+
+.vcm-row-body {
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;
+  align-items: end;
+}
+.vcm-row-body:has(.vcm-col--last) {
+  grid-template-columns: 1fr 1.2fr .8fr .8fr;
+}
+
+.vcm-label {
+  display: block; font-size: 10px; font-weight: 600; color: #94a3b8;
+  text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px;
+}
+
+.vcm-system-val {
+  font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+  font-size: 14px; font-weight: 600; color: #334155;
+  padding: 8px 0;
+}
+
+.vcm-input {
+  width: 100%; padding: 8px 10px;
+  border: 1.5px solid #e2e8f0; border-radius: 10px;
+  font-size: 14px; font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+  text-align: right; outline: none; transition: all .15s;
+  background: #f8fafc; font-weight: 600;
+}
+.vcm-input:focus { border-color: #6366f1; background: #fff; box-shadow: 0 0 0 3px rgba(99,102,241,.1); }
+
+.vcm-diff-val {
+  font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+  font-size: 13px; font-weight: 700; padding: 8px 0; text-align: right;
+}
+.vcm-pos { color: #10b981; }
+.vcm-neg { color: #ef4444; }
+.vcm-ok { color: #10b981; }
+.vcm-empty { color: #e2e8f0; }
+
+/* Add Currency */
+.vcm-add-section { padding-top: 12px; position: relative; }
+.vcm-add-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: none; border: 1.5px dashed #cbd5e1; border-radius: 10px;
+  padding: 8px 16px; color: #64748b; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all .15s; width: 100%; justify-content: center;
+}
+.vcm-add-btn:hover { border-color: #6366f1; color: #6366f1; background: #eef2ff; }
+.vcm-add-btn .material-symbols-outlined { font-size: 18px; }
+
+.vcm-add-menu {
+  position: absolute; left: 0; right: 0; top: 100%; margin-top: 4px;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0,0,0,.12); z-index: 10;
+  max-height: 200px; overflow-y: auto; padding: 4px;
+}
+.vcm-add-item {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 8px 12px; border: none; background: none;
+  cursor: pointer; border-radius: 8px; transition: background .1s;
+  text-align: left;
+}
+.vcm-add-item:hover { background: #f1f5f9; }
+.vcm-add-item-code { font-weight: 700; font-size: 13px; color: #0f172a; min-width: 48px; }
+.vcm-add-item-name { font-size: 12px; color: #94a3b8; }
+
+/* Error */
+.vcm-error {
+  display: flex; align-items: center; gap: 8px; margin-top: 12px;
+  padding: 10px 14px; background: #fef2f2; border: 1px solid #fca5a5;
+  border-radius: 10px; font-size: 13px; color: #dc2626;
+}
+
+/* Footer */
+.vcm-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 24px; border-top: 1px solid #f1f5f9; background: #fafbfc;
+  flex-shrink: 0;
+}
+.vcm-footer-right { display: flex; gap: 8px; }
+
+.vcm-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 16px; border-radius: 10px; font-size: 13px; font-weight: 600;
+  border: none; cursor: pointer; transition: all .15s;
+}
+.vcm-btn:disabled { opacity: .45; cursor: not-allowed; }
+.vcm-btn--primary { background: #6366f1; color: #fff; }
+.vcm-btn--primary:hover:not(:disabled) { background: #4f46e5; }
+.vcm-btn--secondary { background: #f1f5f9; color: #475569; }
+.vcm-btn--secondary:hover { background: #e2e8f0; }
+.vcm-btn--ghost { background: none; color: #64748b; font-size: 12px; }
+.vcm-btn--ghost:hover { background: #f1f5f9; color: #334155; }
+.vcm-btn .material-symbols-outlined { font-size: 18px; }
+
+/* Success */
+.vcm-success {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  padding: 56px 24px; text-align: center;
+}
+.vcm-success-icon { font-size: 56px; color: #10b981; }
+.vcm-success-text { font-size: 16px; font-weight: 700; color: #10b981; margin: 0; }
+
+/* Animations */
+@keyframes vcm-spin { to { transform: rotate(360deg); } }
+.vcm-spin { animation: vcm-spin .7s linear infinite; }
+.vcm-fade-enter-active, .vcm-fade-leave-active { transition: opacity .2s ease; }
+.vcm-fade-enter-from, .vcm-fade-leave-to { opacity: 0; }
 </style>

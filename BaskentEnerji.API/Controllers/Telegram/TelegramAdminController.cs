@@ -43,20 +43,28 @@ namespace BaskentEnerji.API.Controllers.Telegram
             var totalUsdt = await completedTx.Where(t => t.Currency == "USDT").SumAsync(t => (decimal?)t.Amount ?? 0);
             var totalRub = await completedTx.Where(t => t.Currency == "RUBLE" || t.Currency == "RUB").SumAsync(t => (decimal?)t.Amount ?? 0);
 
+            var totalDealerBalance = await _db.TgDealers.Where(d => d.IsActive).SumAsync(d => (decimal?)d.Balance ?? 0);
+            var totalCustomers = await _db.TgCustomers.CountAsync();
+            var pendingTx = await _db.TgTransactions.CountAsync(t => t.Status == "pending" || t.Status == "processing");
+            var completedTxCount = await completedTx.CountAsync();
+
             var recentTx = await _db.TgTransactions
                 .Include(t => t.Customer)
                 .OrderByDescending(t => t.CreatedAt)
-                .Take(10)
+                .Take(15)
                 .Select(t => new
                 {
                     t.TransactionId,
                     t.Currency,
                     t.Amount,
+                    TlAmount = t.TryAmount,
                     t.ExchangeRate,
                     t.Status,
+                    t.IsBuy,
                     t.CreatedAt,
+                    t.CompletedAt,
                     CustomerName = t.Customer != null ? t.Customer.FirstName : null,
-                    DealerName = t.ReferralCode
+                    t.ReferralCode
                 })
                 .ToListAsync();
 
@@ -66,7 +74,10 @@ namespace BaskentEnerji.API.Controllers.Telegram
                 total_tl = totalTl,
                 total_usdt = totalUsdt,
                 total_rub = totalRub,
-                total_dealer_balance = 0,
+                total_dealer_balance = totalDealerBalance,
+                total_customers = totalCustomers,
+                pending_tx = pendingTx,
+                completed_tx = completedTxCount,
                 recent_transactions = recentTx
             });
         }
@@ -107,18 +118,44 @@ namespace BaskentEnerji.API.Controllers.Telegram
         {
             await RequireAdmin();
 
-            var dealers = await _db.Users
+            var dealerUsers = await _db.Users
                 .Where(u => u.DealerReferralCode != null)
                 .Select(u => new
                 {
                     id = u.Id,
                     username = u.Username,
-                    name = u.Firstname + " " + u.Lastname,
+                    name = (u.Firstname + " " + u.Lastname).Trim(),
                     dealer_code = u.DealerReferralCode,
                     is_active = u.Rank != Entity.Rank.Banned,
                     created_at = u.CreatedDate
                 })
                 .ToListAsync();
+
+            var tgDealers = await _db.TgDealers.ToListAsync();
+            var txCounts = await _db.TgTransactions
+                .Where(t => t.ReferralCode != null)
+                .GroupBy(t => t.ReferralCode)
+                .Select(g => new { Code = g.Key, Total = g.Count(), Completed = g.Count(t => t.Status == "completed") })
+                .ToListAsync();
+
+            var dealers = dealerUsers.Select(u =>
+            {
+                var tgd = tgDealers.FirstOrDefault(d => d.DealerCode == u.dealer_code);
+                var txc = txCounts.FirstOrDefault(t => t.Code == u.dealer_code);
+                return new
+                {
+                    u.id,
+                    u.username,
+                    u.name,
+                    u.dealer_code,
+                    dealer_name = tgd?.DealerName ?? u.name,
+                    u.is_active,
+                    balance = tgd?.Balance ?? 0,
+                    total_tx = txc?.Total ?? 0,
+                    completed_tx = txc?.Completed ?? 0,
+                    u.created_at
+                };
+            }).ToList();
 
             return Ok(new { dealers });
         }

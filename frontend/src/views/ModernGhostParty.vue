@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useExchangeStore } from '@/stores/exchange'
 import apiService from '@/services/apiservice'
+import AppKpiCard from '@/components/common/AppKpiCard.vue'
 
 const authStore = useAuthStore()
 const exchangeStore = useExchangeStore()
@@ -256,18 +257,9 @@ onMounted(() => {
 
     <!-- Summary -->
     <div v-if="activeTab === 'accounts' && ghostSummary" class="kpi-grid">
-      <div class="kpi-card">
-        <div class="kpi-label">Hesap Sayısı</div>
-        <div class="kpi-value">{{ ghostAccounts.length }}</div>
-      </div>
-      <div class="kpi-card kpi-green">
-        <div class="kpi-label">Toplam Alacak</div>
-        <div class="kpi-value">{{ formatCurrency(ghostSummary.totalReceivables ?? ghostSummary.totalCredits ?? 0) }}</div>
-      </div>
-      <div class="kpi-card kpi-red">
-        <div class="kpi-label">Toplam Borç</div>
-        <div class="kpi-value">{{ formatCurrency(ghostSummary.totalPayables ?? ghostSummary.totalDebits ?? 0) }}</div>
-      </div>
+      <AppKpiCard icon="account_circle" label="Hesap Sayısı" :value="ghostAccounts.length" color="#6366f1" bg="#eef2ff" />
+      <AppKpiCard icon="arrow_downward" label="Toplam Alacak" :value="formatCurrency(ghostSummary.totalReceivables ?? ghostSummary.totalCredits ?? 0)" color="#059669" bg="#ecfdf5" />
+      <AppKpiCard icon="arrow_upward" label="Toplam Borç" :value="formatCurrency(ghostSummary.totalPayables ?? ghostSummary.totalDebits ?? 0)" color="#ef4444" bg="#fef2f2" />
     </div>
 
     <!-- Search (parties tab) -->
@@ -552,11 +544,6 @@ onMounted(() => {
 .btn-cancel:hover { background: #f3f4f6; }
 
 .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 20px; }
-.kpi-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px 20px; }
-.kpi-label { font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
-.kpi-value { font-size: 20px; font-weight: 700; color: #1a1a2e; }
-.kpi-green .kpi-value { color: #059669; }
-.kpi-red .kpi-value { color: #dc2626; }
 
 .search-bar {
   display: flex; align-items: center; gap: 8px;

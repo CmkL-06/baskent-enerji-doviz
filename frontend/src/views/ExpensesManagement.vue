@@ -3,6 +3,9 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useExchangeStore } from '@/stores/exchange'
 import apiService from '@/services/apiservice'
+import AppKpiCard from '@/components/common/AppKpiCard.vue'
+import AppPageHeader from '@/components/common/AppPageHeader.vue'
+import AppEmptyState from '@/components/common/AppEmptyState.vue'
 
 const authStore = useAuthStore()
 const exchangeStore = useExchangeStore()
@@ -212,39 +215,21 @@ const activeTab = ref<'payments' | 'definitions'>('payments')
 <template>
   <div class="exp-wrap">
     <!-- Header -->
-    <div class="exp-header">
-      <div>
-        <h1 class="exp-title">Gider Yönetimi</h1>
-        <p class="exp-sub">Gider tanımları ve ödemelerinizi yönetin</p>
-      </div>
-      <div class="exp-actions">
-        <button class="exp-btn secondary" @click="openCreateDef">
-          <span class="material-symbols-outlined">category</span>Yeni Tanım
-        </button>
-        <button class="exp-btn primary" @click="openCreatePay()">
-          <span class="material-symbols-outlined">add_circle</span>Yeni Ödeme
-        </button>
-      </div>
-    </div>
+    <AppPageHeader icon="payments" title="Gider Yönetimi" subtitle="Gider tanımları ve ödemelerinizi yönetin">
+      <button class="exp-btn secondary" @click="openCreateDef">
+        <span class="material-symbols-outlined">category</span>Yeni Tanım
+      </button>
+      <button class="exp-btn primary" @click="openCreatePay()">
+        <span class="material-symbols-outlined">add_circle</span>Yeni Ödeme
+      </button>
+    </AppPageHeader>
 
     <!-- KPIs -->
     <div class="kpi-grid">
-      <div class="kpi-card" style="--kc:#6366f1;--kb:#eef2ff">
-        <span class="material-symbols-outlined kpi-icon">payments</span>
-        <div><div class="kpi-label">Toplam Gider</div><div class="kpi-val">₺{{ fmt(totalExpense) }}</div></div>
-      </div>
-      <div class="kpi-card" style="--kc:#8b5cf6;--kb:#f5f3ff">
-        <span class="material-symbols-outlined kpi-icon">receipt_long</span>
-        <div><div class="kpi-label">Ödeme Sayısı</div><div class="kpi-val">{{ filteredPayments.length }}</div></div>
-      </div>
-      <div class="kpi-card" style="--kc:#059669;--kb:#ecfdf5">
-        <span class="material-symbols-outlined kpi-icon">category</span>
-        <div><div class="kpi-label">Tanım Sayısı</div><div class="kpi-val">{{ definitions.length }}</div></div>
-      </div>
-      <div class="kpi-card" style="--kc:#d97706;--kb:#fffbeb">
-        <span class="material-symbols-outlined kpi-icon">trending_up</span>
-        <div><div class="kpi-label">En Yüksek Kategori</div><div class="kpi-val">{{ categoryBreakdown[0]?.[0] || '-' }}</div></div>
-      </div>
+      <AppKpiCard icon="payments" label="Toplam Gider" :value="'₺' + fmt(totalExpense)" color="#6366f1" bg="#eef2ff" />
+      <AppKpiCard icon="receipt_long" label="Ödeme Sayısı" :value="filteredPayments.length" color="#8b5cf6" bg="#f5f3ff" />
+      <AppKpiCard icon="category" label="Tanım Sayısı" :value="definitions.length" color="#059669" bg="#ecfdf5" />
+      <AppKpiCard icon="trending_up" label="En Yüksek Kategori" :value="categoryBreakdown[0]?.[0] || '-'" color="#d97706" bg="#fffbeb" />
     </div>
 
     <!-- Filters -->
@@ -318,11 +303,9 @@ const activeTab = ref<'payments' | 'definitions'>('payments')
           </tr>
         </tbody>
       </table>
-      <div v-else class="empty-state">
-        <span class="material-symbols-outlined">receipt_long</span>
-        <p>Henüz gider ödemesi bulunmuyor.</p>
+      <AppEmptyState v-else icon="receipt_long" message="Henüz gider ödemesi bulunmuyor.">
         <button class="exp-btn primary" @click="openCreatePay()">İlk Ödemeyi Ekle</button>
-      </div>
+      </AppEmptyState>
 
       <!-- Category breakdown -->
       <div v-if="categoryBreakdown.length" class="breakdown">
@@ -383,11 +366,9 @@ const activeTab = ref<'payments' | 'definitions'>('payments')
           </tr>
         </tbody>
       </table>
-      <div v-else class="empty-state">
-        <span class="material-symbols-outlined">category</span>
-        <p>Henüz gider tanımı bulunmuyor.</p>
+      <AppEmptyState v-else icon="category" message="Henüz gider tanımı bulunmuyor.">
         <button class="exp-btn primary" @click="openCreateDef">İlk Tanımı Ekle</button>
-      </div>
+      </AppEmptyState>
     </div>
 
     <!-- Definition Modal -->
@@ -504,10 +485,6 @@ const activeTab = ref<'payments' | 'definitions'>('payments')
 <style scoped>
 .exp-wrap { max-width: 1200px; margin: 0 auto; }
 
-/* Header */
-.exp-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-.exp-title { font-size: 22px; font-weight: 700; color: #111; margin: 0; }
-.exp-sub { font-size: 13px; color: #6b7280; margin: 4px 0 0; }
 .exp-actions { display: flex; gap: 8px; }
 
 /* Buttons */
@@ -525,13 +502,6 @@ const activeTab = ref<'payments' | 'definitions'>('payments')
 
 /* KPI */
 .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
-.kpi-card {
-  display: flex; align-items: center; gap: 12px;
-  background: var(--kb, #f9fafb); padding: 16px; border-radius: 10px;
-}
-.kpi-icon { font-size: 28px; color: var(--kc, #6366f1); }
-.kpi-label { font-size: 11px; color: #6b7280; font-weight: 500; }
-.kpi-val { font-size: 18px; font-weight: 700; color: #111; margin-top: 2px; }
 
 /* Filters */
 .filter-bar { display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
@@ -601,13 +571,6 @@ const activeTab = ref<'payments' | 'definitions'>('payments')
 .icon-btn.danger:hover { background: #fef2f2; color: #dc2626; }
 .icon-btn .material-symbols-outlined { font-size: 18px; }
 
-/* Empty state */
-.empty-state {
-  text-align: center; padding: 48px 16px; color: #9ca3af;
-}
-.empty-state .material-symbols-outlined { font-size: 48px; margin-bottom: 8px; }
-.empty-state p { margin: 0 0 16px; font-size: 14px; }
-
 /* Breakdown */
 .breakdown { margin-top: 20px; padding: 16px; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; }
 .breakdown h3 { font-size: 13px; font-weight: 700; color: #111; margin: 0 0 12px; }
@@ -663,7 +626,6 @@ textarea.form-input { resize: vertical; }
 /* Responsive */
 @media (max-width: 768px) {
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
-  .exp-header { flex-direction: column; gap: 12px; align-items: flex-start; }
   .filter-bar { flex-direction: column; }
   .form-row { flex-direction: column; }
 }

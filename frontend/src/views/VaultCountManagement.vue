@@ -3,6 +3,9 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useExchangeStore } from '@/stores/exchange'
 import apiService from '@/services/apiservice'
+import AppKpiCard from '@/components/common/AppKpiCard.vue'
+import AppPageHeader from '@/components/common/AppPageHeader.vue'
+import AppEmptyState from '@/components/common/AppEmptyState.vue'
 
 const authStore = useAuthStore()
 const exchangeStore = useExchangeStore()
@@ -313,50 +316,23 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
 <template>
   <div class="vc-wrap">
     <!-- Header -->
-    <div class="vc-header">
-      <h1>Kasa Kontrol</h1>
-      <div class="header-actions">
-        <button class="btn-secondary" @click="loadVaults">
-          <span class="material-symbols-outlined">refresh</span>
-          Yenile
-        </button>
-        <button v-if="authStore.isAdmin" class="btn-secondary" @click="openSnapshotModal">
-          <span class="material-symbols-outlined">add_a_photo</span>
-          Snapshot Al
-        </button>
-      </div>
-    </div>
+    <AppPageHeader icon="fact_check" title="Kasa Kontrol">
+      <button class="btn-secondary" @click="loadVaults">
+        <span class="material-symbols-outlined">refresh</span>
+        Yenile
+      </button>
+      <button v-if="authStore.isAdmin" class="btn-secondary" @click="openSnapshotModal">
+        <span class="material-symbols-outlined">add_a_photo</span>
+        Snapshot Al
+      </button>
+    </AppPageHeader>
 
     <!-- KPI Cards -->
     <div class="kpi-grid">
-      <div class="kpi-card kpi-blue">
-        <div class="kpi-icon"><span class="material-symbols-outlined">account_balance_wallet</span></div>
-        <div>
-          <div class="kpi-label">Toplam Kasa</div>
-          <div class="kpi-value">{{ vaults.length }}</div>
-        </div>
-      </div>
-      <div class="kpi-card kpi-orange">
-        <div class="kpi-icon"><span class="material-symbols-outlined">priority_high</span></div>
-        <div>
-          <div class="kpi-label">Sayım Bekleyen</div>
-          <div class="kpi-value">{{ pendingCount }}</div>
-        </div>
-      </div>
-      <div class="kpi-card kpi-green">
-        <div class="kpi-icon"><span class="material-symbols-outlined">task_alt</span></div>
-        <div>
-          <div class="kpi-label">Bugün Sayılan</div>
-          <div class="kpi-value">{{ countedToday }}</div>
-        </div>
-      </div>
-      <div class="kpi-card kpi-purple">
-        <div class="kpi-icon"><span class="material-symbols-outlined">photo_camera</span></div>
-        <div>
-          <div class="kpi-label">Snapshot</div>
-          <div class="kpi-value">{{ snapshots.length }}</div>
-        </div>
-      </div>
+      <AppKpiCard icon="account_balance_wallet" label="Toplam Kasa" :value="vaults.length" color="#3b82f6" bg="#eff6ff" />
+      <AppKpiCard icon="priority_high" label="Sayım Bekleyen" :value="pendingCount" color="#d97706" bg="#fffbeb" />
+      <AppKpiCard icon="task_alt" label="Bugün Sayılan" :value="countedToday" color="#059669" bg="#ecfdf5" />
+      <AppKpiCard icon="photo_camera" label="Snapshot" :value="snapshots.length" color="#8b5cf6" bg="#f5f3ff" />
     </div>
 
     <!-- Tabs -->
@@ -452,11 +428,7 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
           </div>
         </div>
 
-        <div v-if="displayedVaults.length === 0" class="empty-state">
-          <span class="material-symbols-outlined">inventory_2</span>
-          <p v-if="vaultFilter === 'pending'">Sayım bekleyen kasa yok</p>
-          <p v-else>Kasa bulunamadı</p>
-        </div>
+        <AppEmptyState v-if="displayedVaults.length === 0" icon="inventory_2" :message="vaultFilter === 'pending' ? 'Sayım bekleyen kasa yok' : 'Kasa bulunamadı'" />
       </div>
     </template>
 
@@ -474,10 +446,7 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
       </div>
 
       <div class="timeline-list">
-        <div v-if="timeline.length === 0" class="empty-state">
-          <span class="material-symbols-outlined">schedule</span>
-          <p>Kayıt bulunamadı</p>
-        </div>
+        <AppEmptyState v-if="timeline.length === 0" icon="schedule" message="Kayıt bulunamadı" />
 
         <div v-for="item in timeline" :key="item.id + item._type" class="tl-item" :class="'tl-' + item._type">
           <div class="tl-marker">
@@ -827,8 +796,6 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
 .vc-wrap { padding: 28px 32px; max-width: 1400px; margin: 0 auto; }
 
 /* Header */
-.vc-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-.vc-header h1 { font-size: 24px; font-weight: 800; color: #0f172a; margin: 0; letter-spacing: -0.3px; }
 .header-actions { display: flex; gap: 10px; }
 
 /* Buttons */
@@ -865,32 +832,6 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
 
 /* KPI */
 .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
-.kpi-card {
-  background: #fff; border-radius: 14px;
-  padding: 18px 22px; display: flex; align-items: center; gap: 16px;
-  box-shadow: 0 1px 4px rgba(0,0,0,.06); border: 1px solid #f1f5f9;
-  transition: box-shadow .15s;
-}
-.kpi-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.08); }
-.kpi-icon {
-  width: 44px; height: 44px; border-radius: 12px;
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
-.kpi-icon .material-symbols-outlined { font-size: 22px; }
-.kpi-label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: .6px; font-weight: 500; }
-.kpi-value { font-size: 24px; font-weight: 800; margin-top: 2px; }
-.kpi-blue .kpi-icon { background: linear-gradient(135deg, #dbeafe, #bfdbfe); }
-.kpi-blue .kpi-icon .material-symbols-outlined { color: #1d4ed8; }
-.kpi-blue .kpi-value { color: #1e40af; }
-.kpi-orange .kpi-icon { background: linear-gradient(135deg, #fef3c7, #fde68a); }
-.kpi-orange .kpi-icon .material-symbols-outlined { color: #b45309; }
-.kpi-orange .kpi-value { color: #b45309; }
-.kpi-green .kpi-icon { background: linear-gradient(135deg, #d1fae5, #a7f3d0); }
-.kpi-green .kpi-icon .material-symbols-outlined { color: #047857; }
-.kpi-green .kpi-value { color: #047857; }
-.kpi-purple .kpi-icon { background: linear-gradient(135deg, #e0e7ff, #c7d2fe); }
-.kpi-purple .kpi-icon .material-symbols-outlined { color: #4338ca; }
-.kpi-purple .kpi-value { color: #4338ca; }
 
 /* Tabs */
 .tab-bar { display: flex; gap: 2px; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; }
@@ -982,10 +923,6 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
 .admin-btn-off:hover { background: #fef2f2; border-color: #fca5a5; }
 .admin-btn-on { color: #059669; }
 .admin-btn-on:hover { background: #f0fdf4; border-color: #86efac; }
-
-.empty-state { grid-column: 1 / -1; text-align: center; padding: 60px 20px; color: #94a3b8; }
-.empty-state .material-symbols-outlined { font-size: 48px; display: block; margin-bottom: 8px; }
-.empty-state p { margin: 0; font-size: 14px; }
 
 /* Timeline */
 .timeline-filters { display: flex; gap: 12px; margin-bottom: 20px; }
@@ -1137,7 +1074,6 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
 /* Responsive */
 @media (max-width: 768px) {
   .vc-wrap { padding: 16px; }
-  .vc-header { flex-direction: column; gap: 12px; align-items: flex-start; }
   .vault-grid { grid-template-columns: 1fr; }
   .count-row { grid-template-columns: 1fr 1fr; }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }

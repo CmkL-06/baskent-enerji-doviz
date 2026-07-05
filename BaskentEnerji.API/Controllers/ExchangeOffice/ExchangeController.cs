@@ -636,11 +636,19 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
                     {
                         var sourceDetail = t.Details?.FirstOrDefault(d => d.CurrencyCode != "TRY") ?? t.Details?.FirstOrDefault();
                         var targetDetail = t.Details?.FirstOrDefault(d => d.CurrencyCode == "TRY") ?? t.Details?.LastOrDefault();
+                        // Fix legacy records: if Type=Exchange(1) but foreign currency Side=Credit, it's actually a Buy
+                        var resolvedType = t.Type;
+                        if (t.Type == TransactionType.Exchange && sourceDetail != null && sourceDetail.CurrencyCode != "TRY")
+                        {
+                            var foreignDetail = t.Details?.FirstOrDefault(d => d.CurrencyCode != "TRY");
+                            if (foreignDetail != null && foreignDetail.Side == TransactionSide.Credit)
+                                resolvedType = TransactionType.Buy;
+                        }
                         return new
                         {
                             t.Id,
                             TransactionReferenceNo = t.TransactionNumber,
-                            t.Type,
+                            Type = resolvedType,
                             TransactionStatus = (int)t.Status,
                             t.TransactionDate,
                             OfficeName = t.OfficeName ?? t.VaultName,
@@ -649,14 +657,20 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
                             SourceCurrencyCode = sourceDetail?.CurrencyCode ?? "",
                             SourceAmount = sourceDetail?.Amount ?? 0m,
                             ExchangeRate = sourceDetail?.Rate ?? 0m,
+                            TargetCurrencyCode = targetDetail?.CurrencyCode ?? "",
                             TargetAmount = targetDetail?.NetAmount ?? targetDetail?.Amount ?? 0m,
                             CustomRate = sourceDetail?.CustomRate,
                             t.Notes,
+                            t.IsDeleted,
+                            t.DeletedBy,
+                            t.DeletedReason,
+                            Username = t.User?.Username ?? "",
+                            UserFullName = (t.User?.Firstname ?? "") + " " + (t.User?.Lastname ?? ""),
                             Details = t.Details?.Select(d => new
                             {
                                 d.CurrencyId,
                                 d.CurrencyCode,
-                                d.Side,
+                                Side = d.Side == TransactionSide.Credit ? 0 : 1,
                                 d.Amount,
                                 d.Rate,
                                 d.NetAmount

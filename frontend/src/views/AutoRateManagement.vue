@@ -4,6 +4,9 @@ import { useAuthStore } from '@/stores/auth'
 import { useExchangeStore } from '@/stores/exchange'
 import apiService from '@/services/apiservice'
 import { getCurrencyFlagImg } from '@/utils/currency'
+import AppKpiCard from '@/components/common/AppKpiCard.vue'
+import AppPageHeader from '@/components/common/AppPageHeader.vue'
+import AppEmptyState from '@/components/common/AppEmptyState.vue'
 
 const authStore = useAuthStore()
 const exchangeStore = useExchangeStore()
@@ -222,38 +225,23 @@ onMounted(async () => {
 <template>
   <div class="ar-wrap">
     <!-- Header -->
-    <div class="ar-header">
-      <h1>Otomatik Kur Yönetimi</h1>
-      <div class="header-actions">
-        <button class="btn-secondary" @click="triggerUpdate(true)">
-          <span class="material-symbols-outlined">science</span>
-          Test Et
-        </button>
-        <button v-if="authStore.isAdmin" class="btn-primary" @click="triggerUpdate(false)">
-          <span class="material-symbols-outlined">sync</span>
-          Şimdi Güncelle
-        </button>
-      </div>
-    </div>
+    <AppPageHeader icon="auto_fix_high" title="Otomatik Kur Yönetimi">
+      <button class="btn-secondary" @click="triggerUpdate(true)">
+        <span class="material-symbols-outlined">science</span>
+        Test Et
+      </button>
+      <button v-if="authStore.isAdmin" class="btn-primary" @click="triggerUpdate(false)">
+        <span class="material-symbols-outlined">sync</span>
+        Şimdi Güncelle
+      </button>
+    </AppPageHeader>
 
     <!-- KPI -->
     <div class="kpi-grid">
-      <div class="kpi-card" :class="settingsForm.isAutoUpdateEnabled ? 'kpi-green' : 'kpi-red'">
-        <div class="kpi-label">Otomatik Güncelleme</div>
-        <div class="kpi-value">{{ settingsForm.isAutoUpdateEnabled ? 'Açık' : 'Kapalı' }}</div>
-      </div>
-      <div class="kpi-card kpi-orange">
-        <div class="kpi-label">Onay Bekleyen</div>
-        <div class="kpi-value">{{ pendingApprovals.length }}</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Dış Kaynak</div>
-        <div class="kpi-value">{{ externalRates.length }} kur</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Güncelleme Aralığı</div>
-        <div class="kpi-value">{{ settingsForm.updateIntervalMinutes }} dk</div>
-      </div>
+      <AppKpiCard icon="toggle_on" label="Otomatik Güncelleme" :value="settingsForm.isAutoUpdateEnabled ? 'Açık' : 'Kapalı'" :color="settingsForm.isAutoUpdateEnabled ? '#059669' : '#ef4444'" :bg="settingsForm.isAutoUpdateEnabled ? '#ecfdf5' : '#fef2f2'" />
+      <AppKpiCard icon="pending_actions" label="Onay Bekleyen" :value="pendingApprovals.length" color="#d97706" bg="#fffbeb" />
+      <AppKpiCard icon="public" label="Dış Kaynak" :value="externalRates.length + ' kur'" color="#6366f1" bg="#eef2ff" />
+      <AppKpiCard icon="schedule" label="Güncelleme Aralığı" :value="settingsForm.updateIntervalMinutes + ' dk'" color="#6366f1" bg="#eef2ff" />
     </div>
 
     <!-- Tabs -->
@@ -497,9 +485,7 @@ onMounted(async () => {
         </table>
       </div>
 
-      <div v-if="externalRates.length === 0" class="empty-state">
-        Dış kaynak verisi bulunamadı
-      </div>
+      <AppEmptyState v-if="externalRates.length === 0" icon="public" message="Dış kaynak verisi bulunamadı" />
     </div>
 
     <!-- History Tab -->
@@ -555,13 +541,6 @@ onMounted(async () => {
   margin: 0 auto;
 }
 
-.ar-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-.ar-header h1 { font-size: 22px; font-weight: 700; color: #1a1a2e; margin: 0; }
 .header-actions { display: flex; gap: 8px; }
 
 /* Buttons */
@@ -594,15 +573,6 @@ onMounted(async () => {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 16px; margin-bottom: 20px;
 }
-.kpi-card {
-  background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px 20px;
-}
-.kpi-label { font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
-.kpi-value { font-size: 20px; font-weight: 700; color: #1a1a2e; }
-.kpi-green .kpi-value { color: #059669; }
-.kpi-red .kpi-value { color: #dc2626; }
-.kpi-orange .kpi-value { color: #d97706; }
-
 /* Tabs */
 .tab-bar {
   display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid #e5e7eb; flex-wrap: wrap;
@@ -716,8 +686,6 @@ onMounted(async () => {
 .status-ok { color: #059669; font-size: 12px; font-weight: 500; }
 .status-err { color: #dc2626; font-size: 12px; font-weight: 500; cursor: help; }
 
-.empty-state { text-align: center; padding: 40px; color: #9ca3af; font-size: 14px; }
-
 .ar-pair-cell { display: flex; align-items: center; gap: 8px; }
 .ar-flag { width: 24px; height: 16px; object-fit: cover; border-radius: 2px; border: 1px solid #e5e7eb; flex-shrink: 0; }
 
@@ -731,7 +699,6 @@ onMounted(async () => {
 /* Responsive */
 @media (max-width: 768px) {
   .ar-wrap { padding: 12px; }
-  .ar-header { flex-direction: column; gap: 12px; align-items: flex-start; }
   .form-grid-2, .form-grid-3 { grid-template-columns: 1fr; }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
   .day-chips { flex-wrap: wrap; }

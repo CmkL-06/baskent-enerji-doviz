@@ -35,11 +35,12 @@ namespace BaskentEnerji.Entity.Entities.ExchangeOffice.Office
 
     public enum TransactionType
     {
-        Exchange = 1,      // Currency exchange
+        Buy = 0,           // Döviz alış (müşteriden döviz alıyoruz)
+        Exchange = 1,      // Döviz satış (müşteriye döviz satıyoruz)
         Deposit = 2,       // Vault deposit
         Withdrawal = 3,    // Vault withdrawal
         Transfer = 4,      // Inter-vault transfer
-        Adjustment = 5,     // Manual adjustment
+        Adjustment = 5,    // Manual adjustment
         Party = 6,
     }
 

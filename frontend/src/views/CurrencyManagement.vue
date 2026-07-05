@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import apiService from '@/services/apiservice'
+import AppKpiCard from '@/components/common/AppKpiCard.vue'
+import AppPageHeader from '@/components/common/AppPageHeader.vue'
 
 interface Currency {
   id: string
@@ -175,46 +177,18 @@ onMounted(loadCurrencies)
     </transition>
 
     <!-- Header -->
-    <div class="cm-header">
-      <div>
-        <h1 class="cm-title">Para Birimi Yönetimi</h1>
-        <p class="cm-sub">{{ currencies.length }} para birimi kayıtlı</p>
-      </div>
+    <AppPageHeader icon="currency_exchange" title="Para Birimi Yönetimi" :subtitle="currencies.length + ' para birimi kayıtlı'">
       <button class="cm-btn cm-btn-primary" @click="openCreate">
         <span class="material-symbols-outlined">add_circle</span> Yeni Ekle
       </button>
-    </div>
+    </AppPageHeader>
 
     <!-- KPI Cards -->
-    <div class="cm-kpi-grid">
-      <div class="cm-kpi cm-kpi-blue">
-        <div class="cm-kpi-icon"><span class="material-symbols-outlined">payments</span></div>
-        <div class="cm-kpi-body">
-          <div class="cm-kpi-value">{{ currencies.length }}</div>
-          <div class="cm-kpi-label">Toplam Para Birimi</div>
-        </div>
-      </div>
-      <div class="cm-kpi cm-kpi-green">
-        <div class="cm-kpi-icon"><span class="material-symbols-outlined">check_circle</span></div>
-        <div class="cm-kpi-body">
-          <div class="cm-kpi-value">{{ activeCount }}</div>
-          <div class="cm-kpi-label">Tedavüldeki</div>
-        </div>
-      </div>
-      <div class="cm-kpi cm-kpi-red">
-        <div class="cm-kpi-icon"><span class="material-symbols-outlined">history</span></div>
-        <div class="cm-kpi-body">
-          <div class="cm-kpi-value">{{ discontinuedCount }}</div>
-          <div class="cm-kpi-label">Tedavülden Kalkan</div>
-        </div>
-      </div>
-      <div class="cm-kpi cm-kpi-purple">
-        <div class="cm-kpi-icon"><span class="material-symbols-outlined">public</span></div>
-        <div class="cm-kpi-body">
-          <div class="cm-kpi-value">{{ regionCount }}</div>
-          <div class="cm-kpi-label">Bölge</div>
-        </div>
-      </div>
+    <div class="kpi-grid">
+      <AppKpiCard icon="payments" label="Toplam Para Birimi" :value="currencies.length" color="#3b82f6" bg="#eff6ff" />
+      <AppKpiCard icon="check_circle" label="Tedavüldeki" :value="activeCount" color="#059669" bg="#ecfdf5" />
+      <AppKpiCard icon="history" label="Tedavülden Kalkan" :value="discontinuedCount" color="#ef4444" bg="#fef2f2" />
+      <AppKpiCard icon="public" label="Bölge" :value="regionCount" color="#8b5cf6" bg="#f5f3ff" />
     </div>
 
     <!-- Loading -->
@@ -387,33 +361,12 @@ onMounted(loadCurrencies)
 }
 
 /* Header */
-.cm-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-.cm-title { font-size: 22px; font-weight: 700; color: #111; margin: 0; }
-.cm-sub { font-size: 13px; color: #9ca3af; margin: 2px 0 0; }
 
 /* KPI Grid */
-.cm-kpi-grid {
+.kpi-grid {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 14px; margin-bottom: 20px;
 }
-.cm-kpi {
-  display: flex; align-items: center; gap: 14px;
-  background: #fff; border: 1px solid #e5e7eb; border-radius: 14px;
-  padding: 18px 20px; transition: box-shadow .15s;
-}
-.cm-kpi:hover { box-shadow: 0 4px 16px rgba(0,0,0,.06); }
-.cm-kpi-icon {
-  width: 44px; height: 44px; border-radius: 12px;
-  display: flex; align-items: center; justify-content: center;
-}
-.cm-kpi-icon .material-symbols-outlined { font-size: 22px; }
-.cm-kpi-blue .cm-kpi-icon  { background: #eff6ff; color: #2563eb; }
-.cm-kpi-green .cm-kpi-icon { background: #f0fdf4; color: #16a34a; }
-.cm-kpi-red .cm-kpi-icon   { background: #fef2f2; color: #dc2626; }
-.cm-kpi-purple .cm-kpi-icon { background: #f5f3ff; color: #7c3aed; }
-.cm-kpi-body { flex: 1; }
-.cm-kpi-value { font-size: 22px; font-weight: 700; color: #111; }
-.cm-kpi-label { font-size: 12px; color: #6b7280; margin-top: 1px; }
 
 /* Loading */
 .cm-loading {
@@ -587,7 +540,7 @@ onMounted(loadCurrencies)
 /* Responsive */
 @media (max-width: 768px) {
   .cm-page { padding: 12px; }
-  .cm-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
   .cm-card { overflow-x: auto; }
   .cm-detail-grid { grid-template-columns: repeat(2, 1fr); }
 }

@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import apiService from '@/services/apiservice'
 import { getCurrencyFlagImg } from '@/utils/currency'
+import AppKpiCard from '@/components/common/AppKpiCard.vue'
 
 const authStore = useAuthStore()
 
@@ -37,10 +38,33 @@ const fmtDate = (iso: string) =>
 const fmtDateTime = (iso: string) =>
   iso ? new Date(iso).toLocaleString('tr-TR') : '-'
 
+const fmtTime = (iso: string) =>
+  iso ? new Date(iso).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '-'
+
 const months = [
   'Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
   'Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'
 ]
+
+const txTypeLabels: Record<number, string> = {
+  0: 'Alış',
+  1: 'Döviz',
+  2: 'Giriş',
+  3: 'Çıkış',
+  4: 'Transfer',
+  5: 'Düzeltme',
+  6: 'Cari',
+}
+
+const txTypeColors: Record<number, string> = {
+  0: '#6366f1',
+  1: '#8b5cf6',
+  2: '#10b981',
+  3: '#ef4444',
+  4: '#3b82f6',
+  5: '#f59e0b',
+  6: '#ec4899',
+}
 
 const s = computed(() => reportData.value?.summary ?? {})
 const hasData = computed(() => !!reportData.value)
@@ -48,14 +72,15 @@ const isMultiOffice = computed(() => !selectedOfficeId.value && (reportData.valu
 
 const kpis = computed(() => {
   if (!s.value) return []
-  return [
+  const items = [
     { icon: 'trending_up', label: 'Toplam Kar', value: fmt(s.value.totalProfit ?? s.value.totalProfitInTRY ?? 0), unit: '₺', color: '#10b981', bg: 'rgba(16,185,129,0.10)' },
     { icon: 'swap_horiz', label: 'İşlem Sayısı', value: fmt(s.value.totalTransactions ?? 0, 0), unit: 'adet', color: '#6366f1', bg: 'rgba(99,102,241,0.10)' },
+    { icon: 'monitoring', label: 'İşlem Hacmi', value: fmt(s.value.totalForeignCurrencyProcessed ?? 0), unit: '₺', color: '#0ea5e9', bg: 'rgba(14,165,233,0.10)' },
     { icon: 'percent', label: 'Kar Marjı', value: fmt(s.value.profitMargin ?? 0, 1), unit: '%', color: '#f59e0b', bg: 'rgba(245,158,11,0.10)' },
     { icon: 'straighten', label: 'Ort. İşlem', value: fmt(s.value.averageTransactionSize ?? 0), unit: '₺', color: '#8b5cf6', bg: 'rgba(139,92,246,0.10)' },
     { icon: 'account_balance', label: 'Kasa Değeri', value: fmt(s.value.totalValueInBaseCurrency ?? 0), unit: '₺', color: '#3b82f6', bg: 'rgba(59,130,246,0.10)' },
-    { icon: 'savings', label: 'Net Kasa Hareket', value: fmt(s.value.netVaultChange ?? 0), unit: '₺', color: '#ec4899', bg: 'rgba(236,72,153,0.10)' },
   ]
+  return items
 })
 
 const txBreakdown = computed(() => {
@@ -68,17 +93,37 @@ const txBreakdown = computed(() => {
   ]
 })
 
+const volumesByCurrency = computed(() => {
+  const vols = s.value?.totalVolumesByCurrency
+  if (!vols || typeof vols !== 'object') return []
+  return Object.entries(vols).map(([code, amount]) => ({ code, amount: Number(amount) })).filter(v => v.amount > 0)
+})
+
 const currencyRows = computed(() => reportData.value?.currencyDetails ?? [])
 const totalUnrealized = computed(() => currencyRows.value.reduce((sum: number, r: any) => sum + (r.unrealizedProfit ?? 0), 0))
+const totalRealized = computed(() => currencyRows.value.reduce((sum: number, r: any) => sum + (r.realizedProfit ?? 0), 0))
+
 const vaultRows = computed(() => {
   const histories = reportData.value?.vaultBalanceHistories ?? []
-  if (histories.length) return histories
-  return []
+  return histories.map((h: any) => ({
+    ...h,
+    amount: Math.abs(h.balance ?? 0),
+    isDeposit: (h.balance ?? 0) >= 0,
+    typeLabel: txTypeLabels[h.transactionType] ?? 'Bilinmeyen',
+    typeColor: txTypeColors[h.transactionType] ?? '#6b7280',
+  }))
 })
+
 const transactions = computed(() => reportData.value?.transactions ?? [])
 const officeRows = computed(() => reportData.value?.officeBreakdown ?? [])
 const partyData = computed(() => reportData.value?.partyAccountsSummary ?? null)
 const cashData = computed(() => reportData.value?.cashOnlySummary ?? null)
+
+const cashVolumesByCurrency = computed(() => {
+  const vols = cashData.value?.cashVolumesByCurrency
+  if (!vols || typeof vols !== 'object') return []
+  return Object.entries(vols).map(([code, amount]) => ({ code, amount: Number(amount) })).filter(v => v.amount > 0)
+})
 
 const reportTitle = computed(() => {
   if (reportMode.value === 'daily') return `Günlük Z-Raporu — ${fmtDate(selectedDate.value)}`
@@ -100,9 +145,9 @@ function toggleCurrency(code: string) {
 async function loadOffices() {
   try {
     const res = await apiService.getVaults()
-    const map: Record<number, string> = {}
-    ;(res ?? []).forEach((v: any) => { if (v.officeId) map[v.officeId] = v.officeName ?? `Ofis ${v.officeId}` })
-    offices.value = Object.entries(map).map(([id, name]) => ({ id: Number(id), name }))
+    const map: Record<string, string> = {}
+    ;(res ?? []).forEach((v: any) => { if (v.officeId) map[String(v.officeId)] = v.officeName ?? `Ofis ${v.officeId}` })
+    offices.value = Object.entries(map).map(([id, name]) => ({ id, name }))
   } catch { offices.value = [] }
 }
 
@@ -131,6 +176,22 @@ async function fetchReport() {
 }
 
 function printReport() { window.print() }
+
+function getTxTypeChipClass(tx: any): string {
+  const t = tx.type ?? tx.transactionType
+  if (t === 0 || t === 1) return 'chip-exchange'
+  if (t === 2) return 'chip-deposit'
+  if (t === 3) return 'chip-withdrawal'
+  if (t === 4) return 'chip-transfer'
+  if (t === 6) return 'chip-party'
+  return 'chip-default'
+}
+
+function getTxTypeLabel(tx: any): string {
+  if (tx.typeName) return tx.typeName
+  const t = tx.type ?? tx.transactionType
+  return txTypeLabels[t] ?? `Tür ${t}`
+}
 
 onMounted(async () => {
   await loadOffices()
@@ -225,7 +286,7 @@ onMounted(async () => {
     <!-- ── Rapor İçeriği ── -->
     <template v-if="!isLoading && hasData">
 
-      <!-- Başlık (print + ekran) -->
+      <!-- Başlık -->
       <div class="zr-header">
         <div>
           <h2 class="zr-title">{{ reportTitle }}</h2>
@@ -241,26 +302,41 @@ onMounted(async () => {
 
       <!-- ── KPI Kartları ── -->
       <div class="kpi-grid">
-        <div v-for="k in kpis" :key="k.label" class="kpi" :style="{ '--kc': k.color, '--kb': k.bg }">
-          <div class="kpi-icon"><span class="material-symbols-outlined">{{ k.icon }}</span></div>
-          <div class="kpi-body">
-            <p class="kpi-label">{{ k.label }}</p>
-            <p class="kpi-value">{{ k.value }} <small>{{ k.unit }}</small></p>
+        <AppKpiCard v-for="k in kpis" :key="k.label" :icon="k.icon" :label="k.label" :value="k.value" :unit="k.unit" :color="k.color" :bg="k.bg" />
+      </div>
+
+      <!-- ── İşlem Dağılımı + Devir Bakiye ── -->
+      <div class="breakdown-row">
+        <div class="tx-breakdown" v-if="txBreakdown.some(t => t.count > 0)">
+          <div v-for="t in txBreakdown" :key="t.label" class="tx-chip" :style="{ '--tc': t.color }">
+            <span class="material-symbols-outlined">{{ t.icon }}</span>
+            <span class="tx-count">{{ t.count }}</span>
+            <span class="tx-label">{{ t.label }}</span>
+          </div>
+        </div>
+        <div class="opening-balance" v-if="s.hasInheritedBalance">
+          <span class="material-symbols-outlined">history</span>
+          <div>
+            <p class="ob-label">Devir Bakiye</p>
+            <p class="ob-val">{{ fmt(s.openingBalanceTRY) }} ₺</p>
           </div>
         </div>
       </div>
 
-      <!-- ── İşlem Dağılımı Mini Kartlar ── -->
-      <div class="tx-breakdown" v-if="txBreakdown.some(t => t.count > 0)">
-        <div v-for="t in txBreakdown" :key="t.label" class="tx-chip" :style="{ '--tc': t.color }">
-          <span class="material-symbols-outlined">{{ t.icon }}</span>
-          <span class="tx-count">{{ t.count }}</span>
-          <span class="tx-label">{{ t.label }}</span>
-        </div>
-        <div class="tx-chip" v-if="s.hasInheritedBalance" style="--tc: #f59e0b">
-          <span class="material-symbols-outlined">history</span>
-          <span class="tx-count">{{ fmt(s.openingBalanceTRY) }} ₺</span>
-          <span class="tx-label">Devir Bakiye</span>
+      <!-- ── Döviz Bazlı Hacim ── -->
+      <div class="volume-chips" v-if="volumesByCurrency.length">
+        <span class="vc-title">
+          <span class="material-symbols-outlined">bar_chart</span>
+          Döviz Bazlı Hacim
+        </span>
+        <div class="vc-list">
+          <div v-for="v in volumesByCurrency" :key="v.code" class="vc-item">
+            <div class="cur-cell">
+              <img v-if="getCurrencyFlagImg(v.code)" :src="getCurrencyFlagImg(v.code)" class="cur-flag cur-flag--sm" />
+              <span class="cur-code">{{ v.code }}</span>
+            </div>
+            <span class="vc-amount">{{ fmt(v.amount) }}</span>
+          </div>
         </div>
       </div>
 
@@ -279,6 +355,14 @@ onMounted(async () => {
           <div>
             <p class="vo-label">Kasa Çıkış</p>
             <p class="vo-val">{{ fmt(s.vaultWithdrawals) }} ₺</p>
+          </div>
+        </div>
+        <div class="vo-divider"></div>
+        <div class="vo-item">
+          <span class="material-symbols-outlined" style="color: #3b82f6">sync_alt</span>
+          <div>
+            <p class="vo-label">Net Hareket</p>
+            <p class="vo-val" :class="(s.netVaultChange ?? 0) >= 0 ? 'pos' : 'neg'">{{ (s.netVaultChange ?? 0) >= 0 ? '+' : '' }}{{ fmt(s.netVaultChange) }} ₺</p>
           </div>
         </div>
         <div class="vo-divider"></div>
@@ -353,6 +437,7 @@ onMounted(async () => {
                 <th>WAC</th>
                 <th>Net Pozisyon</th>
                 <th>Kar (₺)</th>
+                <th>G.leşen K/Z</th>
                 <th>G.leşmemiş K/Z</th>
                 <th>Marj</th>
               </tr>
@@ -377,6 +462,7 @@ onMounted(async () => {
                 <td class="mono wac-cell">{{ row.wac ? fmt(row.wac, 4) : '—' }}</td>
                 <td :class="(row.netPosition ?? 0) >= 0 ? 'pos' : 'neg'">{{ fmt(row.netPosition) }}</td>
                 <td :class="(row.profit ?? 0) >= 0 ? 'pos' : 'neg'" class="fw-600">{{ (row.profit ?? 0) >= 0 ? '+' : '' }}{{ fmt(row.profit) }}</td>
+                <td :class="(row.realizedProfit ?? 0) >= 0 ? 'pos' : 'neg'">{{ row.realizedProfit != null ? ((row.realizedProfit >= 0 ? '+' : '') + fmt(row.realizedProfit)) : '—' }}</td>
                 <td :class="(row.unrealizedProfit ?? 0) >= 0 ? 'pos' : 'neg'">{{ row.unrealizedProfit ? ((row.unrealizedProfit >= 0 ? '+' : '') + fmt(row.unrealizedProfit)) : '—' }}</td>
                 <td>%{{ fmt(row.profitMargin ?? 0, 1) }}</td>
               </tr>
@@ -386,6 +472,7 @@ onMounted(async () => {
                 <td class="fw-600">TOPLAM</td>
                 <td colspan="8"></td>
                 <td :class="(s.totalProfit ?? 0) >= 0 ? 'pos' : 'neg'" class="fw-600">{{ fmt(s.totalProfit ?? s.totalProfitInTRY) }}</td>
+                <td :class="totalRealized >= 0 ? 'pos' : 'neg'">{{ totalRealized ? ((totalRealized >= 0 ? '+' : '') + fmt(totalRealized)) : '—' }}</td>
                 <td :class="totalUnrealized >= 0 ? 'pos' : 'neg'">{{ totalUnrealized ? ((totalUnrealized >= 0 ? '+' : '') + fmt(totalUnrealized)) : '—' }}</td>
                 <td>%{{ fmt(s.profitMargin ?? 0, 1) }}</td>
               </tr>
@@ -478,6 +565,11 @@ onMounted(async () => {
               <p class="pc-val">{{ partyData.partyTransactionCount ?? 0 }} <small>adet</small></p>
             </div>
           </div>
+          <!-- Cari İşlem Hacmi -->
+          <div class="party-volume" v-if="(partyData.partyTransactionVolume ?? 0) > 0">
+            <span class="pv-label">Cari İşlem Hacmi</span>
+            <span class="pv-val">{{ fmt(partyData.partyTransactionVolume) }} ₺</span>
+          </div>
           <!-- Döviz bazlı alacak/borç -->
           <div class="party-currencies" v-if="partyData.totalReceivablesByCurrency || partyData.totalDebtsByCurrency">
             <table class="tbl tbl--compact">
@@ -530,6 +622,19 @@ onMounted(async () => {
               <span>{{ fmt(cashData.cashVolumeInTRY ?? 0) }} ₺</span>
             </div>
           </div>
+          <!-- Nakit Döviz Bazlı Hacim -->
+          <div class="cash-volumes" v-if="cashVolumesByCurrency.length">
+            <div class="cv-title">Döviz Bazlı Nakit Hacim</div>
+            <div class="cv-list">
+              <div v-for="v in cashVolumesByCurrency" :key="v.code" class="cv-item">
+                <div class="cur-cell">
+                  <img v-if="getCurrencyFlagImg(v.code)" :src="getCurrencyFlagImg(v.code)" class="cur-flag cur-flag--sm" />
+                  <span class="cur-code">{{ v.code }}</span>
+                </div>
+                <span>{{ fmt(v.amount) }}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -546,17 +651,28 @@ onMounted(async () => {
               <tr>
                 <th>Tarih</th>
                 <th>Tür</th>
+                <th>İşlem Tipi</th>
                 <th>Döviz</th>
                 <th>Miktar</th>
+                <th>TRY Karşılığı</th>
+                <th>Personel</th>
                 <th>Açıklama</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="(vh, i) in vaultRows" :key="i">
-                <td>{{ fmtDateTime(vh.createdDate ?? vh.date) }}</td>
+                <td class="no-wrap">{{ fmtDateTime(vh.createdDate ?? vh.date) }}</td>
                 <td>
                   <span class="status-chip" :class="vh.isDeposit ? 'done' : 'pend'">
                     {{ vh.isDeposit ? 'Giriş' : 'Çıkış' }}
+                  </span>
+                </td>
+                <td>
+                  <span class="type-tag" :style="{ '--tag-color': vh.typeColor }">
+                    {{ vh.typeLabel }}
+                  </span>
+                  <span v-if="vh.isParty" class="party-indicator" title="Cari İşlem">
+                    <span class="material-symbols-outlined">person</span>
                   </span>
                 </td>
                 <td>
@@ -566,7 +682,15 @@ onMounted(async () => {
                   </div>
                 </td>
                 <td :class="vh.isDeposit ? 'pos' : 'neg'">{{ vh.isDeposit ? '+' : '-' }}{{ fmt(Math.abs(vh.amount ?? 0)) }}</td>
-                <td class="text-muted">{{ vh.description ?? '-' }}</td>
+                <td class="text-muted mono">{{ vh.valueInBaseCurrency ? fmt(vh.valueInBaseCurrency) + ' ₺' : '-' }}</td>
+                <td>
+                  <span v-if="vh.user" class="user-tag">
+                    <span class="material-symbols-outlined">person</span>
+                    {{ vh.user }}
+                  </span>
+                  <span v-else class="text-muted">-</span>
+                </td>
+                <td class="text-muted desc-cell">{{ vh.description ?? '-' }}</td>
               </tr>
             </tbody>
           </table>
@@ -600,8 +724,12 @@ onMounted(async () => {
               <tr v-for="tx in transactions" :key="tx.id ?? tx.transactionNumber">
                 <td class="mono">{{ tx.transactionNumber }}</td>
                 <td>{{ tx.vaultName ?? '-' }}</td>
-                <td>{{ tx.typeName ?? tx.type }}</td>
-                <td>{{ fmtDateTime(tx.transactionDate) }}</td>
+                <td>
+                  <span class="type-chip" :class="getTxTypeChipClass(tx)">
+                    {{ getTxTypeLabel(tx) }}
+                  </span>
+                </td>
+                <td class="no-wrap">{{ fmtDateTime(tx.transactionDate) }}</td>
                 <td>
                   <div class="cur-cell">
                     <img v-if="getCurrencyFlagImg(tx.currencyCode)" :src="getCurrencyFlagImg(tx.currencyCode)" class="cur-flag cur-flag--sm" />
@@ -656,7 +784,6 @@ onMounted(async () => {
 .zr-input { height: 36px; padding: 0 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 13px; color: #111; background: #f9fafb; outline: none; transition: border .15s; }
 .zr-input:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,.12); }
 .zr-input-sm { width: 90px; }
-.fi--sm { width: 90px; }
 .mode-tabs { display: flex; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
 .mt-btn { padding: 7px 14px; font-size: 12px; font-weight: 500; background: #f9fafb; border: none; cursor: pointer; color: #6b7280; transition: all .15s; }
 .mt-btn.active { background: #6366f1; color: #fff; }
@@ -685,12 +812,9 @@ onMounted(async () => {
 
 /* ── KPI ── */
 .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 12px; }
-.kpi { background: var(--kb); border: 1px solid rgba(0,0,0,.05); border-radius: 10px; padding: 14px; display: flex; align-items: center; gap: 12px; }
-.kpi-icon { width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; border-radius: 9px; background: rgba(255,255,255,.6); }
-.kpi-icon .material-symbols-outlined { font-size: 20px; color: var(--kc); font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
-.kpi-label { font-size: 11px; color: #6b7280; margin: 0 0 2px; }
-.kpi-value { font-size: 17px; font-weight: 700; color: #111; margin: 0; }
-.kpi-value small { font-size: 11px; font-weight: 400; color: #9ca3af; }
+
+/* ── Breakdown Row ── */
+.breakdown-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 
 /* ── TX Breakdown ── */
 .tx-breakdown { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -698,6 +822,20 @@ onMounted(async () => {
 .tx-chip .material-symbols-outlined { font-size: 16px; color: var(--tc); font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
 .tx-count { font-weight: 700; color: #111; }
 .tx-label { color: #6b7280; }
+
+/* ── Opening Balance ── */
+.opening-balance { display: flex; align-items: center; gap: 8px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 6px 14px; margin-left: auto; }
+.opening-balance .material-symbols-outlined { font-size: 18px; color: #f59e0b; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+.ob-label { font-size: 10px; color: #92400e; margin: 0; text-transform: uppercase; letter-spacing: .03em; }
+.ob-val { font-size: 14px; font-weight: 700; color: #92400e; margin: 0; }
+
+/* ── Volume Chips ── */
+.volume-chips { display: flex; align-items: center; gap: 12px; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 16px; flex-wrap: wrap; }
+.vc-title { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #374151; white-space: nowrap; }
+.vc-title .material-symbols-outlined { font-size: 16px; color: #6366f1; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+.vc-list { display: flex; gap: 8px; flex-wrap: wrap; }
+.vc-item { display: flex; align-items: center; gap: 8px; background: #f9fafb; border-radius: 6px; padding: 4px 10px; }
+.vc-amount { font-weight: 600; font-size: 12px; color: #111; font-family: 'JetBrains Mono', 'Cascadia Code', monospace; }
 
 /* ── Vault Ops Bar ── */
 .vault-ops { display: flex; align-items: center; gap: 16px; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 20px; flex-wrap: wrap; }
@@ -752,6 +890,9 @@ onMounted(async () => {
 .pc-label { font-size: 10px; color: #6b7280; margin: 0 0 4px; text-transform: uppercase; letter-spacing: .04em; }
 .pc-val { font-size: 16px; font-weight: 700; margin: 0; color: #111; }
 .pc-val small { font-size: 11px; font-weight: 400; color: #9ca3af; }
+.party-volume { display: flex; justify-content: space-between; align-items: center; padding: 8px 18px; background: #f0fdf4; border-top: 1px solid #dcfce7; }
+.pv-label { font-size: 11px; color: #166534; font-weight: 500; }
+.pv-val { font-size: 13px; font-weight: 700; color: #166534; }
 .party-currencies { border-top: 1px solid #f3f4f6; padding: 0; }
 
 /* ── Vault Balances ── */
@@ -760,6 +901,30 @@ onMounted(async () => {
 .vb-amount { font-weight: 700; font-size: 14px; color: #111; }
 .cash-summary { border-top: 1px solid #f3f4f6; padding: 12px 18px; display: flex; flex-direction: column; gap: 6px; }
 .cs-row { display: flex; justify-content: space-between; font-size: 13px; color: #374151; }
+
+/* ── Cash Volumes ── */
+.cash-volumes { border-top: 1px solid #f3f4f6; padding: 10px 18px; }
+.cv-title { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; font-weight: 600; }
+.cv-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.cv-item { display: flex; align-items: center; gap: 6px; background: #f9fafb; border-radius: 6px; padding: 4px 8px; font-size: 12px; font-weight: 500; color: #374151; }
+
+/* ── Type Tags & Chips ── */
+.type-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; background: color-mix(in srgb, var(--tag-color) 12%, transparent); color: var(--tag-color); }
+.type-chip { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; }
+.chip-exchange { background: #ede9fe; color: #6d28d9; }
+.chip-deposit { background: #d1fae5; color: #065f46; }
+.chip-withdrawal { background: #fee2e2; color: #991b1b; }
+.chip-transfer { background: #dbeafe; color: #1e40af; }
+.chip-party { background: #fce7f3; color: #9d174d; }
+.chip-default { background: #f3f4f6; color: #374151; }
+
+/* ── User Tag ── */
+.user-tag { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: #6b7280; }
+.user-tag .material-symbols-outlined { font-size: 13px; }
+
+/* ── Party Indicator ── */
+.party-indicator { display: inline-flex; align-items: center; margin-left: 4px; }
+.party-indicator .material-symbols-outlined { font-size: 13px; color: #ec4899; }
 
 /* ── Progress Bar ── */
 .bar-wrap { position: relative; width: 80px; height: 20px; background: #f3f4f6; border-radius: 4px; overflow: hidden; }
@@ -783,6 +948,8 @@ onMounted(async () => {
 .fw-600 { font-weight: 600; }
 .mono { font-family: 'JetBrains Mono', 'Cascadia Code', monospace; font-size: 12px; }
 .text-muted { color: #9ca3af; }
+.no-wrap { white-space: nowrap; }
+.desc-cell { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ── Empty ── */
 .zr-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px; gap: 10px; color: #9ca3af; }
@@ -795,7 +962,9 @@ onMounted(async () => {
   .zr-timestamp { display: block !important; }
   .zr { padding: 0; gap: 12px; }
   .panel { break-inside: avoid; }
-  .kpi { break-inside: avoid; }
+  .cur-row:hover td { background: transparent !important; }
+  .volume-chips { border: none; padding: 6px 0; }
+  .vault-ops { border: none; padding: 8px 0; }
 }
 
 /* ── Responsive ── */
@@ -805,6 +974,8 @@ onMounted(async () => {
   .kpi-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
   .tbl { font-size: 11px; }
   .tbl th, .tbl td { padding: 7px 10px; }
+  .breakdown-row { flex-direction: column; align-items: flex-start; }
+  .opening-balance { margin-left: 0; }
 }
 .wac-cell { color: #7c3aed; font-weight: 500; }
 .wac-val { color: #7c3aed; font-weight: 600; }

@@ -46,6 +46,9 @@ namespace BaskentEnerji.API.Controllers.Telegram
 
             var dealerCode = user.DealerReferralCode ?? "";
 
+            var tgDealer = await _db.TgDealers
+                .FirstOrDefaultAsync(d => d.DealerCode == dealerCode);
+
             var txs = await _db.TgTransactions
                 .Where(t => t.ReferralCode == dealerCode)
                 .OrderByDescending(t => t.CreatedAt)
@@ -72,14 +75,18 @@ namespace BaskentEnerji.API.Controllers.Telegram
             var cryptoTxs = txs.Where(t => t.Currency?.ToUpper() == "USDT").ToList();
             var cryptoVerified = completedTxs.Where(t => t.Currency?.ToUpper() == "USDT").Count();
 
+            var dealerName = tgDealer?.DealerName ?? $"{user.Firstname} {user.Lastname}".Trim();
+            var dealerBalance = tgDealer?.Balance ?? 0;
+
             return Ok(new
             {
-                balance = 0,
+                balance = dealerBalance,
                 given_tl = givenTl,
                 usdt = usdtTotal,
                 rub = rubTotal,
-                dealer_name = $"{user.Firstname} {user.Lastname}".Trim(),
+                dealer_name = dealerName,
                 dealer_code = dealerCode,
+                staff_name = $"{user.Firstname} {user.Lastname}".Trim(),
                 transactions = txs,
                 crypto_summary = new
                 {
@@ -89,10 +96,11 @@ namespace BaskentEnerji.API.Controllers.Telegram
                 },
                 dealer = new
                 {
-                    Id = user.Id,
-                    Name = $"{user.Firstname} {user.Lastname}".Trim(),
+                    Id = tgDealer?.DealerId ?? 0,
+                    Name = dealerName,
                     DealerCode = dealerCode,
-                    IsActive = user.Rank != Entity.Rank.Banned,
+                    IsActive = tgDealer?.IsActive ?? (user.Rank != Entity.Rank.Banned),
+                    Balance = dealerBalance,
                     user.CreatedDate
                 }
             });

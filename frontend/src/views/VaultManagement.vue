@@ -4,6 +4,8 @@ import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useExchangeStore } from '@/stores/exchange'
 import apiService from '@/services/apiservice'
+import AppKpiCard from '@/components/common/AppKpiCard.vue'
+import AppPageHeader from '@/components/common/AppPageHeader.vue'
 
 const route = useRoute()
 const authStore = useAuthStore()
@@ -130,28 +132,18 @@ onMounted(async () => {
 
 <template>
   <div class="vm-wrap">
-    <div class="vm-header">
-      <h1>Kasa Yönetimi</h1>
+    <AppPageHeader icon="account_balance_wallet" title="Kasa Yönetimi">
       <button class="btn-primary" @click="openCreateModal">
         <span class="material-symbols-outlined">add</span>
         Yeni Kasa
       </button>
-    </div>
+    </AppPageHeader>
 
     <!-- KPI -->
     <div class="kpi-grid">
-      <div class="kpi-card">
-        <div class="kpi-label">Toplam Kasa</div>
-        <div class="kpi-value">{{ vaults.length }}</div>
-      </div>
-      <div class="kpi-card kpi-green">
-        <div class="kpi-label">Aktif</div>
-        <div class="kpi-value">{{ vaults.filter(v => v.isActive !== false).length }}</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Sayım Gerektiren</div>
-        <div class="kpi-value">{{ vaults.filter(v => v.shouldCount).length }}</div>
-      </div>
+      <AppKpiCard icon="account_balance_wallet" label="Toplam Kasa" :value="vaults.length" color="#3b82f6" bg="#eff6ff" />
+      <AppKpiCard icon="check_circle" label="Aktif" :value="vaults.filter(v => v.isActive !== false).length" color="#059669" bg="#ecfdf5" />
+      <AppKpiCard icon="fact_check" label="Sayım Gerektiren" :value="vaults.filter(v => v.shouldCount).length" color="#d97706" bg="#fffbeb" />
     </div>
 
     <div v-if="loading" class="loading-state">
@@ -201,10 +193,7 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div v-if="vaults.length === 0" class="empty-state">
-        <span class="material-symbols-outlined">account_balance_wallet</span>
-        <p>Kasa bulunamadı</p>
-      </div>
+      <AppEmptyState v-if="vaults.length === 0" icon="account_balance_wallet" message="Kasa bulunamadı" />
     </div>
 
     <!-- Modal -->
@@ -257,11 +246,6 @@ onMounted(async () => {
 
 <style scoped>
 .vm-wrap { padding: 24px; max-width: 1400px; margin: 0 auto; }
-.vm-header {
-  display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;
-}
-.vm-header h1 { font-size: 22px; font-weight: 700; color: #1a1a2e; margin: 0; }
-
 .btn-primary {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 8px 16px; background: #2563eb; color: #fff;
@@ -280,11 +264,6 @@ onMounted(async () => {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 16px; margin-bottom: 20px;
 }
-.kpi-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px 20px; }
-.kpi-label { font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
-.kpi-value { font-size: 20px; font-weight: 700; color: #1a1a2e; }
-.kpi-green .kpi-value { color: #059669; }
-
 /* Loading */
 .loading-state, .error-state { text-align: center; padding: 60px 20px; color: #6b7280; font-size: 14px; }
 .error-state { color: #dc2626; }
@@ -329,12 +308,6 @@ onMounted(async () => {
 .icon-btn:hover { background: #f3f4f6; color: #2563eb; }
 .icon-btn.danger:hover { color: #dc2626; }
 .icon-btn .material-symbols-outlined { font-size: 18px; }
-.empty-state {
-  grid-column: 1 / -1; text-align: center; padding: 60px 20px; color: #9ca3af;
-}
-.empty-state .material-symbols-outlined { font-size: 48px; display: block; margin-bottom: 8px; }
-.empty-state p { margin: 0; font-size: 14px; }
-
 /* Modal */
 .modal-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,.4);
@@ -372,7 +345,6 @@ onMounted(async () => {
 
 @media (max-width: 768px) {
   .vm-wrap { padding: 12px; }
-  .vm-header { flex-direction: column; gap: 12px; align-items: flex-start; }
   .vault-grid { grid-template-columns: 1fr; }
 }
 </style>

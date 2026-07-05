@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useExchangeStore } from '@/stores/exchange'
 import apiService from '@/services/apiservice'
+import AppKpiCard from '@/components/common/AppKpiCard.vue'
 
 const authStore = useAuthStore()
 const exchangeStore = useExchangeStore()
@@ -381,22 +382,10 @@ onUnmounted(() => {
 
     <!-- KPI Cards -->
     <div v-if="activeTab === 'list'" class="kpi-grid">
-      <div class="kpi-card">
-        <div class="kpi-label">Toplam Cari</div>
-        <div class="kpi-value">{{ totals.count }}</div>
-      </div>
-      <div class="kpi-card kpi-green">
-        <div class="kpi-label">Toplam Alacak</div>
-        <div class="kpi-value">{{ formatCurrency(totals.totalReceivables) }} ₺</div>
-      </div>
-      <div class="kpi-card kpi-red">
-        <div class="kpi-label">Toplam Borç</div>
-        <div class="kpi-value">{{ formatCurrency(totals.totalDebts) }} ₺</div>
-      </div>
-      <div class="kpi-card" :class="totals.netBalance >= 0 ? 'kpi-green' : 'kpi-red'">
-        <div class="kpi-label">Net Bakiye</div>
-        <div class="kpi-value">{{ formatCurrency(totals.netBalance) }} ₺</div>
-      </div>
+      <AppKpiCard icon="people" label="Toplam Cari" :value="totals.count" color="#6366f1" bg="#eef2ff" />
+      <AppKpiCard icon="arrow_downward" label="Toplam Alacak" :value="formatCurrency(totals.totalReceivables) + ' ₺'" color="#059669" bg="#ecfdf5" />
+      <AppKpiCard icon="arrow_upward" label="Toplam Borç" :value="formatCurrency(totals.totalDebts) + ' ₺'" color="#ef4444" bg="#fef2f2" />
+      <AppKpiCard icon="account_balance" label="Net Bakiye" :value="formatCurrency(totals.netBalance) + ' ₺'" :color="totals.netBalance >= 0 ? '#059669' : '#ef4444'" :bg="totals.netBalance >= 0 ? '#ecfdf5' : '#fef2f2'" />
     </div>
 
     <!-- Filters -->
@@ -909,27 +898,6 @@ onUnmounted(() => {
   gap: 16px;
   margin-bottom: 20px;
 }
-.kpi-card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 16px 20px;
-}
-.kpi-label {
-  font-size: 12px;
-  color: #6b7280;
-  text-transform: uppercase;
-  letter-spacing: .5px;
-  margin-bottom: 4px;
-}
-.kpi-value {
-  font-size: 20px;
-  font-weight: 700;
-  color: #1a1a2e;
-}
-.kpi-green .kpi-value { color: #059669; }
-.kpi-red .kpi-value { color: #dc2626; }
-
 /* Filter Bar */
 .filter-bar {
   display: flex;

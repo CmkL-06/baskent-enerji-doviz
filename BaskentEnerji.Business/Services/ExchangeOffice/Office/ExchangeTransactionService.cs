@@ -84,7 +84,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     CustomerId = request.First().CustomerId,
                     PartyId = request.First().PartyId,
                     UserId = Guid.Parse(_validationService.GetUserID()),
-                    Type = TransactionType.Exchange,
+                    Type = request.First().IsBuyingFromCustomer ? TransactionType.Buy : TransactionType.Exchange,
                     TransactionDate = DateTime.UtcNow,
                     Status = TransactionStatus.Pending,
                     Notes = request.First().Notes,
@@ -102,6 +102,13 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 // Pre-fetch all needed currencies to avoid N+1 queries inside loop
                 var allCurrencyIds = request.SelectMany(r => new[] { r.SourceCurrencyId, r.TargetCurrencyId }).Distinct().ToList();
                 var currencyDict = await _context.Currencies.Where(c => allCurrencyIds.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => c);
+
+                // Save transaction to DB first so WAC history FK references are valid
+                _context.Transactions.Add(exchangeTransaction);
+                await _context.SaveChangesAsync();
+
+                // Collect details separately to avoid EF tracking issues after initial save
+                var pendingDetails = new List<TransactionDetail>();
 
                 // Process each exchange request
                 foreach (var singleRequest in request)
@@ -175,7 +182,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     if (singleRequest.IsBuyingFromCustomer)
                     {
                         // Customer sells to us: we debit target currency, credit source currency
-                        exchangeTransaction.Details.Add(new TransactionDetail
+                        pendingDetails.Add(new TransactionDetail
                         {
                             Id = Guid.NewGuid(),
                             CurrencyId = singleRequest.TargetCurrencyId,
@@ -190,7 +197,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                             CustomRate = singleRequest.CustomRate
                         });
 
-                        exchangeTransaction.Details.Add(new TransactionDetail
+                        pendingDetails.Add(new TransactionDetail
                         {
                             Id = Guid.NewGuid(),
                             CurrencyId = singleRequest.SourceCurrencyId,
@@ -208,7 +215,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     else
                     {
                         // Customer buys from us: we credit target currency, debit source currency
-                        exchangeTransaction.Details.Add(new TransactionDetail
+                        pendingDetails.Add(new TransactionDetail
                         {
                             Id = Guid.NewGuid(),
                             CurrencyId = singleRequest.SourceCurrencyId,
@@ -223,7 +230,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                             CustomRate = singleRequest.CustomRate
                         });
 
-                        exchangeTransaction.Details.Add(new TransactionDetail
+                        pendingDetails.Add(new TransactionDetail
                         {
                             Id = Guid.NewGuid(),
                             CurrencyId = singleRequest.TargetCurrencyId,
@@ -255,14 +262,18 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 // Set total profit on transaction
                 exchangeTransaction.Profit = totalProfit;
 
-                // Save transaction
-                _context.Transactions.Add(exchangeTransaction);
+                // Add details via context to ensure they are tracked as "Added"
+                foreach (var d in pendingDetails)
+                {
+                    d.TransactionId = exchangeTransaction.Id;
+                    _context.Set<TransactionDetail>().Add(d);
+                }
+
+                // Save updated profit and details
                 await _context.SaveChangesAsync();
 
                 // Update vault balances
-
-          
-                foreach (var detail in exchangeTransaction.Details)
+                foreach (var detail in pendingDetails)
                 {
                     var amount = detail.Side == TransactionSide.Credit
                         ? detail.NetAmount
@@ -274,7 +285,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                         currencyId = detail.CurrencyId,
                         description = $"Exchange transaction {exchangeTransaction.TransactionNumber}",
                         vaultId = vaultId,
-                        TransactionType = TransactionType.Exchange
+                        TransactionType = exchangeTransaction.Type
                     };
 
                     await _vaultService.UpdateVaultBalanceAsync(updateData);
@@ -422,7 +433,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 .Where(t =>
                     t.Vault.OfficeId == officeId &&
                     t.Status == TransactionStatus.Completed &&
-                    t.Type == TransactionType.Exchange);
+                    (t.Type == TransactionType.Exchange || t.Type == TransactionType.Buy));
 
             if (startDate.HasValue)
             {
@@ -652,7 +663,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 }
 
                 // Reverse WAC changes for exchange transactions
-                if (dbTransaction.Type == TransactionType.Exchange && dbTransaction.Details != null)
+                if ((dbTransaction.Type == TransactionType.Exchange || dbTransaction.Type == TransactionType.Buy) && dbTransaction.Details != null)
                 {
                     var detailCurrencyIds = dbTransaction.Details.Select(d => d.CurrencyId).Distinct().ToList();
                     var detailCurrencies = await _context.Currencies.Where(c => detailCurrencyIds.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => c);
