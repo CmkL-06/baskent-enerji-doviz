@@ -98,7 +98,7 @@
 
         <!-- Footer -->
         <div class="login-footer">
-          <p>&copy; 2024 Exchange Office. Tüm hakları saklıdır.</p>
+          <p>&copy; {{ new Date().getFullYear() }} Exchange Office. Tüm hakları saklıdır.</p>
         </div>
       </div>
     </div>

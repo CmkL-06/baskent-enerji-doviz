@@ -97,25 +97,14 @@ namespace BaskentEnerji.API.Controllers.Site
                 return BadRequest(new { message = "Invalid form data" });
             }
 
-            var dbCheckSubmit = await _dbContext.Form_Submits.FirstOrDefaultAsync(x => x.Id == data.Id);
-            if (dbCheckSubmit != null)
+            var formSubmit = new Form_Submit
             {
-                dbCheckSubmit.data = data.data ?? string.Empty;
-                dbCheckSubmit.IsActive = data.IsActive;
-                dbCheckSubmit.Notes = data.Notes ?? string.Empty;
-                dbCheckSubmit.FormId = data.FormId;
-            }
-            else
-            {
-                var formSubmit = new Form_Submit
-                {
-                    FormId = data.FormId,
-                    data = data.data ?? string.Empty,
-                    IsActive = true,
-                    IpAdress = tools_string.GetIpAddress(HttpContext)
-                };
-                _dbContext.Form_Submits.Add(formSubmit);
-            }
+                FormId = data.FormId,
+                data = data.data ?? string.Empty,
+                IsActive = true,
+                IpAdress = tools_string.GetIpAddress(HttpContext)
+            };
+            _dbContext.Form_Submits.Add(formSubmit);
 
             await _dbContext.SaveChangesAsync();
             return Ok(new { message = "Form submission saved successfully" });

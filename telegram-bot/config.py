@@ -71,6 +71,7 @@ class Config:
     FLASK_SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key')
     FLASK_PORT = int(os.getenv('FLASK_PORT', '5000'))
     WEB_PANEL_URL = os.getenv('WEB_PANEL_URL', 'http://localhost:5000')
+    NOTIFY_SECRET = os.getenv('NOTIFY_SECRET', 'bsk-notify-2026-secret')
 
     # ── Dosya Yükleme ──
     UPLOAD_DIR = os.getenv('UPLOAD_DIR', 'uploads')

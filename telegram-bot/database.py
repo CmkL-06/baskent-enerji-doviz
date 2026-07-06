@@ -848,6 +848,7 @@ def notify_web_panel(transaction_id):
         req.post(
             f'{Config.WEB_PANEL_URL}/api/v1/tg/notify',
             json={'transaction_id': transaction_id},
+            headers={'X-Notify-Secret': Config.NOTIFY_SECRET},
             timeout=0.5
         )
     except:

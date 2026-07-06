@@ -14,12 +14,14 @@ namespace BaskentEnerji.API.Controllers.Telegram
     public class TelegramEventsController : ControllerBase
     {
         private readonly ValidationService _validationService;
+        private readonly IConfiguration _configuration;
 
         private static readonly ConcurrentDictionary<string, SseClient> _clients = new();
 
-        public TelegramEventsController(ValidationService validationService)
+        public TelegramEventsController(ValidationService validationService, IConfiguration configuration)
         {
             _validationService = validationService;
+            _configuration = configuration;
         }
 
         [HttpGet("events")]
@@ -75,6 +77,11 @@ namespace BaskentEnerji.API.Controllers.Telegram
         [AllowAnonymous]
         public IActionResult Notify([FromBody] JsonElement data)
         {
+            var secret = _configuration["NotifySecret"] ?? "bsk-notify-2026-secret";
+            var headerSecret = Request.Headers["X-Notify-Secret"].FirstOrDefault();
+            if (headerSecret != secret)
+                return Unauthorized(new { ok = false, error = "Invalid secret" });
+
             var message = $"event: transaction_update\ndata: {data.GetRawText()}\n\n";
             foreach (var client in _clients.Values)
                 client.Send(message);

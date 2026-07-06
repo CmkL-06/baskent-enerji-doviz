@@ -45,7 +45,7 @@ namespace BaskentEnerji.API.Controllers.Blog
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { success = false, message = "İç sunucu hatası", error = ex.Message });
+                return StatusCode(500, new { success = false, message = "İç sunucu hatası" });
             }
         }
 
@@ -63,7 +63,7 @@ namespace BaskentEnerji.API.Controllers.Blog
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { success = false, message = "İç sunucu hatası", error = ex.Message });
+                return StatusCode(500, new { success = false, message = "İç sunucu hatası" });
             }
         }
 
@@ -81,7 +81,7 @@ namespace BaskentEnerji.API.Controllers.Blog
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { success = false, message = "İç sunucu hatası", error = ex.Message });
+                return StatusCode(500, new { success = false, message = "İç sunucu hatası" });
             }
         }
 
@@ -124,7 +124,7 @@ namespace BaskentEnerji.API.Controllers.Blog
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { success = false, message = "İç sunucu hatası", error = ex.Message });
+                return StatusCode(500, new { success = false, message = "İç sunucu hatası" });
             }
         }
 
@@ -142,7 +142,7 @@ namespace BaskentEnerji.API.Controllers.Blog
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { success = false, message = "İç sunucu hatası", error = ex.Message });
+                return StatusCode(500, new { success = false, message = "İç sunucu hatası" });
             }
         }
 
@@ -160,7 +160,7 @@ namespace BaskentEnerji.API.Controllers.Blog
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { success = false, message = "İç sunucu hatası", error = ex.Message });
+                return StatusCode(500, new { success = false, message = "İç sunucu hatası" });
             }
         }
 
@@ -205,7 +205,7 @@ namespace BaskentEnerji.API.Controllers.Blog
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { success = false, message = "İç sunucu hatası", error = ex.Message });
+                return StatusCode(500, new { success = false, message = "İç sunucu hatası" });
             }
         }
     }

@@ -88,14 +88,12 @@ namespace BaskentEnerji.API.Controllers
                     DurationMs = (long)(DateTime.UtcNow - startedAt).TotalMilliseconds
                 });
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                var msg = (ex.InnerException?.Message ?? ex.Message) ?? "?";
                 return Ok(new
                 {
                     Ok = false,
-                    Error = msg,
-                    Provider = _db.Database.ProviderName,
+                    Error = "Database connection failed",
                     DurationMs = (long)(DateTime.UtcNow - startedAt).TotalMilliseconds
                 });
             }

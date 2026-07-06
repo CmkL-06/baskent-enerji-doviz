@@ -6,6 +6,7 @@ using BaskentEnerji.Business.Services.Coin;
 using BaskentEnerji.Data.Contexts;
 using BaskentEnerji.Entity.Modals.RequestModals.Coin;
 using BaskentEnerji.Entity.Modals.ViewModals.Coin;
+using BaskentEnerji.Business.Services.Permission;
 
 namespace BaskentEnerji.API.Controllers.Coin
 {
@@ -18,13 +19,15 @@ namespace BaskentEnerji.API.Controllers.Coin
         private readonly ICoinServiceCommand _coinServiceCommand;
         private readonly ICoinServiceQuery _coinServiceQuery;
         private readonly BaskentEnerjiDbContext _dbContext;
+        private readonly ValidationService _validationService;
 
-        public CoinController(CoinPriceService coinPriceService, ICoinServiceCommand coinServiceCommand, ICoinServiceQuery coinServiceQuery, BaskentEnerjiDbContext dbContext)
+        public CoinController(CoinPriceService coinPriceService, ICoinServiceCommand coinServiceCommand, ICoinServiceQuery coinServiceQuery, BaskentEnerjiDbContext dbContext, ValidationService validationService)
         {
             _coinPriceService = coinPriceService;
             _coinServiceCommand = coinServiceCommand;
             _coinServiceQuery = coinServiceQuery;
             _dbContext = dbContext;
+            _validationService = validationService;
         }
 
         [HttpGet("track/{coinSymbol}")]
@@ -52,24 +55,32 @@ namespace BaskentEnerji.API.Controllers.Coin
         }
 
         [HttpPost("admin/save")]
-        public async Task SaveCoin (rm_savecoin_admin data)
+        public async Task<IActionResult> SaveCoin (rm_savecoin_admin data)
         {
+            if (!await _validationService.IsAdminAsync()) return Forbid();
             await _coinServiceCommand.Admin_SaveCoin(data);
+            return Ok();
         }
         [HttpPost("admin/delete")]
-        public async Task Admin_DeleteCoin([FromBody] Guid CoinId)
+        public async Task<IActionResult> Admin_DeleteCoin([FromBody] Guid CoinId)
         {
+            if (!await _validationService.IsAdminAsync()) return Forbid();
             await _coinServiceCommand.Admin_DeleteCoin(CoinId);
+            return Ok();
         }
         [HttpPost("admin/addpair")]
-        public async Task AddPair(rm_addpair data)
+        public async Task<IActionResult> AddPair(rm_addpair data)
         {
+            if (!await _validationService.IsAdminAsync()) return Forbid();
             await _coinServiceCommand.Admin_AddPair(data);
+            return Ok();
         }
         [HttpPost("admin/deletepair")]
-        public async Task DeletePair([FromBody] Guid PairId)
+        public async Task<IActionResult> DeletePair([FromBody] Guid PairId)
         {
+            if (!await _validationService.IsAdminAsync()) return Forbid();
             await _coinServiceCommand.Admin_DeletePair(PairId);
+            return Ok();
         }
 
         [HttpGet]
