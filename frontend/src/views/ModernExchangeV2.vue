@@ -1295,34 +1295,30 @@ const handleWaitingCustomer = () => {
   
   // Show countdown notification
   const showCountdown = () => {
-    if (vaultCountingModalRef.value) {
-      const remaining = vaultCountingModalRef.value.getRemainingTime()
-      if (remaining > 0) {
-        const mins = Math.floor(remaining / 60)
-        const secs = remaining % 60
-        notification.warning(
-          `Kasa sayımı ${mins}:${secs.toString().padStart(2, '0')} sonra tekrar açılacak`, 
-          {
-            duration: 3000,
-            title: 'Kasa Sayım Hatırlatması'
-          }
-        )
-      }
+    const remaining = vaultCountingModalRef.value?.getRemainingTime?.() ?? 0
+    if (remaining > 0) {
+      const mins = Math.floor(remaining / 60)
+      const secs = remaining % 60
+      notification.warning(
+        `Kasa sayımı ${mins}:${secs.toString().padStart(2, '0')} sonra tekrar açılacak`,
+        {
+          duration: 3000,
+          title: 'Kasa Sayım Hatırlatması'
+        }
+      )
     }
   }
-  
+
   // Show initial notification
   showCountdown()
-  
+
   // Show periodic reminders
   const reminderInterval = setInterval(() => {
-    if (vaultCountingModalRef.value) {
-      const remaining = vaultCountingModalRef.value.getRemainingTime()
-      if (remaining <= 0) {
-        clearInterval(reminderInterval)
-      } else if (remaining === 120 || remaining === 60 || remaining === 30) {
-        showCountdown()
-      }
+    const remaining = vaultCountingModalRef.value?.getRemainingTime?.() ?? 0
+    if (remaining <= 0) {
+      clearInterval(reminderInterval)
+    } else if (remaining === 120 || remaining === 60 || remaining === 30) {
+      showCountdown()
     }
   }, 1000)
 }
