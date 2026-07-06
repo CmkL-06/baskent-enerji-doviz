@@ -326,6 +326,7 @@ const modalLoading = ref(false)
 const modalMsg = ref({ type: '', text: '' })
 const modalUsers = ref<any[]>([])
 const modalCurrencies = ref<any[]>([])
+const modalVaultList = ref<any[]>([])
 
 const modalTitles: Record<string, string> = {
   addUser: 'Kullanıcı Ekle', removeUser: 'Kullanıcı Çıkar',
@@ -341,13 +342,12 @@ const selectedUserId = ref('')
 const selectedVaultId = ref('')
 
 const modalVaults = computed(() => {
-  const result: any[] = []
-  for (const o of offices.value) {
-    for (const v of (o.vaults ?? [])) {
-      result.push({ id: v.vaultId ?? v.id, name: v.vaultName ?? v.name, officeName: o.officeName, officeId: o.officeId })
-    }
-  }
-  return result
+  return modalVaultList.value.map(v => ({
+    id: v.vaultId ?? v.id,
+    name: v.vaultName ?? v.name ?? 'Kasa',
+    officeName: v.officeName ?? '',
+    officeId: v.officeId ?? ''
+  }))
 })
 
 async function openModal(type: string) {
@@ -355,6 +355,9 @@ async function openModal(type: string) {
   modalMsg.value = { type: '', text: '' }
   if (type === 'removeUser') {
     try { const d = await apiService.getUsers(); modalUsers.value = Array.isArray(d) ? d : (d?.items ?? []) } catch { modalUsers.value = [] }
+  }
+  if (['loadBalance', 'transfer', 'removeVault'].includes(type)) {
+    try { const d = await apiService.getVaults(); modalVaultList.value = Array.isArray(d) ? d : [] } catch { modalVaultList.value = [] }
   }
   if (['loadBalance', 'transfer'].includes(type)) {
     try { const d = await apiService.getCurrencies(); modalCurrencies.value = Array.isArray(d) ? d : [] } catch { modalCurrencies.value = [] }
@@ -868,7 +871,7 @@ onUnmounted(() => clearInterval(timer))
                 <label>Para Birimi</label>
                 <select v-model="formBalance.currencyId">
                   <option value="">Seçiniz...</option>
-                  <option v-for="c in modalCurrencies" :key="c.id" :value="c.id">{{ c.code }} — {{ c.name }}</option>
+                  <option v-for="c in modalCurrencies" :key="c.id" :value="c.id">{{ c.currencyCode }} — {{ c.currencyName }}</option>
                 </select>
               </div>
               <div class="qm-row"><label>Miktar</label><input v-model.number="formBalance.amount" type="number" step="0.01" placeholder="0.00" /></div>
@@ -895,7 +898,7 @@ onUnmounted(() => clearInterval(timer))
                 <label>Para Birimi</label>
                 <select v-model="formTransfer.currencyId">
                   <option value="">Seçiniz...</option>
-                  <option v-for="c in modalCurrencies" :key="c.id" :value="c.id">{{ c.code }} — {{ c.name }}</option>
+                  <option v-for="c in modalCurrencies" :key="c.id" :value="c.id">{{ c.currencyCode }} — {{ c.currencyName }}</option>
                 </select>
               </div>
               <div class="qm-row"><label>Miktar</label><input v-model.number="formTransfer.amount" type="number" step="0.01" placeholder="0.00" /></div>
