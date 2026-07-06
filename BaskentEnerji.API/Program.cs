@@ -394,13 +394,12 @@ app.MapGet("/health/ready", async (IServiceProvider serviceProvider) =>
             timestamp = DateTime.UtcNow
         });
     }
-    catch (Exception ex)
+    catch (Exception)
     {
         return Results.Json(new
         {
             status = "not-ready",
             db = "error",
-            error = ex.Message,
             timestamp = DateTime.UtcNow
         }, statusCode: StatusCodes.Status503ServiceUnavailable);
     }

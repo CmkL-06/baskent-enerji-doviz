@@ -30,7 +30,7 @@ const isUserMenuOpen = ref(false)
 // All navigation items
 const allNavItems = computed(() => [
   { id: 'home', icon: 'dashboard', label: t('navbar.dashboard'), category: 'GENEL', path: '/ihtiyar/dashboard', adminOnly: false },
-  { id: 'z-report', icon: 'insert_chart', label: t('navbar.zReport'), category: 'RAPORLAR', path: '/ihtiyar/z-report', adminOnly: true },
+  { id: 'z-report', icon: 'insert_chart', label: t('navbar.zReport'), category: 'RAPORLAR', path: '/ihtiyar/z-report', adminOnly: false },
   { id: 'exchange-v2', icon: 'paid', label: t('navbar.exchange'), category: 'İŞLEMLER', path: '/ihtiyar/exchange-v2', adminOnly: false },
   { id: 'parties', icon: 'contacts', label: t('navbar.parties'), category: 'İŞLEMLER', path: '/ihtiyar/parties', adminOnly: false },
   // { id: 'ghost-party', icon: 'auto_awesome', label: t('navbar.ghostParty'), category: 'İŞLEMLER', path: '/ihtiyar/ghost-party', adminOnly: true },

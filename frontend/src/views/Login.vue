@@ -55,7 +55,7 @@
               <input type="checkbox" v-model="rememberMe">
               <span>Beni hatırla</span>
             </label>
-            <a href="#" class="forgot-password" @click.prevent>Şifremi unuttum</a>
+            <span class="forgot-password disabled-link">Şifremi unuttum</span>
           </div>
 
           <!-- Error Message -->
@@ -353,15 +353,10 @@ onMounted(() => {
 }
 
 .forgot-password {
-  color: #667eea;
-  text-decoration: none;
+  color: #a0aec0;
   font-size: 0.9rem;
   font-weight: 500;
-  transition: color 0.3s ease;
-}
-
-.forgot-password:hover {
-  color: #764ba2;
+  cursor: default;
 }
 
 /* Error Message */
