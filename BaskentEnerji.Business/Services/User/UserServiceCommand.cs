@@ -80,10 +80,14 @@ namespace BaskentEnerji.Business.Services.User
 
             user.LastIp = tools_string.GetIpAddress(httpContext);
 
+            var userOffice = await _dbContext.User_Offices
+                .Where(uo => uo.UserId == user.Id && uo.IsActive)
+                .Select(uo => uo.OfficeId)
+                .FirstOrDefaultAsync();
+
             return new rsp_user_login
             {
                 ApiToken = jwtTokenString,
-                //FirebaseToken = firebaseToken,  // Add Firebase token here
                 UserInfo = new vm_user_simple
                 {
                     Id = user.Id,
@@ -93,7 +97,8 @@ namespace BaskentEnerji.Business.Services.User
                     Firstname = user.Firstname ?? "",
                     Lastname = user.Lastname ?? "",
                     Rank = user.Rank,
-                    Username = user.Username ?? ""
+                    Username = user.Username ?? "",
+                    OfficeId = userOffice != Guid.Empty ? userOffice : null
                 }
             };
         }

@@ -38,6 +38,7 @@ export const useAuthStore = defineStore('auth', () => {
       localStorage.setItem('token', jwt)
       localStorage.setItem('user', JSON.stringify(info))
       localStorage.setItem('uiStyle', 'modern')
+      if (info?.officeId) localStorage.setItem('selectedOfficeId', info.officeId)
       await loadUserOffices()
       await router.push('/ihtiyar/dashboard')
     } catch (err: any) {

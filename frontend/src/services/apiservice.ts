@@ -15,15 +15,24 @@ apiClient.interceptors.request.use(cfg => {
   return cfg
 })
 
-// 401 → login yönlendir
+// 401 → login yönlendir (cascade korumalı)
+let _redirecting = false
 apiClient.interceptors.response.use(
   r => r,
   err => {
-    if (err.response?.status === 401) {
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      if (window.location.pathname !== '/login') {
-        import('@/router').then(m => m.default.push('/login'))
+    if (err.response?.status === 401 && !_redirecting) {
+      const hadToken = !!localStorage.getItem('token')
+      if (hadToken) {
+        _redirecting = true
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+        if (window.location.pathname !== '/login') {
+          import('@/router').then(m => {
+            m.default.push('/login').finally(() => { _redirecting = false })
+          })
+        } else {
+          _redirecting = false
+        }
       }
     }
     return Promise.reject(err)
@@ -153,8 +162,8 @@ const apiService = {
   getPartyAccountEntries:   (accountId: any)      => get(`/exchange/party/account/${accountId}/entries`),
   createPartyPayment:       (data: any)           => post('/exchange/party/account/payment', data),
   getPartyStatement:        (partyId: any)        => get(`/exchange/party/${partyId}/statement`),
-  getPartyBalanceSummary:   ()                    => get('/exchange/party/reports/balance-summary'),
-  getPartyAgedReceivables:  ()                    => get('/exchange/party/reports/aged-receivables'),
+  getPartyBalanceSummary:   (officeId?: any)       => get(`/exchange/party/reports/balance-summary${officeId ? `?officeId=${officeId}` : ''}`),
+  getPartyAgedReceivables:  (officeId?: any)      => get(`/exchange/party/reports/aged-receivables${officeId ? `?officeId=${officeId}` : ''}`),
 
   // ── Ghost Party  [ExchangeController → /api/v1/exchange/ghost-party]
   createGhostAccount:     (data: any)             => post('/exchange/ghost-party/account/create', data),

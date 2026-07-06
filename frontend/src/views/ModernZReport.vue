@@ -144,6 +144,13 @@ function toggleCurrency(code: string) {
 
 async function loadOffices() {
   try {
+    if (!authStore.isAdmin) {
+      const access = await apiService.getMyOfficeAccess()
+      const list = (access ?? []).map((a: any) => ({ id: a.officeId, name: a.office?.officeName ?? 'Ofis' })).filter((o: any) => o.id)
+      offices.value = list
+      if (list.length === 1) selectedOfficeId.value = list[0].id
+      return
+    }
     const res = await apiService.getVaults()
     const map: Record<string, string> = {}
     ;(res ?? []).forEach((v: any) => { if (v.officeId) map[String(v.officeId)] = v.officeName ?? `Ofis ${v.officeId}` })
@@ -249,12 +256,16 @@ onMounted(async () => {
           </div>
         </template>
 
-        <div class="filter-group" v-if="offices.length > 0">
+        <div class="filter-group" v-if="offices.length > 0 && authStore.isAdmin">
           <label>Şube</label>
           <select v-model="selectedOfficeId" class="zr-input">
             <option value="">Tüm Şubeler</option>
             <option v-for="o in offices" :key="o.id" :value="o.id">{{ o.name }}</option>
           </select>
+        </div>
+        <div class="filter-group" v-else-if="offices.length === 1 && !authStore.isAdmin">
+          <label>Şube</label>
+          <div class="zr-input zr-office-fixed">{{ offices[0].name }}</div>
         </div>
 
         <div class="filter-group filter-group--actions">
@@ -784,6 +795,7 @@ onMounted(async () => {
 .zr-input { height: 36px; padding: 0 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 13px; color: #111; background: #f9fafb; outline: none; transition: border .15s; }
 .zr-input:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,.12); }
 .zr-input-sm { width: 90px; }
+.zr-office-fixed { display: flex; align-items: center; font-weight: 600; color: #4f46e5; background: #eef2ff; border-color: #c7d2fe; cursor: default; }
 .mode-tabs { display: flex; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
 .mt-btn { padding: 7px 14px; font-size: 12px; font-weight: 500; background: #f9fafb; border: none; cursor: pointer; color: #6b7280; transition: all .15s; }
 .mt-btn.active { background: #6366f1; color: #fff; }

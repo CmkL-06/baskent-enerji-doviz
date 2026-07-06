@@ -1360,14 +1360,29 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         /// </summary>
         [HttpGet("party/reports/aged-receivables")]
         public async Task<ActionResult<List<vm_agedreceivables>>> GetAgedReceivables(
-            [FromQuery] Guid officeId,
+            [FromQuery] Guid? officeId = null,
             [FromQuery] DateTime? asOfDate = null)
         {
             try
             {
-                await _permissionService.ValidateOfficeAccessAsync(officeId);
-                var report = await _partyReportingService.GetAgedReceivablesAsync(officeId, asOfDate ?? DateTime.Today);
-                return Ok(report);
+                var date = asOfDate ?? DateTime.Today;
+                if (officeId.HasValue)
+                {
+                    await _permissionService.ValidateOfficeAccessAsync(officeId.Value);
+                    var report = await _partyReportingService.GetAgedReceivablesAsync(officeId.Value, date);
+                    return Ok(report);
+                }
+                else
+                {
+                    var allResults = new List<vm_agedreceivables>();
+                    var offices = await _context.Offices.Where(o => o.IsActive).ToListAsync();
+                    foreach (var office in offices)
+                    {
+                        var officeReport = await _partyReportingService.GetAgedReceivablesAsync(office.Id, date);
+                        allResults.AddRange(officeReport);
+                    }
+                    return Ok(allResults);
+                }
             }
             catch (Exception ex)
             {

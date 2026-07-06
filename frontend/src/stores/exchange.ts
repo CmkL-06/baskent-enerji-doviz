@@ -46,7 +46,9 @@ export const useExchangeStore = defineStore('exchange', () => {
       const data = await apiService.getOffices()
       offices.value = Array.isArray(data) ? data : (data?.items ?? data?.data ?? [])
       if (!selectedOffice.value && offices.value.length > 0) {
-        selectedOffice.value = offices.value[0]
+        const savedId = localStorage.getItem(OFFICE_ID_KEY)
+        const match = savedId ? offices.value.find((o: any) => o.officeId === savedId || o.id === savedId) : null
+        selectedOffice.value = match ?? offices.value[0]
       }
     } catch {}
   }

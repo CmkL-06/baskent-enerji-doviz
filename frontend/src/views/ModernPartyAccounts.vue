@@ -103,10 +103,8 @@ const totals = computed(() => {
   let totalReceivables = 0
   let totalDebts = 0
   parties.value.forEach(p => {
-    p.accounts?.forEach((a: any) => {
-      if (a.balance > 0) totalReceivables += a.balance
-      else if (a.balance < 0) totalDebts += Math.abs(a.balance)
-    })
+    totalReceivables += p.totalReceivables ?? 0
+    totalDebts += p.totalPayables ?? 0
   })
   return {
     totalReceivables,

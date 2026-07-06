@@ -4,7 +4,6 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useExchangeStore } from '@/stores/exchange'
 import apiService from '@/services/apiservice'
-import AppKpiCard from '@/components/common/AppKpiCard.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -12,8 +11,7 @@ const exchangeStore = useExchangeStore()
 
 const isLoading = ref(true)
 const dashboard = ref<any>(null)
-const now = new Date()
-const dateStr = now.toLocaleDateString('tr-TR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+const dateStr = ref('')
 
 const fmtNum = (n: number | null | undefined, dec = 0) =>
   new Intl.NumberFormat('tr-TR', { minimumFractionDigits: dec, maximumFractionDigits: dec }).format(n ?? 0)
@@ -26,221 +24,25 @@ const g = (o: any, k: string) => {
   return o[lk] !== undefined ? o[lk] : o[k]
 }
 
-// Tab system
-type Tab = 'overview' | 'offices' | 'users' | 'qr'
-const activeTab = ref<Tab>('overview')
-
-// Owner: Offices
+// ── Owner data
 const offices = ref<any[]>([])
-const officesLoading = ref(false)
-const officesError = ref('')
-
-async function loadOffices() {
-  officesLoading.value = true
-  officesError.value = ''
-  try {
-    offices.value = await apiService.getOfficeSummaries() ?? []
-  } catch (e: any) {
-    officesError.value = e?.response?.data?.message || e.message || 'Veri yüklenemedi'
-  } finally {
-    officesLoading.value = false
-  }
-}
-
-// Kargıcak bir şube DEĞİL, merkezdir. Merkezi şubelerden ayırıyoruz.
-const isMerkez = (o: any) => /merkez/i.test(o?.officeName ?? '')
-// Merkez her zaman en üstte listelenir, ardından şubeler
-const sortedOffices = computed(() =>
-  [...offices.value].sort((a, b) => (isMerkez(b) ? 1 : 0) - (isMerkez(a) ? 1 : 0))
-)
-const merkezCount = computed(() => offices.value.filter(isMerkez).length)
-const subeCount = computed(() => offices.value.filter(o => !isMerkez(o)).length)
-
-const totalVaults = computed(() => offices.value.reduce((a, o) => a + (o.vaultCount ?? 0), 0))
-const totalDailyPL = computed(() => offices.value.reduce((a, o) => a + (o.dailyProfitLoss ?? 0), 0))
-const totalMonthlyPL = computed(() => offices.value.reduce((a, o) => a + (o.monthlyProfitLoss ?? 0), 0))
-
-// Owner: QR
-const qrInput = ref('')
-const qrLabel = ref('')
-const qrSize = ref(280)
-const qrGenerated = ref(false)
-const qrImgUrl = ref('')
-
-function generateQr() {
-  const text = qrInput.value.trim()
-  if (!text) return
-  qrImgUrl.value = `https://api.qrserver.com/v1/create-qr-code/?size=${qrSize.value}x${qrSize.value}&data=${encodeURIComponent(text)}&margin=10&ecc=M`
-  qrGenerated.value = true
-}
-
-function downloadQr() {
-  if (!qrImgUrl.value) return
-  const a = document.createElement('a')
-  a.href = qrImgUrl.value
-  a.download = (qrLabel.value.trim() || 'qrcode') + '.png'
-  a.target = '_blank'
-  a.click()
-}
-
-function resetQr() {
-  qrInput.value = ''
-  qrLabel.value = ''
-  qrGenerated.value = false
-  qrImgUrl.value = ''
-}
-
-const currencyKeys = (obj: Record<string, number> | null | undefined) =>
-  obj ? Object.entries(obj).slice(0, 4) : []
-
-// Admin: User Management
-const umUsers = ref<any[]>([])
-const umOffices = ref<any[]>([])
-const umLoading = ref(false)
-const umError = ref('')
-const umSearch = ref('')
-const umSelected = ref<any>(null)
-const umDetailTab = ref<'info' | 'password' | 'offices'>('info')
-const umSaving = ref(false)
-const umSaveError = ref('')
-const umSaveOk = ref(false)
-const umEditForm = ref({ username: '', mail: '', firstname: '', lastname: '', rank: 1 })
-const umPwForm = ref({ newPassword: '', confirm: '' })
-const umCreateForm = ref({ username: '', mail: '', password: '', firstname: '', lastname: '' })
-const umCreateMode = ref(false)
-const umUserOffices = ref<any[]>([])
-
-const RANKS = [
-  { value: 0, label: 'Yasaklı', key: 'Banned', color: '#ef4444', bg: '#fef2f2', ring: '#fca5a5' },
-  { value: 1, label: 'Kullanıcı', key: 'User', color: '#6b7280', bg: '#f9fafb', ring: '#d1d5db' },
-  { value: 2, label: 'Müşteri', key: 'Customer', color: '#0ea5e9', bg: '#f0f9ff', ring: '#7dd3fc' },
-  { value: 50, label: 'Personel', key: 'Staff', color: '#8b5cf6', bg: '#f5f3ff', ring: '#c4b5fd' },
-  { value: 99, label: 'Admin', key: 'Admin', color: '#dc2626', bg: '#fef2f2', ring: '#fca5a5' },
-  { value: 100, label: 'Owner', key: 'Owner', color: '#d97706', bg: '#fffbeb', ring: '#fcd34d' },
-]
-
-function rankInfo(rank: any) { return RANKS.find(r => r.label === rank || r.value === rank || r.key === rank) ?? RANKS[1] }
-function rankValue(rank: any) { return typeof rank === 'number' ? rank : (RANKS.find(r => r.label === rank || r.key === rank)?.value ?? 1) }
-function avatarColor(name: string) {
-  const colors = ['#6366f1','#8b5cf6','#ec4899','#f97316','#14b8a6','#0ea5e9','#84cc16','#ef4444']
-  return colors[(name?.charCodeAt(0) ?? 0) % colors.length]
-}
-
-const umFiltered = computed(() => {
-  const q = umSearch.value.toLowerCase()
-  if (!q) return umUsers.value
-  return umUsers.value.filter(u =>
-    u.username?.toLowerCase().includes(q) || u.mail?.toLowerCase().includes(q) ||
-    (u.firstname + ' ' + u.lastname).toLowerCase().includes(q)
-  )
-})
-
-const umAssignedIds = computed(() => new Set(umUserOffices.value.map((o: any) => o.officeId ?? o.id)))
-
-const umActiveCount = computed(() => umUsers.value.filter(u => rankValue(u.rank) > 0).length)
-const umAdminCount = computed(() => umUsers.value.filter(u => rankValue(u.rank) >= 99).length)
-const umStaffCount = computed(() => umUsers.value.filter(u => rankValue(u.rank) === 50).length)
-const umBannedCount = computed(() => umUsers.value.filter(u => rankValue(u.rank) === 0).length)
-
-async function loadUsers() {
-  umLoading.value = true; umError.value = ''
-  try {
-    const [u, o] = await Promise.all([apiService.getUsers(), apiService.getOffices()])
-    umUsers.value = u ?? []; umOffices.value = o ?? []
-  } catch (e: any) { umError.value = e.response?.data?.message || 'Veriler yüklenemedi' }
-  finally { umLoading.value = false }
-}
-
-async function umSelectUser(user: any) {
-  umSelected.value = user; umCreateMode.value = false; umDetailTab.value = 'info'
-  umSaveError.value = ''; umSaveOk.value = false
-  umEditForm.value = { username: user.username ?? '', mail: user.mail ?? '', firstname: user.firstname ?? '', lastname: user.lastname ?? '', rank: rankValue(user.rank) }
-  umPwForm.value = { newPassword: '', confirm: '' }
-  umUserOffices.value = []
-  try { umUserOffices.value = await apiService.getUserOffices(user.id) ?? [] } catch { umUserOffices.value = [] }
-}
-
-function umOpenCreate() {
-  umSelected.value = null; umCreateMode.value = true; umDetailTab.value = 'info'
-  umSaveError.value = ''; umSaveOk.value = false
-  umCreateForm.value = { username: '', mail: '', password: '', firstname: '', lastname: '' }
-}
-
-async function umSaveInfo() {
-  umSaveError.value = ''; umSaveOk.value = false; umSaving.value = true
-  try {
-    await apiService.updateUser({ Id: umSelected.value.id, ...umEditForm.value })
-    umSaveOk.value = true; await loadUsers()
-    const updated = umUsers.value.find(u => u.id === umSelected.value.id)
-    if (updated) umSelected.value = updated
-  } catch (e: any) { umSaveError.value = e.response?.data?.message || 'Kaydedilemedi' }
-  finally { umSaving.value = false }
-}
-
-async function umCreateUser() {
-  umSaveError.value = ''; umSaveOk.value = false
-  const f = umCreateForm.value
-  if (!f.username || !f.mail || !f.password) { umSaveError.value = 'Kullanıcı adı, e-posta ve şifre zorunludur.'; return }
-  umSaving.value = true
-  try {
-    await apiService.registerUser(f); umSaveOk.value = true; await loadUsers()
-    setTimeout(() => { umCreateMode.value = false }, 1200)
-  } catch (e: any) { umSaveError.value = e.response?.data?.message || 'Kullanıcı oluşturulamadı' }
-  finally { umSaving.value = false }
-}
-
-async function umSavePassword() {
-  umSaveError.value = ''; umSaveOk.value = false
-  if (!umPwForm.value.newPassword) { umSaveError.value = 'Şifre boş olamaz'; return }
-  if (umPwForm.value.newPassword !== umPwForm.value.confirm) { umSaveError.value = 'Şifreler eşleşmiyor'; return }
-  umSaving.value = true
-  try {
-    await apiService.changeUserPassword(umSelected.value.id, umPwForm.value.newPassword)
-    umSaveOk.value = true; umPwForm.value = { newPassword: '', confirm: '' }
-  } catch (e: any) { umSaveError.value = e.response?.data?.message || 'Şifre değiştirilemedi' }
-  finally { umSaving.value = false }
-}
-
-async function umConfirmDelete() {
-  if (!umSelected.value) return
-  const name = (umSelected.value.firstname || '') + ' ' + (umSelected.value.lastname || umSelected.value.username)
-  if (!confirm(`"${name.trim()}" kullanıcısını yasaklamak (erişimini kaldırmak) istediğinize emin misiniz?`)) return
-  try {
-    await apiService.updateUser({ Id: umSelected.value.id, rank: 0 })
-    await loadUsers()
-    const updated = umUsers.value.find(u => u.id === umSelected.value.id)
-    if (updated) { umSelected.value = updated; umEditForm.value.rank = 0 }
-  } catch (e: any) { umError.value = e.response?.data?.message || 'İşlem başarısız'; setTimeout(() => umError.value = '', 3000) }
-}
-
-async function umToggleOffice(office: any) {
-  if (!umSelected.value || !authStore.isAdmin) return
-  const officeId = office.officeId ?? office.id
-  try {
-    if (umAssignedIds.value.has(officeId)) {
-      await apiService.removeOfficeFromUser(umSelected.value.id, officeId)
-      umUserOffices.value = umUserOffices.value.filter((o: any) => (o.officeId ?? o.id) !== officeId)
-    } else {
-      await apiService.attachOfficeToUser({ userId: umSelected.value.id, officeId })
-      umUserOffices.value = [...umUserOffices.value, { officeId, ...office }]
-    }
-  } catch (e: any) { umError.value = e.response?.data?.message || 'İşlem başarısız'; setTimeout(() => umError.value = '', 3000) }
-}
-
-// Dashboard data
-// Recent transactions
+const pendingTransfers = ref<any[]>([])
+const ownerAlerts = ref<any[]>([])
+const liveRates = ref<any[]>([])
 const recentTx = ref<any[]>([])
 const recentTxLoading = ref(false)
+const zHistory = ref<any[]>([])
 
-async function loadRecentTx() {
-  recentTxLoading.value = true
-  try {
-    const res = await apiService.getTransactionHistory({ pageSize: 10, page: 1 })
-    recentTx.value = (res?.items ?? res?.data ?? res ?? []).slice(0, 10)
-  } catch { recentTx.value = [] }
-  finally { recentTxLoading.value = false }
-}
+const MAIN_CURRENCIES = ['USD', 'EUR', 'GBP', 'CHF', 'RUB', 'KRUB', 'USDT']
 
+// ── Staff data
+const myOfficeIds = ref<Set<string>>(new Set())
+const zReport = ref<any>(null)
+const zReportLoading = ref(false)
+const partyTotals = ref<any>(null)
+const expenseTotals = ref<{ total: number; count: number }>({ total: 0, count: 0 })
+
+// ── Helper functions
 function txTypeLabel(t: any) {
   const type = (t?.transactionType ?? t?.type ?? '').toString().toLowerCase()
   if (type.includes('buy') || type === '0') return { label: 'Alış', cls: 'tx-buy' }
@@ -255,72 +57,376 @@ function txTime(t: any) {
   return dt.toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
+function txUser(t: any) {
+  return t?.userName ?? t?.userFullName ?? t?.createdBy ?? ''
+}
+
+// ── Loaders
+async function loadOffices() {
+  try { offices.value = await apiService.getOfficeSummaries() ?? [] } catch { offices.value = [] }
+}
+
+async function loadLiveRates() {
+  try {
+    const officeId = myOfficeIds.value.size ? [...myOfficeIds.value][0] : undefined
+    const data = await apiService.getExchangeRates(officeId)
+    liveRates.value = Array.isArray(data) ? data : []
+  } catch { liveRates.value = [] }
+}
+
+async function loadRecentTx() {
+  recentTxLoading.value = true
+  try {
+    const res = await apiService.getTransactionHistory({ pageSize: 15, page: 1 })
+    recentTx.value = (res?.items ?? res?.data ?? res ?? []).slice(0, 15)
+  } catch { recentTx.value = [] }
+  finally { recentTxLoading.value = false }
+}
+
+async function loadPendingTransfers() {
+  try { pendingTransfers.value = await apiService.getPendingTransfers() ?? [] } catch { pendingTransfers.value = [] }
+}
+
+async function loadAlerts() {
+  try { ownerAlerts.value = await apiService.getUnreadAlerts() ?? [] } catch { ownerAlerts.value = [] }
+}
+
+async function loadZHistory() {
+  try {
+    const data = await apiService.getZReportHistory({ count: 7 })
+    zHistory.value = Array.isArray(data) ? data : []
+  } catch { zHistory.value = [] }
+}
+
+async function loadMyAccess() {
+  if (authStore.isAdmin) return
+  try {
+    const res = await apiService.getMyOfficeAccess()
+    const ids = (res ?? []).map((r: any) => r.officeId ?? r.office?.id).filter(Boolean)
+    myOfficeIds.value = new Set(ids)
+  } catch {}
+}
+
+// Staff-specific loaders
+async function loadStaffZReport() {
+  zReportLoading.value = true
+  try {
+    const officeId = myOfficeIds.value.size ? [...myOfficeIds.value][0] : undefined
+    const today = new Date().toISOString().slice(0, 10)
+    zReport.value = await apiService.getZReportDaily(officeId, today)
+  } catch { zReport.value = null }
+  finally { zReportLoading.value = false }
+}
+
+async function loadStaffParties() {
+  try {
+    const officeId = myOfficeIds.value.size ? [...myOfficeIds.value][0] : undefined
+    if (!officeId) return
+    const data = await apiService.getParties(officeId)
+    const list = Array.isArray(data) ? data : (data?.items ?? [])
+    const recv = list.reduce((a: number, p: any) => a + (p.totalReceivables ?? 0), 0)
+    const payb = list.reduce((a: number, p: any) => a + (p.totalPayables ?? 0), 0)
+    partyTotals.value = { count: list.length, receivables: recv, payables: payb, net: recv - payb }
+  } catch { partyTotals.value = null }
+}
+
+async function loadStaffExpenses() {
+  try {
+    const officeId = myOfficeIds.value.size ? [...myOfficeIds.value][0] : undefined
+    if (!officeId) return
+    const data = await apiService.getExpensePayments({ officeId })
+    const list = Array.isArray(data) ? data : (data?.items ?? [])
+    const total = list.reduce((a: number, p: any) => a + (p.amount ?? 0), 0)
+    expenseTotals.value = { total, count: list.length }
+  } catch { expenseTotals.value = { total: 0, count: 0 } }
+}
+
+// ── Computed: Owner
 const sum = computed(() => dashboard.value?.summary ?? {})
+
+const mainRates = computed(() =>
+  liveRates.value
+    .filter(r => r.targetCurrencyCode === 'TRY' && MAIN_CURRENCIES.includes(r.sourceCurrencyCode))
+    .sort((a: any, b: any) => MAIN_CURRENCIES.indexOf(a.sourceCurrencyCode) - MAIN_CURRENCIES.indexOf(b.sourceCurrencyCode))
+)
+
+const ownerKpi = computed(() => {
+  const s = sum.value
+  const totalAssets = Number(g(s, 'totalAssets') ?? 0)
+  const tp = Number(g(s, 'todayProfit') ?? 0)
+  const mp = Number(g(s, 'monthlyProfit') ?? 0)
+  const txCount = Number(g(s, 'todayTransactionCount') ?? 0)
+  const fxValue = Number(g(s, 'totalForeignCurrencyValue') ?? 0)
+  const cariNet = Number(g(s, 'netPartyBalance') ?? 0)
+  const ch = kpiChanges.value
+  return [
+    { icon: 'account_balance', label: 'Toplam Varlık', value: fmtNum(totalAssets), unit: '₺', color: '#7c3aed', bg: '#f3f0ff', spark: null, change: null },
+    { icon: 'trending_up', label: 'Günlük K/Z', value: plSign(tp) + fmtNum(tp), unit: '₺', color: plColor(tp), bg: tp >= 0 ? '#f0fdf4' : '#fef2f2', spark: profitSpark.value, change: ch.profit },
+    { icon: 'calendar_month', label: 'Aylık K/Z', value: plSign(mp) + fmtNum(mp), unit: '₺', color: plColor(mp), bg: mp >= 0 ? '#f0fdf4' : '#fef2f2', spark: null, change: null },
+    { icon: 'swap_horiz', label: 'İşlem Sayısı', value: String(txCount), unit: 'adet', color: '#6366f1', bg: '#eef2ff', spark: txSpark.value, change: ch.txCount },
+    { icon: 'currency_exchange', label: 'Döviz Varlık', value: fmtNum(fxValue), unit: '₺', color: '#2563eb', bg: '#eff6ff', spark: null, change: null },
+    { icon: 'people', label: 'Cari Net', value: fmtNum(cariNet), unit: '₺', color: '#d97706', bg: '#fffbeb', spark: null, change: null },
+  ]
+})
 
 const topCurrencies = computed(() =>
   (dashboard.value?.currencyDistribution?.currencies ?? [])
     .filter((c: any) => c.totalAmount > 0)
     .sort((a: any, b: any) => b.totalValueInBaseCurrency - a.totalValueInBaseCurrency)
-    .slice(0, 6)
 )
-const totalFV = computed(() => {
-  const v = dashboard.value?.currencyDistribution?.totalForeignCurrencyValue
-  return v && v > 0 ? v : 1
+
+const totalFxValue = computed(() => {
+  const v = topCurrencies.value.reduce((a: number, c: any) => a + (c.totalValueInBaseCurrency ?? 0), 0)
+  return v > 0 ? v : 1
 })
 
-const adminKpi = computed(() => {
-  const s = sum.value
-  const cards = []
-  if (authStore.isOwner) cards.push({ icon: 'account_balance', label: 'Toplam Varlık', value: fmtNum(g(s, 'totalAssets')), unit: '₺', color: '#7c3aed', bg: '#f3f0ff' })
-  const tp = Number(g(s, 'todayProfit') ?? 0)
-  cards.push({ icon: 'trending_up', label: 'Bugün K/Z', value: plSign(tp) + fmtNum(tp), unit: '₺', color: plColor(tp), bg: tp >= 0 ? '#f0fdf4' : '#fef2f2' })
-  const mp = Number(g(s, 'monthlyProfit') ?? 0)
-  cards.push({ icon: 'calendar_month', label: 'Aylık K/Z', value: plSign(mp) + fmtNum(mp), unit: '₺', color: plColor(mp), bg: mp >= 0 ? '#f0fdf4' : '#fef2f2' })
-  cards.push({ icon: 'receipt_long', label: 'Bugün İşlem', value: String(g(s, 'todayTransactionCount') ?? 0), unit: 'adet', color: '#6366f1', bg: '#eef2ff' })
-  if (authStore.isOwner) cards.push({ icon: 'currency_exchange', label: 'Döviz Varlık', value: fmtNum(g(s, 'totalForeignCurrencyValue')), unit: '₺', color: '#2563eb', bg: '#eff6ff' })
-  cards.push({ icon: 'people', label: 'Cari Net', value: fmtNum(g(s, 'netPartyBalance')), unit: '₺', color: '#d97706', bg: '#fffbeb' })
-  return cards
+const riskLevel = computed(() => {
+  if (!topCurrencies.value.length) return { level: 'low', label: 'Düşük', color: '#22c55e' }
+  const top = topCurrencies.value[0]
+  const pct = (top.totalValueInBaseCurrency / totalFxValue.value) * 100
+  if (pct > 70) return { level: 'high', label: 'Yüksek', color: '#ef4444' }
+  if (pct > 50) return { level: 'medium', label: 'Orta', color: '#f59e0b' }
+  return { level: 'low', label: 'Düşük', color: '#22c55e' }
 })
 
-const staffKpi = computed(() => {
-  const s = sum.value
-  const tp = Number(g(s, 'todayProfit') ?? 0)
+const isMerkez = (o: any) => /merkez/i.test(o?.officeName ?? '')
+const sortedOffices = computed(() =>
+  [...offices.value].sort((a, b) => (isMerkez(b) ? 1 : 0) - (isMerkez(a) ? 1 : 0))
+)
+
+const pendingActionCount = computed(() => pendingTransfers.value.length + ownerAlerts.value.length)
+
+// ── Z-Report history → sparklines + bugün vs dün
+const sortedZHistory = computed(() =>
+  [...zHistory.value].sort((a, b) =>
+    new Date(a.reportDate ?? a.startDate ?? 0).getTime() - new Date(b.reportDate ?? b.startDate ?? 0).getTime()
+  )
+)
+
+const profitSpark = computed(() => sortedZHistory.value.map(z => z?.summary?.totalProfit ?? z?.summary?.totalProfitInTRY ?? 0))
+const txSpark = computed(() => sortedZHistory.value.map(z => z?.summary?.totalTransactions ?? 0))
+
+const kpiChanges = computed(() => {
+  const h = sortedZHistory.value
+  if (h.length < 2) return { profit: null, txCount: null }
+  const cur = h[h.length - 1]?.summary ?? {}
+  const prev = h[h.length - 2]?.summary ?? {}
+  const cp = cur.totalProfit ?? cur.totalProfitInTRY ?? 0
+  const pp = prev.totalProfit ?? prev.totalProfitInTRY ?? 0
+  const ct = cur.totalTransactions ?? 0
+  const pt = prev.totalTransactions ?? 0
+  const pct = (c: number, p: number) => p === 0 ? (c > 0 ? 100 : c < 0 ? -100 : 0) : ((c - p) / Math.abs(p)) * 100
+  return { profit: pct(cp, pp), txCount: pct(ct, pt) }
+})
+
+// ── Active staff from recent transactions
+const activeStaffList = computed(() => {
+  const m = new Map<string, { name: string; last: string; count: number }>()
+  for (const tx of recentTx.value) {
+    const n = txUser(tx)
+    if (!n) continue
+    if (!m.has(n)) m.set(n, { name: n, last: tx.createdAt ?? tx.transactionDate ?? '', count: 0 })
+    m.get(n)!.count++
+  }
+  return [...m.values()].sort((a, b) => new Date(b.last).getTime() - new Date(a.last).getTime()).slice(0, 8)
+})
+
+function sparkPath(vals: number[], w = 80, h = 24): string {
+  if (vals.length < 2) return ''
+  const mx = Math.max(...vals, 1), mn = Math.min(...vals, 0), rng = mx - mn || 1
+  const step = w / (vals.length - 1)
+  return vals.map((v, i) => `${i ? 'L' : 'M'}${(i * step).toFixed(1)},${(h - ((v - mn) / rng) * h * 0.7 - h * 0.15).toFixed(1)}`).join(' ')
+}
+
+function timeAgo(d: string): string {
+  if (!d) return '—'
+  const diff = Date.now() - new Date(d).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'az önce'
+  if (mins < 60) return `${mins} dk önce`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs} sa önce`
+  return `${Math.floor(hrs / 24)} gün önce`
+}
+
+// ── Computed: Staff
+const staffOffices = computed(() => {
+  const all = dashboard.value?.offices ?? []
+  if (!myOfficeIds.value.size) return all
+  return all.filter((o: any) => myOfficeIds.value.has(o.officeId))
+})
+const staffVaults = computed(() => staffOffices.value.flatMap((o: any) => (o.vaults ?? []).map((v: any) => ({ ...v, officeName: o.officeName }))))
+
+const VAULT_CURRENCIES = ['TRY', ...MAIN_CURRENCIES]
+
+function vaultBalanceFor(code: string): number {
+  const found = vaultMainCurrencies.value.find((c: any) => c.currencyCode === code)
+  return found?.balance ?? 0
+}
+
+const vaultMainCurrencies = computed(() => {
+  const currencies: any[] = []
+  for (const v of staffVaults.value) {
+    for (const c of (v.currencies ?? [])) {
+      if (c.balance > 0 && MAIN_CURRENCIES.includes(c.currencyCode)) currencies.push(c)
+    }
+  }
+  return currencies.sort((a: any, b: any) => MAIN_CURRENCIES.indexOf(a.currencyCode) - MAIN_CURRENCIES.indexOf(b.currencyCode))
+})
+
+function filteredVaultCurrencies(vault: any): any[] {
+  return (vault.currencies ?? []).filter((c: any) => c.balance > 0 && VAULT_CURRENCIES.includes(c.currencyCode))
+}
+
+const zSummary = computed(() => zReport.value?.summary ?? {})
+
+const staffZKpi = computed(() => {
+  const myOff = staffOffices.value
+  const totalAssets = myOff.reduce((a: number, o: any) => a + (o.totalValueInBaseCurrency ?? 0), 0)
+  const zs = zSummary.value
+  const profit = zs.totalProfit ?? zs.totalProfitInTRY ?? 0
+  const txCount = zs.totalTransactions ?? 0
+  const volume = zs.totalForeignCurrencyProcessed ?? 0
+  const margin = zs.profitMargin ?? 0
+  const vaultValue = zs.totalValueInBaseCurrency ?? totalAssets
   return [
-    { icon: 'receipt_long', label: 'Bugünkü İşlem', value: String(g(s, 'todayTransactionCount') ?? 0), unit: 'adet', color: '#6366f1', bg: '#eef2ff' },
-    { icon: 'trending_up', label: 'Bugün K/Z', value: plSign(tp) + fmtNum(tp), unit: '₺', color: plColor(tp), bg: tp >= 0 ? '#f0fdf4' : '#fef2f2' },
+    { icon: 'account_balance_wallet', label: 'Kasa Değeri', value: fmtNum(vaultValue), unit: '₺', color: '#7c3aed', bg: '#f3f0ff' },
+    { icon: 'trending_up', label: 'Günlük Kar', value: plSign(profit) + fmtNum(profit), unit: '₺', color: plColor(profit), bg: profit >= 0 ? '#f0fdf4' : '#fef2f2' },
+    { icon: 'swap_horiz', label: 'İşlem Sayısı', value: String(txCount), unit: 'adet', color: '#6366f1', bg: '#eef2ff' },
+    { icon: 'monitoring', label: 'İşlem Hacmi', value: fmtNum(volume), unit: '₺', color: '#0ea5e9', bg: 'rgba(14,165,233,0.10)' },
+    { icon: 'percent', label: 'Kar Marjı', value: fmtNum(margin, 1), unit: '%', color: '#f59e0b', bg: 'rgba(245,158,11,0.10)' },
+    { icon: 'receipt_long', label: 'Giderler', value: fmtNum(expenseTotals.value.total), unit: '₺', color: '#ef4444', bg: '#fef2f2' },
   ]
 })
 
-const quickLinks = [
-  { p: '/ihtiyar/exchange-v2?type=buy&currency=fiat', i: 'south_east', l: 'Döviz Al' },
-  { p: '/ihtiyar/exchange-v2?type=sell&currency=fiat', i: 'north_east', l: 'Döviz Sat' },
-  { p: '/ihtiyar/exchange-v2?type=buy&currency=usdt', i: 'generating_tokens', l: 'USDT Al' },
-  { p: '/ihtiyar/exchange-v2?type=sell&currency=usdt', i: 'token', l: 'USDT Sat' },
-  { p: '/ihtiyar/z-report', i: 'insert_chart', l: 'Z-Raporu' },
-  { p: '/ihtiyar/parties', i: 'contacts', l: 'Cariler' },
-  { p: '/ihtiyar/vaults', i: 'account_balance_wallet', l: 'Kasalar' },
-  { p: '/ihtiyar/expenses', i: 'receipt_long', l: 'Giderler' },
-]
-
-const adminQuickLinks = computed(() => {
-  const links = [...quickLinks]
-  if (authStore.isAdmin) {
-    links.push({ p: '/ihtiyar/users', i: 'manage_accounts', l: 'Kullanıcılar' })
-    links.push({ p: '/ihtiyar/auto-rate-management', i: 'currency_exchange', l: 'Kur Yönetimi' })
-    links.push({ p: '/ihtiyar/currencies', i: 'payments', l: 'Para Birimleri' })
-  }
-  return links
-})
-
+// ── Main loader
 async function load() {
   isLoading.value = true
+  dateStr.value = new Date().toLocaleDateString('tr-TR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
   try {
-    const calls: Promise<any>[] = [apiService.getDashboardData(), loadRecentTx()]
-    if (authStore.isOwner) calls.push(loadOffices())
+    const calls: Promise<any>[] = [apiService.getDashboardData(), loadRecentTx(), loadMyAccess()]
+    if (authStore.isOwner) calls.push(loadOffices(), loadPendingTransfers(), loadAlerts(), loadZHistory())
     const [db] = await Promise.all(calls)
     dashboard.value = db
+    // Use rates from dashboard response for owner; separate call for staff
+    if (authStore.isAdmin) {
+      const dbRates = db?.exchangeRates ?? []
+      if (dbRates.length) liveRates.value = dbRates
+      else await loadLiveRates()
+    } else {
+      await Promise.all([loadStaffZReport(), loadStaffParties(), loadStaffExpenses(), loadLiveRates()])
+    }
   } catch (e) { console.error(e) }
   finally { isLoading.value = false }
+}
+
+// ── Owner Quick Actions (modals)
+const activeModal = ref<string | null>(null)
+const modalLoading = ref(false)
+const modalMsg = ref({ type: '', text: '' })
+const modalUsers = ref<any[]>([])
+const modalCurrencies = ref<any[]>([])
+
+const modalTitles: Record<string, string> = {
+  addUser: 'Kullanıcı Ekle', removeUser: 'Kullanıcı Çıkar',
+  addVault: 'Kasa Ekle', removeVault: 'Kasa Çıkar',
+  loadBalance: 'Bakiye Yükle', transfer: 'Transfer Yap',
+}
+
+const formUser = ref({ firstname: '', lastname: '', mail: '', username: '', password: '', rank: 1 })
+const formVault = ref({ name: '', officeId: '' })
+const formBalance = ref({ vaultId: '', currencyId: '', amount: 0, description: '' })
+const formTransfer = ref({ sourceVaultId: '', targetVaultId: '', currencyId: '', amount: 0, notes: '' })
+const selectedUserId = ref('')
+const selectedVaultId = ref('')
+
+const modalVaults = computed(() => {
+  const result: any[] = []
+  for (const o of offices.value) {
+    for (const v of (o.vaults ?? [])) {
+      result.push({ id: v.vaultId ?? v.id, name: v.vaultName ?? v.name, officeName: o.officeName, officeId: o.officeId })
+    }
+  }
+  return result
+})
+
+async function openModal(type: string) {
+  activeModal.value = type
+  modalMsg.value = { type: '', text: '' }
+  if (type === 'removeUser') {
+    try { const d = await apiService.getUsers(); modalUsers.value = Array.isArray(d) ? d : (d?.items ?? []) } catch { modalUsers.value = [] }
+  }
+  if (['loadBalance', 'transfer'].includes(type)) {
+    try { const d = await apiService.getCurrencies(); modalCurrencies.value = Array.isArray(d) ? d : [] } catch { modalCurrencies.value = [] }
+  }
+}
+
+function closeModal() {
+  activeModal.value = null
+  formUser.value = { firstname: '', lastname: '', mail: '', username: '', password: '', rank: 1 }
+  formVault.value = { name: '', officeId: '' }
+  formBalance.value = { vaultId: '', currencyId: '', amount: 0, description: '' }
+  formTransfer.value = { sourceVaultId: '', targetVaultId: '', currencyId: '', amount: 0, notes: '' }
+  selectedUserId.value = ''
+  selectedVaultId.value = ''
+}
+
+async function submitModal() {
+  modalLoading.value = true
+  modalMsg.value = { type: '', text: '' }
+  try {
+    switch (activeModal.value) {
+      case 'addUser': {
+        if (!formUser.value.mail || !formUser.value.username || !formUser.value.password) throw new Error('Tüm alanları doldurun')
+        const regRes = await apiService.registerUser(formUser.value)
+        const newId = regRes?.userInfo?.id
+        if (newId && formUser.value.rank !== 1) {
+          await apiService.updateUser({ id: newId, username: formUser.value.username, mail: formUser.value.mail, firstname: formUser.value.firstname, lastname: formUser.value.lastname, rank: formUser.value.rank, isEmailVerified: false })
+        }
+        modalMsg.value = { type: 'ok', text: 'Kullanıcı başarıyla eklendi' }
+      }
+        break
+      case 'removeUser': {
+        if (!selectedUserId.value) throw new Error('Kullanıcı seçin')
+        const usr = modalUsers.value.find((u: any) => u.id === selectedUserId.value)
+        if (!usr) throw new Error('Kullanıcı bulunamadı')
+        await apiService.updateUser({ id: usr.id, username: usr.username ?? '', mail: usr.mail ?? '', firstname: usr.firstname ?? '', lastname: usr.lastname ?? '', rank: 0, isEmailVerified: usr.isEmailVerified ?? false })
+        modalMsg.value = { type: 'ok', text: 'Kullanıcı banlandı' }
+      }
+        break
+      case 'addVault':
+        if (!formVault.value.name || !formVault.value.officeId) throw new Error('Kasa adı ve şube seçin')
+        await apiService.saveVault({ name: formVault.value.name, officeId: formVault.value.officeId, isActive: true })
+        modalMsg.value = { type: 'ok', text: 'Kasa oluşturuldu' }
+        break
+      case 'removeVault':
+        if (!selectedVaultId.value) throw new Error('Kasa seçin')
+        await apiService.deleteVault(selectedVaultId.value)
+        modalMsg.value = { type: 'ok', text: 'Kasa silindi' }
+        break
+      case 'loadBalance':
+        if (!formBalance.value.vaultId || !formBalance.value.currencyId || !formBalance.value.amount) throw new Error('Tüm alanları doldurun')
+        await apiService.updateVaultBalance({
+          vaultId: formBalance.value.vaultId, currencyId: formBalance.value.currencyId,
+          amount: Number(formBalance.value.amount), description: formBalance.value.description || 'Dashboard bakiye yükleme',
+          isEntireBalance: false
+        })
+        modalMsg.value = { type: 'ok', text: 'Bakiye güncellendi' }
+        break
+      case 'transfer':
+        if (!formTransfer.value.sourceVaultId || !formTransfer.value.targetVaultId || !formTransfer.value.currencyId || !formTransfer.value.amount) throw new Error('Tüm alanları doldurun')
+        await apiService.createTransferRequest({
+          sourceVaultId: formTransfer.value.sourceVaultId, targetVaultId: formTransfer.value.targetVaultId,
+          currencyId: formTransfer.value.currencyId, amount: Number(formTransfer.value.amount),
+          notes: formTransfer.value.notes || ''
+        })
+        modalMsg.value = { type: 'ok', text: 'Transfer talebi oluşturuldu' }
+        break
+    }
+    setTimeout(() => { closeModal(); load() }, 1200)
+  } catch (e: any) {
+    modalMsg.value = { type: 'err', text: e?.response?.data?.error ?? e?.response?.data?.message ?? e?.message ?? 'Hata oluştu' }
+  } finally { modalLoading.value = false }
 }
 
 let timer: ReturnType<typeof setInterval>
@@ -338,873 +444,959 @@ onUnmounted(() => clearInterval(timer))
     <template v-else>
       <!-- Header -->
       <div class="db-hero">
-        <div class="db-hero-content">
-          <div class="db-hero-icon">
-            <span class="material-symbols-outlined">monitoring</span>
-          </div>
-          <div class="db-hero-text">
-            <h1 class="db-hero-title">Hoş Geldiniz, {{ authStore.user?.firstname ?? authStore.user?.username }}</h1>
-            <p class="db-hero-sub">{{ dateStr }} · Kontrol Paneli</p>
-          </div>
+        <div class="db-hero-left">
+          <p class="db-hero-hello">Hoş Geldiniz</p>
+          <h1 class="db-hero-name">{{ authStore.user?.firstname ?? authStore.user?.username }}</h1>
+          <p class="db-hero-date">{{ dateStr }}</p>
         </div>
-        <button class="db-hero-refresh" @click="load">
-          <span class="material-symbols-outlined">refresh</span> Yenile
-        </button>
+        <div class="db-hero-right">
+          <div v-if="authStore.isOwner && pendingActionCount > 0" class="db-hero-badge" @click="router.push('/ihtiyar/owner-panel')">
+            <span class="material-symbols-outlined">notifications_active</span>
+            {{ pendingActionCount }} bekleyen
+          </div>
+          <button class="db-hero-refresh" @click="load" title="Yenile">
+            <span class="material-symbols-outlined">refresh</span>
+          </button>
+        </div>
       </div>
 
-      <!-- ═══════════════════════════ STAFF VIEW ═══ -->
+      <!-- ═══════════ STAFF VIEW ═══════════ -->
       <template v-if="!authStore.isAdmin">
-        <div class="kpi-grid-small">
-          <AppKpiCard v-for="k in staffKpi" :key="k.label" :icon="k.icon" :label="k.label" :value="k.value" :unit="k.unit" :color="k.color" :bg="k.bg" />
+        <div class="sf-kpi-row">
+          <div v-for="k in staffZKpi.slice(0, 3)" :key="k.label" class="sf-kpi" :style="{ '--kpi-accent': k.color }">
+            <div class="sf-kpi-icon" :style="{ background: k.bg }">
+              <span class="material-symbols-outlined" :style="{ color: k.color }">{{ k.icon }}</span>
+            </div>
+            <div class="sf-kpi-body">
+              <span class="sf-kpi-label">{{ k.label }}</span>
+              <span class="sf-kpi-value">{{ k.value }} <small>{{ k.unit }}</small></span>
+            </div>
+          </div>
+        </div>
+        <div class="sf-kpi-row">
+          <div v-for="k in staffZKpi.slice(3)" :key="k.label" class="sf-kpi" :style="{ '--kpi-accent': k.color }">
+            <div class="sf-kpi-icon" :style="{ background: k.bg }">
+              <span class="material-symbols-outlined" :style="{ color: k.color }">{{ k.icon }}</span>
+            </div>
+            <div class="sf-kpi-body">
+              <span class="sf-kpi-label">{{ k.label }}</span>
+              <span class="sf-kpi-value">{{ k.value }} <small>{{ k.unit }}</small></span>
+            </div>
+          </div>
         </div>
 
+        <div class="sf-main-grid">
+          <div class="sf-panel">
+            <div class="sf-panel-head">
+              <div class="sf-panel-title">
+                <span class="material-symbols-outlined">currency_exchange</span>Döviz Kurları
+              </div>
+              <button class="sf-link-btn" @click="router.push('/ihtiyar/exchange-v2')">İşlem Yap <span class="material-symbols-outlined">arrow_forward</span></button>
+            </div>
+            <div v-if="!mainRates.length" class="state-msg"><span class="material-symbols-outlined">info</span> Kur verisi bulunamadı</div>
+            <table v-else class="sf-rates">
+              <thead><tr><th>Döviz</th><th>Alış</th><th>Satış</th><th>Kasada</th></tr></thead>
+              <tbody>
+                <tr v-for="r in mainRates" :key="r.id">
+                  <td class="sf-rate-cur">
+                    <span class="sf-rate-code">{{ r.sourceCurrencyCode }}</span>
+                    <span class="sf-rate-name">{{ r.sourceCurrencyName }}</span>
+                  </td>
+                  <td class="sf-rate-buy">{{ fmtNum(r.buyRate, r.buyRate < 1 ? 6 : 2) }} <small>₺</small></td>
+                  <td class="sf-rate-sell">{{ fmtNum(r.sellRate, r.sellRate < 1 ? 6 : 2) }} <small>₺</small></td>
+                  <td class="sf-rate-vault">{{ fmtNum(vaultBalanceFor(r.sourceCurrencyCode), 2) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="sf-panel sf-vault-panel" v-for="vault in staffVaults" :key="vault.vaultId">
+            <div class="sf-panel-head sf-vault-head">
+              <div class="sf-panel-title">
+                <span class="material-symbols-outlined">account_balance_wallet</span>{{ vault.vaultName }}
+              </div>
+              <div class="sf-vault-total">₺{{ fmtMoney(vault.totalValueInBaseCurrency) }}</div>
+            </div>
+            <div class="sf-vault-grid">
+              <div v-for="cur in filteredVaultCurrencies(vault)" :key="cur.currencyCode" class="sf-vault-item">
+                <span class="sf-vault-code">{{ cur.currencyCode }}</span>
+                <span class="sf-vault-bal">{{ fmtMoney(cur.balance) }}</span>
+                <span class="sf-vault-val" v-if="!cur.isBaseCurrency">≈ ₺{{ fmtMoney(cur.valueInBaseCurrency) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sf-info-card">
+          <div class="sf-info-head">
+            <span class="material-symbols-outlined" style="color:#6366f1">contacts</span>
+            <span class="sf-info-title">Cari Hesaplar</span>
+            <button class="sf-link-btn" @click="router.push('/ihtiyar/parties')">Detay <span class="material-symbols-outlined">arrow_forward</span></button>
+          </div>
+          <div v-if="partyTotals" class="sf-info-body sf-info-inline">
+            <div class="sf-info-row"><span>Toplam Cari</span><strong>{{ partyTotals.count }}</strong></div>
+            <div class="sf-info-row"><span>Alacak</span><strong style="color:#16a34a">{{ fmtMoney(partyTotals.receivables) }} ₺</strong></div>
+            <div class="sf-info-row"><span>Borç</span><strong style="color:#dc2626">{{ fmtMoney(partyTotals.payables) }} ₺</strong></div>
+            <div class="sf-info-row sf-info-highlight"><span>Net Bakiye</span><strong :style="{ color: plColor(partyTotals.net) }">{{ plSign(partyTotals.net) }}{{ fmtMoney(partyTotals.net) }} ₺</strong></div>
+          </div>
+          <div v-else class="state-msg"><span class="material-symbols-outlined">info</span> Veri yüklenemedi</div>
+        </div>
+
+        <div class="sf-panel">
+          <div class="sf-panel-head">
+            <div class="sf-panel-title"><span class="material-symbols-outlined">history</span>Son İşlemler</div>
+            <button class="sf-link-btn" @click="router.push('/ihtiyar/exchange-v2')">Tümü <span class="material-symbols-outlined">arrow_forward</span></button>
+          </div>
+          <div v-if="recentTxLoading" class="state-msg"><span class="material-symbols-outlined spin">progress_activity</span></div>
+          <div v-else-if="!recentTx.length" class="state-msg"><span class="material-symbols-outlined">receipt_long</span> Henüz işlem yok</div>
+          <div v-else class="sf-tx-list">
+            <div v-for="tx in recentTx.slice(0, 10)" :key="tx.id" class="sf-tx-row">
+              <span class="sf-tx-badge" :class="txTypeLabel(tx).cls">{{ txTypeLabel(tx).label }}</span>
+              <span class="sf-tx-cur">{{ tx.sourceCurrencyCode ?? tx.currencyCode ?? '—' }}</span>
+              <span class="sf-tx-amount">{{ fmtMoney(tx.sourceAmount ?? tx.amount) }}</span>
+              <span class="sf-tx-rate">@ {{ fmtNum(tx.exchangeRate ?? tx.rate, 4) }}</span>
+              <span class="sf-tx-total">{{ fmtMoney(tx.targetAmount ?? tx.totalTry) }} ₺</span>
+              <span class="sf-tx-time">{{ txTime(tx) }}</span>
+            </div>
+          </div>
+        </div>
       </template>
 
-      <!-- ═══════════════════════════ ADMIN / OWNER VIEW ═══ -->
+      <!-- ═══════════ OWNER / ADMIN VIEW ═══════════ -->
       <template v-else>
-        <!-- KPI Cards -->
-        <div class="kpi-grid">
-          <AppKpiCard v-for="k in adminKpi" :key="k.label" :icon="k.icon" :label="k.label" :value="k.value" :unit="k.unit" :color="k.color" :bg="k.bg" />
+
+        <!-- 1. Kur Bandı -->
+        <div class="rate-band" v-if="mainRates.length">
+          <div class="rate-band-inner">
+            <div v-for="r in mainRates" :key="r.id" class="rate-chip">
+              <span class="rate-chip-code">{{ r.sourceCurrencyCode }}</span>
+              <span class="rate-chip-buy">{{ fmtNum(r.buyRate, r.buyRate < 1 ? 4 : 2) }}</span>
+              <span class="rate-chip-sep">/</span>
+              <span class="rate-chip-sell">{{ fmtNum(r.sellRate, r.sellRate < 1 ? 4 : 2) }}</span>
+            </div>
+          </div>
         </div>
 
-        <!-- Tab Navigation (Owner gets extra tabs) -->
-        <div class="db-tabs">
-          <button class="db-tab" :class="{ active: activeTab === 'overview' }" @click="activeTab = 'overview'">
-            <span class="material-symbols-outlined">dashboard</span> Genel Bakış
-          </button>
-          <button v-if="authStore.isOwner" class="db-tab" :class="{ active: activeTab === 'offices' }" @click="activeTab = 'offices'">
-            <span class="material-symbols-outlined">store</span> Şube Yönetimi
-          </button>
-          <button v-if="authStore.isAdmin" class="db-tab" :class="{ active: activeTab === 'users' }" @click="activeTab = 'users'; if (!umUsers.length) loadUsers()">
-            <span class="material-symbols-outlined">manage_accounts</span> Kullanıcı Yönetimi
-          </button>
-          <button v-if="authStore.isOwner" class="db-tab" :class="{ active: activeTab === 'qr' }" @click="activeTab = 'qr'">
-            <span class="material-symbols-outlined">qr_code_2</span> QR Oluştur
-          </button>
+        <!-- 2. KPI Kartları -->
+        <div class="ok-grid">
+          <div v-for="k in ownerKpi" :key="k.label" class="ok-card">
+            <div class="ok-icon" :style="{ background: k.bg }">
+              <span class="material-symbols-outlined" :style="{ color: k.color }">{{ k.icon }}</span>
+            </div>
+            <div class="ok-body">
+              <span class="ok-label">{{ k.label }}</span>
+              <span class="ok-value" :style="{ color: k.label.includes('K/Z') ? k.color : undefined }">{{ k.value }} <small>{{ k.unit }}</small></span>
+              <span v-if="k.change != null && k.change !== 0" class="ok-change" :class="k.change > 0 ? 'up' : 'down'">
+                <span class="material-symbols-outlined">{{ k.change > 0 ? 'trending_up' : 'trending_down' }}</span>
+                %{{ Math.abs(k.change).toFixed(1) }} <span class="ok-change-label">düne göre</span>
+              </span>
+            </div>
+            <svg v-if="k.spark?.length >= 2" class="ok-spark" :viewBox="'0 0 80 24'" preserveAspectRatio="none">
+              <path :d="sparkPath(k.spark)" fill="none" :stroke="k.color" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.35" />
+            </svg>
+          </div>
         </div>
 
-        <!-- ── Tab: Genel Bakış ── -->
-        <template v-if="activeTab === 'overview'">
-          <!-- Quick Links -->
-          <div class="ql-grid">
-            <button v-for="q in adminQuickLinks" :key="q.p" class="ql-btn" @click="router.push(q.p)">
-              <span class="material-symbols-outlined ql-icon">{{ q.i }}</span>
-              <span class="ql-label">{{ q.l }}</span>
-            </button>
+        <!-- 2.5 Hızlı İşlemler -->
+        <div class="qa-section">
+          <div class="qa-head"><span class="material-symbols-outlined">bolt</span> Hızlı İşlemler</div>
+          <div class="qa-grid">
+            <button class="qa-btn" @click="openModal('addUser')"><span class="material-symbols-outlined" style="color:#22c55e">person_add</span><span>Kullanıcı Ekle</span></button>
+            <button class="qa-btn" @click="openModal('removeUser')"><span class="material-symbols-outlined" style="color:#ef4444">person_remove</span><span>Kullanıcı Çıkar</span></button>
+            <button class="qa-btn" @click="openModal('addVault')"><span class="material-symbols-outlined" style="color:#6366f1">add_card</span><span>Kasa Ekle</span></button>
+            <button class="qa-btn" @click="openModal('removeVault')"><span class="material-symbols-outlined" style="color:#f59e0b">credit_card_off</span><span>Kasa Çıkar</span></button>
+            <button class="qa-btn" @click="openModal('loadBalance')"><span class="material-symbols-outlined" style="color:#0ea5e9">account_balance_wallet</span><span>Bakiye Yükle</span></button>
+            <button class="qa-btn" @click="openModal('transfer')"><span class="material-symbols-outlined" style="color:#8b5cf6">swap_horiz</span><span>Transfer Yap</span></button>
           </div>
+        </div>
 
-          <div class="db-two-col" :class="{ 'single-col': !(authStore.isOwner && topCurrencies.length) }">
-            <!-- Recent Transactions -->
-            <div class="panel">
-              <div class="panel-header">
-                <span class="material-symbols-outlined">history</span><h3>Son İşlemler</h3>
-                <button class="see-all" @click="router.push('/ihtiyar/exchange-v2')">Tümü <span class="material-symbols-outlined">chevron_right</span></button>
-              </div>
-              <div v-if="recentTxLoading" class="state-msg"><span class="material-symbols-outlined spin">progress_activity</span></div>
-              <div v-else-if="!recentTx.length" class="state-msg">
-                <span class="material-symbols-outlined">receipt_long</span> Henüz işlem yok
-              </div>
-              <div v-else class="rtx-list">
-                <div v-for="tx in recentTx" :key="tx.id" class="rtx-row">
-                  <span class="rtx-type" :class="txTypeLabel(tx).cls">{{ txTypeLabel(tx).label }}</span>
-                  <span class="rtx-curr">{{ tx.sourceCurrencyCode ?? tx.currencyCode ?? '—' }}</span>
-                  <span class="rtx-amount">{{ fmtMoney(tx.sourceAmount ?? tx.amount) }}</span>
-                  <span class="rtx-rate">@ {{ fmtNum(tx.exchangeRate ?? tx.rate, 4) }}</span>
-                  <span class="rtx-try">{{ fmtMoney(tx.targetAmount ?? tx.totalTry) }} ₺</span>
-                  <span class="rtx-time">{{ txTime(tx) }}</span>
-                </div>
+        <!-- 3. Pozisyon + Bekleyen Aksiyonlar -->
+        <div class="ow-two-col">
+          <!-- Pozisyon Özeti -->
+          <div class="ow-card">
+            <div class="ow-card-head">
+              <span class="material-symbols-outlined">donut_large</span>
+              <h3>Döviz Pozisyonu</h3>
+              <div class="ow-risk-badge" :style="{ color: riskLevel.color, background: riskLevel.color + '18', borderColor: riskLevel.color + '40' }">
+                <span class="material-symbols-outlined">{{ riskLevel.level === 'high' ? 'warning' : riskLevel.level === 'medium' ? 'info' : 'check_circle' }}</span>
+                Yoğunlaşma: {{ riskLevel.label }}
               </div>
             </div>
-
-            <!-- Currency Distribution -->
-            <div class="panel" v-if="authStore.isOwner && topCurrencies.length">
-              <div class="panel-header">
-                <span class="material-symbols-outlined">pie_chart</span><h3>Döviz Dağılımı</h3>
-                <button class="see-all" @click="router.push('/ihtiyar/vaults')">Detay <span class="material-symbols-outlined">chevron_right</span></button>
-              </div>
-              <div class="curr-list">
-                <div v-for="c in topCurrencies" :key="c.currencyCode" class="curr-row">
-                  <span class="curr-code">{{ c.currencyCode }}</span>
-                  <div class="cr-bar-wrap"><div class="cr-bar" :style="{width:Math.min(100,c.totalValueInBaseCurrency/totalFV*100)+'%'}"></div></div>
-                  <span class="curr-try">{{ fmtNum(c.totalValueInBaseCurrency) }} ₺</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </template>
-
-        <!-- ── Tab: Şube Yönetimi ── -->
-        <template v-if="activeTab === 'offices' && authStore.isOwner">
-          <div class="sec-stats">
-            <div class="sec-stat-card">
-              <div class="sec-stat-icon amber"><span class="material-symbols-outlined">hub</span></div>
-              <div class="sec-stat-body">
-                <div class="sec-stat-val">{{ merkezCount }}</div>
-                <div class="sec-stat-lbl">Merkez</div>
-              </div>
-            </div>
-            <div class="sec-stat-card">
-              <div class="sec-stat-icon blue"><span class="material-symbols-outlined">store</span></div>
-              <div class="sec-stat-body">
-                <div class="sec-stat-val">{{ subeCount }}</div>
-                <div class="sec-stat-lbl">Şube</div>
-              </div>
-            </div>
-            <div class="sec-stat-card">
-              <div class="sec-stat-icon purple"><span class="material-symbols-outlined">account_balance_wallet</span></div>
-              <div class="sec-stat-body">
-                <div class="sec-stat-val">{{ totalVaults }}</div>
-                <div class="sec-stat-lbl">Toplam Kasa</div>
-              </div>
-            </div>
-            <div class="sec-stat-card">
-              <div class="sec-stat-icon" :class="totalDailyPL >= 0 ? 'green' : 'red'">
-                <span class="material-symbols-outlined">trending_up</span>
-              </div>
-              <div class="sec-stat-body">
-                <div class="sec-stat-val" :style="{color: plColor(totalDailyPL)}">{{ fmtMoney(totalDailyPL) }} ₺</div>
-                <div class="sec-stat-lbl">Günlük K/Z</div>
-              </div>
-            </div>
-            <div class="sec-stat-card">
-              <div class="sec-stat-icon" :class="totalMonthlyPL >= 0 ? 'green' : 'red'">
-                <span class="material-symbols-outlined">calendar_month</span>
-              </div>
-              <div class="sec-stat-body">
-                <div class="sec-stat-val" :style="{color: plColor(totalMonthlyPL)}">{{ fmtMoney(totalMonthlyPL) }} ₺</div>
-                <div class="sec-stat-lbl">Aylık K/Z</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="panel">
-            <div class="panel-header">
-              <span class="material-symbols-outlined">store</span><h3>Merkez &amp; Şubeler</h3>
-              <div class="header-actions">
-                <button class="action-btn add" @click="router.push('/ihtiyar/dashboard?tab=offices&action=add')">
-                  <span class="material-symbols-outlined">add_business</span> Şube Ekle
-                </button>
-                <button class="action-btn remove" @click="router.push('/ihtiyar/dashboard?tab=offices&action=remove')">
-                  <span class="material-symbols-outlined">remove_circle_outline</span> Şube Kaldır
-                </button>
-              </div>
-              <button class="refresh-btn-sm" @click="loadOffices">
-                <span class="material-symbols-outlined">refresh</span>
-              </button>
-            </div>
-            <div v-if="officesLoading" class="state-msg">
-              <span class="material-symbols-outlined spin">progress_activity</span> Yükleniyor...
-            </div>
-            <div v-else-if="officesError" class="state-msg error">
-              <span class="material-symbols-outlined">error</span> {{ officesError }}
-            </div>
-            <div v-else-if="offices.length === 0" class="state-msg">
-              <span class="material-symbols-outlined">store</span> Şube bulunamadı
-            </div>
-            <div v-else class="o-grid">
-              <div v-for="o in sortedOffices" :key="o.officeId" class="o-card" :class="{ merkez: isMerkez(o) }">
-                <div class="o-card-accent" :class="{ merkez: isMerkez(o) }"></div>
-                <div class="o-card-head">
-                  <div class="o-avatar" :class="{ merkez: isMerkez(o) }">
-                    <span class="material-symbols-outlined">{{ isMerkez(o) ? 'hub' : 'store' }}</span>
-                  </div>
-                  <div class="o-title">
-                    <div class="o-name">{{ o.officeName }}</div>
-                    <div class="o-sub"><span class="material-symbols-outlined">account_balance_wallet</span>{{ o.vaultCount }} kasa</div>
-                  </div>
-                  <span v-if="isMerkez(o)" class="o-status merkez"><span class="material-symbols-outlined">verified</span>Merkez</span>
-                  <span v-else class="o-status"><span class="o-dot"></span>Şube</span>
-                </div>
-                <div class="o-asset">
-                  <span class="o-asset-lbl">Toplam Varlık</span>
-                  <span class="o-asset-val">{{ fmtMoney(o.totalValueInBaseCurrency) }} ₺</span>
-                </div>
-                <div class="o-metrics">
-                  <div class="o-metric">
-                    <span class="o-metric-lbl">Günlük K/Z</span>
-                    <span class="o-metric-val" :style="{color: plColor(o.dailyProfitLoss)}">
-                      <span class="material-symbols-outlined">{{ o.dailyProfitLoss >= 0 ? 'arrow_upward' : 'arrow_downward' }}</span>
-                      {{ fmtMoney(o.dailyProfitLoss) }} ₺
-                    </span>
-                  </div>
-                  <div class="o-metric">
-                    <span class="o-metric-lbl">Aylık K/Z</span>
-                    <span class="o-metric-val" :style="{color: plColor(o.monthlyProfitLoss)}">
-                      <span class="material-symbols-outlined">{{ o.monthlyProfitLoss >= 0 ? 'arrow_upward' : 'arrow_downward' }}</span>
-                      {{ fmtMoney(o.monthlyProfitLoss) }} ₺
-                    </span>
+            <div v-if="!topCurrencies.length" class="state-msg"><span class="material-symbols-outlined">account_balance_wallet</span> Döviz pozisyonu yok</div>
+            <div v-else class="pos-list">
+              <div v-for="c in topCurrencies.slice(0, 8)" :key="c.currencyCode" class="pos-row">
+                <span class="pos-code">{{ c.currencyCode }}</span>
+                <span class="pos-amount">{{ fmtNum(c.totalAmount, 2) }}</span>
+                <div class="pos-bar-wrap">
+                  <div class="pos-bar" :style="{ width: Math.min(100, (c.totalValueInBaseCurrency / totalFxValue) * 100) + '%' }">
+                    <span class="pos-pct">%{{ fmtNum((c.totalValueInBaseCurrency / totalFxValue) * 100, 0) }}</span>
                   </div>
                 </div>
-                <div class="o-footer" v-if="o.totalBalancesByCurrency && Object.keys(o.totalBalancesByCurrency).length">
-                  <span v-for="[cur, bal] in currencyKeys(o.totalBalancesByCurrency)" :key="cur" class="currency-badge">
-                    {{ cur }} {{ fmtMoney(bal) }}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </template>
-
-        <!-- ── Tab: Kullanıcı Yönetimi ── -->
-        <template v-if="activeTab === 'users' && authStore.isAdmin">
-          <div class="sec-stats">
-            <div class="sec-stat-card">
-              <div class="sec-stat-icon blue"><span class="material-symbols-outlined">group</span></div>
-              <div class="sec-stat-body">
-                <div class="sec-stat-val">{{ umUsers.length }}</div>
-                <div class="sec-stat-lbl">Toplam Kullanıcı</div>
-              </div>
-            </div>
-            <div class="sec-stat-card">
-              <div class="sec-stat-icon green"><span class="material-symbols-outlined">check_circle</span></div>
-              <div class="sec-stat-body">
-                <div class="sec-stat-val">{{ umActiveCount }}</div>
-                <div class="sec-stat-lbl">Aktif</div>
-              </div>
-            </div>
-            <div class="sec-stat-card">
-              <div class="sec-stat-icon purple"><span class="material-symbols-outlined">shield_person</span></div>
-              <div class="sec-stat-body">
-                <div class="sec-stat-val">{{ umAdminCount }}</div>
-                <div class="sec-stat-lbl">Admin / Owner</div>
-              </div>
-            </div>
-            <div class="sec-stat-card">
-              <div class="sec-stat-icon" :class="umBannedCount > 0 ? 'red' : 'gray'">
-                <span class="material-symbols-outlined">block</span>
-              </div>
-              <div class="sec-stat-body">
-                <div class="sec-stat-val">{{ umBannedCount }}</div>
-                <div class="sec-stat-lbl">Yasaklı</div>
+                <span class="pos-try">{{ fmtNum(c.totalValueInBaseCurrency) }} ₺</span>
               </div>
             </div>
           </div>
 
-          <div class="panel">
-            <div class="panel-header">
-              <span class="material-symbols-outlined">manage_accounts</span>
-              <h3>Kullanıcı Detayları</h3>
-              <div class="header-actions">
-                <button v-if="authStore.isOwner" class="action-btn add" @click="umOpenCreate">
-                  <span class="material-symbols-outlined">person_add</span> Kullanıcı Ekle
-                </button>
-                <button v-if="authStore.isOwner && umSelected && !umCreateMode" class="action-btn remove" @click="umConfirmDelete">
-                  <span class="material-symbols-outlined">person_remove</span> Kullanıcı Kaldır
-                </button>
-              </div>
-              <button class="refresh-btn-sm" @click="loadUsers">
-                <span class="material-symbols-outlined" :class="{ spin: umLoading }">refresh</span>
-              </button>
+          <!-- Bekleyen Aksiyonlar -->
+          <div class="ow-card">
+            <div class="ow-card-head">
+              <span class="material-symbols-outlined">pending_actions</span>
+              <h3>Bekleyen Aksiyonlar</h3>
             </div>
-
-            <div v-if="umError" class="um-error-bar">{{ umError }}</div>
-
-            <div v-if="umLoading" class="state-msg">
-              <span class="material-symbols-outlined spin">progress_activity</span> Yükleniyor...
-            </div>
-
-            <template v-else>
-              <!-- Search -->
-              <div class="um-toolbar">
-                <div class="um-search-wrap">
-                  <span class="material-symbols-outlined um-search-icon">search</span>
-                  <input v-model="umSearch" class="um-search" placeholder="Kullanıcı ara..." />
+            <div class="action-list">
+              <div class="action-item" @click="router.push('/ihtiyar/owner-panel')" style="cursor:pointer">
+                <div class="action-icon" :class="pendingTransfers.length ? 'warn' : 'ok'">
+                  <span class="material-symbols-outlined">swap_horiz</span>
                 </div>
-                <span class="panel-badge">{{ umFiltered.length }} / {{ umUsers.length }}</span>
+                <div class="action-body">
+                  <span class="action-title">Bekleyen Transferler</span>
+                  <span class="action-desc">Onay bekleyen şubelerarası transferler</span>
+                </div>
+                <span class="action-count" :class="pendingTransfers.length ? 'warn' : 'ok'">{{ pendingTransfers.length }}</span>
               </div>
+              <div class="action-item" @click="router.push('/ihtiyar/owner-panel')" style="cursor:pointer">
+                <div class="action-icon" :class="ownerAlerts.length ? 'warn' : 'ok'">
+                  <span class="material-symbols-outlined">notifications</span>
+                </div>
+                <div class="action-body">
+                  <span class="action-title">Sistem Uyarıları</span>
+                  <span class="action-desc">Okunmamış uyarılar ve bildirimler</span>
+                </div>
+                <span class="action-count" :class="ownerAlerts.length ? 'warn' : 'ok'">{{ ownerAlerts.length }}</span>
+              </div>
+              <div class="action-item" @click="router.push('/ihtiyar/owner-panel')" style="cursor:pointer">
+                <div class="action-icon info">
+                  <span class="material-symbols-outlined">store</span>
+                </div>
+                <div class="action-body">
+                  <span class="action-title">Aktif Şubeler</span>
+                  <span class="action-desc">Toplam kasa sayısı ve operasyon durumu</span>
+                </div>
+                <span class="action-count info">{{ offices.length }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
 
-              <div class="um-layout">
-                <!-- User Cards List -->
-                <div class="um-list">
-                  <div v-if="!umFiltered.length" class="state-msg">Kullanıcı bulunamadı</div>
-                  <div v-for="u in umFiltered" :key="u.id" class="um-card" :class="{ active: umSelected?.id === u.id && !umCreateMode }" @click="umSelectUser(u)">
-                    <div class="um-avatar" :style="{ background: avatarColor(u.firstname || u.username) }">
-                      {{ (u.firstname || u.username || '?')[0].toUpperCase() }}
+        <!-- 4. Şube Performansı -->
+        <div class="ow-card" v-if="offices.length">
+          <div class="ow-card-head">
+            <span class="material-symbols-outlined">leaderboard</span>
+            <h3>Şube Performansı</h3>
+            <button class="ow-link" @click="router.push('/ihtiyar/owner-panel')">Detay <span class="material-symbols-outlined">arrow_forward</span></button>
+          </div>
+          <div class="branch-table-wrap">
+            <table class="branch-table">
+              <thead>
+                <tr>
+                  <th class="bt-name">Şube</th>
+                  <th class="bt-num">Kasalar</th>
+                  <th class="bt-num">Personel</th>
+                  <th class="bt-num">Günlük K/Z</th>
+                  <th class="bt-num">Aylık K/Z</th>
+                  <th class="bt-num">Toplam Varlık</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="o in sortedOffices" :key="o.officeId" :class="{ 'bt-merkez': isMerkez(o) }">
+                  <td class="bt-name">
+                    <div class="bt-name-inner">
+                      <span class="bt-office-badge" :class="isMerkez(o) ? 'merkez' : 'sube'">{{ isMerkez(o) ? 'Merkez' : 'Şube' }}</span>
+                      <span class="bt-office-name">{{ o.officeName }}</span>
                     </div>
-                    <div class="um-card-body">
-                      <div class="um-card-name">{{ u.firstname }} {{ u.lastname }}</div>
-                      <div class="um-card-mail"><span class="material-symbols-outlined">alternate_email</span>{{ u.username }}</div>
-                    </div>
-                    <span class="um-rank-badge" :style="{ color: rankInfo(u.rank).color, background: rankInfo(u.rank).bg, border: '1px solid ' + rankInfo(u.rank).ring }">
-                      {{ rankInfo(u.rank).label }}
-                    </span>
+                  </td>
+                  <td class="bt-num">{{ o.vaultCount ?? 0 }}</td>
+                  <td class="bt-num">{{ o.userCount ?? 0 }}</td>
+                  <td class="bt-num" :style="{ color: plColor(o.dailyProfitLoss ?? 0) }">{{ plSign(o.dailyProfitLoss ?? 0) }}{{ fmtNum(o.dailyProfitLoss ?? 0) }} ₺</td>
+                  <td class="bt-num" :style="{ color: plColor(o.monthlyProfitLoss ?? 0) }">{{ plSign(o.monthlyProfitLoss ?? 0) }}{{ fmtNum(o.monthlyProfitLoss ?? 0) }} ₺</td>
+                  <td class="bt-num bt-total">{{ fmtNum(o.totalValueInBaseCurrency ?? 0) }} ₺</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 5. Son İşlemler + Kasa Dağılımı -->
+        <div class="ow-two-col">
+          <div class="ow-card">
+            <div class="ow-card-head">
+              <span class="material-symbols-outlined">history</span>
+              <h3>Son İşlemler</h3>
+              <button class="ow-link" @click="router.push('/ihtiyar/exchange-v2')">Tümü <span class="material-symbols-outlined">arrow_forward</span></button>
+            </div>
+            <div v-if="recentTxLoading" class="state-msg"><span class="material-symbols-outlined spin">progress_activity</span></div>
+            <div v-else-if="!recentTx.length" class="state-msg"><span class="material-symbols-outlined">receipt_long</span> Henüz işlem yok</div>
+            <div v-else class="tx-feed">
+              <div v-for="tx in recentTx" :key="tx.id" class="tx-item">
+                <span class="tx-badge" :class="txTypeLabel(tx).cls">{{ txTypeLabel(tx).label }}</span>
+                <div class="tx-detail">
+                  <span class="tx-cur">{{ tx.sourceCurrencyCode ?? tx.currencyCode ?? '—' }}</span>
+                  <span class="tx-amt">{{ fmtMoney(tx.sourceAmount ?? tx.amount) }}</span>
+                </div>
+                <span class="tx-rate-val">@ {{ fmtNum(tx.exchangeRate ?? tx.rate, 4) }}</span>
+                <span class="tx-total-val">{{ fmtMoney(tx.targetAmount ?? tx.totalTry) }} ₺</span>
+                <div class="tx-meta">
+                  <span class="tx-user" v-if="txUser(tx)">{{ txUser(tx) }}</span>
+                  <span class="tx-time-val">{{ txTime(tx) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Kasa Doluluk -->
+          <div class="ow-card">
+            <div class="ow-card-head">
+              <span class="material-symbols-outlined">inventory_2</span>
+              <h3>Kasa Doluluk Durumu</h3>
+              <button class="ow-link" @click="router.push('/ihtiyar/vaults')">Kasalar <span class="material-symbols-outlined">arrow_forward</span></button>
+            </div>
+            <div v-if="!sortedOffices.length" class="state-msg"><span class="material-symbols-outlined">info</span> Kasa verisi yok</div>
+            <div v-else class="vault-fill-list">
+              <div v-for="o in sortedOffices" :key="o.officeId" class="vf-office">
+                <div class="vf-office-head">
+                  <span class="vf-office-name">{{ o.officeName }}</span>
+                  <span class="vf-office-total">₺{{ fmtNum(o.totalValueInBaseCurrency ?? 0) }}</span>
+                </div>
+                <div class="vf-currencies">
+                  <div v-for="[code, val] in Object.entries(o.currencies ?? {})" :key="code" class="vf-cur" v-show="val as number > 0">
+                    <span class="vf-code">{{ code }}</span>
+                    <span class="vf-bal">{{ fmtNum(val as number, 2) }}</span>
                   </div>
-                </div>
-
-                <!-- Detail Panel -->
-                <div class="um-detail">
-                  <div v-if="!umSelected && !umCreateMode" class="um-placeholder">
-                    <span class="material-symbols-outlined">manage_accounts</span>
-                    <p>Listeden bir kullanıcı seçin</p>
-                  </div>
-
-                  <!-- Create Mode -->
-                  <template v-if="umCreateMode">
-                    <div class="um-detail-header">
-                      <div class="um-detail-avatar" style="background:#6366f1">
-                        <span class="material-symbols-outlined" style="font-size:20px">person_add</span>
-                      </div>
-                      <div><div class="um-detail-name">Yeni Kullanıcı</div></div>
-                    </div>
-                    <div class="um-detail-body">
-                      <div class="um-field-row">
-                        <div class="um-field"><label>Ad</label><input v-model="umCreateForm.firstname" class="um-input" placeholder="Ad" /></div>
-                        <div class="um-field"><label>Soyad</label><input v-model="umCreateForm.lastname" class="um-input" placeholder="Soyad" /></div>
-                      </div>
-                      <div class="um-field"><label>Kullanıcı Adı *</label><input v-model="umCreateForm.username" class="um-input" placeholder="kullanici_adi" /></div>
-                      <div class="um-field"><label>E-posta *</label><input v-model="umCreateForm.mail" type="email" class="um-input" placeholder="ornek@email.com" /></div>
-                      <div class="um-field"><label>Şifre *</label><input v-model="umCreateForm.password" type="password" class="um-input" placeholder="••••••••" /></div>
-                      <div v-if="umSaveOk" class="um-msg ok">Kullanıcı oluşturuldu</div>
-                      <div v-if="umSaveError" class="um-msg err">{{ umSaveError }}</div>
-                      <button class="um-btn primary" @click="umCreateUser" :disabled="umSaving">
-                        {{ umSaving ? 'Oluşturuluyor...' : 'Kullanıcı Oluştur' }}
-                      </button>
-                    </div>
-                  </template>
-
-                  <!-- Edit Mode -->
-                  <template v-if="umSelected && !umCreateMode">
-                    <div class="um-detail-header">
-                      <div class="um-detail-avatar" :style="{ background: avatarColor(umSelected.firstname || umSelected.username) }">
-                        {{ (umSelected.firstname || umSelected.username || '?')[0].toUpperCase() }}
-                      </div>
-                      <div class="um-detail-identity">
-                        <div class="um-detail-name">{{ umSelected.firstname }} {{ umSelected.lastname }}</div>
-                        <div class="um-detail-sub">@{{ umSelected.username }}</div>
-                      </div>
-                      <span class="um-rank-badge" :style="{ color: rankInfo(umSelected.rank).color, background: rankInfo(umSelected.rank).bg, border: '1px solid ' + rankInfo(umSelected.rank).ring }">
-                        {{ rankInfo(umSelected.rank).label }}
-                      </span>
-                    </div>
-
-                    <div class="um-tabs">
-                      <button class="um-tab" :class="{ active: umDetailTab === 'info' }" @click="umDetailTab = 'info'; umSaveError = ''; umSaveOk = false">
-                        <span class="material-symbols-outlined">edit</span> Bilgiler
-                      </button>
-                      <button class="um-tab" :class="{ active: umDetailTab === 'password' }" @click="umDetailTab = 'password'; umSaveError = ''; umSaveOk = false">
-                        <span class="material-symbols-outlined">key</span> Şifre
-                      </button>
-                      <button v-if="authStore.isAdmin" class="um-tab" :class="{ active: umDetailTab === 'offices' }" @click="umDetailTab = 'offices'; umSaveError = ''; umSaveOk = false">
-                        <span class="material-symbols-outlined">store</span> Ofisler
-                      </button>
-                    </div>
-
-                    <div v-if="umDetailTab === 'info'" class="um-detail-body">
-                      <div class="um-field-row">
-                        <div class="um-field"><label>Ad</label><input v-model="umEditForm.firstname" class="um-input" :disabled="!authStore.isOwner" /></div>
-                        <div class="um-field"><label>Soyad</label><input v-model="umEditForm.lastname" class="um-input" :disabled="!authStore.isOwner" /></div>
-                      </div>
-                      <div class="um-field"><label>Kullanıcı Adı</label><input v-model="umEditForm.username" class="um-input" :disabled="!authStore.isOwner" /></div>
-                      <div class="um-field"><label>E-posta</label><input v-model="umEditForm.mail" type="email" class="um-input" :disabled="!authStore.isOwner" /></div>
-                      <div class="um-field">
-                        <label>Yetki Seviyesi</label>
-                        <div class="um-rank-grid">
-                          <button v-for="r in RANKS" :key="r.value" class="um-rank-chip" :class="{ selected: umEditForm.rank === r.value }"
-                            :style="umEditForm.rank === r.value ? { background: r.bg, color: r.color, borderColor: r.ring } : {}"
-                            @click="authStore.isOwner && (umEditForm.rank = r.value)">{{ r.label }}</button>
-                        </div>
-                      </div>
-                      <div v-if="umSaveOk" class="um-msg ok">Kaydedildi</div>
-                      <div v-if="umSaveError" class="um-msg err">{{ umSaveError }}</div>
-                      <button v-if="authStore.isOwner" class="um-btn primary" @click="umSaveInfo" :disabled="umSaving">
-                        {{ umSaving ? 'Kaydediliyor...' : 'Kaydet' }}
-                      </button>
-                    </div>
-
-                    <div v-if="umDetailTab === 'password'" class="um-detail-body">
-                      <div class="um-field"><label>Yeni Şifre</label><input v-model="umPwForm.newPassword" type="password" class="um-input" placeholder="••••••••" :disabled="!authStore.isOwner" /></div>
-                      <div class="um-field"><label>Şifre Tekrar</label><input v-model="umPwForm.confirm" type="password" class="um-input" placeholder="••••••••" :disabled="!authStore.isOwner" /></div>
-                      <div v-if="umSaveOk" class="um-msg ok">Şifre değiştirildi</div>
-                      <div v-if="umSaveError" class="um-msg err">{{ umSaveError }}</div>
-                      <button v-if="authStore.isOwner" class="um-btn primary" @click="umSavePassword" :disabled="umSaving">
-                        {{ umSaving ? 'Değiştiriliyor...' : 'Şifre Değiştir' }}
-                      </button>
-                    </div>
-
-                    <div v-if="umDetailTab === 'offices'" class="um-detail-body">
-                      <div v-for="o in umOffices" :key="o.officeId ?? o.id" class="um-office-row" @click="umToggleOffice(o)">
-                        <span class="material-symbols-outlined" :style="{ color: umAssignedIds.has(o.officeId ?? o.id) ? '#22c55e' : '#d1d5db' }">
-                          {{ umAssignedIds.has(o.officeId ?? o.id) ? 'check_circle' : 'radio_button_unchecked' }}
-                        </span>
-                        <span>{{ o.officeName ?? o.name }}</span>
-                      </div>
-                      <div v-if="!umOffices.length" class="state-msg">Ofis bulunamadı</div>
-                    </div>
-                  </template>
-                </div>
-              </div>
-            </template>
-          </div>
-        </template>
-
-        <!-- ── Tab: QR Oluştur ── -->
-        <template v-if="activeTab === 'qr' && authStore.isOwner">
-          <div class="panel">
-            <div class="qr-layout">
-              <div class="qr-form">
-                <h3 class="qr-title">
-                  <span class="material-symbols-outlined">qr_code_2</span> QR Kod Oluşturucu
-                </h3>
-
-                <div class="qr-field">
-                  <label class="qr-label">İçerik / URL</label>
-                  <textarea v-model="qrInput" class="qr-textarea" rows="3" placeholder="QR içeriğini girin (URL, metin, telefon, vb.)" @keydown.enter.prevent="generateQr" />
-                </div>
-
-                <div class="qr-field">
-                  <label class="qr-label">Dosya Adı (opsiyonel)</label>
-                  <input v-model="qrLabel" type="text" class="qr-input" placeholder="örn: bayi-ankara" />
-                </div>
-
-                <div class="qr-field">
-                  <label class="qr-label">Boyut: {{ qrSize }}×{{ qrSize }} px</label>
-                  <input v-model.number="qrSize" type="range" min="100" max="500" step="20" class="qr-range" />
-                </div>
-
-                <div class="qr-btns">
-                  <button class="qr-btn primary" :disabled="!qrInput.trim()" @click="generateQr">
-                    <span class="material-symbols-outlined">qr_code</span> Oluştur
-                  </button>
-                  <button class="qr-btn secondary" @click="resetQr">
-                    <span class="material-symbols-outlined">refresh</span> Temizle
-                  </button>
-                </div>
-              </div>
-
-              <div class="qr-preview">
-                <div v-if="!qrGenerated" class="qr-empty">
-                  <span class="material-symbols-outlined">qr_code_2</span>
-                  <p>Sol taraftan içerik girin ve<br><strong>Oluştur</strong>'a basın</p>
-                </div>
-                <div v-else class="qr-result">
-                  <img :src="qrImgUrl" :alt="qrLabel || 'QR Kod'" class="qr-img" />
-                  <p class="qr-caption">{{ qrLabel || 'QR Kod' }}</p>
-                  <button class="qr-btn primary full-w" @click="downloadQr">
-                    <span class="material-symbols-outlined">download</span> İndir (.png)
-                  </button>
+                  <div v-if="!Object.entries(o.currencies ?? {}).some(([, v]) => (v as number) > 0)" class="vf-empty">Bakiye yok</div>
                 </div>
               </div>
             </div>
           </div>
-        </template>
+        </div>
+
+        <!-- 6. Personel Aktivitesi -->
+        <div class="ow-card" v-if="activeStaffList.length">
+          <div class="ow-card-head">
+            <span class="material-symbols-outlined">group</span>
+            <h3>Personel Aktivitesi</h3>
+            <button class="ow-link" @click="router.push('/ihtiyar/users')">Tümü <span class="material-symbols-outlined">arrow_forward</span></button>
+          </div>
+          <div class="staff-grid">
+            <div v-for="s in activeStaffList" :key="s.name" class="staff-item">
+              <div class="staff-avatar">{{ s.name.charAt(0).toUpperCase() }}</div>
+              <div class="staff-body">
+                <span class="staff-name">{{ s.name }}</span>
+                <span class="staff-meta">{{ s.count }} işlem · {{ timeAgo(s.last) }}</span>
+              </div>
+              <div class="staff-indicator active"></div>
+            </div>
+          </div>
+        </div>
 
       </template>
     </template>
+
+    <!-- ═══ Owner Quick-Action Modals ═══ -->
+    <Teleport to="body">
+      <div v-if="activeModal" class="qm-overlay" @click.self="closeModal">
+        <div class="qm-box">
+          <div class="qm-header">
+            <h3>{{ modalTitles[activeModal!] }}</h3>
+            <button class="qm-close" @click="closeModal"><span class="material-symbols-outlined">close</span></button>
+          </div>
+
+          <div class="qm-body">
+            <!-- Kullanıcı Ekle -->
+            <template v-if="activeModal === 'addUser'">
+              <div class="qm-row"><label>Ad</label><input v-model="formUser.firstname" placeholder="Ad" /></div>
+              <div class="qm-row"><label>Soyad</label><input v-model="formUser.lastname" placeholder="Soyad" /></div>
+              <div class="qm-row"><label>E-posta</label><input v-model="formUser.mail" type="email" placeholder="mail@example.com" /></div>
+              <div class="qm-row"><label>Kullanıcı Adı</label><input v-model="formUser.username" placeholder="kullanici_adi" /></div>
+              <div class="qm-row"><label>Şifre</label><input v-model="formUser.password" type="password" placeholder="••••••" /></div>
+              <div class="qm-row">
+                <label>Yetki</label>
+                <select v-model.number="formUser.rank">
+                  <option :value="1">Kullanıcı</option>
+                  <option :value="2">Müşteri</option>
+                  <option :value="50">Personel</option>
+                  <option :value="99">Admin</option>
+                </select>
+              </div>
+            </template>
+
+            <!-- Kullanıcı Çıkar -->
+            <template v-if="activeModal === 'removeUser'">
+              <div class="qm-row">
+                <label>Kullanıcı</label>
+                <select v-model="selectedUserId">
+                  <option value="">Seçiniz...</option>
+                  <option v-for="u in modalUsers.filter((u: any) => u.id !== authStore.user?.id)" :key="u.id" :value="u.id">{{ u.fullName || ((u.firstname ?? '') + ' ' + (u.lastname ?? '')).trim() }} ({{ u.mail }})</option>
+                </select>
+              </div>
+              <p v-if="selectedUserId" class="qm-warn">Bu kullanıcı banlanacak ve sisteme erişimi kapatılacak.</p>
+            </template>
+
+            <!-- Kasa Ekle -->
+            <template v-if="activeModal === 'addVault'">
+              <div class="qm-row"><label>Kasa Adı</label><input v-model="formVault.name" placeholder="Ana Kasa" /></div>
+              <div class="qm-row">
+                <label>Şube</label>
+                <select v-model="formVault.officeId">
+                  <option value="">Seçiniz...</option>
+                  <option v-for="o in offices" :key="o.officeId" :value="o.officeId">{{ o.officeName }}</option>
+                </select>
+              </div>
+            </template>
+
+            <!-- Kasa Çıkar -->
+            <template v-if="activeModal === 'removeVault'">
+              <div class="qm-row">
+                <label>Kasa</label>
+                <select v-model="selectedVaultId">
+                  <option value="">Seçiniz...</option>
+                  <option v-for="v in modalVaults" :key="v.id" :value="v.id">{{ v.name }} ({{ v.officeName }})</option>
+                </select>
+              </div>
+              <p v-if="selectedVaultId" class="qm-warn qm-warn-red">Bu kasa kalıcı olarak silinecek!</p>
+            </template>
+
+            <!-- Bakiye Yükle -->
+            <template v-if="activeModal === 'loadBalance'">
+              <div class="qm-row">
+                <label>Kasa</label>
+                <select v-model="formBalance.vaultId">
+                  <option value="">Seçiniz...</option>
+                  <option v-for="v in modalVaults" :key="v.id" :value="v.id">{{ v.name }} ({{ v.officeName }})</option>
+                </select>
+              </div>
+              <div class="qm-row">
+                <label>Para Birimi</label>
+                <select v-model="formBalance.currencyId">
+                  <option value="">Seçiniz...</option>
+                  <option v-for="c in modalCurrencies" :key="c.id" :value="c.id">{{ c.code }} — {{ c.name }}</option>
+                </select>
+              </div>
+              <div class="qm-row"><label>Miktar</label><input v-model.number="formBalance.amount" type="number" step="0.01" placeholder="0.00" /></div>
+              <div class="qm-row"><label>Açıklama</label><input v-model="formBalance.description" placeholder="Opsiyonel" /></div>
+            </template>
+
+            <!-- Transfer Yap -->
+            <template v-if="activeModal === 'transfer'">
+              <div class="qm-row">
+                <label>Kaynak Kasa</label>
+                <select v-model="formTransfer.sourceVaultId">
+                  <option value="">Seçiniz...</option>
+                  <option v-for="v in modalVaults" :key="'s'+v.id" :value="v.id">{{ v.name }} ({{ v.officeName }})</option>
+                </select>
+              </div>
+              <div class="qm-row">
+                <label>Hedef Kasa</label>
+                <select v-model="formTransfer.targetVaultId">
+                  <option value="">Seçiniz...</option>
+                  <option v-for="v in modalVaults.filter(x => x.id !== formTransfer.sourceVaultId)" :key="'t'+v.id" :value="v.id">{{ v.name }} ({{ v.officeName }})</option>
+                </select>
+              </div>
+              <div class="qm-row">
+                <label>Para Birimi</label>
+                <select v-model="formTransfer.currencyId">
+                  <option value="">Seçiniz...</option>
+                  <option v-for="c in modalCurrencies" :key="c.id" :value="c.id">{{ c.code }} — {{ c.name }}</option>
+                </select>
+              </div>
+              <div class="qm-row"><label>Miktar</label><input v-model.number="formTransfer.amount" type="number" step="0.01" placeholder="0.00" /></div>
+              <div class="qm-row"><label>Not</label><input v-model="formTransfer.notes" placeholder="Opsiyonel" /></div>
+            </template>
+          </div>
+
+          <div v-if="modalMsg.text" class="qm-msg" :class="modalMsg.type">
+            <span class="material-symbols-outlined">{{ modalMsg.type === 'ok' ? 'check_circle' : 'error' }}</span>
+            {{ modalMsg.text }}
+          </div>
+
+          <div class="qm-footer">
+            <button class="qm-cancel" @click="closeModal">İptal</button>
+            <button class="qm-submit" @click="submitModal" :disabled="modalLoading">
+              <span v-if="modalLoading" class="material-symbols-outlined spin">progress_activity</span>
+              {{ modalLoading ? 'İşleniyor...' : 'Onayla' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <style scoped>
-.db { padding: 24px; display: flex; flex-direction: column; gap: 20px; min-height: 100vh; }
-.db-loading { display:flex; flex-direction:column; align-items:center; justify-content:center; height:60vh; gap:16px; color:#64748b; }
-.spinner { width:40px; height:40px; border:3px solid #e2e8f0; border-top-color:#6366f1; border-radius:50%; animation:spin .8s linear infinite; }
-@keyframes spin { to { transform:rotate(360deg); } }
+.db { padding: 24px; display: flex; flex-direction: column; gap: 18px; min-height: 100vh; }
+.db-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60vh; gap: 16px; color: #64748b; }
+.spinner { width: 40px; height: 40px; border: 3px solid #e2e8f0; border-top-color: #6366f1; border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-/* ═══ Hero Header ═══ */
-.db-hero {
-  display:flex; align-items:center; justify-content:space-between;
-  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4338ca 100%);
-  border-radius: 18px;
-  padding: 24px 28px;
-  box-shadow: 0 8px 32px -8px rgba(30,27,75,0.4);
-  position: relative;
-  overflow: hidden;
+/* ═══ Hero ═══ */
+.db-hero { display: flex; align-items: center; justify-content: space-between; }
+.db-hero-left { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.db-hero-hello { margin: 0; font-size: 14px; font-weight: 500; color: #64748b; }
+.db-hero-name { font-size: 1.35rem; font-weight: 800; margin: 0; color: #0f172a; letter-spacing: -0.02em; }
+.db-hero-date { font-size: 13px; color: #94a3b8; margin: 0; font-weight: 500; }
+.db-hero-right { display: flex; align-items: center; gap: 10px; }
+.db-hero-badge {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 14px; background: #fef3c7; border: 1px solid #fcd34d;
+  border-radius: 20px; font-size: 12px; font-weight: 700; color: #92400e;
+  cursor: pointer; transition: all .2s;
 }
-.db-hero::before {
-  content: '';
-  position: absolute;
-  top: -50%; right: -10%;
-  width: 300px; height: 300px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(129,140,248,0.15), transparent 70%);
-}
-.db-hero::after {
-  content: '';
-  position: absolute;
-  bottom: -40%; left: 20%;
-  width: 200px; height: 200px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(99,102,241,0.1), transparent 70%);
-}
-.db-hero-content { display:flex; align-items:center; gap:16px; position:relative; z-index:1; }
-.db-hero-icon {
-  width: 52px; height: 52px;
-  display: flex; align-items: center; justify-content: center;
-  background: rgba(255,255,255,0.12);
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 16px;
-  backdrop-filter: blur(8px);
-}
-.db-hero-icon .material-symbols-outlined { font-size: 26px; color: #c7d2fe; }
-.db-hero-text { position:relative; z-index:1; }
-.db-hero-title { font-size: 1.5rem; font-weight: 800; margin: 0; color: #fff; letter-spacing: -0.01em; }
-.db-hero-sub { font-size: 13px; color: #a5b4fc; margin: 4px 0 0; font-weight: 500; }
+.db-hero-badge:hover { background: #fde68a; }
+.db-hero-badge .material-symbols-outlined { font-size: 16px; }
 .db-hero-refresh {
-  display:flex; align-items:center; gap:6px;
-  padding: 10px 20px;
-  background: rgba(255,255,255,0.1);
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 12px;
-  cursor:pointer; font-size:13px; font-weight:600;
-  color: #c7d2fe;
-  transition: all .2s;
-  position:relative; z-index:1;
-  backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; background: #f1f5f9; border: 1px solid #e2e8f0;
+  border-radius: 10px; cursor: pointer; color: #64748b; transition: all .2s;
 }
-.db-hero-refresh:hover { background:rgba(255,255,255,0.2); color:#fff; transform:translateY(-1px); }
-.db-hero-refresh .material-symbols-outlined { font-size:18px; }
+.db-hero-refresh:hover { background: #e2e8f0; color: #4338ca; transform: rotate(90deg); }
+.db-hero-refresh .material-symbols-outlined { font-size: 20px; }
 
-.refresh-btn-sm { display:flex; align-items:center; padding:6px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; cursor:pointer; margin-left:auto; transition:all .2s; }
-.refresh-btn-sm:hover { background:#e2e8f0; transform:rotate(90deg); }
-.refresh-btn-sm .material-symbols-outlined { font-size:18px; color:#64748b; }
-
-/* KPI */
-.kpi-grid       { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:14px; }
-.kpi-grid-small { display:grid; grid-template-columns:repeat(2,1fr); gap:14px; max-width:400px; }
-
-/* Tabs */
-.db-tabs {
-  display:flex; gap:4px; padding:5px;
-  background: linear-gradient(135deg, #f1f5f9, #eef2ff);
-  border-radius:16px;
-  border: 1px solid #e5e7eb;
+/* ═══ Rate Band ═══ */
+.rate-band {
+  background: linear-gradient(135deg, #1e1b4b, #312e81);
+  border-radius: 14px; padding: 14px 20px; overflow-x: auto;
 }
-.db-tab {
-  display:flex; align-items:center; gap:7px;
-  padding:12px 22px; background:none; border:none;
-  border-radius:12px;
-  cursor:pointer; font-size:13px; color:#64748b; font-weight:600;
-  transition:all .25s cubic-bezier(.4,0,.2,1);
-  position:relative;
+.rate-band-inner { display: flex; gap: 6px; min-width: max-content; }
+.rate-chip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 16px; background: rgba(255,255,255,0.08);
+  border-radius: 10px; white-space: nowrap;
+  transition: background .15s;
 }
-.db-tab:hover { color:#4f46e5; background:rgba(99,102,241,.08); }
-.db-tab.active {
-  color:#4338ca; background:#fff; font-weight:700;
-  box-shadow:0 2px 8px rgba(99,102,241,.15), 0 1px 3px rgba(0,0,0,.06);
+.rate-chip:hover { background: rgba(255,255,255,0.14); }
+.rate-chip-code { font-size: 13px; font-weight: 800; color: #c7d2fe; letter-spacing: 0.3px; }
+.rate-chip-buy { font-size: 13px; font-weight: 700; color: #4ade80; font-variant-numeric: tabular-nums; }
+.rate-chip-sep { color: rgba(255,255,255,0.25); font-size: 12px; }
+.rate-chip-sell { font-size: 13px; font-weight: 700; color: #f87171; font-variant-numeric: tabular-nums; }
+
+/* ═══ Owner KPI ═══ */
+.ok-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+.ok-card {
+  display: flex; align-items: center; gap: 12px; position: relative;
+  background: #fff; border: 1px solid #eef0f4; border-radius: 14px;
+  padding: 16px; transition: border-color .2s, box-shadow .2s; overflow: hidden;
 }
-.db-tab .material-symbols-outlined { font-size:18px; }
-
-/* Panels */
-.panel {
-  background:#fff; border:1px solid #e5e7eb; border-radius:18px; overflow:hidden;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
-  transition: box-shadow .3s cubic-bezier(.4,0,.2,1);
+.ok-card:hover { border-color: #d4d8e8; box-shadow: 0 4px 16px -6px rgba(0,0,0,0.08); }
+.ok-icon {
+  width: 42px; height: 42px; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
-.panel:hover { box-shadow: 0 4px 20px rgba(99,102,241,0.08); }
-.panel-header {
-  display:flex; align-items:center; gap:10px;
-  padding:16px 20px;
-  border-bottom:1px solid #f1f5f9;
-  background: linear-gradient(135deg, #fafbfe, #f5f3ff);
+.ok-icon .material-symbols-outlined { font-size: 22px; }
+.ok-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; z-index: 1; }
+.ok-label { font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.03em; }
+.ok-value { font-size: 1.1rem; font-weight: 800; color: #0f172a; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ok-value small { font-size: 12px; font-weight: 600; color: #94a3b8; margin-left: 2px; }
+.ok-change {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 11px; font-weight: 700; margin-top: 1px;
 }
-.panel-header h3 { margin:0; font-size:15px; font-weight:800; color:#1e1b4b; flex:1; }
-.panel-header .material-symbols-outlined { font-size:22px; color:#6366f1; }
-
-.db-row { display:flex; flex-direction:column; gap:16px; }
-
-/* Header action buttons */
-.header-actions { display:flex; gap:6px; margin-left:auto; }
-.action-btn { display:flex; align-items:center; gap:4px; padding:6px 12px; border:none; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; transition:.15s; }
-.action-btn .material-symbols-outlined { font-size:16px; }
-.action-btn.add { background:#f0fdf4; color:#16a34a; border:1px solid #bbf7d0; }
-.action-btn.add:hover { background:#dcfce7; }
-.action-btn.remove { background:#fef2f2; color:#dc2626; border:1px solid #fecaca; }
-.action-btn.remove:hover { background:#fee2e2; }
-
-/* Currency distribution */
-.curr-list { padding:14px 18px; display:flex; flex-direction:column; gap:10px; }
-.curr-row  {
-  display:flex; align-items:center; gap:10px;
-  padding: 8px 12px;
-  border-radius: 10px;
-  transition: background .2s;
+.ok-change .material-symbols-outlined { font-size: 14px; }
+.ok-change.up { color: #16a34a; }
+.ok-change.down { color: #dc2626; }
+.ok-change-label { font-weight: 500; color: #94a3b8; font-size: 10px; }
+.ok-spark {
+  position: absolute; right: 8px; bottom: 8px;
+  width: 80px; height: 24px; z-index: 0;
 }
-.curr-row:hover { background: #f8fafc; }
-.curr-code {
-  font-weight:800; font-size:13px; color:#1e1b4b; width:52px; flex-shrink:0;
-  letter-spacing: 0.3px;
+
+/* ═══ Quick Actions ═══ */
+.qa-section {
+  background: #fff; border: 1px solid #eef0f4; border-radius: 16px;
+  padding: 16px 20px; overflow: hidden;
 }
-.cr-bar-wrap { flex:1; background:#f1f5f9; border-radius:6px; height:10px; }
-.cr-bar {
-  height:10px; border-radius:6px;
-  background:linear-gradient(90deg,#6366f1,#818cf8,#a78bfa);
-  transition:width .6s cubic-bezier(.4,0,.2,1);
-  box-shadow: 0 2px 8px -2px rgba(99,102,241,0.3);
+.qa-head {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 15px; font-weight: 800; color: #1e1b4b; margin-bottom: 14px;
 }
-.curr-try { font-size:13px; color:#1e1b4b; font-weight:700; width:120px; text-align:right; font-family:'JetBrains Mono',ui-monospace,monospace; }
-
-.see-all {
-  display:flex; align-items:center; gap:3px;
-  background:none; border:none; cursor:pointer;
-  color:#6366f1; font-size:13px; font-weight:700;
-  padding:5px 10px; border-radius:8px; margin-left:auto;
-  transition: all .2s;
+.qa-head .material-symbols-outlined { font-size: 22px; color: #f59e0b; }
+.qa-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+.qa-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 16px 8px; background: #f8fafc; border: 1px solid #eef0f4;
+  border-radius: 12px; cursor: pointer; transition: all .2s;
 }
-.see-all:hover { background:#eef2ff; color:#4338ca; }
-.see-all .material-symbols-outlined { font-size:16px; }
+.qa-btn:hover { background: #eef2ff; border-color: #c7d2fe; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(99,102,241,0.1); }
+.qa-btn .material-symbols-outlined { font-size: 28px; }
+.qa-btn span:last-child { font-size: 12px; font-weight: 700; color: #475569; white-space: nowrap; }
 
-/* ═══ Shared Section Stats — modern ═══ */
-.sec-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:14px; }
-.sec-stat-card {
-  position:relative; overflow:hidden;
-  background:#fff; border:1px solid #eef0f4; border-radius:18px;
-  padding:22px; transition:transform .3s cubic-bezier(.4,0,.2,1), box-shadow .3s, border-color .3s;
+/* ═══ Quick-Action Modal ═══ */
+.qm-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(15,23,42,0.5); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
 }
-.sec-stat-card::after {
-  content:''; position:absolute; right:-20px; top:-20px;
-  width:100px; height:100px; border-radius:50%;
-  background:var(--sc-glow,rgba(99,102,241,.08)); filter:blur(6px);
-  transition: transform .3s;
+.qm-box {
+  background: #fff; border-radius: 18px; width: 460px; max-width: 95vw;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2); overflow: hidden;
+  animation: qmIn .2s ease-out;
 }
-.sec-stat-card:hover { transform:translateY(-4px); box-shadow:0 16px 32px -8px rgba(30,41,59,.18); border-color:#c7d2fe; }
-.sec-stat-card:hover::after { transform: scale(1.3); }
-.sec-stat-icon { position:relative; z-index:1; width:44px; height:44px; border-radius:13px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 10px -3px var(--sc-glow,rgba(99,102,241,.3)); }
-.sec-stat-icon .material-symbols-outlined { font-size:23px; color:#fff; }
-.sec-stat-icon.blue   { background:linear-gradient(135deg,#3b82f6,#60a5fa); --sc-glow:rgba(59,130,246,.28); }
-.sec-stat-icon.purple { background:linear-gradient(135deg,#8b5cf6,#a78bfa); --sc-glow:rgba(139,92,246,.28); }
-.sec-stat-icon.green  { background:linear-gradient(135deg,#22c55e,#4ade80); --sc-glow:rgba(34,197,94,.28); }
-.sec-stat-icon.red    { background:linear-gradient(135deg,#ef4444,#f87171); --sc-glow:rgba(239,68,68,.28); }
-.sec-stat-icon.gray   { background:linear-gradient(135deg,#94a3b8,#cbd5e1); --sc-glow:rgba(148,163,184,.28); }
-.sec-stat-icon.amber  { background:linear-gradient(135deg,#f59e0b,#fbbf24); --sc-glow:rgba(245,158,11,.28); }
-.sec-stat-val  { position:relative; z-index:1; font-size:1.7rem; font-weight:800; color:#0f172a; line-height:1.1; margin-top:14px; letter-spacing:-.02em; }
-.sec-stat-lbl  { position:relative; z-index:1; font-size:12px; color:#64748b; margin-top:4px; font-weight:600; }
-
-/* ═══ Office Cards — modern grid ═══ */
-.o-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:18px; padding:20px; }
-.o-card {
-  position:relative; overflow:hidden;
-  background:#fff; border:1px solid #eef0f4; border-radius:20px; padding:20px;
-  transition: all .3s cubic-bezier(.4,0,.2,1);
+@keyframes qmIn { from { opacity: 0; transform: scale(0.95) translateY(10px); } }
+.qm-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 24px; border-bottom: 1px solid #f1f5f9;
 }
-.o-card:hover { transform:translateY(-4px); box-shadow:0 20px 40px -12px rgba(30,41,59,.18); border-color:#c7d2fe; }
-/* Merkez kartı özel — altın vurgulu, öne çıkar */
-.o-card.merkez {
-  border-color:#fcd34d;
-  box-shadow:0 8px 24px -10px rgba(245,158,11,.28);
-  background: linear-gradient(135deg, #fff 85%, #fffbeb 100%);
+.qm-header h3 { margin: 0; font-size: 16px; font-weight: 800; color: #1e1b4b; }
+.qm-close {
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border-radius: 8px; background: none;
+  border: none; cursor: pointer; color: #94a3b8; transition: all .15s;
 }
-.o-card.merkez:hover { border-color:#fbbf24; box-shadow:0 20px 40px -12px rgba(245,158,11,.4); }
-.o-card-accent { position:absolute; top:0; left:0; right:0; height:4px; background:linear-gradient(90deg,#6366f1,#8b5cf6,#ec4899); }
-.o-card-accent.merkez { background:linear-gradient(90deg,#f59e0b,#fbbf24,#fcd34d); }
-.o-avatar.merkez { background:linear-gradient(135deg,#f59e0b,#fbbf24); box-shadow:0 6px 14px -4px rgba(245,158,11,.5); }
-.o-status.merkez { background:#fffbeb; color:#d97706; }
-.o-status.merkez .material-symbols-outlined { font-size:14px; }
-.o-card-head { display:flex; align-items:center; gap:12px; }
-.o-avatar { width:46px; height:46px; border-radius:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0; background:linear-gradient(135deg,#6366f1,#818cf8); box-shadow:0 6px 14px -4px rgba(99,102,241,.5); }
-.o-avatar .material-symbols-outlined { font-size:24px; color:#fff; }
-.o-title { flex:1; min-width:0; }
-.o-name { font-size:15px; font-weight:700; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.o-sub { display:flex; align-items:center; gap:4px; font-size:12px; color:#94a3b8; margin-top:2px; }
-.o-sub .material-symbols-outlined { font-size:14px; }
-.o-status { display:flex; align-items:center; gap:5px; padding:5px 11px; border-radius:20px; font-size:11px; font-weight:700; background:#f0fdf4; color:#16a34a; }
-.o-dot { width:7px; height:7px; border-radius:50%; background:#22c55e; box-shadow:0 0 0 3px rgba(34,197,94,.15); }
-.o-asset { margin-top:16px; padding:14px 16px; border-radius:14px; background:linear-gradient(135deg,#f8fafc,#eef2ff); border:1px solid #eef0f4; }
-.o-asset-lbl { display:block; font-size:11px; color:#64748b; font-weight:600; text-transform:uppercase; letter-spacing:.03em; }
-.o-asset-val { display:block; font-size:1.35rem; font-weight:800; color:#0f172a; margin-top:2px; letter-spacing:-.02em; }
-.o-metrics { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
-.o-metric { padding:10px 12px; border-radius:12px; background:#fafbfc; border:1px solid #f1f3f7; }
-.o-metric-lbl { display:block; font-size:10px; color:#94a3b8; font-weight:600; text-transform:uppercase; letter-spacing:.03em; }
-.o-metric-val { display:flex; align-items:center; gap:2px; font-size:13px; font-weight:700; margin-top:3px; }
-.o-metric-val .material-symbols-outlined { font-size:15px; }
-.o-footer { display:flex; flex-wrap:wrap; gap:6px; margin-top:14px; padding-top:14px; border-top:1px dashed #e5e7eb; }
-
-.currency-badge { display:inline-flex; align-items:center; padding:4px 10px; background:#eef2ff; color:#4f46e5; border-radius:8px; font-size:11px; font-weight:700; }
-
-.state-msg { display:flex; align-items:center; justify-content:center; gap:10px; padding:48px 20px; color:#94a3b8; font-size:14px; font-weight:500; }
-.state-msg .material-symbols-outlined { font-size:24px; opacity:0.6; }
-.state-msg.error { color:#ef4444; }
-.spin { animation:spin 1s linear infinite; }
-.dimmed { color:#9ca3af; font-size:12px; }
-
-/* ═══ QR Tab ═══ */
-.qr-layout { display:grid; grid-template-columns:1fr 1fr; gap:24px; padding:20px; }
-@media(max-width:768px) { .qr-layout { grid-template-columns:1fr; } }
-.qr-title { display:flex; align-items:center; gap:8px; font-size:16px; font-weight:700; color:#1e293b; margin:0 0 20px; }
-.qr-field { margin-bottom:16px; }
-.qr-label { display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:6px; }
-.qr-textarea, .qr-input {
-  width:100%; padding:10px 12px; border:2px solid #e2e8f0;
-  border-radius:8px; font-size:14px; color:#1e293b;
-  background:#f8fafc; transition:border-color .2s; outline:none; resize:vertical;
-  box-sizing:border-box;
+.qm-close:hover { background: #f1f5f9; color: #475569; }
+.qm-body { padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
+.qm-row { display: flex; flex-direction: column; gap: 5px; }
+.qm-row label { font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.03em; }
+.qm-row input, .qm-row select {
+  padding: 10px 14px; border: 1px solid #e2e8f0; border-radius: 10px;
+  font-size: 14px; color: #0f172a; background: #f8fafc;
+  transition: border-color .15s, box-shadow .15s; outline: none;
 }
-.qr-textarea:focus, .qr-input:focus { border-color:#6366f1; background:white; }
-.qr-range { width:100%; accent-color:#6366f1; }
-.qr-btns { display:flex; gap:10px; }
-.qr-btn {
-  display:flex; align-items:center; gap:6px;
-  padding:10px 18px; border:none; border-radius:8px;
-  cursor:pointer; font-size:14px; font-weight:600; transition:.15s;
+.qm-row input:focus, .qm-row select:focus { border-color: #818cf8; box-shadow: 0 0 0 3px rgba(129,140,248,0.15); background: #fff; }
+.qm-warn {
+  margin: 0; padding: 10px 14px; background: #fef3c7; border: 1px solid #fcd34d;
+  border-radius: 8px; font-size: 12px; color: #92400e; font-weight: 600;
 }
-.qr-btn.primary { background:#6366f1; color:white; }
-.qr-btn.primary:hover:not(:disabled) { background:#4f46e5; }
-.qr-btn.secondary { background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; }
-.qr-btn.secondary:hover { background:#e2e8f0; }
-.qr-btn:disabled { opacity:.5; cursor:not-allowed; }
-.qr-btn.full-w { width:100%; justify-content:center; }
-
-.qr-preview {
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
-  background:#f8fafc; border:2px dashed #e2e8f0; border-radius:12px;
-  padding:24px; min-height:280px;
+.qm-warn-red { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+.qm-msg {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 24px; padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 600;
 }
-.qr-empty { display:flex; flex-direction:column; align-items:center; gap:12px; color:#94a3b8; text-align:center; }
-.qr-empty .material-symbols-outlined { font-size:48px; opacity:.3; }
-.qr-result { display:flex; flex-direction:column; align-items:center; gap:12px; width:100%; }
-.qr-img { border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,.12); }
-.qr-caption { font-weight:600; color:#1e293b; }
-
-/* ═══ Users Tab ═══ */
-.um-error-bar { background:#fef2f2; color:#dc2626; padding:8px 16px; font-size:13px; font-weight:500; }
-
-.um-toolbar { display:flex; align-items:center; gap:10px; padding:12px 18px; border-bottom:1px solid #f3f4f6; }
-.um-search-wrap { position:relative; flex:1; max-width:320px; }
-.um-search-icon { position:absolute; left:10px; top:50%; transform:translateY(-50%); font-size:18px; color:#9ca3af; }
-.um-search { width:100%; padding:9px 10px 9px 36px; border:2px solid #e5e7eb; border-radius:10px; font-size:13px; outline:none; box-sizing:border-box; background:#f8fafc; transition:.2s; }
-.um-search:focus { border-color:#6366f1; background:#fff; }
-
-.um-layout { display:grid; grid-template-columns:340px 1fr; min-height:440px; }
-@media(max-width:900px) { .um-layout { grid-template-columns:1fr; } }
-
-.um-list { border-right:1px solid #f1f3f7; display:flex; flex-direction:column; gap:8px; overflow-y:auto; max-height:520px; padding:14px; background:#fafbfc; }
-.um-card { display:flex; align-items:center; gap:12px; cursor:pointer; padding:12px; border-radius:14px; background:#fff; border:1px solid #eef0f4; transition:transform .2s cubic-bezier(.4,0,.2,1), box-shadow .2s, border-color .2s; }
-.um-card:hover { transform:translateY(-2px); box-shadow:0 8px 18px -8px rgba(30,41,59,.15); border-color:#c7d2fe; }
-.um-card.active { border-color:#6366f1; box-shadow:0 8px 18px -8px rgba(99,102,241,.35); background:linear-gradient(135deg,#fff,#f5f3ff); }
-.um-avatar { width:42px; height:42px; border-radius:12px; display:flex; align-items:center; justify-content:center; color:white; font-weight:700; font-size:16px; flex-shrink:0; box-shadow:0 4px 10px -3px rgba(0,0,0,.25); }
-.um-card-body { flex:1; min-width:0; }
-.um-card-name { font-size:14px; font-weight:700; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.um-card-mail { display:flex; align-items:center; gap:3px; font-size:12px; color:#94a3b8; margin-top:1px; }
-.um-card-mail .material-symbols-outlined { font-size:14px; }
-
-.um-detail { padding:22px; display:flex; flex-direction:column; gap:16px; }
-.um-placeholder { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; height:100%; min-height:360px; color:#cbd5e1; }
-.um-placeholder .material-symbols-outlined { font-size:64px; opacity:.4; }
-.um-placeholder p { font-size:14px; color:#94a3b8; margin:0; }
-
-.um-detail-header { position:relative; overflow:hidden; display:flex; align-items:center; gap:14px; padding:18px 18px; background:linear-gradient(135deg,#eef2ff,#faf5ff); border:1px solid #eef0f4; border-radius:16px; }
-.um-detail-header::after { content:''; position:absolute; right:-30px; top:-30px; width:120px; height:120px; border-radius:50%; background:radial-gradient(circle,rgba(99,102,241,.12),transparent 70%); }
-.um-detail-avatar { position:relative; z-index:1; width:52px; height:52px; border-radius:15px; display:flex; align-items:center; justify-content:center; color:white; font-weight:700; font-size:20px; flex-shrink:0; box-shadow:0 6px 16px -4px rgba(0,0,0,.3); }
-.um-detail-identity { position:relative; z-index:1; flex:1; min-width:0; }
-.um-detail-name { font-size:17px; font-weight:800; color:#0f172a; letter-spacing:-.01em; }
-.um-detail-sub { font-size:12px; color:#7c85a3; margin-top:2px; }
-.um-rank-badge { position:relative; z-index:1; padding:5px 13px; border-radius:20px; font-size:11px; font-weight:700; white-space:nowrap; }
-
-.um-tabs { display:flex; gap:4px; padding:3px; background:#f1f5f9; border-radius:10px; }
-.um-tab { display:flex; align-items:center; gap:5px; padding:7px 14px; background:none; border:none; border-radius:7px; cursor:pointer; font-size:12px; color:#64748b; font-weight:500; transition:.2s; }
-.um-tab:hover { color:#4f46e5; background:rgba(99,102,241,.06); }
-.um-tab.active { color:#4f46e5; background:#fff; font-weight:600; box-shadow:0 1px 2px rgba(0,0,0,.06); }
-.um-tab .material-symbols-outlined { font-size:16px; }
-
-.um-detail-body { display:flex; flex-direction:column; gap:12px; padding-top:4px; }
-.um-field { display:flex; flex-direction:column; gap:4px; }
-.um-field label { font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; }
-.um-field-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-.um-input { padding:10px 12px; border:2px solid #e5e7eb; border-radius:9px; font-size:13px; outline:none; box-sizing:border-box; background:#f8fafc; transition:.2s; }
-.um-input:focus { border-color:#6366f1; background:#fff; }
-.um-input:disabled { background:#f9fafb; color:#94a3b8; }
-
-.um-rank-grid { display:flex; flex-wrap:wrap; gap:6px; }
-.um-rank-chip { padding:4px 10px; border:1px solid #e5e7eb; border-radius:6px; font-size:11px; font-weight:600; cursor:pointer; background:#f9fafb; color:#64748b; transition:.15s; }
-.um-rank-chip.selected { font-weight:700; }
-
-.um-msg { padding:8px 12px; border-radius:6px; font-size:12px; font-weight:500; }
-.um-msg.ok { background:#f0fdf4; color:#16a34a; }
-.um-msg.err { background:#fef2f2; color:#dc2626; }
-
-.um-btn { padding:10px 20px; border:none; border-radius:10px; cursor:pointer; font-size:13px; font-weight:600; transition:.2s; }
-.um-btn.primary { background:linear-gradient(135deg,#6366f1,#818cf8); color:white; box-shadow:0 2px 8px rgba(99,102,241,.25); }
-.um-btn.primary:hover:not(:disabled) { background:linear-gradient(135deg,#4f46e5,#6366f1); box-shadow:0 4px 12px rgba(99,102,241,.35); transform:translateY(-1px); }
-.um-btn:disabled { opacity:.5; cursor:not-allowed; transform:none; box-shadow:none; }
-
-.um-office-row { display:flex; align-items:center; gap:10px; padding:11px 12px; cursor:pointer; font-size:13px; font-weight:500; color:#374151; border-radius:8px; transition:.15s; }
-.um-office-row:hover { background:#f8fafc; color:#6366f1; }
-.um-office-row .material-symbols-outlined { font-size:22px; }
-
-.panel-badge { font-size:11px; background:#ede9fe; color:#6366f1; padding:2px 8px; border-radius:12px; font-weight:600; }
-
-/* ═══ Quick Links ═══ */
-.ql-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:12px; }
-.ql-btn {
-  display:flex; flex-direction:column; align-items:center; gap:10px;
-  padding:20px 10px; background:#fff; border:1px solid #eef0f4; border-radius:16px;
-  cursor:pointer;
-  transition: all .3s cubic-bezier(.4,0,.2,1);
-  position: relative;
-  overflow: hidden;
+.qm-msg .material-symbols-outlined { font-size: 18px; }
+.qm-msg.ok { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+.qm-msg.err { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+.qm-footer {
+  display: flex; justify-content: flex-end; gap: 10px;
+  padding: 16px 24px; border-top: 1px solid #f1f5f9;
 }
-.ql-btn::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(99,102,241,0.04), rgba(139,92,246,0.06));
-  opacity: 0;
-  transition: opacity .3s;
+.qm-cancel {
+  padding: 9px 20px; background: #f1f5f9; border: 1px solid #e2e8f0;
+  border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 600;
+  color: #475569; transition: all .15s;
 }
-.ql-btn:hover {
-  transform:translateY(-4px);
-  box-shadow: 0 12px 28px -8px rgba(99,102,241,0.2);
-  border-color:#c7d2fe;
+.qm-cancel:hover { background: #e2e8f0; }
+.qm-submit {
+  display: flex; align-items: center; gap: 6px;
+  padding: 9px 24px; background: linear-gradient(135deg, #6366f1, #4f46e5);
+  border: none; border-radius: 10px; cursor: pointer;
+  font-size: 13px; font-weight: 700; color: #fff; transition: all .15s;
 }
-.ql-btn:hover::before { opacity:1; }
-.ql-icon {
-  font-size:28px;
-  color:#6366f1;
-  width:48px; height:48px;
-  display:flex; align-items:center; justify-content:center;
-  background: linear-gradient(135deg, #eef2ff, #e0e7ff);
-  border-radius:14px;
-  position:relative; z-index:1;
-  transition: all .3s;
+.qm-submit:hover { box-shadow: 0 4px 12px rgba(99,102,241,0.3); }
+.qm-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+.qm-submit .material-symbols-outlined { font-size: 16px; }
+
+/* ═══ Two column layout ═══ */
+.ow-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+/* ═══ Owner Cards ═══ */
+.ow-card {
+  background: #fff; border: 1px solid #eef0f4; border-radius: 16px;
+  overflow: hidden; transition: box-shadow .2s;
 }
-.ql-btn:hover .ql-icon {
+.ow-card:hover { box-shadow: 0 4px 20px rgba(99,102,241,0.06); }
+.ow-card-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 16px 20px; border-bottom: 1px solid #f1f5f9;
+}
+.ow-card-head .material-symbols-outlined { font-size: 22px; color: #6366f1; }
+.ow-card-head h3 { margin: 0; font-size: 15px; font-weight: 800; color: #1e1b4b; flex: 1; }
+.ow-link {
+  display: flex; align-items: center; gap: 3px;
+  background: none; border: none; cursor: pointer;
+  color: #6366f1; font-size: 13px; font-weight: 700;
+  padding: 5px 10px; border-radius: 8px; transition: background .2s;
+}
+.ow-link:hover { background: #eef2ff; }
+.ow-link .material-symbols-outlined { font-size: 16px; }
+
+.ow-risk-badge {
+  display: flex; align-items: center; gap: 4px;
+  padding: 4px 12px; border-radius: 20px;
+  font-size: 11px; font-weight: 700; border: 1px solid;
+}
+.ow-risk-badge .material-symbols-outlined { font-size: 14px; }
+
+/* ═══ Position Overview ═══ */
+.pos-list { padding: 8px 0; }
+.pos-row {
+  display: grid; grid-template-columns: 60px 100px 1fr 110px;
+  align-items: center; gap: 12px; padding: 10px 20px;
+  transition: background .12s;
+}
+.pos-row:hover { background: #fafbfe; }
+.pos-code { font-weight: 800; font-size: 14px; color: #1e1b4b; letter-spacing: 0.3px; }
+.pos-amount { font-size: 13px; font-weight: 600; color: #475569; font-variant-numeric: tabular-nums; text-align: right; }
+.pos-bar-wrap { height: 22px; background: #f1f5f9; border-radius: 6px; overflow: hidden; position: relative; }
+.pos-bar {
+  height: 100%; border-radius: 6px;
+  background: linear-gradient(90deg, #6366f1, #818cf8);
+  display: flex; align-items: center; justify-content: flex-end;
+  padding-right: 6px; min-width: 32px;
+  transition: width .6s cubic-bezier(.4,0,.2,1);
+}
+.pos-pct { font-size: 10px; font-weight: 700; color: #fff; }
+.pos-try { font-size: 13px; font-weight: 700; color: #0f172a; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ═══ Pending Actions ═══ */
+.action-list { padding: 8px 0; }
+.action-item {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 20px; transition: background .12s;
+  border-bottom: 1px solid #f8f8f8;
+}
+.action-item:last-child { border-bottom: none; }
+.action-item:hover { background: #fafbfe; }
+.action-icon {
+  width: 42px; height: 42px; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.action-icon .material-symbols-outlined { font-size: 20px; }
+.action-icon.warn { background: #fef3c7; }
+.action-icon.warn .material-symbols-outlined { color: #d97706; }
+.action-icon.ok { background: #f0fdf4; }
+.action-icon.ok .material-symbols-outlined { color: #22c55e; }
+.action-icon.info { background: #eef2ff; }
+.action-icon.info .material-symbols-outlined { color: #6366f1; }
+.action-body { flex: 1; min-width: 0; }
+.action-title { display: block; font-size: 14px; font-weight: 700; color: #0f172a; }
+.action-desc { display: block; font-size: 12px; color: #94a3b8; margin-top: 2px; }
+.action-count {
+  font-size: 1.3rem; font-weight: 800; min-width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 10px; flex-shrink: 0;
+}
+.action-count.warn { background: #fef3c7; color: #d97706; }
+.action-count.ok { background: #f0fdf4; color: #22c55e; }
+.action-count.info { background: #eef2ff; color: #6366f1; }
+
+/* ═══ Branch Table ═══ */
+.branch-table-wrap { overflow-x: auto; }
+.branch-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.branch-table thead th {
+  padding: 12px 18px; font-size: 11px; font-weight: 700;
+  color: #64748b; text-transform: uppercase; letter-spacing: 0.04em;
+  text-align: left; background: #f8fafc; border-bottom: 1px solid #eef0f4;
+}
+.branch-table thead th.bt-num { text-align: right; }
+.branch-table tbody tr { border-bottom: 1px solid #f5f5f5; transition: background .12s; }
+.branch-table tbody tr:last-child { border-bottom: none; }
+.branch-table tbody tr:hover { background: #fafbfe; }
+.branch-table tbody tr.bt-merkez { background: linear-gradient(135deg, #fffbeb, #fefce8); }
+.branch-table tbody td { padding: 14px 18px; font-size: 13px; }
+.branch-table tbody td.bt-num { text-align: right; font-weight: 700; }
+.bt-name-inner { display: flex; align-items: center; gap: 10px; }
+.bt-office-badge {
+  padding: 3px 10px; border-radius: 6px; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.3px;
+}
+.bt-office-badge.merkez { background: #fef3c7; color: #92400e; }
+.bt-office-badge.sube { background: #eef2ff; color: #4f46e5; }
+.bt-office-name { font-weight: 700; color: #0f172a; }
+.bt-total { color: #1e1b4b !important; font-weight: 800 !important; }
+
+/* ═══ Transaction Feed ═══ */
+.tx-feed { max-height: 460px; overflow-y: auto; }
+.tx-item {
+  display: grid; grid-template-columns: 52px 1fr 85px 95px auto;
+  align-items: center; gap: 8px; padding: 11px 18px;
+  border-bottom: 1px solid #f5f5f5; font-size: 13px; transition: background .12s;
+}
+.tx-item:last-child { border-bottom: none; }
+.tx-item:hover { background: #fafbfe; }
+.tx-badge {
+  padding: 3px 10px; border-radius: 7px;
+  font-size: 11px; font-weight: 700; text-align: center; letter-spacing: 0.3px;
+}
+.tx-buy { background: linear-gradient(135deg, #ecfdf5, #d1fae5); color: #059669; }
+.tx-sell { background: linear-gradient(135deg, #fef2f2, #fee2e2); color: #dc2626; }
+.tx-detail { display: flex; align-items: baseline; gap: 6px; }
+.tx-cur { font-weight: 800; color: #1e1b4b; letter-spacing: 0.3px; }
+.tx-amt { font-weight: 600; color: #374151; font-variant-numeric: tabular-nums; }
+.tx-rate-val { font-size: 11px; color: #94a3b8; font-variant-numeric: tabular-nums; }
+.tx-total-val { font-weight: 700; color: #4338ca; text-align: right; font-variant-numeric: tabular-nums; }
+.tx-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.tx-user { font-size: 11px; font-weight: 600; color: #64748b; }
+.tx-time-val { font-size: 10px; color: #94a3b8; }
+
+/* ═══ Vault Fill ═══ */
+.vault-fill-list { padding: 8px 0; }
+.vf-office { padding: 12px 20px; border-bottom: 1px solid #f5f5f5; }
+.vf-office:last-child { border-bottom: none; }
+.vf-office-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.vf-office-name { font-size: 14px; font-weight: 700; color: #0f172a; }
+.vf-office-total { font-size: 13px; font-weight: 800; color: #4338ca; font-variant-numeric: tabular-nums; }
+.vf-currencies { display: flex; flex-wrap: wrap; gap: 6px; }
+.vf-cur {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 12px; background: #f8fafc; border: 1px solid #eef0f4;
+  border-radius: 8px; font-size: 12px;
+}
+.vf-code { font-weight: 800; color: #4f46e5; }
+.vf-bal { font-weight: 600; color: #374151; font-variant-numeric: tabular-nums; }
+.vf-empty { font-size: 12px; color: #94a3b8; padding: 4px 0; }
+
+/* ═══ Staff Activity ═══ */
+.staff-grid { display: grid; grid-template-columns: repeat(2, 1fr); }
+.staff-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 20px; border-bottom: 1px solid #f5f5f5;
+  border-right: 1px solid #f5f5f5; transition: background .12s;
+}
+.staff-item:nth-child(2n) { border-right: none; }
+.staff-item:nth-last-child(-n+2) { border-bottom: none; }
+.staff-item:hover { background: #fafbfe; }
+.staff-avatar {
+  width: 36px; height: 36px; border-radius: 10px;
   background: linear-gradient(135deg, #6366f1, #818cf8);
-  color: #fff;
-  box-shadow: 0 6px 16px -4px rgba(99,102,241,0.4);
+  color: #fff; font-size: 14px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
-.ql-label { font-size:12px; font-weight:700; color:#374151; text-align:center; position:relative; z-index:1; }
-
-/* ═══ Two-column layout ═══ */
-.db-two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-.db-two-col.single-col { grid-template-columns:1fr; }
-@media(max-width:900px) { .db-two-col { grid-template-columns:1fr; } }
-
-/* ═══ Recent Transactions ═══ */
-.rtx-list { display:flex; flex-direction:column; }
-.rtx-row {
-  display:grid; grid-template-columns:56px 52px 1fr 90px 1fr 80px;
-  align-items:center; gap:8px;
-  padding:12px 18px;
-  border-bottom:1px solid #f3f4f6;
-  font-size:13px;
-  transition: all .2s;
+.staff-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.staff-name { font-size: 13px; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.staff-meta { font-size: 11px; color: #94a3b8; }
+.staff-indicator {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
 }
-.rtx-row:last-child { border-bottom:none; }
-.rtx-row:hover { background: linear-gradient(135deg, #fafbfe, #f5f3ff); }
-.rtx-type {
-  padding:4px 12px; border-radius:8px;
-  font-size:11px; font-weight:700; text-align:center;
-  letter-spacing: 0.3px;
-}
-.tx-buy { background: linear-gradient(135deg, #ecfdf5, #d1fae5); color:#059669; border:1px solid rgba(5,150,105,0.15); }
-.tx-sell { background: linear-gradient(135deg, #fef2f2, #fee2e2); color:#dc2626; border:1px solid rgba(220,38,38,0.15); }
-.rtx-curr { font-weight:800; color:#1e1b4b; letter-spacing:0.3px; }
-.rtx-amount { font-weight:700; color:#0f172a; text-align:right; font-family:'JetBrains Mono',ui-monospace,monospace; }
-.rtx-rate { font-size:11px; color:#94a3b8; font-family:'JetBrains Mono',ui-monospace,monospace; }
-.rtx-try { font-weight:700; color:#4338ca; text-align:right; font-family:'JetBrains Mono',ui-monospace,monospace; }
-.rtx-time { font-size:11px; color:#94a3b8; text-align:right; }
+.staff-indicator.active { background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,0.4); }
 
-@media(max-width:600px) {
-  .db { padding:16px; gap:16px; }
-  .kpi-grid { grid-template-columns:repeat(2,1fr); }
-  .sec-stats { grid-template-columns:1fr 1fr; }
-  .o-grid { grid-template-columns:1fr; padding:14px; }
-  .um-layout { grid-template-columns:1fr; }
-  .um-field-row { grid-template-columns:1fr; }
-  .ql-grid { grid-template-columns:repeat(3,1fr); }
-  .ql-icon { width:40px; height:40px; font-size:22px; border-radius:12px; }
-  .rtx-row { grid-template-columns:56px 48px 1fr 80px; }
-  .rtx-rate, .rtx-time { display:none; }
-  .db-hero { padding:18px 20px; border-radius:14px; }
-  .db-hero-title { font-size:1.2rem; }
-  .db-hero-icon { width:42px; height:42px; border-radius:12px; }
+/* ═══ Shared ═══ */
+.state-msg { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 48px 20px; color: #94a3b8; font-size: 14px; font-weight: 500; }
+.state-msg .material-symbols-outlined { font-size: 24px; opacity: 0.6; }
+.spin { animation: spin 1s linear infinite; }
+
+/* ═══ Staff View Styles ═══ */
+.sf-kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.sf-kpi {
+  display: flex; align-items: center; gap: 14px;
+  background: #fff; border: 1px solid #eef0f4; border-radius: 14px; padding: 16px 18px;
+  transition: border-color .2s, box-shadow .2s;
+}
+.sf-kpi:hover { border-color: #d4d8e8; box-shadow: 0 4px 16px -6px rgba(0,0,0,0.08); }
+.sf-kpi-icon {
+  width: 42px; height: 42px; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.sf-kpi-icon .material-symbols-outlined { font-size: 22px; }
+.sf-kpi-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sf-kpi-label { font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.03em; }
+.sf-kpi-value { font-size: 1.15rem; font-weight: 800; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sf-kpi-value small { font-size: 12px; font-weight: 600; color: #94a3b8; margin-left: 2px; }
+
+.sf-panel {
+  background: #fff; border: 1px solid #eef0f4; border-radius: 14px; overflow: hidden;
+  transition: border-color .2s, box-shadow .2s;
+}
+.sf-panel:hover { border-color: #d4d8e8; box-shadow: 0 4px 16px -6px rgba(0,0,0,0.08); }
+.sf-panel-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; border-bottom: 1px solid #f1f5f9;
+}
+.sf-panel-title { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: #1e293b; }
+.sf-panel-title .material-symbols-outlined { font-size: 20px; color: #6366f1; }
+.sf-link-btn {
+  display: inline-flex; align-items: center; gap: 3px;
+  background: none; border: none; cursor: pointer;
+  font-size: 12px; font-weight: 600; color: #6366f1;
+  padding: 4px 8px; border-radius: 6px; transition: background .15s;
+}
+.sf-link-btn:hover { background: #eef2ff; }
+.sf-link-btn .material-symbols-outlined { font-size: 15px; }
+
+.sf-main-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; }
+
+.sf-rates { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.sf-rates thead th {
+  padding: 10px 18px; font-size: 11px; font-weight: 700;
+  color: #64748b; text-transform: uppercase; letter-spacing: 0.04em;
+  text-align: left; background: #f8fafc; border-bottom: 1px solid #f1f5f9;
+}
+.sf-rates thead th:nth-child(n+2) { text-align: right; }
+.sf-rates tbody tr { border-bottom: 1px solid #f5f5f5; transition: background .12s; }
+.sf-rates tbody tr:last-child { border-bottom: none; }
+.sf-rates tbody tr:hover { background: #fafbfe; }
+.sf-rates tbody td { padding: 11px 18px; font-size: 13px; }
+.sf-rates tbody td:nth-child(n+2) { text-align: right; }
+.sf-rate-cur { display: flex; flex-direction: column; gap: 1px; }
+.sf-rate-code { font-weight: 800; font-size: 14px; color: #1e1b4b; letter-spacing: 0.3px; }
+.sf-rate-name { font-size: 11px; color: #94a3b8; font-weight: 500; }
+.sf-rate-buy { font-weight: 700; color: #16a34a; }
+.sf-rate-buy small { font-weight: 500; color: #6b7280; }
+.sf-rate-sell { font-weight: 700; color: #dc2626; }
+.sf-rate-sell small { font-weight: 500; color: #6b7280; }
+.sf-rate-vault { font-weight: 600; color: #374151; }
+
+.sf-vault-panel { display: flex; flex-direction: column; }
+.sf-vault-head { background: linear-gradient(135deg, #1e1b4b, #312e81); border-bottom: none; }
+.sf-vault-head .sf-panel-title { color: #e0e7ff; }
+.sf-vault-head .sf-panel-title .material-symbols-outlined { color: #a5b4fc; }
+.sf-vault-total { font-size: 1.1rem; font-weight: 800; color: #a5f3fc; }
+.sf-vault-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 1px; background: #f1f5f9; flex: 1;
+}
+.sf-vault-item { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; background: #fff; }
+.sf-vault-code { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.4px; }
+.sf-vault-bal { font-size: 14px; font-weight: 700; color: #0f172a; font-variant-numeric: tabular-nums; }
+.sf-vault-val { font-size: 11px; color: #94a3b8; }
+
+.sf-info-card {
+  background: #fff; border: 1px solid #eef0f4; border-radius: 14px; overflow: hidden;
+  transition: border-color .2s, box-shadow .2s;
+}
+.sf-info-card:hover { border-color: #d4d8e8; box-shadow: 0 4px 16px -6px rgba(0,0,0,0.08); }
+.sf-info-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 14px 18px; border-bottom: 1px solid #f1f5f9;
+}
+.sf-info-head .material-symbols-outlined { font-size: 20px; }
+.sf-info-title { flex: 1; font-size: 14px; font-weight: 700; color: #1e293b; }
+.sf-info-body { display: flex; flex-direction: column; }
+.sf-info-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 18px; border-bottom: 1px solid #f8f8f8; font-size: 13px; color: #64748b;
+}
+.sf-info-row:last-child { border-bottom: none; }
+.sf-info-row strong { font-weight: 700; color: #0f172a; font-variant-numeric: tabular-nums; }
+.sf-info-highlight { background: #fafbfe; }
+
+.sf-tx-list { display: flex; flex-direction: column; }
+.sf-tx-row {
+  display: grid; grid-template-columns: 56px 52px 1fr 90px 1fr 80px;
+  align-items: center; gap: 8px; padding: 11px 18px;
+  border-bottom: 1px solid #f5f5f5; font-size: 13px; transition: background .12s;
+}
+.sf-tx-row:last-child { border-bottom: none; }
+.sf-tx-row:hover { background: #fafbfe; }
+.sf-tx-badge {
+  padding: 3px 10px; border-radius: 6px;
+  font-size: 11px; font-weight: 700; text-align: center; letter-spacing: 0.3px;
+}
+.sf-tx-cur { font-weight: 800; color: #1e1b4b; letter-spacing: 0.3px; }
+.sf-tx-amount { font-weight: 700; color: #0f172a; text-align: right; font-variant-numeric: tabular-nums; }
+.sf-tx-rate { font-size: 11px; color: #94a3b8; font-variant-numeric: tabular-nums; }
+.sf-tx-total { font-weight: 700; color: #4338ca; text-align: right; font-variant-numeric: tabular-nums; }
+.sf-tx-time { font-size: 11px; color: #94a3b8; text-align: right; }
+
+/* ═══ Responsive ═══ */
+@media(max-width: 1200px) {
+  .ok-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media(max-width: 900px) {
+  .ok-grid { grid-template-columns: repeat(2, 1fr); }
+  .qa-grid { grid-template-columns: repeat(3, 1fr); }
+  .ow-two-col { grid-template-columns: 1fr; }
+  .sf-main-grid { grid-template-columns: 1fr; }
+  .pos-row { grid-template-columns: 50px 80px 1fr 90px; }
+}
+@media(max-width: 600px) {
+  .db { padding: 16px; gap: 14px; }
+  .ok-grid { grid-template-columns: 1fr 1fr; }
+  .qa-grid { grid-template-columns: repeat(3, 1fr); }
+  .sf-kpi-row { grid-template-columns: 1fr 1fr; }
+  .sf-kpi-row .sf-kpi:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .sf-tx-row { grid-template-columns: 56px 48px 1fr 80px; }
+  .sf-tx-rate, .sf-tx-time { display: none; }
+  .tx-item { grid-template-columns: 52px 1fr 85px; }
+  .tx-rate-val, .tx-meta { display: none; }
+  .rate-band-inner { gap: 4px; }
+  .rate-chip { padding: 6px 10px; }
+  .db-hero-name { font-size: 1.15rem; }
 }
 </style>

@@ -103,7 +103,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             try
             {
                 if (!await _validation.IsOwnerAsync())
-                    return Unauthorized(new { error = "Bu işlem için Owner yetkisi gereklidir." });
+                    return StatusCode(403, new { error = "Bu işlem için Owner yetkisi gereklidir." });
 
                 await _officeCommand.SaveOffice(data);
                 return Ok(new { message = "Ofis kaydedildi." });
@@ -148,7 +148,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             try
             {
                 if (!await _validation.IsAdminAsync())
-                    return Unauthorized(new { error = "Bu işlem için Admin veya Owner yetkisi gereklidir." });
+                    return StatusCode(403, new { error = "Bu işlem için Admin veya Owner yetkisi gereklidir." });
 
                 var result = await _transfer.GetPendingTransfersAsync();
                 return Ok(result);
@@ -189,7 +189,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             try
             {
                 if (!await _validation.IsAdminAsync())
-                    return Unauthorized(new { error = "Bu işlem için Admin veya Owner yetkisi gereklidir." });
+                    return StatusCode(403, new { error = "Bu işlem için Admin veya Owner yetkisi gereklidir." });
 
                 var userId = GetCurrentUserId();
                 if (userId == Guid.Empty) return Unauthorized();
@@ -221,7 +221,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         {
             try
             {
-                if (!await _validation.IsAdminAsync()) return Unauthorized();
+                if (!await _validation.IsAdminAsync()) return StatusCode(403, new { error = "Yetersiz yetki." });
 
                 var startDate = period switch
                 {
@@ -289,7 +289,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         [HttpGet("alerts/unread")]
         public async Task<IActionResult> GetUnreadAlerts()
         {
-            if (!await _validation.IsAdminAsync()) return Unauthorized();
+            if (!await _validation.IsAdminAsync()) return StatusCode(403, new { error = "Yetersiz yetki." });
             var alerts = await _alertService.GetUnreadAlertsAsync();
             return Ok(alerts);
         }
@@ -337,7 +337,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             try
             {
                 if (!await _validation.IsOwnerAsync())
-                    return Unauthorized(new { error = "Bu işlem için Owner yetkisi gereklidir." });
+                    return StatusCode(403, new { error = "Bu işlem için Owner yetkisi gereklidir." });
 
                 var count = await _rateService.PushRatesToBranchesAsync(request.MerkezOfficeId);
                 return Ok(new { message = $"{count} kur güncellendi.", updatedCount = count });

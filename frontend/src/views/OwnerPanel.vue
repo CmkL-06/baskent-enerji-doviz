@@ -9,6 +9,7 @@ import OwnerTransfers from './owner/OwnerTransfers.vue'
 import OwnerBalances from './owner/OwnerBalances.vue'
 import OwnerReports from './owner/OwnerReports.vue'
 import OwnerQr from './owner/OwnerQr.vue'
+import OwnerVaultInspect from './owner/OwnerVaultInspect.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -18,7 +19,7 @@ onMounted(() => {
   loadAlerts()
 })
 
-type Tab = 'dashboard' | 'branches' | 'transfers' | 'balances' | 'reports' | 'qr'
+type Tab = 'dashboard' | 'branches' | 'transfers' | 'balances' | 'inspect' | 'reports' | 'qr'
 const activeTab = ref<Tab>('dashboard')
 const refreshKey = ref(0)
 
@@ -27,6 +28,7 @@ const tabs: { id: Tab; icon: string; label: string }[] = [
   { id: 'branches',   icon: 'store',            label: 'Şubeler' },
   { id: 'transfers',  icon: 'swap_horiz',       label: 'Transferler' },
   { id: 'balances',   icon: 'account_balance',   label: 'Bakiye İşlemleri' },
+  { id: 'inspect',    icon: 'manage_search',     label: 'Kasa İnceleme' },
   { id: 'reports',    icon: 'insert_chart',      label: 'Raporlar' },
   { id: 'qr',         icon: 'qr_code_2',        label: 'QR Oluştur' },
 ]
@@ -139,6 +141,7 @@ function refresh() {
     <OwnerBranches    v-if="activeTab === 'branches'"   :key="'b-' + refreshKey" />
     <OwnerTransfers   v-if="activeTab === 'transfers'"  :key="'t-' + refreshKey" />
     <OwnerBalances    v-if="activeTab === 'balances'"   :key="'bl-' + refreshKey" />
+    <OwnerVaultInspect v-if="activeTab === 'inspect'"   :key="'vi-' + refreshKey" />
     <OwnerReports     v-if="activeTab === 'reports'"    :key="'r-' + refreshKey" />
     <OwnerQr          v-if="activeTab === 'qr'" />
   </div>

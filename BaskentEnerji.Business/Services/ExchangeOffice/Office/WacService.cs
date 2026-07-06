@@ -53,9 +53,10 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
         public async Task<decimal> CalculateRealizedProfitAsync(decimal sellRate, decimal quantity, Guid vaultId, Guid currencyId)
         {
-            var wac = await GetWacAsync(vaultId, currencyId);
-            if (wac == 0) return 0;
-            return (sellRate - wac) * quantity;
+            // Use locked read when inside a transaction to prevent stale WAC
+            var wacEntity = await GetOrCreateWacAsync(vaultId, currencyId);
+            if (wacEntity.Wac == 0) return 0;
+            return (sellRate - wacEntity.Wac) * quantity;
         }
 
         public async Task AdjustWacQuantityAsync(Guid vaultId, Guid currencyId, decimal newQuantity, WacAdjustReason reason, Guid? transactionId = null)
@@ -133,8 +134,10 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
         private async Task<CurrencyWac> GetOrCreateWacAsync(Guid vaultId, Guid currencyId)
         {
+            // Use UPDLOCK to prevent concurrent WAC updates from racing
             var wac = await _context.CurrencyWacs
-                .FirstOrDefaultAsync(w => w.VaultId == vaultId && w.CurrencyId == currencyId);
+                .FromSqlRaw("SELECT * FROM CurrencyWacs WITH (UPDLOCK) WHERE VaultId = {0} AND CurrencyId = {1}", vaultId, currencyId)
+                .FirstOrDefaultAsync();
 
             if (wac == null)
             {

@@ -34,6 +34,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
         private readonly ValidationService _validationService;
         private readonly PartyTransactionIntegration _partyIntegration;
         private readonly IMemoryCache _memoryCache;
+        private readonly IDayClosureService _dayClosureService;
 
         public ExchangeTransactionService(
             BaskentEnerjiDbContext context,
@@ -41,7 +42,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             IVaultService vaultService,
             IWacService wacService,
             ValidationService validationService,
-            PartyTransactionIntegration partyIntegration, IMemoryCache memoryCache
+            PartyTransactionIntegration partyIntegration, IMemoryCache memoryCache,
+            IDayClosureService dayClosureService
             )
         {
             _context = context;
@@ -51,6 +53,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             _validationService = validationService;
             _partyIntegration = partyIntegration;
             _memoryCache = memoryCache;
+            _dayClosureService = dayClosureService;
         }
 
         public async Task<List<vm_exchangetransaction>> ProcessExchangeAsync(List<rm_exchangetransaction> request)
@@ -71,6 +74,11 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
                 if (vault == null)
                     throw new InvalidOperationException("Vault not found");
+
+                // Check day closure status — block transactions if unclosed days exist
+                var canTransact = await _dayClosureService.CanTransactAsync(vault.OfficeId);
+                if (!canTransact)
+                    throw new ApiException(HttpStatusCode.BadRequest, "Önceki günün kapanışı yapılmadan işlem yapılamaz.");
 
                 // Result list to return
                 var results = new List<vm_exchangetransaction>();
@@ -161,12 +169,15 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                         // Office sells foreign currency to customer → realized profit = (SellRate - WAC) * Qty
                         if (!isTrySource)
                         {
-                            profit = await _wacService.CalculateRealizedProfitAsync(rate, singleRequest.SourceAmount, vaultId, singleRequest.SourceCurrencyId);
-                            var currentWac = await _wacService.GetWacAsync(vaultId, singleRequest.SourceCurrencyId);
+                            // Verify sufficient balance before selling
                             var currentBalance = await _context.VaultBalances
                                 .Where(vb => vb.VaultId == vaultId && vb.CurrencyId == singleRequest.SourceCurrencyId)
                                 .Select(vb => vb.Balance)
                                 .FirstOrDefaultAsync();
+                            if (currentBalance < singleRequest.SourceAmount)
+                                throw new ApiException(HttpStatusCode.BadRequest, $"Insufficient vault balance");
+
+                            profit = await _wacService.CalculateRealizedProfitAsync(rate, singleRequest.SourceAmount, vaultId, singleRequest.SourceCurrencyId);
                             var newQty = currentBalance - singleRequest.SourceAmount;
                             await _wacService.AdjustWacQuantityAsync(vaultId, singleRequest.SourceCurrencyId, newQty, Infrastructure.ExchangeOffice.Office.WacAdjustReason.Sale, exchangeTransaction.Id);
                         }
