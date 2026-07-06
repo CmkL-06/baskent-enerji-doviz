@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { useNotification } from '@/composables/useNotification'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ??
   ((typeof window !== 'undefined' &&
@@ -15,12 +16,16 @@ apiClient.interceptors.request.use(cfg => {
   return cfg
 })
 
-// 401 → login yönlendir (cascade korumalı)
+// 401 → login yönlendir (cascade korumalı) + global hata toast
 let _redirecting = false
+const { error: toastError } = useNotification()
+
 apiClient.interceptors.response.use(
   r => r,
   err => {
-    if (err.response?.status === 401 && !_redirecting) {
+    const status = err.response?.status
+
+    if (status === 401 && !_redirecting) {
       const hadToken = !!localStorage.getItem('token')
       if (hadToken) {
         _redirecting = true
@@ -34,7 +39,17 @@ apiClient.interceptors.response.use(
           _redirecting = false
         }
       }
+    } else if (status !== 401) {
+      const msg = err.response?.data?.message
+        || err.response?.data?.error
+        || (status === 403 ? 'Bu işlem için yetkiniz yok'
+          : status === 404 ? 'İstenen kaynak bulunamadı'
+          : status === 500 ? 'Sunucu hatası oluştu'
+          : status ? `Hata (${status})`
+          : 'Sunucuya bağlanılamadı')
+      toastError(msg, { duration: 5000 })
     }
+
     return Promise.reject(err)
   }
 )
