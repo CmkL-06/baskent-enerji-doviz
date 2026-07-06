@@ -223,11 +223,13 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     return new List<vm_vaultsummary>();
                 }
 
-                var dbUserOffice = await _context.User_Offices
+                var userOfficeIds = await _context.User_Offices
                     .AsNoTracking()
-                    .FirstOrDefaultAsync(x => x.UserId == parsedUserId);
+                    .Where(x => x.UserId == parsedUserId)
+                    .Select(x => x.OfficeId)
+                    .ToListAsync();
 
-                if (dbUserOffice == null)
+                if (!userOfficeIds.Any())
                 {
                     return new List<vm_vaultsummary>();
                 }
@@ -237,7 +239,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                    .Include(v => v.Office)
                    .Include(v => v.Balances)
                        .ThenInclude(b => b.Currency)
-                   .Where(v => v.IsActive && v.OfficeId == dbUserOffice.OfficeId)
+                   .Where(v => v.IsActive && userOfficeIds.Contains(v.OfficeId))
                    .ToListAsync();
             }
             else
@@ -330,19 +332,39 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
         public async Task<List<vm_officesummary>> GetOfficeSummariesAsync()
         {
-            // Use caching for frequently accessed data
-            var cacheKey = "OfficeSummaries";
+            var isAdmin = await _validationService.IsAdminAsync();
+            var cacheKey = isAdmin ? "OfficeSummaries_All" : $"OfficeSummaries_{_validationService.GetUserID()}";
             if (_memoryCache.TryGetValue(cacheKey, out List<vm_officesummary> cachedOfficeSummaries))
             {
                 return cachedOfficeSummaries;
             }
 
-            var offices = await _context.Offices
+            var officeQuery = _context.Offices
                 .AsNoTracking()
                 .Include(o => o.Vaults)
                     .ThenInclude(v => v.Balances)
                         .ThenInclude(b => b.Currency)
-                .Where(o => o.IsActive)
+                .Where(o => o.IsActive);
+
+            if (!isAdmin)
+            {
+                var userIdStr = _validationService.GetUserID();
+                if (!string.IsNullOrEmpty(userIdStr) && Guid.TryParse(userIdStr, out var parsedUserId))
+                {
+                    var userOfficeIds = await _context.User_Offices
+                        .AsNoTracking()
+                        .Where(x => x.UserId == parsedUserId)
+                        .Select(x => x.OfficeId)
+                        .ToListAsync();
+                    officeQuery = officeQuery.Where(o => userOfficeIds.Contains(o.Id));
+                }
+                else
+                {
+                    return new List<vm_officesummary>();
+                }
+            }
+
+            var offices = await officeQuery
                 .OrderBy(o => o.OfficeType)
                 .ThenBy(o => o.OfficeName)
                 .AsSplitQuery()

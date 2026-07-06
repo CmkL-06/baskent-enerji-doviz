@@ -502,11 +502,11 @@ function assetPercent(o: any) {
                 <div class="ob-field-row">
                   <div class="ob-field">
                     <label>Günlük İşlem Limiti (₺)</label>
-                    <input v-model.number="editForm.dailyTransactionLimit" type="number" class="ob-input" placeholder="Sınırsız" />
+                    <input v-model.number="editForm.dailyTransactionLimit" type="number" class="ob-input" placeholder="Boş = sınırsız" min="0" />
                   </div>
                   <div class="ob-field">
                     <label>Aylık İşlem Limiti (₺)</label>
-                    <input v-model.number="editForm.monthlyTransactionLimit" type="number" class="ob-input" placeholder="Sınırsız" />
+                    <input v-model.number="editForm.monthlyTransactionLimit" type="number" class="ob-input" placeholder="Boş = sınırsız" min="0" />
                   </div>
                 </div>
               </div>
@@ -521,8 +521,8 @@ function assetPercent(o: any) {
                     </select>
                   </div>
                   <div class="ob-field">
-                    <label>Oto-Onay Eşiği (₺)</label>
-                    <input v-model.number="editForm.transferApprovalThreshold" type="number" step="100" class="ob-input" placeholder="Hepsi onay gerektirir" />
+                    <label>Transfer Modu</label>
+                    <input type="text" class="ob-input" value="Otomatik (anında tamamlanır)" disabled style="background:#f0fdf4;color:#16a34a;font-weight:500;" />
                   </div>
                 </div>
               </div>

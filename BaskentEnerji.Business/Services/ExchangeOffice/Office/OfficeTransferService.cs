@@ -51,8 +51,20 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     throw new ApiException(HttpStatusCode.BadRequest,
                         $"Kaynak kasada yeterli bakiye yok. Mevcut: {balance?.Balance ?? 0}");
 
-                var autoApprove = sourceVault.Office.TransferApprovalThreshold.HasValue &&
-                                  model.Amount <= sourceVault.Office.TransferApprovalThreshold.Value;
+                // Günlük işlem limiti kontrolü
+                if (sourceVault.Office.DailyTransactionLimit.HasValue)
+                {
+                    var todayStart = DateTime.UtcNow.Date;
+                    var dailyTotal = await _db.OfficeTransfers
+                        .Where(t => t.SourceVaultId == model.SourceVaultId
+                            && t.Status == TransferStatus.Completed
+                            && t.CreatedDate >= todayStart)
+                        .SumAsync(t => t.Amount);
+
+                    if (dailyTotal + model.Amount > sourceVault.Office.DailyTransactionLimit.Value)
+                        throw new ApiException(HttpStatusCode.BadRequest,
+                            $"Günlük işlem limiti aşıldı. Limit: {sourceVault.Office.DailyTransactionLimit.Value:N0}, Bugünkü toplam: {dailyTotal:N0}");
+                }
 
                 var transfer = new OfficeTransfer
                 {
@@ -64,33 +76,30 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     Amount = model.Amount,
                     Notes = model.Notes,
                     RequestedByUserId = requestedByUserId,
-                    Status = autoApprove ? TransferStatus.Completed : TransferStatus.Pending
+                    Status = TransferStatus.Completed
                 };
 
-                if (autoApprove)
+                transfer.ApprovedByUserId = requestedByUserId;
+                transfer.ProcessedAt = DateTime.UtcNow;
+                transfer.Notes = (transfer.Notes ?? "") + " [Otomatik transfer]";
+
+                balance.Balance -= model.Amount;
+
+                var targetBalance = await _db.VaultBalances
+                    .FirstOrDefaultAsync(b => b.VaultId == model.TargetVaultId && b.CurrencyId == model.CurrencyId);
+                if (targetBalance == null)
                 {
-                    transfer.ApprovedByUserId = requestedByUserId;
-                    transfer.ProcessedAt = DateTime.UtcNow;
-                    transfer.Notes = (transfer.Notes ?? "") + " [Otomatik onay — eşik altı]";
-
-                    balance.Balance -= model.Amount;
-
-                    var targetBalance = await _db.VaultBalances
-                        .FirstOrDefaultAsync(b => b.VaultId == model.TargetVaultId && b.CurrencyId == model.CurrencyId);
-                    if (targetBalance == null)
+                    targetBalance = new VaultBalance
                     {
-                        targetBalance = new VaultBalance
-                        {
-                            Id = Guid.NewGuid(),
-                            VaultId = model.TargetVaultId,
-                            CurrencyId = model.CurrencyId,
-                            Balance = 0,
-                            CreatedDate = DateTime.UtcNow
-                        };
-                        await _db.VaultBalances.AddAsync(targetBalance);
-                    }
-                    targetBalance.Balance += model.Amount;
+                        Id = Guid.NewGuid(),
+                        VaultId = model.TargetVaultId,
+                        CurrencyId = model.CurrencyId,
+                        Balance = 0,
+                        CreatedDate = DateTime.UtcNow
+                    };
+                    await _db.VaultBalances.AddAsync(targetBalance);
                 }
+                targetBalance.Balance += model.Amount;
 
                 await _db.OfficeTransfers.AddAsync(transfer);
                 await _db.SaveChangesAsync();

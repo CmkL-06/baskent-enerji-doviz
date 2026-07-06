@@ -27,8 +27,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Blockchain
         {
             _httpClientFactory = httpClientFactory;
             _logger = logger;
-            _apiKey = configuration["Binance:ApiKey"] ?? throw new InvalidOperationException("Binance:ApiKey is not configured");
-            _apiSecret = configuration["Binance:ApiSecret"] ?? throw new InvalidOperationException("Binance:ApiSecret is not configured");
+            _apiKey = configuration["Binance:ApiKey"] ?? "";
+            _apiSecret = configuration["Binance:ApiSecret"] ?? "";
             _binanceApiUrl = configuration["Binance:BaseUrl"] ?? "https://api.binance.com";
         }
 
