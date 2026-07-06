@@ -65,7 +65,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting office hierarchy");
-                return StatusCode(500, new { error = ex.Message });
+                return StatusCode(500, new { error = "İç sunucu hatası" });
             }
         }
 
@@ -156,7 +156,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting pending transfers");
-                return StatusCode(500, new { error = ex.Message });
+                return StatusCode(500, new { error = "İç sunucu hatası" });
             }
         }
 
@@ -174,7 +174,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting transfers by office");
-                return StatusCode(500, new { error = ex.Message });
+                return StatusCode(500, new { error = "İç sunucu hatası" });
             }
         }
 
@@ -279,7 +279,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting branch comparison");
-                return StatusCode(500, new { error = ex.Message });
+                return StatusCode(500, new { error = "İç sunucu hatası" });
             }
         }
 

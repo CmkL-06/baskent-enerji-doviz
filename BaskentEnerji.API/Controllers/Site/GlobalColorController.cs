@@ -52,9 +52,9 @@ namespace BaskentEnerji.API.Controllers.Site
 
                 return Ok(response);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                return StatusCode(500, new { message = "Error getting active colors", error = ex.Message });
+                return StatusCode(500, new { error = "İç sunucu hatası" });
             }
         }
 
@@ -98,9 +98,9 @@ namespace BaskentEnerji.API.Controllers.Site
 
                 return Ok(response);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                return StatusCode(500, new { message = "Error creating color theme", error = ex.Message });
+                return StatusCode(500, new { error = "İç sunucu hatası" });
             }
         }
 
@@ -135,9 +135,9 @@ namespace BaskentEnerji.API.Controllers.Site
 
                 return Ok(response);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                return StatusCode(500, new { message = "Error updating color theme", error = ex.Message });
+                return StatusCode(500, new { error = "İç sunucu hatası" });
             }
         }
 
@@ -165,9 +165,9 @@ namespace BaskentEnerji.API.Controllers.Site
 
                 return Ok(new { message = "Theme deleted successfully" });
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                return StatusCode(500, new { message = "Error deleting color theme", error = ex.Message });
+                return StatusCode(500, new { error = "İç sunucu hatası" });
             }
         }
     }

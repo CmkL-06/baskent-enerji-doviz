@@ -2387,7 +2387,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error submitting vault count");
-            return StatusCode(500, new { error = ex.Message });
+            return StatusCode(500, new { error = "İç sunucu hatası" });
         }
     }
 
@@ -2408,7 +2408,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting vault counts");
-            return StatusCode(500, new { error = ex.Message });
+            return StatusCode(500, new { error = "İç sunucu hatası" });
         }
     }
 
@@ -2429,7 +2429,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error resetting vault count status");
-            return StatusCode(500, new { error = ex.Message });
+            return StatusCode(500, new { error = "İç sunucu hatası" });
         }
     }
 
@@ -2450,7 +2450,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error setting vault count status");
-                return StatusCode(500, new { error = ex.Message });
+                return StatusCode(500, new { error = "İç sunucu hatası" });
             }
         }
 

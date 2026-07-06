@@ -57,7 +57,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting auto-rate settings");
-                return StatusCode(500, new { error = ex.Message });
+                return StatusCode(500, new { error = "İç sunucu hatası" });
             }
         }
 
@@ -109,7 +109,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error updating auto-rate settings");
-                return StatusCode(500, new { error = ex.Message });
+                return StatusCode(500, new { error = "İç sunucu hatası" });
             }
         }
 
@@ -173,7 +173,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in test fetch");
-                return StatusCode(500, new { error = ex.Message });
+                return StatusCode(500, new { error = "İç sunucu hatası" });
             }
         }
 
@@ -197,7 +197,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error triggering auto-update");
-                return StatusCode(500, new { error = ex.Message });
+                return StatusCode(500, new { error = "İç sunucu hatası" });
             }
         }
 
@@ -246,7 +246,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting pending approvals");
-                return StatusCode(500, new { error = ex.Message });
+                return StatusCode(500, new { error = "İç sunucu hatası" });
             }
         }
 
@@ -317,7 +317,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error processing approval action");
-                return StatusCode(500, new { error = ex.Message });
+                return StatusCode(500, new { error = "İç sunucu hatası" });
             }
         }
 
@@ -374,7 +374,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting rate history");
-                return StatusCode(500, new { error = ex.Message });
+                return StatusCode(500, new { error = "İç sunucu hatası" });
             }
         }
 
@@ -404,7 +404,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting external rates");
-                return StatusCode(500, new { error = ex.Message });
+                return StatusCode(500, new { error = "İç sunucu hatası" });
             }
         }
 
@@ -434,7 +434,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting sources");
-                return StatusCode(500, new { error = ex.Message });
+                return StatusCode(500, new { error = "İç sunucu hatası" });
             }
         }
 
@@ -455,7 +455,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error seeding sources");
-                return StatusCode(500, new { error = ex.Message });
+                return StatusCode(500, new { error = "İç sunucu hatası" });
             }
         }
 
