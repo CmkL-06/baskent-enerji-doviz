@@ -1,21 +1,29 @@
-# Security Policy
+# Güvenlik Politikası
 
-## Supported Versions
+## Desteklenen Sürümler
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+Bu proje tek bir canlı ortamda (`BASKENT-DOVIZ` branch) çalışmaktadır. Yalnızca en güncel sürüm desteklenir.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 5.1.x   | :white_check_mark: |
-| 5.0.x   | :x:                |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :x:                |
+| Branch | Durum |
+| --- | --- |
+| `BASKENT-DOVIZ` | :white_check_mark: Aktif |
+| `main` | :x: Kullanılmıyor |
 
-## Reporting a Vulnerability
+## Güvenlik Önlemleri
 
-Use this section to tell people how to report a vulnerability.
+- JWT tabanlı kimlik doğrulama (Bearer token)
+- Rol bazlı yetkilendirme (Rank: User → Staff → Admin → Owner)
+- Ofis bazlı veri izolasyonu (Staff sadece kendi ofisini görür)
+- API yanıtlarında hata detayı gizleme (ex.Message kullanılmaz)
+- CORS kısıtlaması
+- appsettings.json ve .env dosyaları git'e dahil edilmez
 
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+## Güvenlik Açığı Bildirimi
+
+Bir güvenlik açığı tespit ederseniz lütfen doğrudan e-posta ile bildirin:
+
+**E-posta:** kulemlakyatirim.as@gmail.com
+
+- Açığı herkese açık issue olarak **açmayın**.
+- 48 saat içinde geri dönüş yapılacaktır.
+- Kabul edilen açıklar en kısa sürede düzeltilecektir.
