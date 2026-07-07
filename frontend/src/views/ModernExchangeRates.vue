@@ -199,17 +199,17 @@ onMounted(async () => {
     <div class="mr-topbar">
       <div class="mr-topbar-left">
         <div class="mr-topbar-icon">
-          <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 22px; color: #6366f1">tune</span>
+          <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 22px; color: #6366f1">tune</span>
         </div>
         <h1 class="mr-topbar-title">Manuel Kur Yönetimi</h1>
       </div>
       <div class="mr-topbar-right">
         <button class="mr-btn mr-btn--primary" @click="startAdd">
-          <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 18px">add_circle</span>
+          <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 18px">add_circle</span>
           Yeni Kur Ekle
         </button>
         <button class="mr-btn mr-btn--ghost" @click="loadRates" :disabled="loading">
-          <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 18px" :class="{ 'mr-spin': loading }">refresh</span>
+          <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 18px" :class="{ 'mr-spin': loading }">refresh</span>
         </button>
       </div>
     </div>
@@ -217,27 +217,27 @@ onMounted(async () => {
     <!-- Tabs -->
     <div class="mr-tabs">
       <button class="mr-tab" :class="{ 'mr-tab--active': activeTab === 'rates' }" @click="activeTab = 'rates'">
-        <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 18px">monitoring</span>
+        <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 18px">monitoring</span>
         Mevcut Kurlar
       </button>
       <button class="mr-tab" :class="{ 'mr-tab--active': activeTab === 'add' }" @click="startAdd">
-        <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 18px">edit_note</span>
+        <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 18px">edit_note</span>
         {{ editMode ? 'Kur Düzenle' : 'Kur Ekle' }}
       </button>
       <button class="mr-tab" :class="{ 'mr-tab--active': activeTab === 'history' }" @click="activeTab = 'history'" v-if="rateHistory.length">
-        <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 18px">history</span>
+        <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 18px">history</span>
         Geçmiş{{ historyPair ? ` (${historyPair.source}/${historyPair.target})` : '' }}
       </button>
     </div>
 
     <!-- Messages -->
     <div v-if="error" class="mr-alert mr-alert--error">
-      <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 18px">error</span>
+      <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 18px">error</span>
       {{ error }}
       <button class="mr-alert-close" @click="error = ''">×</button>
     </div>
     <div v-if="success" class="mr-alert mr-alert--success">
-      <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 18px">check_circle</span>
+      <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 18px">check_circle</span>
       {{ success }}
     </div>
 
@@ -250,7 +250,7 @@ onMounted(async () => {
     <!-- ═══ TAB: Mevcut Kurlar ═══ -->
     <div v-else-if="activeTab === 'rates'" class="mr-rates-grid">
       <div v-if="!rates.length" class="mr-empty">
-        <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24; font-size: 48px; color: #cbd5e1">currency_exchange</span>
+        <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24; font-size: 48px; color: #cbd5e1">currency_exchange</span>
         <p>Henüz tanımlı kur bulunamadı</p>
         <button class="mr-btn mr-btn--primary" @click="startAdd">İlk Kuru Ekle</button>
       </div>
@@ -262,7 +262,7 @@ onMounted(async () => {
                  :src="getCurrencyFlagImg(getCurrencyCode(rate.sourceCurrencyId))"
                  class="mr-flag" />
             <span class="mr-rate-code">{{ getCurrencyCode(rate.sourceCurrencyId) }}</span>
-            <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 16px; color: #94a3b8">arrow_forward</span>
+            <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 16px; color: #94a3b8">arrow_forward</span>
             <img v-if="getCurrencyFlagImg(getCurrencyCode(rate.targetCurrencyId))"
                  :src="getCurrencyFlagImg(getCurrencyCode(rate.targetCurrencyId))"
                  class="mr-flag" />
@@ -270,10 +270,10 @@ onMounted(async () => {
           </div>
           <div class="mr-rate-actions">
             <button class="mr-icon-btn" @click="loadHistory(rate.sourceCurrencyId, rate.targetCurrencyId)" title="Geçmiş">
-              <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 18px">history</span>
+              <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 18px">history</span>
             </button>
             <button class="mr-icon-btn mr-icon-btn--edit" @click="startEdit(rate)" title="Düzenle">
-              <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 18px">edit</span>
+              <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 18px">edit</span>
             </button>
           </div>
         </div>
@@ -297,7 +297,7 @@ onMounted(async () => {
         </div>
         <div class="mr-rate-footer">
           <span class="mr-rate-date">
-            <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 14px">schedule</span>
+            <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 14px">schedule</span>
             {{ formatDateTime(rate.effectiveFrom) }}
           </span>
           <span class="mr-rate-badge" :class="rate.isActive ? 'mr-rate-badge--active' : 'mr-rate-badge--inactive'">
@@ -311,7 +311,7 @@ onMounted(async () => {
     <div v-else-if="activeTab === 'add'" class="mr-form-wrap">
       <div class="mr-form-card">
         <div class="mr-form-header">
-          <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 22px; color: #6366f1">{{ editMode ? 'edit_note' : 'add_circle' }}</span>
+          <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 22px; color: #6366f1">{{ editMode ? 'edit_note' : 'add_circle' }}</span>
           <h2>{{ editMode ? 'Kur Düzenle' : 'Yeni Kur Ekle' }}</h2>
         </div>
 
@@ -328,7 +328,7 @@ onMounted(async () => {
               </select>
             </div>
             <div class="mr-form-arrow">
-              <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 24px; color: #6366f1">swap_horiz</span>
+              <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 24px; color: #6366f1">swap_horiz</span>
             </div>
             <div class="mr-form-group">
               <label class="mr-label">Hedef Para Birimi</label>
@@ -361,7 +361,7 @@ onMounted(async () => {
 
           <!-- Spread info -->
           <div v-if="spreadPercent !== null" class="mr-spread-info">
-            <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 16px">info</span>
+            <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 16px">info</span>
             Spread: <strong>%{{ spreadPercent }}</strong>
             <span v-if="parseFloat(spreadPercent) > 5" class="mr-spread-warn">
               (Yüksek spread — kontrol ediniz)
@@ -388,7 +388,7 @@ onMounted(async () => {
           {{ historyPair.source }} / {{ historyPair.target }} Kur Geçmişi
         </h2>
         <button class="mr-btn mr-btn--ghost" @click="activeTab = 'rates'">
-          <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 18px">arrow_back</span>
+          <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 18px">arrow_back</span>
           Geri
         </button>
       </div>
@@ -506,7 +506,7 @@ onMounted(async () => {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1), color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .mr-tab:hover {
   color: #334155;
@@ -529,7 +529,7 @@ onMounted(async () => {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .mr-btn--primary {
   background: var(--mr-indigo);
@@ -623,7 +623,7 @@ onMounted(async () => {
   border-radius: var(--mr-radius);
   box-shadow: var(--mr-shadow-sm);
   overflow: hidden;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .mr-rate-card:hover {
   box-shadow: var(--mr-shadow-md);
@@ -665,7 +665,7 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, color 0.2s;
 }
 .mr-icon-btn:hover {
   background: rgba(99,102,241,0.12);
@@ -821,7 +821,7 @@ onMounted(async () => {
   font-weight: 500;
   color: #1e293b;
   background: white;
-  transition: all 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s;
   outline: none;
   font-family: inherit;
 }

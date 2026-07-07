@@ -7,7 +7,9 @@ import { getCurrencyFlagImg } from '@/utils/currency'
 import AppKpiCard from '@/components/common/AppKpiCard.vue'
 import AppPageHeader from '@/components/common/AppPageHeader.vue'
 import AppEmptyState from '@/components/common/AppEmptyState.vue'
+import { useNotification } from '@/composables/useNotification'
 
+const notification = useNotification()
 const authStore = useAuthStore()
 const exchangeStore = useExchangeStore()
 
@@ -111,10 +113,10 @@ async function saveSettings() {
       ...settingsForm.value,
       notificationEmails: emails,
     })
-    alert('Ayarlar kaydedildi')
+    notification.success('Ayarlar kaydedildi')
     await loadSettings()
   } catch (e: any) {
-    alert(e?.response?.data?.message || 'Ayarlar kaydedilemedi')
+    notification.error(e?.response?.data?.message || 'Ayarlar kaydedilemedi')
   } finally {
     saving.value = false
   }
@@ -141,7 +143,7 @@ async function handleApproval(item: any, isApproved: boolean) {
     })
     await loadPending()
   } catch (e: any) {
-    alert(e?.response?.data?.message || 'İşlem başarısız')
+    notification.error(e?.response?.data?.message || 'İşlem başarısız')
   }
 }
 
@@ -176,10 +178,10 @@ async function triggerUpdate(testMode: boolean) {
       TriggeredBy: testMode ? 'TEST' : 'USER',
       TestMode: testMode,
     })
-    alert(testMode ? 'Test çalıştırıldı — kurlar uygulanmadı' : 'Kurlar güncellendi')
+    notification.success(testMode ? 'Test çalıştırıldı — kurlar uygulanmadı' : 'Kurlar güncellendi')
     if (!testMode) await loadPending()
   } catch (e: any) {
-    alert(e?.response?.data?.message || 'Güncelleme başarısız')
+    notification.error(e?.response?.data?.message || 'Güncelleme başarısız')
   }
 }
 
@@ -227,11 +229,11 @@ onMounted(async () => {
     <!-- Header -->
     <AppPageHeader icon="auto_fix_high" title="Otomatik Kur Yönetimi">
       <button class="btn-secondary" @click="triggerUpdate(true)">
-        <span class="material-symbols-outlined">science</span>
+        <span class="material-symbols-outlined" aria-hidden="true">science</span>
         Test Et
       </button>
       <button v-if="authStore.isAdmin" class="btn-primary" @click="triggerUpdate(false)">
-        <span class="material-symbols-outlined">sync</span>
+        <span class="material-symbols-outlined" aria-hidden="true">sync</span>
         Şimdi Güncelle
       </button>
     </AppPageHeader>
@@ -247,17 +249,17 @@ onMounted(async () => {
     <!-- Tabs -->
     <div class="tab-bar">
       <button :class="['tab-btn', activeTab === 'settings' ? 'tab-active' : '']" @click="activeTab = 'settings'">
-        <span class="material-symbols-outlined">settings</span> Ayarlar
+        <span class="material-symbols-outlined" aria-hidden="true">settings</span> Ayarlar
       </button>
       <button :class="['tab-btn', activeTab === 'pending' ? 'tab-active' : '']" @click="activeTab = 'pending'; loadPending()">
-        <span class="material-symbols-outlined">pending_actions</span> Onay Bekleyenler
+        <span class="material-symbols-outlined" aria-hidden="true">pending_actions</span> Onay Bekleyenler
         <span v-if="pendingApprovals.length" class="badge">{{ pendingApprovals.length }}</span>
       </button>
       <button :class="['tab-btn', activeTab === 'external' ? 'tab-active' : '']" @click="activeTab = 'external'; loadExternalRates()">
-        <span class="material-symbols-outlined">public</span> Dış Kurlar
+        <span class="material-symbols-outlined" aria-hidden="true">public</span> Dış Kurlar
       </button>
       <button :class="['tab-btn', activeTab === 'history' ? 'tab-active' : '']" @click="activeTab = 'history'; loadHistory()">
-        <span class="material-symbols-outlined">history</span> Geçmiş
+        <span class="material-symbols-outlined" aria-hidden="true">history</span> Geçmiş
       </button>
     </div>
 
@@ -420,10 +422,10 @@ onMounted(async () => {
             <td>{{ formatDateTime(item.createdAt) }}</td>
             <td class="text-center actions-cell">
               <button class="btn-approve" @click="handleApproval(item, true)" title="Onayla">
-                <span class="material-symbols-outlined">check_circle</span>
+                <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
               </button>
               <button class="btn-reject" @click="handleApproval(item, false)" title="Reddet">
-                <span class="material-symbols-outlined">cancel</span>
+                <span class="material-symbols-outlined" aria-hidden="true">cancel</span>
               </button>
             </td>
           </tr>
@@ -435,7 +437,7 @@ onMounted(async () => {
     <div v-else-if="activeTab === 'external'" class="external-section">
       <div class="ext-header">
         <button class="btn-secondary" @click="loadExternalRates">
-          <span class="material-symbols-outlined">refresh</span>
+          <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
           Yenile
         </button>
       </div>
@@ -446,7 +448,7 @@ onMounted(async () => {
                 class="source-chip"
                 :class="{ 'source-selected': selectedSource === src.sourceKey, 'source-dimmed': selectedSource && selectedSource !== src.sourceKey }"
                 @click="toggleSource(src.sourceKey)">
-          <span class="material-symbols-outlined" style="font-size:14px">{{ selectedSource === src.sourceKey ? 'check_circle' : 'radio_button_unchecked' }}</span>
+          <span class="material-symbols-outlined" aria-hidden="true" style="font-size:14px">{{ selectedSource === src.sourceKey ? 'check_circle' : 'radio_button_unchecked' }}</span>
           {{ src.sourceName }}
           <small>{{ src.sourceType }}</small>
         </button>
@@ -672,7 +674,7 @@ onMounted(async () => {
   display: flex; align-items: center; gap: 4px;
   padding: 6px 12px; border-radius: 8px; border: 1px solid #e5e7eb;
   background: #fff; font-size: 12px; font-weight: 500; cursor: pointer;
-  transition: all .15s ease;
+  transition: border-color 0.2s, background-color 0.2s, color 0.2s;
 }
 .source-chip:hover { border-color: #2563eb; background: #eff6ff; }
 .source-chip small { font-size: 10px; color: #9ca3af; margin-left: 2px; }

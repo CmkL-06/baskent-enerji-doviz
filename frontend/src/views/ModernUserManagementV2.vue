@@ -186,7 +186,7 @@ onMounted(load)
   <div class="uy-page">
     <AppPageHeader icon="manage_accounts" title="Kullanıcı Yönetimi" :subtitle="`${users.length} kullanıcı · ${offices.length} ofis`">
       <button v-if="authStore.isOwner" class="btn-primary" @click="openCreateMode">
-        <span class="material-symbols-outlined">person_add</span> Yeni Kullanıcı
+        <span class="material-symbols-outlined" aria-hidden="true">person_add</span> Yeni Kullanıcı
       </button>
     </AppPageHeader>
 
@@ -243,7 +243,7 @@ onMounted(load)
           <div class="modal-header-left">
             <template v-if="createMode">
               <div class="uy-detail-avatar" style="background:#6366f1">
-                <span class="material-symbols-outlined" style="font-size:20px">person_add</span>
+                <span class="material-symbols-outlined" aria-hidden="true" style="font-size:20px">person_add</span>
               </div>
               <div>
                 <div class="modal-title">Yeni Kullanıcı</div>
@@ -309,13 +309,13 @@ onMounted(load)
           <!-- Tabs -->
           <div class="uy-tabs">
             <button class="uy-tab" :class="{ active: activeTab === 'info' }" @click="switchTab('info')">
-              <span class="material-symbols-outlined">edit</span> Bilgiler
+              <span class="material-symbols-outlined" aria-hidden="true">edit</span> Bilgiler
             </button>
             <button class="uy-tab" :class="{ active: activeTab === 'password' }" @click="switchTab('password')">
-              <span class="material-symbols-outlined">key</span> Şifre
+              <span class="material-symbols-outlined" aria-hidden="true">key</span> Şifre
             </button>
             <button v-if="authStore.isAdmin" class="uy-tab" :class="{ active: activeTab === 'offices' }" @click="switchTab('offices')">
-              <span class="material-symbols-outlined">store</span> Ofisler
+              <span class="material-symbols-outlined" aria-hidden="true">store</span> Ofisler
               <span class="uy-tab-count">{{ assignedIds.size }}</span>
             </button>
           </div>
@@ -367,7 +367,7 @@ onMounted(load)
           <!-- Password Tab -->
           <div v-if="activeTab === 'password'" class="modal-body">
             <div class="uy-info-banner">
-              <span class="material-symbols-outlined">info</span>
+              <span class="material-symbols-outlined" aria-hidden="true">info</span>
               <span>{{ selected.firstname || selected.username }} kullanıcısının şifresini değiştiriyorsunuz.</span>
             </div>
             <div class="uy-field">
@@ -465,7 +465,7 @@ onMounted(load)
 }
 .uy-card {
   background: #fff; border: 1px solid #e5e7eb; border-radius: 14px;
-  padding: 20px; cursor: pointer; transition: all .2s;
+  padding: 20px; cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
 }
 .uy-card:hover { border-color: #a5b4fc; box-shadow: 0 4px 16px rgba(99,102,241,.1); transform: translateY(-2px); }
 .uy-card-top {
@@ -544,7 +544,7 @@ onMounted(load)
   display: flex; align-items: center; gap: 6px;
   padding: 10px 16px; border: none; background: none; cursor: pointer;
   font-size: 13px; font-weight: 500; color: #6b7280;
-  border-bottom: 2px solid transparent; transition: all .15s;
+  border-bottom: 2px solid transparent; transition: background-color 0.2s, color 0.2s, border-color 0.2s;
 }
 .uy-tab .material-symbols-outlined { font-size: 16px; }
 .uy-tab.active { color: #6366f1; border-bottom-color: #6366f1; background: #fff; }
@@ -571,7 +571,7 @@ onMounted(load)
 .uy-rank-chip {
   padding: 5px 12px; border-radius: 20px; border: 1.5px solid #e5e7eb;
   background: #f9fafb; color: #6b7280; font-size: 12px; font-weight: 500;
-  cursor: pointer; transition: all .15s;
+  cursor: pointer; transition: border-color 0.2s, background-color 0.2s, color 0.2s;
 }
 .uy-rank-chip:hover { border-color: #9ca3af; }
 .uy-rank-chip.selected { font-weight: 700; }
@@ -594,7 +594,7 @@ onMounted(load)
 .uy-office-row {
   display: flex; align-items: center; justify-content: space-between;
   padding: 12px 14px; border: 1.5px solid #e5e7eb; border-radius: 12px;
-  transition: all .15s;
+  transition: border-color 0.2s, background-color 0.2s;
 }
 .uy-office-row.assigned { border-color: #a5b4fc; background: #eef2ff; }
 .uy-office-info { display: flex; align-items: center; gap: 12px; }

@@ -5,8 +5,10 @@ import { useExchangeStore } from '@/stores/exchange'
 import apiService from '@/services/apiservice'
 import AppKpiCard from '@/components/common/AppKpiCard.vue'
 import AppPageHeader from '@/components/common/AppPageHeader.vue'
+import { useNotification } from '@/composables/useNotification'
 
 const authStore = useAuthStore()
+const notification = useNotification()
 const exchangeStore = useExchangeStore()
 
 const loading = ref(true)
@@ -59,7 +61,7 @@ async function loadDetail(transfer: any) {
   try {
     selectedTransfer.value = await apiService.getTransferById(String(transfer.id))
     showDetailModal.value = true
-  } catch { alert('Detay yüklenemedi') }
+  } catch { notification.error('Detay yüklenemedi') }
 }
 
 function openCreateModal() {
@@ -75,11 +77,11 @@ function openCreateModal() {
 
 async function createTransfer() {
   if (!transferForm.value.amount || transferForm.value.amount <= 0) {
-    alert('Tutar giriniz')
+    notification.warning('Tutar giriniz')
     return
   }
   if (!transferForm.value.targetOfficeId) {
-    alert('Hedef ofis seçiniz')
+    notification.warning('Hedef ofis seçiniz')
     return
   }
   saving.value = true
@@ -94,7 +96,7 @@ async function createTransfer() {
     showCreateModal.value = false
     await Promise.all([loadPending(), loadHistory()])
   } catch (e: any) {
-    alert(e?.response?.data?.message || 'Transfer talebi oluşturulamadı')
+    notification.error(e?.response?.data?.message || 'Transfer talebi oluşturulamadı')
   } finally {
     saving.value = false
   }
@@ -111,7 +113,7 @@ async function processAction(transfer: any, isApproved: boolean) {
     await loadPending()
     await loadHistory()
   } catch (e: any) {
-    alert(e?.response?.data?.message || 'İşlem başarısız')
+    notification.error(e?.response?.data?.message || 'İşlem başarısız')
   }
 }
 
@@ -143,7 +145,7 @@ onMounted(async () => {
   <div class="io-wrap">
     <AppPageHeader icon="swap_horiz" title="Ofislerarası Transfer">
       <button class="btn-primary" @click="openCreateModal">
-        <span class="material-symbols-outlined">swap_horiz</span>
+        <span class="material-symbols-outlined" aria-hidden="true">swap_horiz</span>
         Yeni Transfer
       </button>
     </AppPageHeader>
@@ -196,13 +198,13 @@ onMounted(async () => {
             <td>{{ formatDateTime(t.createdAt ?? t.requestDate) }}</td>
             <td class="text-center actions-cell">
               <button class="btn-approve" @click="processAction(t, true)" title="Onayla">
-                <span class="material-symbols-outlined">check_circle</span>
+                <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
               </button>
               <button class="btn-reject" @click="processAction(t, false)" title="Reddet">
-                <span class="material-symbols-outlined">cancel</span>
+                <span class="material-symbols-outlined" aria-hidden="true">cancel</span>
               </button>
               <button class="icon-btn" title="Detay" @click="loadDetail(t)">
-                <span class="material-symbols-outlined">visibility</span>
+                <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
               </button>
             </td>
           </tr>
@@ -241,7 +243,7 @@ onMounted(async () => {
             <td>{{ formatDateTime(t.createdAt ?? t.requestDate) }}</td>
             <td class="text-center">
               <button class="icon-btn" @click="loadDetail(t)">
-                <span class="material-symbols-outlined">visibility</span>
+                <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
               </button>
             </td>
           </tr>

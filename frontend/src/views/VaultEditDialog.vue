@@ -77,7 +77,10 @@
 import { ref, onMounted } from 'vue'
 import apiService from '@/services/apiservice'
 import { useExchangeStore } from '@/stores/exchange'
+import { useNotification } from '@/composables/useNotification'
 import type { Vault, Office } from '@/types/api'
+
+const notification = useNotification()
 
 const props = defineProps<{
   vault: Vault
@@ -107,7 +110,7 @@ const loadOffices = async () => {
 
 const saveChanges = async () => {
   if (!(editForm.value.vaultName || '').trim()) {
-    alert('Kasa adı boş olamaz')
+    notification.warning('Kasa adı boş olamaz')
     return
   }
   
@@ -134,7 +137,7 @@ const saveChanges = async () => {
     emit('close')
   } catch (error) {
     console.error('Failed to update vault:', error)
-    alert('Kasa güncellenirken bir hata oluştu')
+    notification.error('Kasa güncellenirken bir hata oluştu')
   } finally {
     isProcessing.value = false
   }
@@ -184,7 +187,7 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   border-radius: 4px;
-  transition: all 0.2s;
+  transition: background-color 0.2s, color 0.2s;
 }
 
 .close-btn:hover {
@@ -302,7 +305,7 @@ onMounted(() => {
   font-size: 1rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, color 0.2s;
 }
 
 .btn-primary {

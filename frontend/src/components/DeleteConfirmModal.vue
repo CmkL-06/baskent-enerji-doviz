@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useNotification } from '@/composables/useNotification'
+
+const notification = useNotification()
 
 const props = defineProps<{
   visible: boolean
@@ -18,7 +21,7 @@ const closeModal = () => {
 
 const confirmDelete = () => {
   if (!reason.value.trim()) {
-    alert('Lütfen silme nedenini açıklayın')
+    notification.warning('Lütfen silme nedenini açıklayın')
     return
   }
   emit('confirm', reason.value)
@@ -115,7 +118,7 @@ p {
   color: white;
   font-size: 14px;
   resize: vertical;
-  transition: all 0.3s ease;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .form-group textarea::placeholder {
@@ -142,7 +145,7 @@ p {
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
 }
 
 .btn-cancel {
@@ -168,7 +171,7 @@ p {
 /* Modal transition */
 .modal-enter-active,
 .modal-leave-active {
-  transition: all 0.3s ease;
+  transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
 .modal-enter-from,

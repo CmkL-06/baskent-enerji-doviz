@@ -49,7 +49,7 @@ defineExpose({
                 @click="close"
                 class="text-white hover:bg-white/20 rounded-lg p-2 transition-colors"
               >
-                <span class="material-symbols-outlined">close</span>
+                <span class="material-symbols-outlined" aria-hidden="true">close</span>
               </button>
             </div>
           </div>

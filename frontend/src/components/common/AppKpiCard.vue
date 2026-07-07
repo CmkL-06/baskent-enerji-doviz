@@ -12,7 +12,7 @@ defineProps<{
 <template>
   <div class="app-kpi" :style="{ '--kc': color ?? '#6366f1', '--kb': bg ?? '#eef2ff' }">
     <div class="app-kpi-icon">
-      <span class="material-symbols-outlined">{{ icon }}</span>
+      <span class="material-symbols-outlined" aria-hidden="true">{{ icon }}</span>
     </div>
     <div class="app-kpi-body">
       <p class="app-kpi-label">{{ label }}</p>

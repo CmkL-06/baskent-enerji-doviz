@@ -24,7 +24,7 @@ function download() {
 
 <template>
   <div>
-    <h3 class="qr-title"><span class="material-symbols-outlined">qr_code_2</span> QR Kod Oluşturucu</h3>
+    <h3 class="qr-title"><span class="material-symbols-outlined" aria-hidden="true">qr_code_2</span> QR Kod Oluşturucu</h3>
 
     <div class="qr-layout">
       <div class="qr-form-card">
@@ -65,7 +65,7 @@ function download() {
           <img :src="qrUrl" alt="QR Code" :width="Math.min(qrSize, 280)" :height="Math.min(qrSize, 280)" />
         </div>
         <button class="qr-download" @click="download">
-          <span class="material-symbols-outlined">download</span> QR Kodunu İndir
+          <span class="material-symbols-outlined" aria-hidden="true">download</span> QR Kodunu İndir
         </button>
       </div>
     </div>
@@ -111,7 +111,7 @@ function download() {
   display: flex; align-items: center; gap: 0.4rem;
   padding: 0.6rem 1.5rem; background: #3b82f6; color: white;
   border: none; border-radius: 8px; cursor: pointer; font-size: 0.85rem;
-  font-weight: 600; transition: all .2s;
+  font-weight: 600; transition: background-color 0.2s;
 }
 .qr-download:hover { background: #2563eb; }
 </style>

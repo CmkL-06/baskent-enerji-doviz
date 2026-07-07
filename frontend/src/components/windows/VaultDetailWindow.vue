@@ -624,7 +624,7 @@ onMounted(() => {
   font-size: 0.9rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: background-color 0.2s, border-color 0.2s, transform 0.2s;
 }
 
 .refresh-button:hover:not(:disabled) {
@@ -716,7 +716,7 @@ onMounted(() => {
   background: #f8f9fb;
   border-radius: 12px;
   padding: 1.25rem;
-  transition: all 0.3s ease;
+  transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.2s;
   border: 1px solid transparent;
 }
 
@@ -880,7 +880,7 @@ onMounted(() => {
   font-weight: 500;
   color: #6b7280;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s, color 0.2s;
 }
 
 .range-btn:hover {
@@ -1208,7 +1208,7 @@ onMounted(() => {
   padding: 1.5rem;
   border: 2px solid transparent;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: box-shadow 0.2s, transform 0.2s;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1230,7 +1230,7 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   font-size: 1.5rem;
-  transition: all 0.3s ease;
+  transition: background-color 0.2s, transform 0.2s;
 }
 
 .action-card.transfer .action-icon {
@@ -1350,7 +1350,7 @@ onMounted(() => {
   border-radius: 10px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: background-color 0.2s, transform 0.2s;
 }
 
 .retry-button:hover {

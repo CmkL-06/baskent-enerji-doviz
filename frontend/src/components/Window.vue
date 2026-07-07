@@ -265,7 +265,7 @@ const stopResize = () => {
   justify-content: center;
   font-size: 18px;
   color: #4a5568;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s, color 0.2s, transform 0.2s;
   position: relative;
   font-weight: 600;
 }
@@ -332,7 +332,7 @@ const stopResize = () => {
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
-  transition: all 0.2s ease;
+  transition: opacity 0.2s, transform 0.2s;
 }
 
 .control-button:hover::after {

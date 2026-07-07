@@ -125,7 +125,7 @@ function avatarColor(name: string) {
       <div class="uom-right">
         <template v-if="!selected">
           <div class="uom-placeholder">
-            <span class="material-symbols-outlined">manage_accounts</span>
+            <span class="material-symbols-outlined" aria-hidden="true">manage_accounts</span>
             <p>Soldaki listeden bir kullanıcı seçin</p>
           </div>
         </template>
@@ -223,7 +223,7 @@ function avatarColor(name: string) {
 .uom-offices-label { padding: 12px 20px 8px; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: .6px; }
 
 .uom-offices-list { padding: 0 12px 12px; display: flex; flex-direction: column; gap: 6px; }
-.uom-office-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border: 1.5px solid #e5e7eb; border-radius: 12px; transition: all .15s; }
+.uom-office-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border: 1.5px solid #e5e7eb; border-radius: 12px; transition: border-color 0.2s, background-color 0.2s; }
 .uom-office-row.assigned { border-color: #a5b4fc; background: #eef2ff; }
 .uom-office-info { display: flex; align-items: center; gap: 12px; }
 .uom-office-icon { font-size: 20px; color: #9ca3af; }

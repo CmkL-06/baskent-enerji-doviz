@@ -155,7 +155,7 @@ updateForm()
   height: 40px;
   border-radius: 50%;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: background-color 0.3s ease;
 }
 
 .close-btn:hover {
@@ -190,7 +190,7 @@ h2 {
   border-radius: 8px;
   color: white;
   font-size: 16px;
-  transition: all 0.3s ease;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .form-group input::placeholder {
@@ -223,7 +223,7 @@ h2 {
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
 }
 
 .btn-cancel {
@@ -249,7 +249,7 @@ h2 {
 /* Modal transition */
 .modal-enter-active,
 .modal-leave-active {
-  transition: all 0.3s ease;
+  transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
 .modal-enter-from,

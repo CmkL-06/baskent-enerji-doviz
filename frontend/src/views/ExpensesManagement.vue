@@ -217,10 +217,10 @@ const activeTab = ref<'payments' | 'definitions'>('payments')
     <!-- Header -->
     <AppPageHeader icon="payments" title="Gider Yönetimi" subtitle="Gider tanımları ve ödemelerinizi yönetin">
       <button class="exp-btn secondary" @click="openCreateDef">
-        <span class="material-symbols-outlined">category</span>Yeni Tanım
+        <span class="material-symbols-outlined" aria-hidden="true">category</span>Yeni Tanım
       </button>
       <button class="exp-btn primary" @click="openCreatePay()">
-        <span class="material-symbols-outlined">add_circle</span>Yeni Ödeme
+        <span class="material-symbols-outlined" aria-hidden="true">add_circle</span>Yeni Ödeme
       </button>
     </AppPageHeader>
 
@@ -254,17 +254,17 @@ const activeTab = ref<'payments' | 'definitions'>('payments')
     <!-- Tabs -->
     <div class="tab-bar">
       <button class="tab-btn" :class="{ active: activeTab === 'payments' }" @click="activeTab = 'payments'">
-        <span class="material-symbols-outlined">receipt_long</span>Ödemeler
+        <span class="material-symbols-outlined" aria-hidden="true">receipt_long</span>Ödemeler
       </button>
       <button class="tab-btn" :class="{ active: activeTab === 'definitions' }" @click="activeTab = 'definitions'">
-        <span class="material-symbols-outlined">category</span>Gider Tanımları
+        <span class="material-symbols-outlined" aria-hidden="true">category</span>Gider Tanımları
       </button>
     </div>
 
     <!-- Loading / Error -->
     <div v-if="loading" class="exp-loading"><div class="spinner"></div>Yükleniyor...</div>
     <div v-else-if="error" class="exp-error">
-      <span class="material-symbols-outlined">error</span>{{ error }}
+      <span class="material-symbols-outlined" aria-hidden="true">error</span>{{ error }}
       <button class="exp-btn secondary" @click="loadAll" style="margin-left:12px">Tekrar Dene</button>
     </div>
 
@@ -296,7 +296,7 @@ const activeTab = ref<'payments' | 'definitions'>('payments')
             <td class="muted">{{ p.createdByUserName || '-' }}</td>
             <td>
               <button v-if="!p.isDeleted && authStore.isAdmin" class="icon-btn danger" @click="deletePay(p)" title="Sil">
-                <span class="material-symbols-outlined">delete</span>
+                <span class="material-symbols-outlined" aria-hidden="true">delete</span>
               </button>
               <span v-if="p.isDeleted" class="deleted-tag">İptal</span>
             </td>
@@ -354,13 +354,13 @@ const activeTab = ref<'payments' | 'definitions'>('payments')
             <td>{{ d.paymentCount ?? 0 }} adet / ₺{{ fmt(d.totalPayments ?? 0) }}</td>
             <td class="action-cell">
               <button class="icon-btn" @click="openCreatePay(d.id)" title="Ödeme Ekle">
-                <span class="material-symbols-outlined">add_circle</span>
+                <span class="material-symbols-outlined" aria-hidden="true">add_circle</span>
               </button>
               <button class="icon-btn" @click="openEditDef(d)" title="Düzenle">
-                <span class="material-symbols-outlined">edit</span>
+                <span class="material-symbols-outlined" aria-hidden="true">edit</span>
               </button>
               <button v-if="authStore.isAdmin" class="icon-btn danger" @click="deleteDef(d)" title="Sil">
-                <span class="material-symbols-outlined">delete</span>
+                <span class="material-symbols-outlined" aria-hidden="true">delete</span>
               </button>
             </td>
           </tr>
@@ -376,7 +376,7 @@ const activeTab = ref<'payments' | 'definitions'>('payments')
       <div class="modal">
         <div class="modal-header">
           <h2>{{ editDef ? 'Tanım Düzenle' : 'Yeni Gider Tanımı' }}</h2>
-          <button class="icon-btn" @click="showDefModal = false"><span class="material-symbols-outlined">close</span></button>
+          <button class="icon-btn" @click="showDefModal = false"><span class="material-symbols-outlined" aria-hidden="true">close</span></button>
         </div>
         <div class="modal-body">
           <div class="form-row">
@@ -428,7 +428,7 @@ const activeTab = ref<'payments' | 'definitions'>('payments')
       <div class="modal">
         <div class="modal-header">
           <h2>Yeni Gider Ödemesi</h2>
-          <button class="icon-btn" @click="showPayModal = false"><span class="material-symbols-outlined">close</span></button>
+          <button class="icon-btn" @click="showPayModal = false"><span class="material-symbols-outlined" aria-hidden="true">close</span></button>
         </div>
         <div class="modal-body">
           <div class="form-group">
@@ -491,7 +491,7 @@ const activeTab = ref<'payments' | 'definitions'>('payments')
 .exp-btn {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 8px 16px; border: none; border-radius: 8px;
-  font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s;
+  font-size: 13px; font-weight: 600; cursor: pointer; transition: background-color 0.2s, color 0.2s;
 }
 .exp-btn .material-symbols-outlined { font-size: 18px; }
 .exp-btn.primary { background: #6366f1; color: #fff; }
@@ -519,7 +519,7 @@ const activeTab = ref<'payments' | 'definitions'>('payments')
   display: flex; align-items: center; gap: 6px;
   padding: 10px 16px; border: none; background: transparent;
   font-size: 13px; font-weight: 500; color: #6b7280;
-  cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all .15s;
+  cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color 0.2s, border-color 0.2s;
 }
 .tab-btn .material-symbols-outlined { font-size: 18px; }
 .tab-btn.active { color: #6366f1; border-bottom-color: #6366f1; font-weight: 600; }

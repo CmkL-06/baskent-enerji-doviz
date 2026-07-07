@@ -178,7 +178,7 @@ function fmtDate(d: string) { return new Date(d).toLocaleString('tr-TR', { day:'
         <p class="ot-subtitle">Merkez ↔ Şube/Bayi para transferleri</p>
       </div>
       <button class="btn-primary" @click="openCreate">
-        <span class="material-symbols-outlined">send</span>
+        <span class="material-symbols-outlined" aria-hidden="true">send</span>
         Transfer Talebi
       </button>
     </div>
@@ -237,11 +237,11 @@ function fmtDate(d: string) { return new Date(d).toLocaleString('tr-TR', { day:'
             </div>
             <div class="transfer-actions">
               <button class="btn-approve" @click="approve(t.id)">
-                <span class="material-symbols-outlined">check</span>
+                <span class="material-symbols-outlined" aria-hidden="true">check</span>
                 Onayla
               </button>
               <button class="btn-reject" @click="openReject(t.id)">
-                <span class="material-symbols-outlined">close</span>
+                <span class="material-symbols-outlined" aria-hidden="true">close</span>
                 Reddet
               </button>
             </div>
@@ -300,7 +300,7 @@ function fmtDate(d: string) { return new Date(d).toLocaleString('tr-TR', { day:'
           <div class="modal-header">
             <h2 class="modal-title">Transfer Talebi Oluştur</h2>
             <button class="btn-icon" @click="createModal = false">
-              <span class="material-symbols-outlined">close</span>
+              <span class="material-symbols-outlined" aria-hidden="true">close</span>
             </button>
           </div>
           <div class="modal-body">
@@ -454,7 +454,7 @@ function fmtDate(d: string) { return new Date(d).toLocaleString('tr-TR', { day:'
   color: #6b7280;
   font-size: 14px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
 }
 
 .btn-cancel:hover { color: #1a1a1a; border-color: #d1d5db; }
@@ -508,7 +508,7 @@ function fmtDate(d: string) { return new Date(d).toLocaleString('tr-TR', { day:'
   color: #6b7280;
   background: transparent;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, color 0.2s, box-shadow 0.2s;
 }
 
 .tab-btn.active {

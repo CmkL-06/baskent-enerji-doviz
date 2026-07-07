@@ -281,7 +281,7 @@ onMounted(async () => {
   font-size: 16px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: background-color 0.2s, color 0.2s;
 }
 
 .btn-primary {

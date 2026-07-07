@@ -89,7 +89,7 @@ function fmtMoney(n: number) {
 
 <template>
   <div>
-    <h3 class="ob-title"><span class="material-symbols-outlined">account_balance</span> Bakiye İşlemleri</h3>
+    <h3 class="ob-title"><span class="material-symbols-outlined" aria-hidden="true">account_balance</span> Bakiye İşlemleri</h3>
 
     <div v-if="loading" class="ob-center">
       <span class="material-symbols-outlined spin">progress_activity</span> Yükleniyor...
@@ -143,10 +143,10 @@ function fmtMoney(n: number) {
 
             <div class="ob-op-toggle">
               <button :class="{ active: form.operationType === 'add' }" @click="form.operationType = 'add'">
-                <span class="material-symbols-outlined">add_circle</span> Ekle
+                <span class="material-symbols-outlined" aria-hidden="true">add_circle</span> Ekle
               </button>
               <button :class="{ active: form.operationType === 'subtract', sub: true }" @click="form.operationType = 'subtract'">
-                <span class="material-symbols-outlined">remove_circle</span> Çıkar
+                <span class="material-symbols-outlined" aria-hidden="true">remove_circle</span> Çıkar
               </button>
             </div>
 
@@ -170,14 +170,14 @@ function fmtMoney(n: number) {
             </div>
 
             <div v-if="success" class="ob-alert success">
-              <span class="material-symbols-outlined">check_circle</span> {{ success }}
+              <span class="material-symbols-outlined" aria-hidden="true">check_circle</span> {{ success }}
             </div>
             <div v-if="error" class="ob-alert error">
-              <span class="material-symbols-outlined">error</span> {{ error }}
+              <span class="material-symbols-outlined" aria-hidden="true">error</span> {{ error }}
             </div>
 
             <button class="ob-submit" :disabled="saving || !selectedVaultId || !form.currencyId || !form.amount" @click="submit">
-              <span class="material-symbols-outlined">{{ saving ? 'progress_activity' : (form.operationType === 'add' ? 'add_circle' : 'remove_circle') }}</span>
+              <span class="material-symbols-outlined" aria-hidden="true">{{ saving ? 'progress_activity' : (form.operationType === 'add' ? 'add_circle' : 'remove_circle') }}</span>
               {{ saving ? 'İşleniyor...' : (form.operationType === 'add' ? 'Bakiye Ekle' : 'Bakiye Çıkar') }}
             </button>
           </div>
@@ -232,7 +232,7 @@ function fmtMoney(n: number) {
   display: flex; align-items: center; gap: 0.3rem; flex: 1;
   padding: 0.6rem; border: 2px solid #e2e8f0; border-radius: 10px;
   background: white; cursor: pointer; font-size: 0.85rem; font-weight: 600;
-  color: #64748b; transition: all .2s;
+  color: #64748b; transition: border-color 0.2s, color 0.2s, background-color 0.2s;
 }
 .ob-op-toggle button.active { border-color: #22c55e; color: #16a34a; background: #f0fdf4; }
 .ob-op-toggle button.sub.active { border-color: #ef4444; color: #dc2626; background: #fef2f2; }
@@ -252,7 +252,7 @@ function fmtMoney(n: number) {
   display: flex; align-items: center; justify-content: center; gap: 0.4rem;
   width: 100%; padding: 0.75rem; background: #3b82f6; color: white;
   border: none; border-radius: 10px; cursor: pointer; font-size: 0.9rem;
-  font-weight: 600; transition: all .2s;
+  font-weight: 600; transition: background-color 0.2s;
 }
 .ob-submit:hover:not(:disabled) { background: #2563eb; }
 .ob-submit:disabled { opacity: 0.5; cursor: not-allowed; }

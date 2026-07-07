@@ -432,9 +432,27 @@ async function submitModal() {
   } finally { modalLoading.value = false }
 }
 
-let timer: ReturnType<typeof setInterval>
-onMounted(() => { load(); timer = setInterval(load, 60000) })
-onUnmounted(() => clearInterval(timer))
+let timer: ReturnType<typeof setInterval> | null = null
+
+const handleVisibilityChange = () => {
+  if (document.hidden) {
+    if (timer) { clearInterval(timer); timer = null }
+  } else {
+    load()
+    timer = setInterval(load, 60000)
+  }
+}
+
+onMounted(() => {
+  load()
+  timer = setInterval(load, 60000)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+})
+
+onUnmounted(() => {
+  if (timer) clearInterval(timer)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+})
 </script>
 
 <template>
@@ -454,11 +472,11 @@ onUnmounted(() => clearInterval(timer))
         </div>
         <div class="db-hero-right">
           <div v-if="authStore.isOwner && pendingActionCount > 0" class="db-hero-badge" @click="router.push('/ihtiyar/owner-panel')">
-            <span class="material-symbols-outlined">notifications_active</span>
+            <span class="material-symbols-outlined" aria-hidden="true">notifications_active</span>
             {{ pendingActionCount }} bekleyen
           </div>
           <button class="db-hero-refresh" @click="load" title="Yenile">
-            <span class="material-symbols-outlined">refresh</span>
+            <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
           </button>
         </div>
       </div>
@@ -468,7 +486,7 @@ onUnmounted(() => clearInterval(timer))
         <div class="sf-kpi-row">
           <div v-for="k in staffZKpi.slice(0, 3)" :key="k.label" class="sf-kpi" :style="{ '--kpi-accent': k.color }">
             <div class="sf-kpi-icon" :style="{ background: k.bg }">
-              <span class="material-symbols-outlined" :style="{ color: k.color }">{{ k.icon }}</span>
+              <span class="material-symbols-outlined" aria-hidden="true" :style="{ color: k.color }">{{ k.icon }}</span>
             </div>
             <div class="sf-kpi-body">
               <span class="sf-kpi-label">{{ k.label }}</span>
@@ -479,7 +497,7 @@ onUnmounted(() => clearInterval(timer))
         <div class="sf-kpi-row">
           <div v-for="k in staffZKpi.slice(3)" :key="k.label" class="sf-kpi" :style="{ '--kpi-accent': k.color }">
             <div class="sf-kpi-icon" :style="{ background: k.bg }">
-              <span class="material-symbols-outlined" :style="{ color: k.color }">{{ k.icon }}</span>
+              <span class="material-symbols-outlined" aria-hidden="true" :style="{ color: k.color }">{{ k.icon }}</span>
             </div>
             <div class="sf-kpi-body">
               <span class="sf-kpi-label">{{ k.label }}</span>
@@ -492,11 +510,11 @@ onUnmounted(() => clearInterval(timer))
           <div class="sf-panel">
             <div class="sf-panel-head">
               <div class="sf-panel-title">
-                <span class="material-symbols-outlined">currency_exchange</span>Döviz Kurları
+                <span class="material-symbols-outlined" aria-hidden="true">currency_exchange</span>Döviz Kurları
               </div>
-              <button class="sf-link-btn" @click="router.push('/ihtiyar/exchange-v2')">İşlem Yap <span class="material-symbols-outlined">arrow_forward</span></button>
+              <button class="sf-link-btn" @click="router.push('/ihtiyar/exchange-v2')">İşlem Yap <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></button>
             </div>
-            <div v-if="!mainRates.length" class="state-msg"><span class="material-symbols-outlined">info</span> Kur verisi bulunamadı</div>
+            <div v-if="!mainRates.length" class="state-msg"><span class="material-symbols-outlined" aria-hidden="true">info</span> Kur verisi bulunamadı</div>
             <table v-else class="sf-rates">
               <thead><tr><th>Döviz</th><th>Alış</th><th>Satış</th><th>Kasada</th></tr></thead>
               <tbody>
@@ -516,7 +534,7 @@ onUnmounted(() => clearInterval(timer))
           <div class="sf-panel sf-vault-panel" v-for="vault in staffVaults" :key="vault.vaultId">
             <div class="sf-panel-head sf-vault-head">
               <div class="sf-panel-title">
-                <span class="material-symbols-outlined">account_balance_wallet</span>{{ vault.vaultName }}
+                <span class="material-symbols-outlined" aria-hidden="true">account_balance_wallet</span>{{ vault.vaultName }}
               </div>
               <div class="sf-vault-total">₺{{ fmtMoney(vault.totalValueInBaseCurrency) }}</div>
             </div>
@@ -532,9 +550,9 @@ onUnmounted(() => clearInterval(timer))
 
         <div class="sf-info-card">
           <div class="sf-info-head">
-            <span class="material-symbols-outlined" style="color:#6366f1">contacts</span>
+            <span class="material-symbols-outlined" aria-hidden="true" style="color:#6366f1">contacts</span>
             <span class="sf-info-title">Cari Hesaplar</span>
-            <button class="sf-link-btn" @click="router.push('/ihtiyar/parties')">Detay <span class="material-symbols-outlined">arrow_forward</span></button>
+            <button class="sf-link-btn" @click="router.push('/ihtiyar/parties')">Detay <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></button>
           </div>
           <div v-if="partyTotals" class="sf-info-body sf-info-inline">
             <div class="sf-info-row"><span>Toplam Cari</span><strong>{{ partyTotals.count }}</strong></div>
@@ -542,16 +560,16 @@ onUnmounted(() => clearInterval(timer))
             <div class="sf-info-row"><span>Borç</span><strong style="color:#dc2626">{{ fmtMoney(partyTotals.payables) }} ₺</strong></div>
             <div class="sf-info-row sf-info-highlight"><span>Net Bakiye</span><strong :style="{ color: plColor(partyTotals.net) }">{{ plSign(partyTotals.net) }}{{ fmtMoney(partyTotals.net) }} ₺</strong></div>
           </div>
-          <div v-else class="state-msg"><span class="material-symbols-outlined">info</span> Veri yüklenemedi</div>
+          <div v-else class="state-msg"><span class="material-symbols-outlined" aria-hidden="true">info</span> Veri yüklenemedi</div>
         </div>
 
         <div class="sf-panel">
           <div class="sf-panel-head">
-            <div class="sf-panel-title"><span class="material-symbols-outlined">history</span>Son İşlemler</div>
-            <button class="sf-link-btn" @click="router.push('/ihtiyar/exchange-v2')">Tümü <span class="material-symbols-outlined">arrow_forward</span></button>
+            <div class="sf-panel-title"><span class="material-symbols-outlined" aria-hidden="true">history</span>Son İşlemler</div>
+            <button class="sf-link-btn" @click="router.push('/ihtiyar/exchange-v2')">Tümü <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></button>
           </div>
           <div v-if="recentTxLoading" class="state-msg"><span class="material-symbols-outlined spin">progress_activity</span></div>
-          <div v-else-if="!recentTx.length" class="state-msg"><span class="material-symbols-outlined">receipt_long</span> Henüz işlem yok</div>
+          <div v-else-if="!recentTx.length" class="state-msg"><span class="material-symbols-outlined" aria-hidden="true">receipt_long</span> Henüz işlem yok</div>
           <div v-else class="sf-tx-list">
             <div v-for="tx in recentTx.slice(0, 10)" :key="tx.id" class="sf-tx-row">
               <span class="sf-tx-badge" :class="txTypeLabel(tx).cls">{{ txTypeLabel(tx).label }}</span>
@@ -584,13 +602,13 @@ onUnmounted(() => clearInterval(timer))
         <div class="ok-grid">
           <div v-for="k in ownerKpi" :key="k.label" class="ok-card">
             <div class="ok-icon" :style="{ background: k.bg }">
-              <span class="material-symbols-outlined" :style="{ color: k.color }">{{ k.icon }}</span>
+              <span class="material-symbols-outlined" aria-hidden="true" :style="{ color: k.color }">{{ k.icon }}</span>
             </div>
             <div class="ok-body">
               <span class="ok-label">{{ k.label }}</span>
               <span class="ok-value" :style="{ color: k.label.includes('K/Z') ? k.color : undefined }">{{ k.value }} <small>{{ k.unit }}</small></span>
               <span v-if="k.change != null && k.change !== 0" class="ok-change" :class="k.change > 0 ? 'up' : 'down'">
-                <span class="material-symbols-outlined">{{ k.change > 0 ? 'trending_up' : 'trending_down' }}</span>
+                <span class="material-symbols-outlined" aria-hidden="true">{{ k.change > 0 ? 'trending_up' : 'trending_down' }}</span>
                 %{{ Math.abs(k.change).toFixed(1) }} <span class="ok-change-label">düne göre</span>
               </span>
             </div>
@@ -602,14 +620,14 @@ onUnmounted(() => clearInterval(timer))
 
         <!-- 2.5 Hızlı İşlemler -->
         <div class="qa-section">
-          <div class="qa-head"><span class="material-symbols-outlined">bolt</span> Hızlı İşlemler</div>
+          <div class="qa-head"><span class="material-symbols-outlined" aria-hidden="true">bolt</span> Hızlı İşlemler</div>
           <div class="qa-grid">
-            <button class="qa-btn" @click="openModal('addUser')"><span class="material-symbols-outlined" style="color:#22c55e">person_add</span><span>Kullanıcı Ekle</span></button>
-            <button class="qa-btn" @click="openModal('removeUser')"><span class="material-symbols-outlined" style="color:#ef4444">person_remove</span><span>Kullanıcı Çıkar</span></button>
-            <button class="qa-btn" @click="openModal('addVault')"><span class="material-symbols-outlined" style="color:#6366f1">add_card</span><span>Kasa Ekle</span></button>
-            <button class="qa-btn" @click="openModal('removeVault')"><span class="material-symbols-outlined" style="color:#f59e0b">credit_card_off</span><span>Kasa Çıkar</span></button>
-            <button class="qa-btn" @click="openModal('loadBalance')"><span class="material-symbols-outlined" style="color:#0ea5e9">account_balance_wallet</span><span>Bakiye Yükle</span></button>
-            <button class="qa-btn" @click="openModal('transfer')"><span class="material-symbols-outlined" style="color:#8b5cf6">swap_horiz</span><span>Transfer Yap</span></button>
+            <button class="qa-btn" @click="openModal('addUser')"><span class="material-symbols-outlined" aria-hidden="true" style="color:#22c55e">person_add</span><span>Kullanıcı Ekle</span></button>
+            <button class="qa-btn" @click="openModal('removeUser')"><span class="material-symbols-outlined" aria-hidden="true" style="color:#ef4444">person_remove</span><span>Kullanıcı Çıkar</span></button>
+            <button class="qa-btn" @click="openModal('addVault')"><span class="material-symbols-outlined" aria-hidden="true" style="color:#6366f1">add_card</span><span>Kasa Ekle</span></button>
+            <button class="qa-btn" @click="openModal('removeVault')"><span class="material-symbols-outlined" aria-hidden="true" style="color:#f59e0b">credit_card_off</span><span>Kasa Çıkar</span></button>
+            <button class="qa-btn" @click="openModal('loadBalance')"><span class="material-symbols-outlined" aria-hidden="true" style="color:#0ea5e9">account_balance_wallet</span><span>Bakiye Yükle</span></button>
+            <button class="qa-btn" @click="openModal('transfer')"><span class="material-symbols-outlined" aria-hidden="true" style="color:#8b5cf6">swap_horiz</span><span>Transfer Yap</span></button>
           </div>
         </div>
 
@@ -618,14 +636,14 @@ onUnmounted(() => clearInterval(timer))
           <!-- Pozisyon Özeti -->
           <div class="ow-card">
             <div class="ow-card-head">
-              <span class="material-symbols-outlined">donut_large</span>
+              <span class="material-symbols-outlined" aria-hidden="true">donut_large</span>
               <h3>Döviz Pozisyonu</h3>
               <div class="ow-risk-badge" :style="{ color: riskLevel.color, background: riskLevel.color + '18', borderColor: riskLevel.color + '40' }">
-                <span class="material-symbols-outlined">{{ riskLevel.level === 'high' ? 'warning' : riskLevel.level === 'medium' ? 'info' : 'check_circle' }}</span>
+                <span class="material-symbols-outlined" aria-hidden="true">{{ riskLevel.level === 'high' ? 'warning' : riskLevel.level === 'medium' ? 'info' : 'check_circle' }}</span>
                 Yoğunlaşma: {{ riskLevel.label }}
               </div>
             </div>
-            <div v-if="!topCurrencies.length" class="state-msg"><span class="material-symbols-outlined">account_balance_wallet</span> Döviz pozisyonu yok</div>
+            <div v-if="!topCurrencies.length" class="state-msg"><span class="material-symbols-outlined" aria-hidden="true">account_balance_wallet</span> Döviz pozisyonu yok</div>
             <div v-else class="pos-list">
               <div v-for="c in topCurrencies.slice(0, 8)" :key="c.currencyCode" class="pos-row">
                 <span class="pos-code">{{ c.currencyCode }}</span>
@@ -643,13 +661,13 @@ onUnmounted(() => clearInterval(timer))
           <!-- Bekleyen Aksiyonlar -->
           <div class="ow-card">
             <div class="ow-card-head">
-              <span class="material-symbols-outlined">pending_actions</span>
+              <span class="material-symbols-outlined" aria-hidden="true">pending_actions</span>
               <h3>Bekleyen Aksiyonlar</h3>
             </div>
             <div class="action-list">
               <div class="action-item" @click="router.push('/ihtiyar/owner-panel')" style="cursor:pointer">
                 <div class="action-icon" :class="pendingTransfers.length ? 'warn' : 'ok'">
-                  <span class="material-symbols-outlined">swap_horiz</span>
+                  <span class="material-symbols-outlined" aria-hidden="true">swap_horiz</span>
                 </div>
                 <div class="action-body">
                   <span class="action-title">Bekleyen Transferler</span>
@@ -659,7 +677,7 @@ onUnmounted(() => clearInterval(timer))
               </div>
               <div class="action-item" @click="router.push('/ihtiyar/owner-panel')" style="cursor:pointer">
                 <div class="action-icon" :class="ownerAlerts.length ? 'warn' : 'ok'">
-                  <span class="material-symbols-outlined">notifications</span>
+                  <span class="material-symbols-outlined" aria-hidden="true">notifications</span>
                 </div>
                 <div class="action-body">
                   <span class="action-title">Sistem Uyarıları</span>
@@ -669,7 +687,7 @@ onUnmounted(() => clearInterval(timer))
               </div>
               <div class="action-item" @click="router.push('/ihtiyar/owner-panel')" style="cursor:pointer">
                 <div class="action-icon info">
-                  <span class="material-symbols-outlined">store</span>
+                  <span class="material-symbols-outlined" aria-hidden="true">store</span>
                 </div>
                 <div class="action-body">
                   <span class="action-title">Aktif Şubeler</span>
@@ -684,9 +702,9 @@ onUnmounted(() => clearInterval(timer))
         <!-- 4. Şube Performansı -->
         <div class="ow-card" v-if="offices.length">
           <div class="ow-card-head">
-            <span class="material-symbols-outlined">leaderboard</span>
+            <span class="material-symbols-outlined" aria-hidden="true">leaderboard</span>
             <h3>Şube Performansı</h3>
-            <button class="ow-link" @click="router.push('/ihtiyar/owner-panel')">Detay <span class="material-symbols-outlined">arrow_forward</span></button>
+            <button class="ow-link" @click="router.push('/ihtiyar/owner-panel')">Detay <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></button>
           </div>
           <div class="branch-table-wrap">
             <table class="branch-table">
@@ -723,12 +741,12 @@ onUnmounted(() => clearInterval(timer))
         <div class="ow-two-col">
           <div class="ow-card">
             <div class="ow-card-head">
-              <span class="material-symbols-outlined">history</span>
+              <span class="material-symbols-outlined" aria-hidden="true">history</span>
               <h3>Son İşlemler</h3>
-              <button class="ow-link" @click="router.push('/ihtiyar/exchange-v2')">Tümü <span class="material-symbols-outlined">arrow_forward</span></button>
+              <button class="ow-link" @click="router.push('/ihtiyar/exchange-v2')">Tümü <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></button>
             </div>
             <div v-if="recentTxLoading" class="state-msg"><span class="material-symbols-outlined spin">progress_activity</span></div>
-            <div v-else-if="!recentTx.length" class="state-msg"><span class="material-symbols-outlined">receipt_long</span> Henüz işlem yok</div>
+            <div v-else-if="!recentTx.length" class="state-msg"><span class="material-symbols-outlined" aria-hidden="true">receipt_long</span> Henüz işlem yok</div>
             <div v-else class="tx-feed">
               <div v-for="tx in recentTx" :key="tx.id" class="tx-item">
                 <span class="tx-badge" :class="txTypeLabel(tx).cls">{{ txTypeLabel(tx).label }}</span>
@@ -749,11 +767,11 @@ onUnmounted(() => clearInterval(timer))
           <!-- Kasa Doluluk -->
           <div class="ow-card">
             <div class="ow-card-head">
-              <span class="material-symbols-outlined">inventory_2</span>
+              <span class="material-symbols-outlined" aria-hidden="true">inventory_2</span>
               <h3>Kasa Doluluk Durumu</h3>
-              <button class="ow-link" @click="router.push('/ihtiyar/vaults')">Kasalar <span class="material-symbols-outlined">arrow_forward</span></button>
+              <button class="ow-link" @click="router.push('/ihtiyar/vaults')">Kasalar <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></button>
             </div>
-            <div v-if="!sortedOffices.length" class="state-msg"><span class="material-symbols-outlined">info</span> Kasa verisi yok</div>
+            <div v-if="!sortedOffices.length" class="state-msg"><span class="material-symbols-outlined" aria-hidden="true">info</span> Kasa verisi yok</div>
             <div v-else class="vault-fill-list">
               <div v-for="o in sortedOffices" :key="o.officeId" class="vf-office">
                 <div class="vf-office-head">
@@ -775,9 +793,9 @@ onUnmounted(() => clearInterval(timer))
         <!-- 6. Personel Aktivitesi -->
         <div class="ow-card" v-if="activeStaffList.length">
           <div class="ow-card-head">
-            <span class="material-symbols-outlined">group</span>
+            <span class="material-symbols-outlined" aria-hidden="true">group</span>
             <h3>Personel Aktivitesi</h3>
-            <button class="ow-link" @click="router.push('/ihtiyar/users')">Tümü <span class="material-symbols-outlined">arrow_forward</span></button>
+            <button class="ow-link" @click="router.push('/ihtiyar/users')">Tümü <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></button>
           </div>
           <div class="staff-grid">
             <div v-for="s in activeStaffList" :key="s.name" class="staff-item">
@@ -800,7 +818,7 @@ onUnmounted(() => clearInterval(timer))
         <div class="qm-box">
           <div class="qm-header">
             <h3>{{ modalTitles[activeModal!] }}</h3>
-            <button class="qm-close" @click="closeModal"><span class="material-symbols-outlined">close</span></button>
+            <button class="qm-close" @click="closeModal"><span class="material-symbols-outlined" aria-hidden="true">close</span></button>
           </div>
 
           <div class="qm-body">
@@ -907,7 +925,7 @@ onUnmounted(() => clearInterval(timer))
           </div>
 
           <div v-if="modalMsg.text" class="qm-msg" :class="modalMsg.type">
-            <span class="material-symbols-outlined">{{ modalMsg.type === 'ok' ? 'check_circle' : 'error' }}</span>
+            <span class="material-symbols-outlined" aria-hidden="true">{{ modalMsg.type === 'ok' ? 'check_circle' : 'error' }}</span>
             {{ modalMsg.text }}
           </div>
 
@@ -941,14 +959,14 @@ onUnmounted(() => clearInterval(timer))
   display: flex; align-items: center; gap: 6px;
   padding: 6px 14px; background: #fef3c7; border: 1px solid #fcd34d;
   border-radius: 20px; font-size: 12px; font-weight: 700; color: #92400e;
-  cursor: pointer; transition: all .2s;
+  cursor: pointer; transition: background-color .2s;
 }
 .db-hero-badge:hover { background: #fde68a; }
 .db-hero-badge .material-symbols-outlined { font-size: 16px; }
 .db-hero-refresh {
   display: flex; align-items: center; justify-content: center;
   width: 38px; height: 38px; background: #f1f5f9; border: 1px solid #e2e8f0;
-  border-radius: 10px; cursor: pointer; color: #64748b; transition: all .2s;
+  border-radius: 10px; cursor: pointer; color: #64748b; transition: background-color .2s, color .2s, transform .2s;
 }
 .db-hero-refresh:hover { background: #e2e8f0; color: #4338ca; transform: rotate(90deg); }
 .db-hero-refresh .material-symbols-outlined { font-size: 20px; }
@@ -1015,7 +1033,7 @@ onUnmounted(() => clearInterval(timer))
 .qa-btn {
   display: flex; flex-direction: column; align-items: center; gap: 8px;
   padding: 16px 8px; background: #f8fafc; border: 1px solid #eef0f4;
-  border-radius: 12px; cursor: pointer; transition: all .2s;
+  border-radius: 12px; cursor: pointer; transition: background-color .2s, border-color .2s, transform .2s, box-shadow .2s;
 }
 .qa-btn:hover { background: #eef2ff; border-color: #c7d2fe; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(99,102,241,0.1); }
 .qa-btn .material-symbols-outlined { font-size: 28px; }
@@ -1041,7 +1059,7 @@ onUnmounted(() => clearInterval(timer))
 .qm-close {
   display: flex; align-items: center; justify-content: center;
   width: 32px; height: 32px; border-radius: 8px; background: none;
-  border: none; cursor: pointer; color: #94a3b8; transition: all .15s;
+  border: none; cursor: pointer; color: #94a3b8; transition: background-color .15s, color .15s;
 }
 .qm-close:hover { background: #f1f5f9; color: #475569; }
 .qm-body { padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
@@ -1072,14 +1090,14 @@ onUnmounted(() => clearInterval(timer))
 .qm-cancel {
   padding: 9px 20px; background: #f1f5f9; border: 1px solid #e2e8f0;
   border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 600;
-  color: #475569; transition: all .15s;
+  color: #475569; transition: background-color .15s;
 }
 .qm-cancel:hover { background: #e2e8f0; }
 .qm-submit {
   display: flex; align-items: center; gap: 6px;
   padding: 9px 24px; background: linear-gradient(135deg, #6366f1, #4f46e5);
   border: none; border-radius: 10px; cursor: pointer;
-  font-size: 13px; font-weight: 700; color: #fff; transition: all .15s;
+  font-size: 13px; font-weight: 700; color: #fff; transition: box-shadow .15s, opacity .15s;
 }
 .qm-submit:hover { box-shadow: 0 4px 12px rgba(99,102,241,0.3); }
 .qm-submit:disabled { opacity: 0.6; cursor: not-allowed; }
@@ -1397,6 +1415,7 @@ onUnmounted(() => clearInterval(timer))
   .sf-tx-row { grid-template-columns: 56px 48px 1fr 80px; }
   .sf-tx-rate, .sf-tx-time { display: none; }
   .tx-item { grid-template-columns: 52px 1fr 85px; }
+  .staff-grid { grid-template-columns: 1fr; }
   .tx-rate-val, .tx-meta { display: none; }
   .rate-band-inner { gap: 4px; }
   .rate-chip { padding: 6px 10px; }

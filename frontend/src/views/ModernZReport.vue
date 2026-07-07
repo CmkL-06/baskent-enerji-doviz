@@ -272,11 +272,11 @@ onMounted(async () => {
           <label>&nbsp;</label>
           <div class="btn-row">
             <button class="btn btn--primary" @click="fetchReport" :disabled="isLoading">
-              <span class="material-symbols-outlined">{{ isLoading ? 'hourglass_top' : 'search' }}</span>
+              <span class="material-symbols-outlined" aria-hidden="true">{{ isLoading ? 'hourglass_top' : 'search' }}</span>
               {{ isLoading ? 'Yükleniyor...' : 'Raporu Getir' }}
             </button>
             <button class="btn btn--ghost" @click="printReport" v-if="hasData" title="Yazdır">
-              <span class="material-symbols-outlined">print</span>
+              <span class="material-symbols-outlined" aria-hidden="true">print</span>
             </button>
           </div>
         </div>
@@ -285,7 +285,7 @@ onMounted(async () => {
 
     <!-- ── Hata ── -->
     <div class="zr-error" v-if="error">
-      <span class="material-symbols-outlined">error</span> {{ error }}
+      <span class="material-symbols-outlined" aria-hidden="true">error</span> {{ error }}
     </div>
 
     <!-- ── Loading ── -->
@@ -320,13 +320,13 @@ onMounted(async () => {
       <div class="breakdown-row">
         <div class="tx-breakdown" v-if="txBreakdown.some(t => t.count > 0)">
           <div v-for="t in txBreakdown" :key="t.label" class="tx-chip" :style="{ '--tc': t.color }">
-            <span class="material-symbols-outlined">{{ t.icon }}</span>
+            <span class="material-symbols-outlined" aria-hidden="true">{{ t.icon }}</span>
             <span class="tx-count">{{ t.count }}</span>
             <span class="tx-label">{{ t.label }}</span>
           </div>
         </div>
         <div class="opening-balance" v-if="s.hasInheritedBalance">
-          <span class="material-symbols-outlined">history</span>
+          <span class="material-symbols-outlined" aria-hidden="true">history</span>
           <div>
             <p class="ob-label">Devir Bakiye</p>
             <p class="ob-val">{{ fmt(s.openingBalanceTRY) }} ₺</p>
@@ -337,7 +337,7 @@ onMounted(async () => {
       <!-- ── Döviz Bazlı Hacim ── -->
       <div class="volume-chips" v-if="volumesByCurrency.length">
         <span class="vc-title">
-          <span class="material-symbols-outlined">bar_chart</span>
+          <span class="material-symbols-outlined" aria-hidden="true">bar_chart</span>
           Döviz Bazlı Hacim
         </span>
         <div class="vc-list">
@@ -354,7 +354,7 @@ onMounted(async () => {
       <!-- ── Kasa Giriş/Çıkış Özeti ── -->
       <div class="vault-ops" v-if="(s.vaultDeposits ?? 0) > 0 || (s.vaultWithdrawals ?? 0) > 0">
         <div class="vo-item">
-          <span class="material-symbols-outlined" style="color: #10b981">arrow_downward</span>
+          <span class="material-symbols-outlined" aria-hidden="true" style="color: #10b981">arrow_downward</span>
           <div>
             <p class="vo-label">Kasa Giriş</p>
             <p class="vo-val">{{ fmt(s.vaultDeposits) }} ₺</p>
@@ -362,7 +362,7 @@ onMounted(async () => {
         </div>
         <div class="vo-divider"></div>
         <div class="vo-item">
-          <span class="material-symbols-outlined" style="color: #ef4444">arrow_upward</span>
+          <span class="material-symbols-outlined" aria-hidden="true" style="color: #ef4444">arrow_upward</span>
           <div>
             <p class="vo-label">Kasa Çıkış</p>
             <p class="vo-val">{{ fmt(s.vaultWithdrawals) }} ₺</p>
@@ -370,7 +370,7 @@ onMounted(async () => {
         </div>
         <div class="vo-divider"></div>
         <div class="vo-item">
-          <span class="material-symbols-outlined" style="color: #3b82f6">sync_alt</span>
+          <span class="material-symbols-outlined" aria-hidden="true" style="color: #3b82f6">sync_alt</span>
           <div>
             <p class="vo-label">Net Hareket</p>
             <p class="vo-val" :class="(s.netVaultChange ?? 0) >= 0 ? 'pos' : 'neg'">{{ (s.netVaultChange ?? 0) >= 0 ? '+' : '' }}{{ fmt(s.netVaultChange) }} ₺</p>
@@ -378,7 +378,7 @@ onMounted(async () => {
         </div>
         <div class="vo-divider"></div>
         <div class="vo-item">
-          <span class="material-symbols-outlined" style="color: #6366f1">balance</span>
+          <span class="material-symbols-outlined" aria-hidden="true" style="color: #6366f1">balance</span>
           <div>
             <p class="vo-label">Kasa Sonrası Kar</p>
             <p class="vo-val" :class="(s.profitAfterVaultOperations ?? 0) >= 0 ? 'pos' : 'neg'">{{ fmt(s.profitAfterVaultOperations) }} ₺</p>
@@ -389,7 +389,7 @@ onMounted(async () => {
       <!-- ── Şube Karşılaştırma ── -->
       <div class="panel" v-if="isMultiOffice">
         <div class="panel-hd">
-          <span class="material-symbols-outlined">store</span>
+          <span class="material-symbols-outlined" aria-hidden="true">store</span>
           <h3>Şube Karşılaştırması</h3>
           <span class="badge">{{ officeRows.length }} şube</span>
         </div>
@@ -430,7 +430,7 @@ onMounted(async () => {
       <!-- ── Döviz Bazlı Özet ── -->
       <div class="panel" v-if="currencyRows.length">
         <div class="panel-hd">
-          <span class="material-symbols-outlined">currency_exchange</span>
+          <span class="material-symbols-outlined" aria-hidden="true">currency_exchange</span>
           <h3>Döviz Bazlı Özet</h3>
           <span class="badge">{{ currencyRows.length }} döviz</span>
         </div>
@@ -547,7 +547,7 @@ onMounted(async () => {
         <!-- Cari Hesap Özeti -->
         <div class="panel" v-if="partyData">
           <div class="panel-hd">
-            <span class="material-symbols-outlined">group</span>
+            <span class="material-symbols-outlined" aria-hidden="true">group</span>
             <h3>Cari Hesap Özeti</h3>
           </div>
           <div class="party-grid">
@@ -606,7 +606,7 @@ onMounted(async () => {
         <!-- Kasa Bakiyeleri -->
         <div class="panel" v-if="cashData">
           <div class="panel-hd">
-            <span class="material-symbols-outlined">account_balance_wallet</span>
+            <span class="material-symbols-outlined" aria-hidden="true">account_balance_wallet</span>
             <h3>Kasa Bakiyeleri</h3>
             <span class="badge" v-if="cashData.totalVaultValueInTRY">{{ fmt(cashData.totalVaultValueInTRY) }} ₺</span>
           </div>
@@ -652,7 +652,7 @@ onMounted(async () => {
       <!-- ── Kasa Hareketleri ── -->
       <div class="panel" v-if="vaultRows.length">
         <div class="panel-hd">
-          <span class="material-symbols-outlined">history</span>
+          <span class="material-symbols-outlined" aria-hidden="true">history</span>
           <h3>Kasa Hareketleri</h3>
           <span class="badge">{{ vaultRows.length }} hareket</span>
         </div>
@@ -683,7 +683,7 @@ onMounted(async () => {
                     {{ vh.typeLabel }}
                   </span>
                   <span v-if="vh.isParty" class="party-indicator" title="Cari İşlem">
-                    <span class="material-symbols-outlined">person</span>
+                    <span class="material-symbols-outlined" aria-hidden="true">person</span>
                   </span>
                 </td>
                 <td>
@@ -696,7 +696,7 @@ onMounted(async () => {
                 <td class="text-muted mono">{{ vh.valueInBaseCurrency ? fmt(vh.valueInBaseCurrency) + ' ₺' : '-' }}</td>
                 <td>
                   <span v-if="vh.user" class="user-tag">
-                    <span class="material-symbols-outlined">person</span>
+                    <span class="material-symbols-outlined" aria-hidden="true">person</span>
                     {{ vh.user }}
                   </span>
                   <span v-else class="text-muted">-</span>
@@ -711,7 +711,7 @@ onMounted(async () => {
       <!-- ── İşlem Detayları ── -->
       <div class="panel" v-if="transactions.length">
         <div class="panel-hd">
-          <span class="material-symbols-outlined">receipt_long</span>
+          <span class="material-symbols-outlined" aria-hidden="true">receipt_long</span>
           <h3>İşlem Detayları</h3>
           <span class="badge">{{ transactions.length }} işlem</span>
         </div>
@@ -766,7 +766,7 @@ onMounted(async () => {
 
       <!-- ── Boş ── -->
       <div class="zr-empty" v-if="!currencyRows.length && !transactions.length && !partyData && !cashData">
-        <span class="material-symbols-outlined">inbox</span>
+        <span class="material-symbols-outlined" aria-hidden="true">inbox</span>
         <p>Seçilen dönem için işlem bulunamadı.</p>
       </div>
 
@@ -774,7 +774,7 @@ onMounted(async () => {
 
     <!-- ── Başlangıç ── -->
     <div class="zr-empty" v-if="!isLoading && !hasData && !error">
-      <span class="material-symbols-outlined">assessment</span>
+      <span class="material-symbols-outlined" aria-hidden="true">assessment</span>
       <p>Filtre seçip <strong>Raporu Getir</strong> butonuna tıklayın.</p>
     </div>
 
@@ -797,9 +797,9 @@ onMounted(async () => {
 .zr-input-sm { width: 90px; }
 .zr-office-fixed { display: flex; align-items: center; font-weight: 600; color: #4f46e5; background: #eef2ff; border-color: #c7d2fe; cursor: default; }
 .mode-tabs { display: flex; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
-.mt-btn { padding: 7px 14px; font-size: 12px; font-weight: 500; background: #f9fafb; border: none; cursor: pointer; color: #6b7280; transition: all .15s; }
+.mt-btn { padding: 7px 14px; font-size: 12px; font-weight: 500; background: #f9fafb; border: none; cursor: pointer; color: #6b7280; transition: background-color 0.2s, color 0.2s; }
 .mt-btn.active { background: #6366f1; color: #fff; }
-.btn { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 16px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; }
+.btn { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 16px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background-color 0.2s, color 0.2s; }
 .btn--primary { background: #6366f1; color: #fff; }
 .btn--primary:hover:not(:disabled) { background: #4f46e5; }
 .btn--primary:disabled { opacity: .6; cursor: not-allowed; }

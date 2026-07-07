@@ -105,7 +105,7 @@ function formatDate(d: string): string {
           </p>
         </div>
         <button class="dc-close-btn" @click="emit('closed')">
-          <span class="material-symbols-outlined">close</span>
+          <span class="material-symbols-outlined" aria-hidden="true">close</span>
         </button>
       </div>
 
@@ -117,7 +117,7 @@ function formatDate(d: string): string {
       <template v-else-if="dayStatus">
         <!-- Already open, no action needed -->
         <div v-if="dayStatus.canTransact && !dayStatus.hasUnclosedDays" class="dc-status-ok">
-          <span class="material-symbols-outlined">check_circle</span>
+          <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
           <p>Gün açık — tüm kapanışlar tamamlanmış, işlem yapabilirsiniz.</p>
           <p v-if="dayStatus.lastClosedDate" class="dc-meta">Son kapanış: {{ formatDate(dayStatus.lastClosedDate) }}</p>
         </div>
@@ -125,12 +125,12 @@ function formatDate(d: string): string {
         <!-- Closure required -->
         <template v-else>
           <div class="dc-warning-bar">
-            <span class="material-symbols-outlined">warning</span>
+            <span class="material-symbols-outlined" aria-hidden="true">warning</span>
             <span>{{ dayStatus.blockReason }}</span>
           </div>
 
           <div v-if="dayStatus.unclosedDayCount > 1" class="dc-info-bar">
-            <span class="material-symbols-outlined">info</span>
+            <span class="material-symbols-outlined" aria-hidden="true">info</span>
             <span>{{ dayStatus.unclosedDayCount }} gün kapanmamış. Ara günler otomatik kapatılacak.</span>
           </div>
 
@@ -184,14 +184,14 @@ function formatDate(d: string): string {
 
           <div class="dc-footer">
             <div v-if="hasAnyDiscrepancy()" class="dc-disc-warn">
-              <span class="material-symbols-outlined">error</span>
+              <span class="material-symbols-outlined" aria-hidden="true">error</span>
               Sayım farkları tespit edildi — açıklama zorunludur
             </div>
             <div class="dc-actions">
               <button class="dc-btn dc-btn-cancel" @click="emit('closed')">İptal</button>
               <button class="dc-btn dc-btn-submit" :disabled="!canSubmit || submitting" @click="submitClosure">
                 <span v-if="submitting" class="material-symbols-outlined spin">sync</span>
-                <span v-else class="material-symbols-outlined">lock</span>
+                <span v-else class="material-symbols-outlined" aria-hidden="true">lock</span>
                 {{ submitting ? 'Kapatılıyor...' : 'Günü Kapat' }}
               </button>
             </div>
@@ -253,7 +253,7 @@ function formatDate(d: string): string {
   cursor: pointer;
   padding: 4px;
   border-radius: 8px;
-  transition: all .2s;
+  transition: background-color 0.2s, color 0.2s;
 }
 .dc-close-btn:hover {
   background: rgba(255,255,255,.1);
@@ -432,7 +432,7 @@ function formatDate(d: string): string {
   font-weight: 500;
   cursor: pointer;
   border: none;
-  transition: all .2s;
+  transition: background-color 0.2s, color 0.2s;
 }
 .dc-btn-cancel {
   background: rgba(255,255,255,.08);

@@ -132,15 +132,15 @@
       <!-- Section Tabs -->
       <div class="section-tabs">
         <button :class="['section-tab', { active: activeSection === 'balances' }]" @click="activeSection = 'balances'">
-          <span class="material-symbols-outlined" style="font-size:18px">account_balance_wallet</span>
+          <span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px">account_balance_wallet</span>
           Bakiyeler
         </button>
         <button :class="['section-tab', { active: activeSection === 'history' }]" @click="activeSection = 'history'">
-          <span class="material-symbols-outlined" style="font-size:18px">history</span>
+          <span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px">history</span>
           Geçmiş
         </button>
         <button v-if="authStore.isAdmin" :class="['section-tab', { active: activeSection === 'count' }]" @click="activeSection = 'count'; loadCountHistory()">
-          <span class="material-symbols-outlined" style="font-size:18px">inventory_2</span>
+          <span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px">inventory_2</span>
           Sayım
         </button>
       </div>
@@ -379,11 +379,11 @@
       <div v-if="activeSection === 'count'" class="count-section">
         <div class="count-section-header">
           <h2 class="section-title">
-            <span class="material-symbols-outlined" style="font-size:20px;font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24">inventory_2</span>
+            <span class="material-symbols-outlined" aria-hidden="true" style="font-size:20px;font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24">inventory_2</span>
             Kasa Sayımı
           </h2>
           <button @click="openCountForm" class="count-start-btn">
-            <span class="material-symbols-outlined" style="font-size:18px;font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24">add_circle</span>
+            <span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px;font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24">add_circle</span>
             Yeni Sayım
           </button>
         </div>
@@ -425,7 +425,7 @@
             <div class="count-form-actions">
               <button @click="showCountForm = false" class="count-cancel-btn">İptal</button>
               <button @click="submitVaultCount" :disabled="isSavingCount" class="count-save-btn">
-                <span class="material-symbols-outlined" style="font-size:16px;font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24">{{ isSavingCount ? 'refresh' : 'save' }}</span>
+                <span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px;font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24">{{ isSavingCount ? 'refresh' : 'save' }}</span>
                 {{ isSavingCount ? 'Kaydediliyor...' : 'Sayımı Kaydet' }}
               </button>
             </div>
@@ -475,7 +475,7 @@
             </tbody>
           </table>
           <div v-else class="count-empty">
-            <span class="material-symbols-outlined" style="font-size:40px;color:#d1d5db;font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24">inventory_2</span>
+            <span class="material-symbols-outlined" aria-hidden="true" style="font-size:40px;color:#d1d5db;font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24">inventory_2</span>
             <p>Henüz sayım kaydı bulunmuyor</p>
           </div>
         </div>
@@ -525,7 +525,7 @@
                       <span>{{ getSelectedCurrency(depositForm.currencyId)?.currencyCode }} - {{ getSelectedCurrency(depositForm.currencyId)?.currencyName }}</span>
                     </div>
                     <span v-else class="placeholder">Para birimi seçin</span>
-                    <span class="material-symbols-outlined">{{ depositDropdownOpen ? 'expand_less' : 'expand_more' }}</span>
+                    <span class="material-symbols-outlined" aria-hidden="true">{{ depositDropdownOpen ? 'expand_less' : 'expand_more' }}</span>
                   </div>
                   <div v-if="depositDropdownOpen" class="currency-dropdown-list">
                     <div 
@@ -593,7 +593,7 @@
                       <span>{{ selectedWithdrawBalance?.currencyCode }} - Kullanılabilir: {{ formatAmount(selectedWithdrawBalance?.availableBalance || 0) }}</span>
                     </div>
                     <span v-else class="placeholder">Para birimi seçin</span>
-                    <span class="material-symbols-outlined">{{ withdrawDropdownOpen ? 'expand_less' : 'expand_more' }}</span>
+                    <span class="material-symbols-outlined" aria-hidden="true">{{ withdrawDropdownOpen ? 'expand_less' : 'expand_more' }}</span>
                   </div>
                   <div v-if="withdrawDropdownOpen" class="currency-dropdown-list">
                     <div 
@@ -763,7 +763,7 @@
                       <span>{{ selectedTransferBalance?.currencyCode }} - Kullanılabilir: {{ formatAmount(selectedTransferBalance?.availableBalance || 0) }}</span>
                     </div>
                     <span v-else class="placeholder">Para birimi seçin</span>
-                    <span class="material-symbols-outlined">{{ transferDropdownOpen ? 'expand_less' : 'expand_more' }}</span>
+                    <span class="material-symbols-outlined" aria-hidden="true">{{ transferDropdownOpen ? 'expand_less' : 'expand_more' }}</span>
                   </div>
                   <div v-if="transferDropdownOpen" class="currency-dropdown-list">
                     <div 
@@ -1495,7 +1495,7 @@ onUnmounted(() => {
   padding: 1.5rem 0 2rem;
   overflow: hidden;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  transition: all 0.3s ease;
+  transition: box-shadow 0.3s ease;
 }
 
 .header-background {
@@ -1539,7 +1539,7 @@ onUnmounted(() => {
   color: white;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
 .back-button:hover {
@@ -1627,7 +1627,7 @@ onUnmounted(() => {
   border-radius: 10px;
   color: white;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
 .refresh-button:hover:not(:disabled) {
@@ -1689,7 +1689,7 @@ onUnmounted(() => {
   border-radius: 16px;
   padding: 1.5rem 1rem;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1719,7 +1719,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.3s ease;
+  transition: background-color 0.3s ease, transform 0.3s ease;
   padding: 12px;
 }
 
@@ -1799,7 +1799,7 @@ onUnmounted(() => {
   border-radius: 8px;
   color: #94a3b8;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1875,7 +1875,7 @@ onUnmounted(() => {
 }
 
 .balances-table tbody tr {
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
 .balances-table tbody tr:hover {
@@ -1965,7 +1965,7 @@ onUnmounted(() => {
   background: #f8fafc;
   border-radius: 16px;
   padding: 1.5rem;
-  transition: all 0.3s ease;
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
   border: 1px solid transparent;
 }
 
@@ -2024,7 +2024,7 @@ onUnmounted(() => {
   border-radius: 8px;
   color: #64748b;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .balance-update-btn:hover {
@@ -2107,7 +2107,7 @@ onUnmounted(() => {
   font-weight: 500;
   color: #64748b;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .time-btn:hover,
@@ -2438,7 +2438,7 @@ onUnmounted(() => {
   color: #64748b;
   cursor: pointer;
   border-radius: 8px;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .modal-close:hover {
@@ -2479,7 +2479,7 @@ onUnmounted(() => {
   border: 2px solid #e2e8f0;
   border-radius: 10px;
   font-size: 1rem;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
   background: white;
 }
 
@@ -2571,7 +2571,7 @@ onUnmounted(() => {
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
 
 .btn-cancel {
@@ -2667,7 +2667,7 @@ onUnmounted(() => {
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
 .btn-delete:hover:not(:disabled) {
@@ -2697,7 +2697,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease;
 }
 
 .currency-select-trigger:hover:not(.disabled) {
@@ -2901,7 +2901,7 @@ onUnmounted(() => {
   font-weight: 500;
   color: #6b7280;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, color 0.2s;
 }
 .section-tab:hover {
   color: #374151;
@@ -2941,7 +2941,7 @@ onUnmounted(() => {
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s;
 }
 .count-start-btn:hover {
   transform: translateY(-1px);
@@ -3093,7 +3093,7 @@ onUnmounted(() => {
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s;
 }
 .count-save-btn:hover:not(:disabled) {
   transform: translateY(-1px);
@@ -3196,5 +3196,11 @@ onUnmounted(() => {
 }
 .animate-spin {
   animation: spin 1s linear infinite;
+}
+@media (max-width: 480px) {
+  .count-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 </style>

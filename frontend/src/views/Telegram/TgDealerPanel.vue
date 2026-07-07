@@ -93,13 +93,24 @@ function statusColor(status: string) {
   return map[status] || '#6b7280'
 }
 
+const handleVisibilityChange = () => {
+  if (document.hidden) {
+    if (refreshInterval) { clearInterval(refreshInterval); refreshInterval = null }
+  } else {
+    loadData()
+    refreshInterval = window.setInterval(loadData, 30000)
+  }
+}
+
 onMounted(() => {
   loadData()
   refreshInterval = window.setInterval(loadData, 30000)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
 })
 
 onUnmounted(() => {
   if (refreshInterval) clearInterval(refreshInterval)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 </script>
 
@@ -114,7 +125,7 @@ onUnmounted(() => {
       <!-- Header -->
       <div class="dealer-header">
         <div class="dealer-info">
-          <span class="material-symbols-outlined" style="font-size: 28px; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">storefront</span>
+          <span class="material-symbols-outlined" aria-hidden="true" style="font-size: 28px; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">storefront</span>
           <div>
             <div class="dealer-name">{{ dashboard.dealer_name }}</div>
             <div class="dealer-code">Bayi Kodu: <code>{{ dashboard.dealer_code || '—' }}</code></div>
@@ -127,28 +138,28 @@ onUnmounted(() => {
       <div class="summary-grid">
         <div class="summary-card">
           <div class="summary-icon" style="color: #10b981">
-            <span class="material-symbols-outlined">account_balance_wallet</span>
+            <span class="material-symbols-outlined" aria-hidden="true">account_balance_wallet</span>
           </div>
           <div class="summary-value">₺{{ formatMoney(dashboard.balance) }}</div>
           <div class="summary-label">Bakiye TL</div>
         </div>
         <div class="summary-card">
           <div class="summary-icon" style="color: #f59e0b">
-            <span class="material-symbols-outlined">payments</span>
+            <span class="material-symbols-outlined" aria-hidden="true">payments</span>
           </div>
           <div class="summary-value">₺{{ formatMoney(dashboard.given_tl) }}</div>
           <div class="summary-label">Verilen Toplam TL</div>
         </div>
         <div class="summary-card">
           <div class="summary-icon" style="color: #3b82f6">
-            <span class="material-symbols-outlined">token</span>
+            <span class="material-symbols-outlined" aria-hidden="true">token</span>
           </div>
           <div class="summary-value">${{ formatMoney(dashboard.usdt) }}</div>
           <div class="summary-label">Alınan USDT</div>
         </div>
         <div class="summary-card">
           <div class="summary-icon" style="color: #8b5cf6">
-            <span class="material-symbols-outlined">currency_ruble</span>
+            <span class="material-symbols-outlined" aria-hidden="true">currency_ruble</span>
           </div>
           <div class="summary-value">₽{{ formatMoney(dashboard.rub) }}</div>
           <div class="summary-label">Alınan RUB</div>
@@ -159,11 +170,11 @@ onUnmounted(() => {
       <div v-if="dashboard.dealer_code" class="qr-section">
         <div class="qr-section-header">
           <div class="section-title" style="margin: 0">
-            <span class="material-symbols-outlined">qr_code</span>
+            <span class="material-symbols-outlined" aria-hidden="true">qr_code</span>
             Telegram Bot QR Kodu
           </div>
           <button class="qr-download-btn" @click="downloadQR">
-            <span class="material-symbols-outlined" style="font-size: 16px; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">download</span>
+            <span class="material-symbols-outlined" aria-hidden="true" style="font-size: 16px; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">download</span>
             İndir
           </button>
         </div>
@@ -186,7 +197,7 @@ onUnmounted(() => {
       <!-- Kripto Özeti -->
       <div v-if="dashboard.crypto_summary?.total_usdt_tx > 0 || cryptoDeposits.length > 0" class="crypto-overview">
         <div class="section-title">
-          <span class="material-symbols-outlined">currency_bitcoin</span>
+          <span class="material-symbols-outlined" aria-hidden="true">currency_bitcoin</span>
           Kripto Özeti
         </div>
         <div class="crypto-stats">
@@ -229,7 +240,7 @@ onUnmounted(() => {
       <!-- Cari Hesap -->
       <div v-if="cariLoaded && cariData.entries?.length > 0" class="cari-section">
         <div class="section-title" style="margin-top: 0">
-          <span class="material-symbols-outlined">account_balance_wallet</span>
+          <span class="material-symbols-outlined" aria-hidden="true">account_balance_wallet</span>
           Cari Hesap
           <span class="cari-badge" :class="cariData.balanceType">
             ₺{{ formatMoney(Math.abs(cariData.balance)) }}
@@ -260,7 +271,7 @@ onUnmounted(() => {
 
       <!-- Filter & Transactions -->
       <div class="section-title" style="margin-top: 20px">
-        <span class="material-symbols-outlined">receipt_long</span>
+        <span class="material-symbols-outlined" aria-hidden="true">receipt_long</span>
         İşlemler
       </div>
       <div class="filter-bar">
@@ -302,7 +313,7 @@ onUnmounted(() => {
 
       <!-- Auto refresh indicator -->
       <div class="refresh-indicator">
-        <span class="material-symbols-outlined" style="font-size: 14px; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">autorenew</span>
+        <span class="material-symbols-outlined" aria-hidden="true" style="font-size: 14px; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">autorenew</span>
         30 saniyede bir otomatik güncellenir
       </div>
     </template>
@@ -328,7 +339,7 @@ onUnmounted(() => {
 
 .qr-section { margin-top: 16px; padding: 16px; background: var(--color-card, #fff); border: 1px solid var(--color-border, #e5e7eb); border-radius: 10px; }
 .qr-section-header { display: flex; justify-content: space-between; align-items: center; }
-.qr-download-btn { display: flex; align-items: center; gap: 4px; padding: 6px 12px; border: 1px solid var(--color-primary, #2563eb); background: transparent; color: var(--color-primary, #2563eb); border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+.qr-download-btn { display: flex; align-items: center; gap: 4px; padding: 6px 12px; border: 1px solid var(--color-primary, #2563eb); background: transparent; color: var(--color-primary, #2563eb); border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background-color 0.15s, color 0.15s, border-color 0.15s; }
 .qr-download-btn:hover { background: var(--color-primary, #2563eb); color: #fff; }
 .qr-body { display: flex; gap: 20px; margin-top: 14px; align-items: flex-start; }
 .qr-image-wrap { flex-shrink: 0; padding: 8px; background: #fff; border: 1px solid var(--color-border, #e5e7eb); border-radius: 8px; }
@@ -345,7 +356,7 @@ onUnmounted(() => {
 .section-title .material-symbols-outlined { font-size: 20px; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
 
 .filter-bar { display: flex; gap: 6px; margin-bottom: 12px; }
-.filter-btn { padding: 6px 12px; border: 1px solid var(--color-border, #e5e7eb); background: var(--color-card, #fff); border-radius: 6px; font-size: 12px; cursor: pointer; color: var(--color-text-secondary, #6b7280); transition: all 0.15s; }
+.filter-btn { padding: 6px 12px; border: 1px solid var(--color-border, #e5e7eb); background: var(--color-card, #fff); border-radius: 6px; font-size: 12px; cursor: pointer; color: var(--color-text-secondary, #6b7280); transition: background-color 0.15s, color 0.15s, border-color 0.15s; }
 .filter-btn:hover { border-color: var(--color-primary, #2563eb); }
 .filter-btn.active { background: var(--color-primary, #2563eb); color: #fff; border-color: var(--color-primary, #2563eb); }
 

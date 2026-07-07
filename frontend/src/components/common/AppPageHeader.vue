@@ -10,7 +10,7 @@ defineProps<{
   <div class="app-page-header">
     <div class="aph-left">
       <div class="aph-icon">
-        <span class="material-symbols-outlined">{{ icon }}</span>
+        <span class="material-symbols-outlined" aria-hidden="true">{{ icon }}</span>
       </div>
       <div>
         <h1 class="aph-title">{{ title }}</h1>

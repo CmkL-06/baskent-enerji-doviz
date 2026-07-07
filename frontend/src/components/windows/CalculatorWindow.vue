@@ -40,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onUnmounted } from 'vue';
 
 // Calculator state
 const display = ref('0');
@@ -173,6 +173,10 @@ const handleKeyboard = (event: KeyboardEvent) => {
 if (typeof window !== 'undefined') {
   window.addEventListener('keydown', handleKeyboard);
 }
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeyboard);
+})
 </script>
 
 <style scoped>
@@ -220,7 +224,7 @@ if (typeof window !== 'undefined') {
   font-size: 20px;
   font-weight: 400;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, color 0.2s;
   color: white;
   display: flex;
   align-items: center;

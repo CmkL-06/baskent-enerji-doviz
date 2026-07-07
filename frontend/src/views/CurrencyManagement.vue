@@ -179,7 +179,7 @@ onMounted(loadCurrencies)
     <!-- Header -->
     <AppPageHeader icon="currency_exchange" title="Para Birimi Yönetimi" :subtitle="currencies.length + ' para birimi kayıtlı'">
       <button class="cm-btn cm-btn-primary" @click="openCreate">
-        <span class="material-symbols-outlined">add_circle</span> Yeni Ekle
+        <span class="material-symbols-outlined" aria-hidden="true">add_circle</span> Yeni Ekle
       </button>
     </AppPageHeader>
 
@@ -217,7 +217,7 @@ onMounted(loadCurrencies)
             <tr class="cm-row" :class="{ expanded: expandedId === c.id }" @click="toggleExpand(c.id)">
               <td class="cm-cell-currency">
                 <img v-if="getMeta(c.currencyCode).flagImg" :src="getMeta(c.currencyCode).flagImg" class="cm-flag" :alt="c.currencyCode" />
-                <span v-else class="cm-flag cm-flag-placeholder"><span class="material-symbols-outlined">currency_exchange</span></span>
+                <span v-else class="cm-flag cm-flag-placeholder"><span class="material-symbols-outlined" aria-hidden="true">currency_exchange</span></span>
                 <div>
                   <div class="cm-currency-code">
                     <span class="cm-badge">{{ c.currencyCode }}</span>
@@ -232,17 +232,17 @@ onMounted(loadCurrencies)
               </td>
               <td>
                 <span class="cm-status" :class="getMeta(c.currencyCode).status === 'active' ? 'cm-status-active' : 'cm-status-disc'">
-                  <span class="material-symbols-outlined">{{ getMeta(c.currencyCode).status === 'active' ? 'check_circle' : 'cancel' }}</span>
+                  <span class="material-symbols-outlined" aria-hidden="true">{{ getMeta(c.currencyCode).status === 'active' ? 'check_circle' : 'cancel' }}</span>
                   {{ getMeta(c.currencyCode).status === 'active' ? 'Aktif' : 'Tedavülden Kalkmış' }}
                 </span>
               </td>
               <td class="cm-cell-date">{{ formatDate(c.createdDate) }}</td>
               <td class="cm-cell-actions" @click.stop>
                 <button class="cm-icon-btn" @click="openEdit(c)" title="Düzenle">
-                  <span class="material-symbols-outlined">edit</span>
+                  <span class="material-symbols-outlined" aria-hidden="true">edit</span>
                 </button>
                 <button class="cm-icon-btn cm-icon-danger" @click="confirmDelete(c)" title="Sil">
-                  <span class="material-symbols-outlined">delete</span>
+                  <span class="material-symbols-outlined" aria-hidden="true">delete</span>
                 </button>
               </td>
             </tr>
@@ -251,7 +251,7 @@ onMounted(loadCurrencies)
               <td colspan="6">
                 <div class="cm-detail">
                   <img v-if="getMeta(c.currencyCode).flagImg" :src="getMeta(c.currencyCode).flagImg" class="cm-detail-flag" :alt="c.currencyCode" />
-                  <span v-else class="cm-detail-flag cm-detail-flag-placeholder"><span class="material-symbols-outlined">currency_exchange</span></span>
+                  <span v-else class="cm-detail-flag cm-detail-flag-placeholder"><span class="material-symbols-outlined" aria-hidden="true">currency_exchange</span></span>
                   <div class="cm-detail-grid">
                     <div class="cm-detail-item">
                       <span class="cm-detail-label">ISO Kodu</span>
@@ -292,14 +292,14 @@ onMounted(loadCurrencies)
         <div class="cm-modal-header">
           <h3>{{ editingCurrency ? 'Para Birimini Düzenle' : 'Yeni Para Birimi' }}</h3>
           <button class="cm-modal-close" @click="cancelForm">
-            <span class="material-symbols-outlined">close</span>
+            <span class="material-symbols-outlined" aria-hidden="true">close</span>
           </button>
         </div>
 
         <!-- Preview -->
         <div v-if="formPreview" class="cm-form-preview">
           <img v-if="formPreview.flagImg" :src="formPreview.flagImg" class="cm-form-preview-flag" alt="" />
-          <span v-else class="cm-form-preview-flag cm-flag-placeholder"><span class="material-symbols-outlined">currency_exchange</span></span>
+          <span v-else class="cm-form-preview-flag cm-flag-placeholder"><span class="material-symbols-outlined" aria-hidden="true">currency_exchange</span></span>
           <div>
             <div class="cm-form-preview-country">{{ formPreview.country }}</div>
             <div class="cm-form-preview-region">{{ formPreview.region }} · {{ formPreview.symbol }}</div>
@@ -336,7 +336,7 @@ onMounted(loadCurrencies)
         <h3>Emin misiniz?</h3>
         <p class="cm-delete-text">
           <img v-if="getMeta(deleteTarget.currencyCode).flagImg" :src="getMeta(deleteTarget.currencyCode).flagImg" class="cm-flag-sm" :alt="deleteTarget.currencyCode" />
-          <span v-else class="material-symbols-outlined" style="font-size:20px;vertical-align:middle;margin-right:6px">currency_exchange</span>
+          <span v-else class="material-symbols-outlined" aria-hidden="true" style="font-size:20px;vertical-align:middle;margin-right:6px">currency_exchange</span>
           <strong>{{ deleteTarget.currencyCode }} — {{ deleteTarget.currencyName }}</strong> silinecek.
           <br>Bu para birimine ait işlemler etkilenebilir.
         </p>
@@ -433,7 +433,7 @@ onMounted(loadCurrencies)
 .cm-cell-actions { display: flex; gap: 4px; }
 .cm-icon-btn {
   background: none; border: none; cursor: pointer; padding: 6px; border-radius: 8px;
-  color: #6b7280; display: flex; align-items: center; transition: all .15s;
+  color: #6b7280; display: flex; align-items: center; transition: background-color 0.2s, color 0.2s;
 }
 .cm-icon-btn:hover { background: #f3f4f6; color: #6b46c1; }
 .cm-icon-btn .material-symbols-outlined { font-size: 18px; }

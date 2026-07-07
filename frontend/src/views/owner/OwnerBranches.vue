@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import apiService from '@/services/apiservice'
+import { useNotification } from '@/composables/useNotification'
+
+const notification = useNotification()
 
 const offices = ref<any[]>([])
 const loading = ref(true)
@@ -135,7 +138,7 @@ async function saveOffice() {
     showModal.value = false
     await loadData()
   } catch (e: any) {
-    alert(e?.response?.data?.error || e.message || 'Kaydetme hatası')
+    notification.error(e?.response?.data?.error || e.message || 'Kaydetme hatası')
   } finally {
     saving.value = false
   }
@@ -194,7 +197,7 @@ function assetPercent(o: any) {
     <div class="ob-stats-row">
       <div class="ob-stat-card">
         <div class="ob-stat-icon" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6;">
-          <span class="material-symbols-outlined">domain</span>
+          <span class="material-symbols-outlined" aria-hidden="true">domain</span>
         </div>
         <div class="ob-stat-info">
           <span class="ob-stat-value">{{ offices.length }}</span>
@@ -203,7 +206,7 @@ function assetPercent(o: any) {
       </div>
       <div class="ob-stat-card">
         <div class="ob-stat-icon" style="background: rgba(168, 85, 247, 0.1); color: #a855f7;">
-          <span class="material-symbols-outlined">account_balance_wallet</span>
+          <span class="material-symbols-outlined" aria-hidden="true">account_balance_wallet</span>
         </div>
         <div class="ob-stat-info">
           <span class="ob-stat-value">{{ totalVaults }}</span>
@@ -212,7 +215,7 @@ function assetPercent(o: any) {
       </div>
       <div class="ob-stat-card">
         <div class="ob-stat-icon" style="background: rgba(34, 197, 94, 0.1); color: #22c55e;">
-          <span class="material-symbols-outlined">groups</span>
+          <span class="material-symbols-outlined" aria-hidden="true">groups</span>
         </div>
         <div class="ob-stat-info">
           <span class="ob-stat-value">{{ totalUsers }}</span>
@@ -221,7 +224,7 @@ function assetPercent(o: any) {
       </div>
       <div class="ob-stat-card">
         <div class="ob-stat-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">
-          <span class="material-symbols-outlined">account_balance</span>
+          <span class="material-symbols-outlined" aria-hidden="true">account_balance</span>
         </div>
         <div class="ob-stat-info">
           <span class="ob-stat-value ob-stat-money">{{ fmtCompact(totalAssets) }} <small>₺</small></span>
@@ -234,18 +237,18 @@ function assetPercent(o: any) {
     <div class="ob-action-bar">
       <div class="ob-action-left">
         <h3 class="ob-section-title">
-          <span class="material-symbols-outlined">store</span>
+          <span class="material-symbols-outlined" aria-hidden="true">store</span>
           Şube Yönetimi
         </h3>
         <span class="ob-subtitle">{{ offices.length }} ofis kayıtlı</span>
       </div>
       <div class="ob-action-right">
         <button class="ob-btn ob-btn-outline" :disabled="pushingRates" @click="pushRates">
-          <span class="material-symbols-outlined" :class="{ spin: pushingRates }">{{ pushingRates ? 'progress_activity' : 'sync' }}</span>
+          <span class="material-symbols-outlined" aria-hidden="true" :class="{ spin: pushingRates }">{{ pushingRates ? 'progress_activity' : 'sync' }}</span>
           <span class="ob-btn-text">Kurları Dağıt</span>
         </button>
         <button class="ob-btn ob-btn-primary" @click="openCreate">
-          <span class="material-symbols-outlined">add</span>
+          <span class="material-symbols-outlined" aria-hidden="true">add</span>
           <span class="ob-btn-text">Yeni Şube</span>
         </button>
       </div>
@@ -254,7 +257,7 @@ function assetPercent(o: any) {
     <!-- Push Result Toast -->
     <Transition name="toast">
       <div v-if="pushResult" :class="['ob-toast', pushResult.type]">
-        <span class="material-symbols-outlined">{{ pushResult.type === 'success' ? 'check_circle' : 'error' }}</span>
+        <span class="material-symbols-outlined" aria-hidden="true">{{ pushResult.type === 'success' ? 'check_circle' : 'error' }}</span>
         {{ pushResult.text }}
       </div>
     </Transition>
@@ -265,7 +268,7 @@ function assetPercent(o: any) {
       <span>Şube verileri yükleniyor...</span>
     </div>
     <div v-else-if="error" class="ob-loading ob-err">
-      <span class="material-symbols-outlined">error</span>
+      <span class="material-symbols-outlined" aria-hidden="true">error</span>
       <span>{{ error }}</span>
       <button class="ob-btn ob-btn-outline" @click="loadData">Tekrar Dene</button>
     </div>
@@ -282,7 +285,7 @@ function assetPercent(o: any) {
           <!-- Office Identity -->
           <div class="ob-office-identity">
             <div :class="['ob-office-icon', o.officeType === 1 ? 'icon-merkez' : 'icon-sube']">
-              <span class="material-symbols-outlined">{{ o.officeType === 1 ? 'hub' : 'store' }}</span>
+              <span class="material-symbols-outlined" aria-hidden="true">{{ o.officeType === 1 ? 'hub' : 'store' }}</span>
             </div>
             <div class="ob-office-name-block">
               <div class="ob-office-name">{{ o.officeName }}</div>
@@ -327,14 +330,14 @@ function assetPercent(o: any) {
               title="Düzenle"
               @click="openEdit(o)"
             >
-              <span class="material-symbols-outlined">edit</span>
+              <span class="material-symbols-outlined" aria-hidden="true">edit</span>
             </button>
             <button
               class="ob-icon-btn ob-expand-toggle"
               :class="{ rotated: expandedId === o.officeId }"
               @click="toggleExpand(o.officeId)"
             >
-              <span class="material-symbols-outlined">expand_more</span>
+              <span class="material-symbols-outlined" aria-hidden="true">expand_more</span>
             </button>
           </div>
         </div>
@@ -374,18 +377,18 @@ function assetPercent(o: any) {
                 <!-- Kasalar -->
                 <div class="ob-detail-section">
                   <div class="ob-detail-header">
-                    <span class="material-symbols-outlined">account_balance_wallet</span>
+                    <span class="material-symbols-outlined" aria-hidden="true">account_balance_wallet</span>
                     <h4>Kasalar</h4>
                     <span class="ob-detail-count">{{ expandedVaults.length }}</span>
                   </div>
                   <div v-if="expandedVaults.length === 0" class="ob-detail-empty">
-                    <span class="material-symbols-outlined">inbox</span>
+                    <span class="material-symbols-outlined" aria-hidden="true">inbox</span>
                     Bu ofise ait kasa bulunamadı
                   </div>
                   <div v-else class="ob-vault-list">
                     <div v-for="v in expandedVaults" :key="v.id || v.vaultId" class="ob-vault-item">
                       <div class="ob-vault-name">
-                        <span class="material-symbols-outlined">lock</span>
+                        <span class="material-symbols-outlined" aria-hidden="true">lock</span>
                         {{ v.name || v.vaultName }}
                       </div>
                       <div class="ob-vault-balances">
@@ -418,12 +421,12 @@ function assetPercent(o: any) {
                 <!-- Personel -->
                 <div class="ob-detail-section">
                   <div class="ob-detail-header">
-                    <span class="material-symbols-outlined">group</span>
+                    <span class="material-symbols-outlined" aria-hidden="true">group</span>
                     <h4>Personel</h4>
                     <span class="ob-detail-count">{{ expandedUsers.length }}</span>
                   </div>
                   <div v-if="expandedUsers.length === 0" class="ob-detail-empty">
-                    <span class="material-symbols-outlined">person_off</span>
+                    <span class="material-symbols-outlined" aria-hidden="true">person_off</span>
                     Bu ofise atanmış personel yok
                   </div>
                   <div v-else class="ob-user-list">
@@ -455,11 +458,11 @@ function assetPercent(o: any) {
           <div class="ob-modal">
             <div class="ob-modal-header">
               <div class="ob-modal-title-block">
-                <span class="material-symbols-outlined">{{ editForm.id ? 'edit' : 'add_business' }}</span>
+                <span class="material-symbols-outlined" aria-hidden="true">{{ editForm.id ? 'edit' : 'add_business' }}</span>
                 <h3>{{ editForm.id ? 'Şube Düzenle' : 'Yeni Şube Oluştur' }}</h3>
               </div>
               <button class="ob-modal-close" @click="showModal = false">
-                <span class="material-symbols-outlined">close</span>
+                <span class="material-symbols-outlined" aria-hidden="true">close</span>
               </button>
             </div>
             <div class="ob-modal-body">
@@ -531,7 +534,7 @@ function assetPercent(o: any) {
               <button class="ob-btn ob-btn-ghost" @click="showModal = false">İptal</button>
               <button class="ob-btn ob-btn-primary" :disabled="saving || !editForm.officeName.trim()" @click="saveOffice">
                 <span v-if="saving" class="material-symbols-outlined spin">progress_activity</span>
-                <span class="material-symbols-outlined" v-else>save</span>
+                <span class="material-symbols-outlined" aria-hidden="true" v-else>save</span>
                 {{ saving ? 'Kaydediliyor...' : 'Kaydet' }}
               </button>
             </div>
@@ -592,7 +595,7 @@ function assetPercent(o: any) {
   display: inline-flex; align-items: center; gap: 0.35rem;
   padding: 0.55rem 1rem; border: none; border-radius: 8px;
   cursor: pointer; font-size: 0.85rem; font-weight: 600;
-  transition: all .2s; white-space: nowrap;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s; white-space: nowrap;
 }
 .ob-btn .material-symbols-outlined { font-size: 18px; }
 .ob-btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -621,7 +624,7 @@ function assetPercent(o: any) {
 .ob-toast.success { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
 .ob-toast.error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
 .ob-toast .material-symbols-outlined { font-size: 18px; }
-.toast-enter-active, .toast-leave-active { transition: all .3s ease; }
+.toast-enter-active, .toast-leave-active { transition: opacity 0.3s ease, transform 0.3s ease; }
 .toast-enter-from, .toast-leave-to { opacity: 0; transform: translateY(-8px); }
 
 /* ── Loading ─────────────────────────────── */
@@ -702,7 +705,7 @@ function assetPercent(o: any) {
 .ob-icon-btn {
   width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
   background: none; border: none; cursor: pointer; color: #94a3b8;
-  border-radius: 6px; transition: all .15s;
+  border-radius: 6px; transition: background-color 0.15s, color 0.15s;
 }
 .ob-icon-btn:hover { background: #f1f5f9; color: #3b82f6; }
 .ob-icon-btn .material-symbols-outlined { font-size: 18px; }
@@ -739,7 +742,7 @@ function assetPercent(o: any) {
 .ob-chip-val { color: #475569; }
 
 /* ── Expanded Detail ─────────────────────── */
-.detail-enter-active, .detail-leave-active { transition: all .25s ease; }
+.detail-enter-active, .detail-leave-active { transition: opacity 0.25s ease, max-height 0.25s ease; }
 .detail-enter-from, .detail-leave-to { opacity: 0; max-height: 0; }
 .detail-enter-to, .detail-leave-from { opacity: 1; max-height: 600px; }
 
@@ -849,7 +852,7 @@ function assetPercent(o: any) {
 .ob-modal-close {
   width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
   background: none; border: none; cursor: pointer; color: #94a3b8;
-  border-radius: 6px; transition: all .15s;
+  border-radius: 6px; transition: background-color 0.15s, color 0.15s;
 }
 .ob-modal-close:hover { background: #f1f5f9; color: #475569; }
 .ob-modal-close .material-symbols-outlined { font-size: 20px; }

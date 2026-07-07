@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import apiService from '@/services/apiservice'
+import { useNotification } from '@/composables/useNotification'
+
+const notification = useNotification()
 
 const loading = ref(true)
 const transactions = ref<any[]>([])
@@ -76,7 +79,7 @@ async function verifyCrypto() {
     }
     await loadTransactions()
   } catch (e: any) {
-    alert(e?.response?.data?.message || 'Doğrulama başarısız')
+    notification.error(e?.response?.data?.message || 'Doğrulama başarısız')
   } finally { verifyingCrypto.value = false }
 }
 
@@ -192,7 +195,7 @@ onUnmounted(() => {
           </div>
 
           <div class="search-box">
-            <span class="material-symbols-outlined" style="font-size: 16px; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">search</span>
+            <span class="material-symbols-outlined" aria-hidden="true" style="font-size: 16px; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">search</span>
             <input v-model="searchQuery" placeholder="Müşteri adı veya işlem no..." />
           </div>
 
@@ -215,7 +218,7 @@ onUnmounted(() => {
         <div class="chat-area">
           <template v-if="selectedTx">
             <div class="chat-header">
-              <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">chat</span>
+              <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">chat</span>
               İşlem #{{ selectedTx.id }} — {{ selectedTx.customerName || 'Müşteri' }}
             </div>
 
@@ -233,12 +236,12 @@ onUnmounted(() => {
             <div class="chat-input">
               <input v-model="newMessage" placeholder="Mesaj yazın..." @keyup.enter="sendChat" :disabled="sendingMsg" />
               <button class="send-btn" @click="sendChat" :disabled="sendingMsg || !newMessage.trim()">
-                <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">send</span>
+                <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">send</span>
               </button>
             </div>
           </template>
           <div v-else class="chat-placeholder">
-            <span class="material-symbols-outlined" style="font-size: 48px; color: var(--color-text-secondary, #9ca3af); font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">forum</span>
+            <span class="material-symbols-outlined" aria-hidden="true" style="font-size: 48px; color: var(--color-text-secondary, #9ca3af); font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">forum</span>
             <p>Soldaki listeden bir işlem seçin</p>
           </div>
         </div>
@@ -267,7 +270,7 @@ onUnmounted(() => {
           <!-- Kripto Doğrulama Bölümü -->
           <div class="crypto-verify-section" v-if="selectedTx.txid || selectedTx.currency === 'USDT'">
             <div class="detail-title" style="margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--color-border, #e5e7eb);">
-              <span class="material-symbols-outlined" style="font-size: 18px; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">currency_bitcoin</span>
+              <span class="material-symbols-outlined" aria-hidden="true" style="font-size: 18px; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">currency_bitcoin</span>
               Kripto Bilgileri
             </div>
             <div class="detail-grid">
@@ -290,7 +293,7 @@ onUnmounted(() => {
               class="action-btn verify-crypto"
               @click="verifyCrypto"
               :disabled="verifyingCrypto">
-              <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">verified</span>
+              <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">verified</span>
               {{ verifyingCrypto ? 'Doğrulanıyor...' : 'Kripto Doğrula' }}
             </button>
           </div>
@@ -298,19 +301,19 @@ onUnmounted(() => {
           <!-- Action Buttons -->
           <div class="action-buttons" v-if="['pending', 'processing', 'approved'].includes(selectedTx.status)">
             <button class="action-btn approve" @click="doAction('approve')" v-if="selectedTx.status === 'pending'">
-              <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">check_circle</span>
+              <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">check_circle</span>
               Kabul Et
             </button>
             <button class="action-btn complete" @click="doAction('complete')" v-if="selectedTx.status === 'approved'">
-              <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">task_alt</span>
+              <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">task_alt</span>
               Tamamla
             </button>
             <button class="action-btn reject" @click="doAction('reject')">
-              <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">block</span>
+              <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">block</span>
               Reddet
             </button>
             <button class="action-btn cancel" @click="doAction('cancel')">
-              <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">cancel</span>
+              <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">cancel</span>
               İptal Et
             </button>
           </div>

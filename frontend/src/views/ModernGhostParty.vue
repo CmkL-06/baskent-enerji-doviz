@@ -4,8 +4,10 @@ import { useAuthStore } from '@/stores/auth'
 import { useExchangeStore } from '@/stores/exchange'
 import apiService from '@/services/apiservice'
 import AppKpiCard from '@/components/common/AppKpiCard.vue'
+import { useNotification } from '@/composables/useNotification'
 
 const authStore = useAuthStore()
+const notification = useNotification()
 const exchangeStore = useExchangeStore()
 
 const loading = ref(true)
@@ -101,7 +103,7 @@ async function loadStatement(party: any) {
   try {
     ghostStatement.value = await apiService.getGhostStatement(party.id)
     showStatementModal.value = true
-  } catch { alert('Ekstre yüklenemedi') }
+  } catch { notification.error('Ekstre yüklenemedi') }
 }
 
 function openCreateAccount() {
@@ -125,7 +127,7 @@ async function createAccount() {
     showCreateAccountModal.value = false
     if (selectedParty.value) await selectParty(selectedParty.value)
   } catch (e: any) {
-    alert(e?.response?.data?.message || 'Hesap oluşturulamadı')
+    notification.error(e?.response?.data?.message || 'Hesap oluşturulamadı')
   } finally { saving.value = false }
 }
 
@@ -156,7 +158,7 @@ function openCollection() {
 }
 
 async function submitPayment() {
-  if (!paymentForm.value.amount || paymentForm.value.amount <= 0) { alert('Tutar giriniz'); return }
+  if (!paymentForm.value.amount || paymentForm.value.amount <= 0) { notification.warning('Tutar giriniz'); return }
   saving.value = true
   try {
     await apiService.createGhostPayment({
@@ -169,12 +171,12 @@ async function submitPayment() {
     showPaymentModal.value = false
     if (selectedParty.value) await selectParty(selectedParty.value)
   } catch (e: any) {
-    alert(e?.response?.data?.message || 'Ödeme kaydedilemedi')
+    notification.error(e?.response?.data?.message || 'Ödeme kaydedilemedi')
   } finally { saving.value = false }
 }
 
 async function submitCollection() {
-  if (!paymentForm.value.amount || paymentForm.value.amount <= 0) { alert('Tutar giriniz'); return }
+  if (!paymentForm.value.amount || paymentForm.value.amount <= 0) { notification.warning('Tutar giriniz'); return }
   saving.value = true
   try {
     await apiService.createGhostCollection({
@@ -187,7 +189,7 @@ async function submitCollection() {
     showCollectionModal.value = false
     if (selectedParty.value) await selectParty(selectedParty.value)
   } catch (e: any) {
-    alert(e?.response?.data?.message || 'Tahsilat kaydedilemedi')
+    notification.error(e?.response?.data?.message || 'Tahsilat kaydedilemedi')
   } finally { saving.value = false }
 }
 
@@ -198,7 +200,7 @@ async function reverseEntry(entry: any) {
     if (selectedAccount.value) await loadEntries(selectedAccount.value)
     if (selectedParty.value) await selectParty(selectedParty.value)
   } catch (e: any) {
-    alert(e?.response?.data?.message || 'İptal başarısız')
+    notification.error(e?.response?.data?.message || 'İptal başarısız')
   }
 }
 
@@ -211,7 +213,7 @@ async function toggleAccountBlock(account: any) {
     }
     if (selectedParty.value) await selectParty(selectedParty.value)
   } catch (e: any) {
-    alert(e?.response?.data?.message || 'İşlem başarısız')
+    notification.error(e?.response?.data?.message || 'İşlem başarısız')
   }
 }
 
@@ -234,23 +236,23 @@ onMounted(() => {
     <div class="gp-header">
       <div class="header-left">
         <button v-if="activeTab === 'accounts'" class="btn-back" @click="backToList">
-          <span class="material-symbols-outlined">arrow_back</span>
+          <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
         </button>
         <h1 v-if="activeTab === 'parties'">Ghost Party</h1>
         <h1 v-else>{{ selectedParty?.name }} <span class="party-code">{{ selectedParty?.partyCode }}</span></h1>
       </div>
       <div class="header-actions" v-if="activeTab === 'accounts' && selectedParty">
         <button class="btn-primary" @click="openPayment">
-          <span class="material-symbols-outlined">arrow_upward</span> Ödeme
+          <span class="material-symbols-outlined" aria-hidden="true">arrow_upward</span> Ödeme
         </button>
         <button class="btn-secondary" @click="openCollection">
-          <span class="material-symbols-outlined">arrow_downward</span> Tahsilat
+          <span class="material-symbols-outlined" aria-hidden="true">arrow_downward</span> Tahsilat
         </button>
         <button class="btn-secondary" @click="openCreateAccount">
-          <span class="material-symbols-outlined">add</span> Hesap Ekle
+          <span class="material-symbols-outlined" aria-hidden="true">add</span> Hesap Ekle
         </button>
         <button class="btn-secondary" @click="loadStatement(selectedParty)">
-          <span class="material-symbols-outlined">receipt_long</span> Ekstre
+          <span class="material-symbols-outlined" aria-hidden="true">receipt_long</span> Ekstre
         </button>
       </div>
     </div>
@@ -264,7 +266,7 @@ onMounted(() => {
 
     <!-- Search (parties tab) -->
     <div v-if="activeTab === 'parties'" class="search-bar">
-      <span class="material-symbols-outlined">search</span>
+      <span class="material-symbols-outlined" aria-hidden="true">search</span>
       <input v-model="searchQuery" placeholder="Cari ara..." />
     </div>
 
@@ -311,7 +313,7 @@ onMounted(() => {
             <span class="acc-currency">{{ acc.currencyCode }}</span>
             <button v-if="authStore.isAdmin" class="icon-btn-sm" @click.stop="toggleAccountBlock(acc)"
                     :title="acc.isBlocked ? 'Blok Kaldır' : 'Blokla'">
-              <span class="material-symbols-outlined">{{ acc.isBlocked ? 'lock_open' : 'lock' }}</span>
+              <span class="material-symbols-outlined" aria-hidden="true">{{ acc.isBlocked ? 'lock_open' : 'lock' }}</span>
             </button>
           </div>
           <div class="acc-balance" :class="(acc.balance ?? 0) >= 0 ? 'balance-pos' : 'balance-neg'">
@@ -352,7 +354,7 @@ onMounted(() => {
               </td>
               <td class="text-center">
                 <button v-if="!e.isReversed" class="icon-btn-sm danger" title="İptal (ters kayıt)" @click="reverseEntry(e)">
-                  <span class="material-symbols-outlined">undo</span>
+                  <span class="material-symbols-outlined" aria-hidden="true">undo</span>
                 </button>
                 <span v-else class="reversed-label">İptal</span>
               </td>

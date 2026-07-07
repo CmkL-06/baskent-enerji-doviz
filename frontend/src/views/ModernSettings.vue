@@ -45,7 +45,7 @@ const toggleTicker = () => {
 
     <!-- Success Message -->
     <div v-if="showSuccessMessage" class="success-alert">
-      <span class="material-symbols-outlined">check_circle</span>
+      <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
       <span>Ayarlar başarıyla kaydedildi!</span>
     </div>
 
@@ -55,7 +55,7 @@ const toggleTicker = () => {
       <div class="settings-section">
         <div class="section-header">
           <h2 class="section-title">
-            <span class="material-symbols-outlined">display_settings</span>
+            <span class="material-symbols-outlined" aria-hidden="true">display_settings</span>
             Görüntü Ayarları
           </h2>
         </div>
@@ -96,7 +96,7 @@ const toggleTicker = () => {
       <div class="settings-section">
         <div class="section-header">
           <h2 class="section-title">
-            <span class="material-symbols-outlined">notifications</span>
+            <span class="material-symbols-outlined" aria-hidden="true">notifications</span>
             Bildirim Ayarları
           </h2>
         </div>
@@ -119,7 +119,7 @@ const toggleTicker = () => {
       <div class="settings-section">
         <div class="section-header">
           <h2 class="section-title">
-            <span class="material-symbols-outlined">tune</span>
+            <span class="material-symbols-outlined" aria-hidden="true">tune</span>
             Sistem Ayarları
           </h2>
         </div>
@@ -217,7 +217,7 @@ const toggleTicker = () => {
   border-radius: 12px;
   background: #f9fafb;
   border: 1px solid #e5e7eb;
-  transition: all 0.3s ease;
+  transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
 }
 
 .setting-item:hover:not(.disabled) {
@@ -299,7 +299,7 @@ const toggleTicker = () => {
 }
 
 input:checked + .toggle-slider {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%);
 }
 
 input:focus + .toggle-slider {

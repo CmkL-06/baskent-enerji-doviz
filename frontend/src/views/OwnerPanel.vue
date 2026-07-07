@@ -89,7 +89,7 @@ function refresh() {
       <div class="op-header-actions">
         <div class="op-bell-wrap">
           <button class="op-bell-btn" @click="showAlertPanel = !showAlertPanel">
-            <span class="material-symbols-outlined">notifications</span>
+            <span class="material-symbols-outlined" aria-hidden="true">notifications</span>
             <span v-if="alerts.length" class="op-bell-badge">{{ alerts.length }}</span>
           </button>
           <div v-if="showAlertPanel" class="op-alert-panel">
@@ -98,7 +98,7 @@ function refresh() {
               <button v-if="alerts.length" class="op-alert-clear" @click="markAllRead">Tümünü Oku</button>
             </div>
             <div v-if="alerts.length === 0" class="op-alert-empty">
-              <span class="material-symbols-outlined">check_circle</span> Okunmamış uyarı yok
+              <span class="material-symbols-outlined" aria-hidden="true">check_circle</span> Okunmamış uyarı yok
             </div>
             <div v-else class="op-alert-list">
               <div v-for="a in alerts" :key="a.id" class="op-alert-item">
@@ -111,14 +111,14 @@ function refresh() {
                   <div class="op-alert-meta">{{ a.officeName }}</div>
                 </div>
                 <button class="op-alert-dismiss" @click="markRead(a.id)" title="Okundu">
-                  <span class="material-symbols-outlined">close</span>
+                  <span class="material-symbols-outlined" aria-hidden="true">close</span>
                 </button>
               </div>
             </div>
           </div>
         </div>
         <button class="op-refresh-btn" @click="refresh">
-          <span class="material-symbols-outlined">refresh</span>
+          <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
           Yenile
         </button>
       </div>
@@ -132,7 +132,7 @@ function refresh() {
         :class="{ active: activeTab === tab.id }"
         @click="activeTab = tab.id"
       >
-        <span class="material-symbols-outlined">{{ tab.icon }}</span>
+        <span class="material-symbols-outlined" aria-hidden="true">{{ tab.icon }}</span>
         {{ tab.label }}
       </button>
     </div>
@@ -162,7 +162,7 @@ function refresh() {
   display: flex; align-items: center; gap: 0.4rem;
   padding: 0.5rem 1rem; background: #f1f5f9; border: 1px solid #e2e8f0;
   border-radius: 8px; cursor: pointer; font-size: 0.875rem; color: #475569;
-  transition: all .2s;
+  transition: background-color .2s;
 }
 .op-refresh-btn:hover { background: #e2e8f0; }
 
@@ -176,7 +176,7 @@ function refresh() {
   padding: 0.6rem 1rem; background: none; border: none;
   border-bottom: 2px solid transparent; margin-bottom: -2px;
   cursor: pointer; font-size: 0.85rem; color: #64748b;
-  transition: all .2s; white-space: nowrap;
+  transition: color .2s, border-bottom-color .2s; white-space: nowrap;
 }
 .op-tab:hover  { color: #3b82f6; }
 .op-tab.active { color: #3b82f6; border-bottom-color: #3b82f6; font-weight: 600; }
@@ -188,7 +188,7 @@ function refresh() {
 .op-bell-btn {
   position: relative; display: flex; align-items: center; justify-content: center;
   width: 40px; height: 40px; background: #f1f5f9; border: 1px solid #e2e8f0;
-  border-radius: 10px; cursor: pointer; transition: all .2s;
+  border-radius: 10px; cursor: pointer; transition: background-color .2s;
 }
 .op-bell-btn:hover { background: #e2e8f0; }
 .op-bell-btn .material-symbols-outlined { font-size: 1.25rem; color: #475569; }
@@ -200,7 +200,7 @@ function refresh() {
 }
 
 .op-alert-panel {
-  position: absolute; top: 48px; right: 0; width: 360px; max-height: 420px;
+  position: absolute; top: 48px; right: 0; width: min(360px, calc(100vw - 2rem)); max-height: 420px;
   background: white; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,.15);
   z-index: 100; overflow: hidden;
 }

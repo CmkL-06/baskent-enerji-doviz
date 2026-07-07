@@ -58,6 +58,8 @@ const groupedNotifications = computed(() => {
       v-for="(group, position) in groupedNotifications" 
       :key="position"
       :class="['notification-group', getPositionClasses(position as string)]"
+      role="alert"
+      aria-live="assertive"
     >
       <TransitionGroup name="notification" tag="div" class="notification-list">
         <div
@@ -67,7 +69,7 @@ const groupedNotifications = computed(() => {
         >
           <div class="notification-content">
             <div class="notification-icon">
-              <span class="material-symbols-outlined">
+              <span class="material-symbols-outlined" aria-hidden="true">
                 {{ getIcon(notification.type) }}
               </span>
             </div>
@@ -82,9 +84,9 @@ const groupedNotifications = computed(() => {
             <button
               @click="remove(notification.id)"
               class="notification-close"
-              aria-label="Zamknij powiadomienie"
+              aria-label="Bildirimi kapat"
             >
-              <span class="material-symbols-outlined">close</span>
+              <span class="material-symbols-outlined" aria-hidden="true">close</span>
             </button>
           </div>
         </div>
@@ -252,7 +254,7 @@ const groupedNotifications = computed(() => {
 /* Animation classes */
 .notification-enter-active,
 .notification-leave-active {
-  transition: all 0.3s ease;
+  transition: opacity 0.3s, transform 0.3s;
 }
 
 .notification-enter-from {

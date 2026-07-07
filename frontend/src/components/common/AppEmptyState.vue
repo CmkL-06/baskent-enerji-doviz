@@ -17,7 +17,7 @@ function go() {
 
 <template>
   <div class="app-empty">
-    <span class="material-symbols-outlined">{{ icon }}</span>
+    <span class="material-symbols-outlined" aria-hidden="true">{{ icon }}</span>
     <p>{{ message }}</p>
     <button v-if="actionLabel" class="app-empty-btn" @click="go">{{ actionLabel }}</button>
     <slot />

@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import apiService from '@/services/apiservice'
+import { useNotification } from '@/composables/useNotification'
+
+const notification = useNotification()
 
 const offices = ref<any[]>([])
 const selectedOfficeId = ref('')
@@ -120,7 +123,7 @@ async function createSnapshot() {
     await apiService.createVaultSnapshot({ officeId: selectedOfficeId.value })
     await loadSnapshots()
   } catch (e: any) {
-    alert(e?.response?.data?.error || 'Snapshot oluşturulamadı')
+    notification.error(e?.response?.data?.error || 'Snapshot oluşturulamadı')
   }
 }
 
@@ -177,7 +180,7 @@ function txTypeClass(t: string | number) {
 
 <template>
   <div>
-    <h3 class="vi-title"><span class="material-symbols-outlined">manage_search</span> Kasa İnceleme</h3>
+    <h3 class="vi-title"><span class="material-symbols-outlined" aria-hidden="true">manage_search</span> Kasa İnceleme</h3>
 
     <div v-if="loading" class="vi-center">
       <span class="material-symbols-outlined spin">progress_activity</span> Yükleniyor...
@@ -205,19 +208,19 @@ function txTypeClass(t: string | number) {
       <!-- Sub tabs -->
       <div class="vi-subtabs">
         <button :class="{ active: subTab === 'overview' }" @click="subTab = 'overview'">
-          <span class="material-symbols-outlined">dashboard</span> Genel Bakış
+          <span class="material-symbols-outlined" aria-hidden="true">dashboard</span> Genel Bakış
         </button>
         <button :class="{ active: subTab === 'history' }" @click="subTab = 'history'">
-          <span class="material-symbols-outlined">history</span> Hareket Geçmişi
+          <span class="material-symbols-outlined" aria-hidden="true">history</span> Hareket Geçmişi
         </button>
         <button :class="{ active: subTab === 'wac' }" @click="subTab = 'wac'">
-          <span class="material-symbols-outlined">analytics</span> WAC Analizi
+          <span class="material-symbols-outlined" aria-hidden="true">analytics</span> WAC Analizi
         </button>
         <button :class="{ active: subTab === 'counts' }" @click="subTab = 'counts'">
-          <span class="material-symbols-outlined">inventory_2</span> Sayımlar
+          <span class="material-symbols-outlined" aria-hidden="true">inventory_2</span> Sayımlar
         </button>
         <button :class="{ active: subTab === 'snapshots' }" @click="subTab = 'snapshots'">
-          <span class="material-symbols-outlined">photo_camera</span> Anlık Görüntüler
+          <span class="material-symbols-outlined" aria-hidden="true">photo_camera</span> Anlık Görüntüler
         </button>
       </div>
 
@@ -243,7 +246,7 @@ function txTypeClass(t: string | number) {
         </div>
 
         <div v-if="!balances.length" class="vi-empty">
-          <span class="material-symbols-outlined">account_balance_wallet</span>
+          <span class="material-symbols-outlined" aria-hidden="true">account_balance_wallet</span>
           <p>Bu kasada henüz bakiye bulunmuyor</p>
         </div>
       </div>
@@ -256,7 +259,7 @@ function txTypeClass(t: string | number) {
             <input v-model="historyDate" type="date" class="vi-input" @change="loadHistory" />
           </div>
           <button class="vi-btn primary" :disabled="historyLoading" @click="loadHistory">
-            <span class="material-symbols-outlined">{{ historyLoading ? 'progress_activity' : 'search' }}</span>
+            <span class="material-symbols-outlined" aria-hidden="true">{{ historyLoading ? 'progress_activity' : 'search' }}</span>
             Sorgula
           </button>
         </div>
@@ -291,7 +294,7 @@ function txTypeClass(t: string | number) {
         </div>
 
         <div v-else class="vi-empty">
-          <span class="material-symbols-outlined">history</span>
+          <span class="material-symbols-outlined" aria-hidden="true">history</span>
           <p>Seçili tarihte hareket bulunamadı</p>
         </div>
       </div>
@@ -324,7 +327,7 @@ function txTypeClass(t: string | number) {
           </div>
         </div>
         <div v-else class="vi-empty">
-          <span class="material-symbols-outlined">analytics</span>
+          <span class="material-symbols-outlined" aria-hidden="true">analytics</span>
           <p>WAC analizi için döviz bakiyesi gerekli</p>
         </div>
       </div>
@@ -359,7 +362,7 @@ function txTypeClass(t: string | number) {
         </div>
 
         <div v-else class="vi-empty">
-          <span class="material-symbols-outlined">inventory_2</span>
+          <span class="material-symbols-outlined" aria-hidden="true">inventory_2</span>
           <p>Sayım kaydı bulunamadı</p>
         </div>
       </div>
@@ -368,7 +371,7 @@ function txTypeClass(t: string | number) {
       <div v-if="subTab === 'snapshots'" class="vi-section">
         <div class="vi-snap-header">
           <button class="vi-btn primary" @click="createSnapshot">
-            <span class="material-symbols-outlined">add_a_photo</span> Anlık Görüntü Al
+            <span class="material-symbols-outlined" aria-hidden="true">add_a_photo</span> Anlık Görüntü Al
           </button>
         </div>
 
@@ -377,7 +380,7 @@ function txTypeClass(t: string | number) {
         <div v-else-if="snapshots.length" class="vi-snap-list">
           <div v-for="s in snapshots" :key="s.id || s.snapshotId" class="vi-snap-card" @click="viewSnapshot(s.id || s.snapshotId)">
             <div class="vi-snap-date">
-              <span class="material-symbols-outlined">photo_camera</span>
+              <span class="material-symbols-outlined" aria-hidden="true">photo_camera</span>
               {{ fmtDate(s.snapshotDate || s.createdDate) }}
             </div>
             <div v-if="s.description" class="vi-snap-desc">{{ s.description }}</div>
@@ -385,7 +388,7 @@ function txTypeClass(t: string | number) {
         </div>
 
         <div v-else class="vi-empty">
-          <span class="material-symbols-outlined">photo_camera</span>
+          <span class="material-symbols-outlined" aria-hidden="true">photo_camera</span>
           <p>Henüz anlık görüntü alınmamış</p>
         </div>
 
@@ -446,7 +449,7 @@ function txTypeClass(t: string | number) {
   display: flex; align-items: center; gap: 0.35rem;
   padding: 0.55rem 0.9rem; background: none; border: none;
   border-bottom: 2px solid transparent; margin-bottom: -2px;
-  cursor: pointer; font-size: 0.82rem; color: #64748b; transition: all .2s; white-space: nowrap;
+  cursor: pointer; font-size: 0.82rem; color: #64748b; transition: color 0.2s, border-color 0.2s; white-space: nowrap;
 }
 .vi-subtabs button:hover { color: #3b82f6; }
 .vi-subtabs button.active { color: #3b82f6; border-bottom-color: #3b82f6; font-weight: 600; }
@@ -481,7 +484,7 @@ function txTypeClass(t: string | number) {
 .vi-btn {
   display: flex; align-items: center; gap: 0.35rem;
   padding: 0.5rem 1rem; border: none; border-radius: 8px;
-  cursor: pointer; font-size: 0.85rem; font-weight: 600; transition: all .2s;
+  cursor: pointer; font-size: 0.85rem; font-weight: 600; transition: background-color 0.2s, color 0.2s;
 }
 .vi-btn.primary { background: #3b82f6; color: white; }
 .vi-btn.primary:hover:not(:disabled) { background: #2563eb; }
@@ -532,7 +535,7 @@ function txTypeClass(t: string | number) {
 .vi-snap-list { display: flex; flex-direction: column; gap: 0.5rem; }
 .vi-snap-card {
   background: white; border-radius: 10px; padding: 0.75rem 1rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,.06); cursor: pointer; transition: all .15s;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06); cursor: pointer; transition: box-shadow 0.15s;
   display: flex; align-items: center; gap: 0.75rem;
 }
 .vi-snap-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.12); }

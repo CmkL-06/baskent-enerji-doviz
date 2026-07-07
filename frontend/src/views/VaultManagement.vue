@@ -6,7 +6,9 @@ import { useExchangeStore } from '@/stores/exchange'
 import apiService from '@/services/apiservice'
 import AppKpiCard from '@/components/common/AppKpiCard.vue'
 import AppPageHeader from '@/components/common/AppPageHeader.vue'
+import { useNotification } from '@/composables/useNotification'
 
+const notification = useNotification()
 const route = useRoute()
 const authStore = useAuthStore()
 const exchangeStore = useExchangeStore()
@@ -80,7 +82,7 @@ function openEditModal(vault: any) {
 
 async function saveVault() {
   if (!vaultForm.value.name) {
-    alert('Kasa adı zorunludur')
+    notification.warning('Kasa adı zorunludur')
     return
   }
   saving.value = true
@@ -99,7 +101,7 @@ async function saveVault() {
     showModal.value = false
     await loadVaults()
   } catch (e: any) {
-    alert(e?.response?.data?.message || 'Kayıt başarısız')
+    notification.error(e?.response?.data?.message || 'Kayıt başarısız')
   } finally {
     saving.value = false
   }
@@ -112,7 +114,7 @@ async function deleteVault(vault: any) {
     await apiService.deleteVault(vault.vaultId ?? vault.id)
     await loadVaults()
   } catch (e: any) {
-    alert(e?.response?.data?.message || 'Silme başarısız')
+    notification.error(e?.response?.data?.message || 'Silme başarısız')
   }
 }
 
@@ -134,7 +136,7 @@ onMounted(async () => {
   <div class="vm-wrap">
     <AppPageHeader icon="account_balance_wallet" title="Kasa Yönetimi">
       <button class="btn-primary" @click="openCreateModal">
-        <span class="material-symbols-outlined">add</span>
+        <span class="material-symbols-outlined" aria-hidden="true">add</span>
         Yeni Kasa
       </button>
     </AppPageHeader>
@@ -185,10 +187,10 @@ onMounted(async () => {
 
         <div class="vault-actions">
           <button class="icon-btn" title="Düzenle" @click="openEditModal(vault)">
-            <span class="material-symbols-outlined">edit</span>
+            <span class="material-symbols-outlined" aria-hidden="true">edit</span>
           </button>
           <button v-if="authStore.isAdmin" class="icon-btn danger" title="Sil" @click="deleteVault(vault)">
-            <span class="material-symbols-outlined">delete</span>
+            <span class="material-symbols-outlined" aria-hidden="true">delete</span>
           </button>
         </div>
       </div>

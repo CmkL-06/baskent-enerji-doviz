@@ -252,7 +252,7 @@ defineExpose({ loadTransactions, printAllTransactions })
           <button @click="filterType = 'sell'" class="th-filter-btn" :class="{ 'th-filter-btn--active': filterType === 'sell' }">Satış</button>
         </div>
         <button v-if="showRefreshButton" @click="loadTransactions" :disabled="isLoading" class="th-action-btn" title="Yenile">
-          <span class="material-symbols-outlined" :class="{ 'th-spin': isLoading }">sync</span>
+          <span class="material-symbols-outlined" aria-hidden="true" :class="{ 'th-spin': isLoading }">sync</span>
         </button>
       </div>
     </div>
@@ -265,7 +265,7 @@ defineExpose({ loadTransactions, printAllTransactions })
 
     <!-- Empty -->
     <div v-else-if="transactions.length === 0" class="th-empty">
-      <span class="material-symbols-outlined" style="font-size:36px;color:#d1d5db">receipt_long</span>
+      <span class="material-symbols-outlined" aria-hidden="true" style="font-size:36px;color:#d1d5db">receipt_long</span>
       <p>Bugün henüz işlem yapılmamış</p>
     </div>
 
@@ -326,11 +326,11 @@ defineExpose({ loadTransactions, printAllTransactions })
     <!-- Pagination -->
     <div v-if="totalPages > 1" class="th-pagination">
       <button @click="changePage(currentPage - 1)" :disabled="currentPage <= 1" class="th-page-btn">
-        <span class="material-symbols-outlined" style="font-size:18px">chevron_left</span>
+        <span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px">chevron_left</span>
       </button>
       <span class="th-page-info">{{ currentPage }} / {{ totalPages }}</span>
       <button @click="changePage(currentPage + 1)" :disabled="currentPage >= totalPages" class="th-page-btn">
-        <span class="material-symbols-outlined" style="font-size:18px">chevron_right</span>
+        <span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px">chevron_right</span>
       </button>
     </div>
 
@@ -345,11 +345,11 @@ defineExpose({ loadTransactions, printAllTransactions })
             </div>
             <div class="th-detail-header-right">
               <button @click="printReceipt(selectedTx)" class="th-print-btn" title="Fiş Yazdır">
-                <span class="material-symbols-outlined" style="font-size:18px">receipt_long</span>
+                <span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px">receipt_long</span>
                 Fiş Yazdır
               </button>
               <button @click="closeDetail" class="th-close-btn">
-                <span class="material-symbols-outlined" style="font-size:20px">close</span>
+                <span class="material-symbols-outlined" aria-hidden="true" style="font-size:20px">close</span>
               </button>
             </div>
           </div>
@@ -371,7 +371,7 @@ defineExpose({ loadTransactions, printAllTransactions })
                 </div>
               </div>
               <div class="th-detail-arrow">
-                <span class="material-symbols-outlined">arrow_forward</span>
+                <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
               </div>
               <div class="th-detail-amount-box">
                 <div class="th-detail-amount-label">Hedef</div>
@@ -412,7 +412,7 @@ defineExpose({ loadTransactions, printAllTransactions })
             </div>
 
             <div v-if="selectedTx.isDeleted" class="th-detail-deleted-banner">
-              <span class="material-symbols-outlined" style="font-size:16px">delete</span>
+              <span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px">delete</span>
               Silinmiş — {{ selectedTx.deletedBy || '' }} {{ selectedTx.deletedReason ? `(${selectedTx.deletedReason})` : '' }}
             </div>
           </div>
@@ -422,14 +422,14 @@ defineExpose({ loadTransactions, printAllTransactions })
               <span style="font-size:13px;color:#6b7280">Bu işlemi silmek istediğinize emin misiniz?</span>
               <div style="display:flex;gap:8px">
                 <button @click="deleteTransaction(selectedTx.id)" :disabled="isDeleting" class="th-detail-del-confirm">
-                  <span class="material-symbols-outlined" style="font-size:16px">{{ isDeleting ? 'refresh' : 'check' }}</span>
+                  <span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px">{{ isDeleting ? 'refresh' : 'check' }}</span>
                   Evet, Sil
                 </button>
                 <button @click="deleteConfirmId = null" class="th-detail-del-cancel">İptal</button>
               </div>
             </template>
             <button v-else @click="deleteConfirmId = selectedTx.id" class="th-detail-del-btn">
-              <span class="material-symbols-outlined" style="font-size:16px">delete</span>
+              <span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px">delete</span>
               İşlemi Sil
             </button>
           </div>
@@ -494,7 +494,7 @@ defineExpose({ loadTransactions, printAllTransactions })
   font-weight: 500;
   color: #6b7280;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background-color 0.2s, color 0.2s;
 }
 .th-filter-btn:not(:last-child) { border-right: 1px solid #e5e7eb; }
 .th-filter-btn:hover { background: #f9fafb; }
@@ -514,7 +514,7 @@ defineExpose({ loadTransactions, printAllTransactions })
   background: white;
   color: #6b7280;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: border-color 0.2s, color 0.2s;
 }
 .th-action-btn:hover:not(:disabled) { border-color: #6366f1; color: #6366f1; }
 .th-action-btn:disabled { opacity: 0.4; }
@@ -662,7 +662,7 @@ defineExpose({ loadTransactions, printAllTransactions })
   background: white;
   color: #374151;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: border-color 0.2s, color 0.2s;
 }
 .th-page-btn:hover:not(:disabled) { border-color: #6366f1; color: #6366f1; }
 .th-page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
@@ -726,7 +726,7 @@ defineExpose({ loadTransactions, printAllTransactions })
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background-color 0.2s, color 0.2s;
 }
 .th-print-btn:hover { background: #6366f1; color: white; }
 .th-close-btn {
@@ -740,7 +740,7 @@ defineExpose({ loadTransactions, printAllTransactions })
   background: #f3f4f6;
   color: #6b7280;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background-color 0.2s, color 0.2s;
 }
 .th-close-btn:hover { background: #e5e7eb; color: #111827; }
 
@@ -856,7 +856,7 @@ defineExpose({ loadTransactions, printAllTransactions })
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
 }
 .th-detail-del-btn:hover { background: #fef2f2; }
 .th-detail-del-confirm {

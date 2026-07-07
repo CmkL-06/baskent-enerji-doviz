@@ -1,10 +1,25 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import apiService from '@/services/apiservice'
+
+const router = useRouter()
 
 const offices = ref<any[]>([])
 const loading = ref(true)
 const error = ref('')
+
+async function goToOfficeVault(officeId: string) {
+  try {
+    const vaults = await apiService.getVaultsByOfficeId(officeId)
+    const list = vaults?.data || vaults
+    if (list?.length) {
+      const id = list[0].vaultId || list[0].id
+      if (id) { router.push(`/ihtiyar/vaults/${id}`); return }
+    }
+  } catch {}
+  router.push('/ihtiyar/vaults')
+}
 
 const perfData = ref<any[]>([])
 const perfPeriod = ref('daily')
@@ -92,7 +107,7 @@ const topCurrencies = (obj: Record<string, number> | null | undefined) => {
       <span class="material-symbols-outlined spin">progress_activity</span> Yükleniyor...
     </div>
     <div v-else-if="error" class="od-error">
-      <span class="material-symbols-outlined">error</span> {{ error }}
+      <span class="material-symbols-outlined" aria-hidden="true">error</span> {{ error }}
     </div>
     <template v-else>
       <!-- Stats -->
@@ -136,7 +151,7 @@ const topCurrencies = (obj: Record<string, number> | null | undefined) => {
 
       <!-- Office Cards -->
       <h3 class="od-section-title">
-        <span class="material-symbols-outlined">hub</span> Merkez & Şubeler
+        <span class="material-symbols-outlined" aria-hidden="true">hub</span> Merkez & Şubeler
       </h3>
       <div class="od-office-grid">
         <div
@@ -144,10 +159,12 @@ const topCurrencies = (obj: Record<string, number> | null | undefined) => {
           :key="o.officeId"
           class="od-office-card"
           :class="{ 'od-merkez': o.officeType === 1 }"
+          style="cursor: pointer"
+          @click="router.push('/ihtiyar/vaults')"
         >
           <div class="od-office-header">
             <div class="od-office-name-row">
-              <span class="material-symbols-outlined" :class="o.officeType === 1 ? 'od-icon-merkez' : 'od-icon-sube'">
+              <span class="material-symbols-outlined" aria-hidden="true" :class="o.officeType === 1 ? 'od-icon-merkez' : 'od-icon-sube'">
                 {{ o.officeType === 1 ? 'hub' : 'store' }}
               </span>
               <strong>{{ o.officeName }}</strong>
@@ -193,7 +210,7 @@ const topCurrencies = (obj: Record<string, number> | null | undefined) => {
       <div class="od-perf-section">
         <div class="od-perf-header">
           <h3 class="od-section-title">
-            <span class="material-symbols-outlined">leaderboard</span> Şube Performansı
+            <span class="material-symbols-outlined" aria-hidden="true">leaderboard</span> Şube Performansı
           </h3>
           <div class="od-perf-periods">
             <button
@@ -232,7 +249,7 @@ const topCurrencies = (obj: Record<string, number> | null | undefined) => {
                 </td>
                 <td>
                   <div class="od-perf-name">
-                    <span class="material-symbols-outlined" style="font-size:1rem" :style="{ color: row.officeType === 1 ? '#f59e0b' : '#3b82f6' }">{{ officeTypeIcon(row.officeType) }}</span>
+                    <span class="material-symbols-outlined" aria-hidden="true" style="font-size:1rem" :style="{ color: row.officeType === 1 ? '#f59e0b' : '#3b82f6' }">{{ officeTypeIcon(row.officeType) }}</span>
                     {{ row.officeName }}
                   </div>
                 </td>
@@ -288,7 +305,7 @@ const topCurrencies = (obj: Record<string, number> | null | undefined) => {
 }
 
 .od-office-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr));
   gap: 1rem; margin-bottom: 1.5rem;
 }
 
@@ -356,7 +373,7 @@ const topCurrencies = (obj: Record<string, number> | null | undefined) => {
 .od-perf-period-btn {
   padding: 0.35rem 0.75rem; border: 1px solid #e2e8f0; background: white;
   border-radius: 6px; font-size: 0.78rem; cursor: pointer; color: #64748b;
-  transition: all .2s;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
 }
 .od-perf-period-btn:hover { border-color: #3b82f6; color: #3b82f6; }
 .od-perf-period-btn.active { background: #3b82f6; color: white; border-color: #3b82f6; }

@@ -88,6 +88,7 @@ const rateRefreshInterval = ref<any>(null)
 const refreshCountdown = ref(60)
 const countdownInterval = ref<any>(null)
 const vaultCheckInterval = ref<any>(null)
+const reminderIntervalRef = ref<any>(null)
 const isPageHidden = ref(false)
 const showVaultCountWarning = ref(false)
 const currentVault = ref<any>(null)
@@ -1313,10 +1314,12 @@ const handleWaitingCustomer = () => {
   showCountdown()
 
   // Show periodic reminders
-  const reminderInterval = setInterval(() => {
+  if (reminderIntervalRef.value) clearInterval(reminderIntervalRef.value)
+  reminderIntervalRef.value = setInterval(() => {
     const remaining = vaultCountingModalRef.value?.getRemainingTime?.() ?? 0
     if (remaining <= 0) {
-      clearInterval(reminderInterval)
+      clearInterval(reminderIntervalRef.value)
+      reminderIntervalRef.value = null
     } else if (remaining === 120 || remaining === 60 || remaining === 30) {
       showCountdown()
     }
@@ -1441,11 +1444,30 @@ const handleOpenUSDTModal = () => {
   openUSDTModal()
 }
 
+// Visibility API: pause polling when tab is in background
+const handleVisibilityChange = () => {
+  if (document.hidden) {
+    if (rateRefreshInterval.value) { clearInterval(rateRefreshInterval.value); rateRefreshInterval.value = null }
+    if (countdownInterval.value) { clearInterval(countdownInterval.value); countdownInterval.value = null }
+    if (vaultCheckInterval.value) { clearInterval(vaultCheckInterval.value); vaultCheckInterval.value = null }
+  } else {
+    refreshRates()
+    rateRefreshInterval.value = setInterval(() => { refreshRates() }, 60000)
+    refreshCountdown.value = 60
+    countdownInterval.value = setInterval(() => {
+      refreshCountdown.value--
+      if (refreshCountdown.value <= 0) refreshCountdown.value = 60
+    }, 1000)
+    vaultCheckInterval.value = setInterval(() => { checkVaultCounting() }, 5 * 60 * 1000)
+  }
+}
+
 // Initialize
 onMounted(async () => {
   // Add event listeners
   window.addEventListener('open-usdt-modal', handleOpenUSDTModal)
   window.addEventListener('keydown', handleKeyDown)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
   
   // Start vault check interval (every 5 minutes)
   vaultCheckInterval.value = setInterval(() => {
@@ -1581,9 +1603,13 @@ onUnmounted(() => {
   if (vaultCheckInterval.value) {
     clearInterval(vaultCheckInterval.value)
   }
+  if (reminderIntervalRef.value) {
+    clearInterval(reminderIntervalRef.value)
+  }
   // Remove event listeners
   window.removeEventListener('open-usdt-modal', handleOpenUSDTModal)
   window.removeEventListener('keydown', handleKeyDown)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 
 // Watch for currency changes
@@ -1669,14 +1695,14 @@ watch(() => exchangeItems.value.map(item => ({
       </div>
       <div class="ex-topbar-right">
         <button @click="refreshRates" :disabled="!selectedOfficeId || loadingExternalRates" class="ex-topbar-btn" :class="{ 'ex-topbar-btn--syncing': loadingExternalRates }" title="Kurları Yenile">
-          <span class="material-symbols-outlined" :class="{ 'animate-spin': loadingExternalRates }">sync</span>
+          <span class="material-symbols-outlined" aria-hidden="true" :class="{ 'animate-spin': loadingExternalRates }">sync</span>
           <span v-if="refreshCountdown < 60" class="ex-countdown">{{ refreshCountdown }}s</span>
         </button>
         <button @click="openManualVaultCounting" :disabled="!selectedVaultId" class="ex-topbar-btn" title="Kasa Sayımı">
-          <span class="material-symbols-outlined">calculate</span>
+          <span class="material-symbols-outlined" aria-hidden="true">calculate</span>
         </button>
         <button @click="transactionHistoryRef?.printAllTransactions?.()" :disabled="!selectedOfficeId" class="ex-topbar-btn" title="Yazdır">
-          <span class="material-symbols-outlined">print</span>
+          <span class="material-symbols-outlined" aria-hidden="true">print</span>
         </button>
       </div>
     </div>
@@ -1701,7 +1727,7 @@ watch(() => exchangeItems.value.map(item => ({
         <p class="ex-warning-desc">Bu kasa için sayım henüz yapılmamış.</p>
       </div>
       <button @click="openManualVaultCounting" class="ex-btn ex-btn--amber ex-btn--sm">
-        <span class="material-symbols-outlined">calculate</span>
+        <span class="material-symbols-outlined" aria-hidden="true">calculate</span>
         Sayım Yap
       </button>
     </div>
@@ -1840,7 +1866,7 @@ watch(() => exchangeItems.value.map(item => ({
           <input type="text" :value="batchCustomRate !== null && batchCustomRate !== '' ? batchCustomRate : batchRate || ''" @input="batchCustomRate = ($event.target as HTMLInputElement).value" class="ex-input ex-input--mono ex-batch-input ex-batch-input--rate" placeholder="Kur" inputmode="decimal" :class="{ 'ex-input--custom': batchCustomRate !== null && batchCustomRate !== '' }" />
           <input type="text" v-model="batchNote" class="ex-input ex-batch-input ex-batch-input--note" placeholder="Not..." />
           <button @click="addToBatch" class="ex-btn ex-btn--indigo ex-btn--sm">
-            <span class="material-symbols-outlined" style="font-size:18px">add</span>
+            <span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px">add</span>
             Ekle
           </button>
         </div>
@@ -1864,7 +1890,7 @@ watch(() => exchangeItems.value.map(item => ({
           </span>
           <span v-if="item.note" class="ex-batch-item-note">{{ item.note }}</span>
           <button @click="removeBatchItem(item.id)" class="ex-item-delete">
-            <span class="material-symbols-outlined" style="font-size:16px">close</span>
+            <span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px">close</span>
           </button>
         </div>
         <div class="ex-batch-totals">
@@ -1886,7 +1912,7 @@ watch(() => exchangeItems.value.map(item => ({
           <div class="ex-card-header">
             <h3 class="ex-card-title">{{ t('exchange.operations.title') }}</h3>
             <button @click="addExchangeItem" class="ex-btn ex-btn--indigo ex-btn--sm">
-              <span class="material-symbols-outlined" style="font-size:18px">add</span>
+              <span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px">add</span>
               {{ t('exchange.operations.addButton') }}
             </button>
           </div>
@@ -1900,7 +1926,7 @@ watch(() => exchangeItems.value.map(item => ({
                   {{ transactionType === 'buy' ? 'ALIŞ' : 'SATIŞ' }} #{{ index + 1 }}
                 </div>
                 <button v-if="exchangeItems.length > 1" @click="removeExchangeItem(index)" class="ex-item-delete">
-                  <span class="material-symbols-outlined">close</span>
+                  <span class="material-symbols-outlined" aria-hidden="true">close</span>
                 </button>
               </div>
 
@@ -1922,7 +1948,7 @@ watch(() => exchangeItems.value.map(item => ({
                 </div>
 
                 <div class="ex-arrow-divider">
-                  <span class="material-symbols-outlined">swap_horiz</span>
+                  <span class="material-symbols-outlined" aria-hidden="true">swap_horiz</span>
                 </div>
 
                 <div class="ex-field">
@@ -2004,11 +2030,11 @@ watch(() => exchangeItems.value.map(item => ({
         <div class="ex-card">
           <button @click="showNotes = !showNotes" class="ex-notes-toggle">
             <div class="ex-notes-toggle-left">
-              <span class="material-symbols-outlined" style="font-size:18px">edit_note</span>
+              <span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px">edit_note</span>
               <span>{{ t('exchange.notes.label') }}</span>
               <span v-if="notes" class="ex-notes-badge">Not var</span>
             </div>
-            <span class="material-symbols-outlined" style="font-size:18px">{{ showNotes ? 'expand_less' : 'expand_more' }}</span>
+            <span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px">{{ showNotes ? 'expand_less' : 'expand_more' }}</span>
           </button>
           <div v-if="showNotes" class="ex-notes-body">
             <textarea
@@ -2063,7 +2089,7 @@ watch(() => exchangeItems.value.map(item => ({
                       {{ getCurrencyById(transactionType === 'buy' ? item.sourceCurrencyId : item.targetCurrencyId)?.currencyCode || '-' }}
                     </span>
                   </div>
-                  <span class="material-symbols-outlined" style="font-size:14px;color:#d1d5db">arrow_forward</span>
+                  <span class="material-symbols-outlined" aria-hidden="true" style="font-size:14px;color:#d1d5db">arrow_forward</span>
                   <div class="ex-summary-to">
                     <i v-if="getCurrencyCountryCode(getCurrencyById(transactionType === 'buy' ? item.targetCurrencyId : item.sourceCurrencyId)?.currencyCode || '')"
                        :class="`fi fi-${getCurrencyCountryCode(getCurrencyById(transactionType === 'buy' ? item.targetCurrencyId : item.sourceCurrencyId)?.currencyCode || '')}`"
@@ -2153,7 +2179,7 @@ watch(() => exchangeItems.value.map(item => ({
                 <span class="material-symbols-outlined ex-icon-filled" style="font-size:18px;color:#16a34a">check_circle</span>
                 <span class="ex-receipt-panel-title">İşlem Başarılı</span>
                 <button @click="showReceiptPanel = false" class="ex-receipt-panel-close">
-                  <span class="material-symbols-outlined" style="font-size:16px">close</span>
+                  <span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px">close</span>
                 </button>
               </div>
               <div class="ex-receipt-panel-body">
@@ -2402,7 +2428,7 @@ watch(() => exchangeItems.value.map(item => ({
   color: #c7d2fe;
   font-size: 14px;
   cursor: pointer;
-  transition: all 0.25s;
+  transition: background-color 0.25s, color 0.25s, transform 0.25s, box-shadow 0.25s;
   position: relative;
 }
 .ex-topbar-btn:hover:not(:disabled) {
@@ -2474,7 +2500,7 @@ watch(() => exchangeItems.value.map(item => ({
   border-radius: var(--ex-radius);
   border: 2px solid transparent;
   cursor: pointer;
-  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background-color 0.35s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.35s cubic-bezier(0.4, 0, 0.2, 1), color 0.35s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   font-size: 14px;
   position: relative;
   overflow: hidden;
@@ -2565,7 +2591,7 @@ watch(() => exchangeItems.value.map(item => ({
   font-weight: 700;
   font-size: 13px;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   color: #475569;
   box-shadow: 0 2px 6px rgba(0,0,0,0.04);
 }
@@ -2616,7 +2642,7 @@ watch(() => exchangeItems.value.map(item => ({
   border-radius: var(--ex-radius);
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .ex-card:hover { box-shadow: 0 8px 28px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04); }
 .ex-card-header {
@@ -2646,7 +2672,7 @@ watch(() => exchangeItems.value.map(item => ({
   display: flex;
   flex-direction: column;
   gap: 14px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
 }
 .ex-item--buy {
@@ -2695,7 +2721,7 @@ watch(() => exchangeItems.value.map(item => ({
   background: transparent;
   color: #9ca3af;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background-color 0.15s, color 0.15s;
 }
 .ex-item-delete:hover { background: #fee2e2; color: #ef4444; }
 
@@ -2756,7 +2782,7 @@ watch(() => exchangeItems.value.map(item => ({
   border: 1.5px solid #dde1e8;
   border-radius: 12px;
   font-size: 15px;
-  transition: all 0.25s;
+  transition: border-color 0.25s, box-shadow 0.25s;
   outline: none;
   background: white;
   box-shadow: inset 0 1px 3px rgba(0,0,0,0.04);
@@ -2911,7 +2937,7 @@ watch(() => exchangeItems.value.map(item => ({
   resize: none;
   min-height: 72px;
   outline: none;
-  transition: all 0.25s;
+  transition: border-color 0.25s, box-shadow 0.25s;
   box-shadow: inset 0 1px 3px rgba(0,0,0,0.04);
 }
 .ex-textarea:focus { border-color: var(--ex-indigo); box-shadow: 0 0 0 4px rgba(99,102,241,0.1), inset 0 1px 2px rgba(0,0,0,0.02); }
@@ -3066,7 +3092,7 @@ watch(() => exchangeItems.value.map(item => ({
   align-items: center;
   justify-content: center;
   gap: 10px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   letter-spacing: 0.02em;
   position: relative;
   overflow: hidden;
@@ -3113,7 +3139,7 @@ watch(() => exchangeItems.value.map(item => ({
   font-weight: 700;
   color: white;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   letter-spacing: 0.01em;
 }
 .ex-btn:hover { transform: translateY(-1px); }
@@ -3234,7 +3260,7 @@ watch(() => exchangeItems.value.map(item => ({
   font-size: 12px;
   font-weight: 600;
   padding: 6px 14px;
-  transition: all 0.15s;
+  transition: background-color 0.15s, color 0.15s;
 }
 .ex-btn--ghost:hover { background: #f3f4f6; color: #374151; }
 
@@ -3296,7 +3322,7 @@ watch(() => exchangeItems.value.map(item => ({
   padding: 10px 16px;
   border-radius: 10px;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
   background: rgba(255,255,255,0.03);
   border: 1px solid transparent;
@@ -3382,7 +3408,7 @@ watch(() => exchangeItems.value.map(item => ({
   font-weight: 600;
   color: #64748b;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .ex-tab:hover { color: #334155; background: rgba(255,255,255,0.7); }
 .ex-tab--active {
@@ -3460,7 +3486,7 @@ watch(() => exchangeItems.value.map(item => ({
   align-items: center;
   gap: 4px;
   font-weight: 600;
-  transition: all 0.2s;
+  transition: background 0.2s, opacity 0.2s;
 }
 .ex-btn--amber:hover { background: linear-gradient(135deg, #d97706, #b45309); }
 .ex-btn--amber:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -3493,7 +3519,7 @@ watch(() => exchangeItems.value.map(item => ({
   font-weight: 600;
   color: #6b7280;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background-color 0.15s, color 0.15s;
 }
 .ex-batch-type-btn:first-child { border-right: 1px solid var(--ex-border); }
 .ex-batch-type--buy { background: #dcfce7; color: #15803d; }
@@ -3557,7 +3583,7 @@ watch(() => exchangeItems.value.map(item => ({
 
 /* ═══ Rate Matrix ═══ */
 .ex-matrix-section { margin-top: 28px; margin-bottom: 8px; }
-.ex-matrix-wrap { overflow-x: auto; padding: 12px 20px 16px; }
+.ex-matrix-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; padding: 12px 20px 16px; }
 .ex-matrix {
   width: 100%;
   border-collapse: separate;
@@ -3579,7 +3605,7 @@ watch(() => exchangeItems.value.map(item => ({
   padding: 10px 14px;
   text-align: center;
   border-radius: 8px;
-  transition: all 0.2s;
+  transition: background-color 0.2s;
 }
 .ex-matrix tbody tr { transition: background 0.15s; }
 .ex-matrix tbody tr:hover td { background: #f5f3ff; }
@@ -3602,7 +3628,7 @@ watch(() => exchangeItems.value.map(item => ({
 .ex-matrix-dash { color: #94a3b8; font-size: 16px; }
 .ex-matrix-cell {
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, box-shadow 0.2s, transform 0.2s;
   border-radius: 8px;
   background: #fff;
   border: 1px solid #f1f5f9;

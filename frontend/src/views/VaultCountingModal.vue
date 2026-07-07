@@ -190,7 +190,7 @@ defineExpose({ open, close, getRemainingTime })
           <div class="vcm-header">
             <div class="vcm-header-left">
               <div class="vcm-header-icon">
-                <span class="material-symbols-outlined">inventory</span>
+                <span class="material-symbols-outlined" aria-hidden="true">inventory</span>
               </div>
               <div>
                 <h2 class="vcm-title">Kasa Sayımı</h2>
@@ -198,7 +198,7 @@ defineExpose({ open, close, getRemainingTime })
               </div>
             </div>
             <button class="vcm-close" @click="close">
-              <span class="material-symbols-outlined">close</span>
+              <span class="material-symbols-outlined" aria-hidden="true">close</span>
             </button>
           </div>
 
@@ -211,7 +211,7 @@ defineExpose({ open, close, getRemainingTime })
           <template v-else>
             <!-- Last Count Info -->
             <div v-if="lastCount" class="vcm-last-count">
-              <span class="material-symbols-outlined">history</span>
+              <span class="material-symbols-outlined" aria-hidden="true">history</span>
               <span>Son sayım: <strong>{{ formatDate(lastCount.countDate) }}</strong></span>
               <span v-if="lastCount.hasDiscrepancy" class="vcm-badge vcm-badge--red">Farklı</span>
               <span v-else class="vcm-badge vcm-badge--green">Eşleşti</span>
@@ -232,7 +232,7 @@ defineExpose({ open, close, getRemainingTime })
                     @click="removeCurrency(row.currencyId)"
                     title="Kaldır"
                   >
-                    <span class="material-symbols-outlined">close</span>
+                    <span class="material-symbols-outlined" aria-hidden="true">close</span>
                   </button>
                 </div>
 
@@ -279,7 +279,7 @@ defineExpose({ open, close, getRemainingTime })
               <!-- Add Currency Button -->
               <div v-if="inactiveCurrencies.length > 0" class="vcm-add-section">
                 <button class="vcm-add-btn" @click="showAddMenu = !showAddMenu">
-                  <span class="material-symbols-outlined">add_circle</span>
+                  <span class="material-symbols-outlined" aria-hidden="true">add_circle</span>
                   Para Birimi Ekle
                 </button>
                 <div v-if="showAddMenu" class="vcm-add-menu">
@@ -297,7 +297,7 @@ defineExpose({ open, close, getRemainingTime })
 
               <!-- Error -->
               <div v-if="error" class="vcm-error">
-                <span class="material-symbols-outlined">error</span>
+                <span class="material-symbols-outlined" aria-hidden="true">error</span>
                 <span>{{ error }}</span>
               </div>
             </div>
@@ -305,7 +305,7 @@ defineExpose({ open, close, getRemainingTime })
             <!-- Footer -->
             <div class="vcm-footer">
               <button class="vcm-btn vcm-btn--ghost" @click="$emit('waiting-customer')">
-                <span class="material-symbols-outlined">person</span>
+                <span class="material-symbols-outlined" aria-hidden="true">person</span>
                 Müşteri Bekliyor
               </button>
               <div class="vcm-footer-right">
@@ -315,7 +315,7 @@ defineExpose({ open, close, getRemainingTime })
                     <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" opacity=".3"/>
                     <path d="M12 2a10 10 0 019.95 9" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round"/>
                   </svg>
-                  <span v-else class="material-symbols-outlined">check</span>
+                  <span v-else class="material-symbols-outlined" aria-hidden="true">check</span>
                   Sayımı Kaydet
                 </button>
               </div>
@@ -358,7 +358,7 @@ defineExpose({ open, close, getRemainingTime })
 .vcm-subtitle { font-size: 12px; color: #94a3b8; margin: 2px 0 0; }
 .vcm-close {
   background: none; border: none; cursor: pointer;
-  color: #94a3b8; padding: 6px; border-radius: 8px; transition: all .15s;
+  color: #94a3b8; padding: 6px; border-radius: 8px; transition: background-color 0.15s, color 0.15s;
 }
 .vcm-close:hover { background: #f1f5f9; color: #334155; }
 
@@ -398,7 +398,7 @@ defineExpose({ open, close, getRemainingTime })
 
 .vcm-remove-btn {
   background: none; border: none; cursor: pointer;
-  color: #cbd5e1; padding: 2px; border-radius: 6px; transition: all .15s;
+  color: #cbd5e1; padding: 2px; border-radius: 6px; transition: background-color 0.15s, color 0.15s;
 }
 .vcm-remove-btn .material-symbols-outlined { font-size: 16px; }
 .vcm-remove-btn:hover { color: #ef4444; background: #fef2f2; }
@@ -426,7 +426,7 @@ defineExpose({ open, close, getRemainingTime })
   width: 100%; padding: 8px 10px;
   border: 1.5px solid #e2e8f0; border-radius: 10px;
   font-size: 14px; font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
-  text-align: right; outline: none; transition: all .15s;
+  text-align: right; outline: none; transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
   background: #f8fafc; font-weight: 600;
 }
 .vcm-input:focus { border-color: #6366f1; background: #fff; box-shadow: 0 0 0 3px rgba(99,102,241,.1); }
@@ -446,7 +446,7 @@ defineExpose({ open, close, getRemainingTime })
   display: inline-flex; align-items: center; gap: 6px;
   background: none; border: 1.5px dashed #cbd5e1; border-radius: 10px;
   padding: 8px 16px; color: #64748b; font-size: 13px; font-weight: 600;
-  cursor: pointer; transition: all .15s; width: 100%; justify-content: center;
+  cursor: pointer; transition: border-color 0.15s, color 0.15s, background-color 0.15s; width: 100%; justify-content: center;
 }
 .vcm-add-btn:hover { border-color: #6366f1; color: #6366f1; background: #eef2ff; }
 .vcm-add-btn .material-symbols-outlined { font-size: 18px; }
@@ -485,7 +485,7 @@ defineExpose({ open, close, getRemainingTime })
 .vcm-btn {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 9px 16px; border-radius: 10px; font-size: 13px; font-weight: 600;
-  border: none; cursor: pointer; transition: all .15s;
+  border: none; cursor: pointer; transition: background-color 0.15s, color 0.15s, opacity 0.15s;
 }
 .vcm-btn:disabled { opacity: .45; cursor: not-allowed; }
 .vcm-btn--primary { background: #6366f1; color: #fff; }

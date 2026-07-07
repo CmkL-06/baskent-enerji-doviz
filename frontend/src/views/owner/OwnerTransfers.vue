@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import apiService from '@/services/apiservice'
+import { useNotification } from '@/composables/useNotification'
+
+const notification = useNotification()
 
 const subTab = ref<'pending' | 'all'>('pending')
 const pending = ref<any[]>([])
@@ -62,7 +65,7 @@ async function approve(id: string) {
     await apiService.processTransfer(id, { approve: true })
     await loadData()
   } catch (e: any) {
-    alert(e?.response?.data?.error || 'Onaylama hatası')
+    notification.error(e?.response?.data?.error || 'Onaylama hatası')
   } finally { saving.value = false }
 }
 
@@ -77,7 +80,7 @@ async function submitReject() {
     showReject.value = false
     await loadData()
   } catch (e: any) {
-    alert(e?.response?.data?.error || 'Reddetme hatası')
+    notification.error(e?.response?.data?.error || 'Reddetme hatası')
   } finally { saving.value = false }
 }
 
@@ -90,7 +93,7 @@ async function submitCreate() {
     form.value = { sourceVaultId: '', targetVaultId: '', currencyId: '', amount: null, notes: '' }
     await loadData()
   } catch (e: any) {
-    alert(e?.response?.data?.error || 'Transfer oluşturma hatası')
+    notification.error(e?.response?.data?.error || 'Transfer oluşturma hatası')
   } finally { saving.value = false }
 }
 
@@ -124,9 +127,9 @@ const vaultLabel = (id: string) => {
 <template>
   <div>
     <div class="ot-header">
-      <h3 class="ot-title"><span class="material-symbols-outlined">swap_horiz</span> Şubeler Arası Transferler</h3>
+      <h3 class="ot-title"><span class="material-symbols-outlined" aria-hidden="true">swap_horiz</span> Şubeler Arası Transferler</h3>
       <button class="ot-btn primary" @click="showCreate = true">
-        <span class="material-symbols-outlined">add</span> Yeni Transfer
+        <span class="material-symbols-outlined" aria-hidden="true">add</span> Yeni Transfer
       </button>
     </div>
 
@@ -147,7 +150,7 @@ const vaultLabel = (id: string) => {
     <!-- Pending -->
     <div v-else-if="subTab === 'pending'">
       <div v-if="pending.length === 0" class="ot-empty">
-        <span class="material-symbols-outlined">check_circle</span>
+        <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
         <p>Bekleyen transfer yok</p>
       </div>
       <div v-else class="ot-card-list">
@@ -165,10 +168,10 @@ const vaultLabel = (id: string) => {
           <div v-if="t.notes" class="ot-notes">{{ t.notes }}</div>
           <div class="ot-actions">
             <button class="ot-btn success" :disabled="saving" @click="approve(t.id)">
-              <span class="material-symbols-outlined">check</span> Onayla
+              <span class="material-symbols-outlined" aria-hidden="true">check</span> Onayla
             </button>
             <button class="ot-btn danger" :disabled="saving" @click="openReject(t.id)">
-              <span class="material-symbols-outlined">close</span> Reddet
+              <span class="material-symbols-outlined" aria-hidden="true">close</span> Reddet
             </button>
           </div>
         </div>
@@ -178,7 +181,7 @@ const vaultLabel = (id: string) => {
     <!-- All -->
     <div v-else-if="subTab === 'all'">
       <div v-if="allTransfers.length === 0" class="ot-empty">
-        <span class="material-symbols-outlined">swap_horiz</span>
+        <span class="material-symbols-outlined" aria-hidden="true">swap_horiz</span>
         <p>Transfer geçmişi bulunamadı</p>
       </div>
       <div v-else class="ot-table-wrap">
@@ -293,7 +296,7 @@ const vaultLabel = (id: string) => {
   display: flex; align-items: center; gap: 0.4rem;
   padding: 0.5rem 1rem; background: #f1f5f9; border: 1px solid #e2e8f0;
   border-radius: 8px; cursor: pointer; font-size: 0.85rem; color: #64748b;
-  transition: all .2s;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
 }
 .ot-subtabs button.active { background: #3b82f6; color: white; border-color: #3b82f6; }
 .ot-count { background: #ef4444; color: white; font-size: 0.7rem; padding: 1px 6px; border-radius: 10px; font-weight: 700; }
@@ -352,7 +355,7 @@ const vaultLabel = (id: string) => {
 .ot-btn {
   display: flex; align-items: center; gap: 0.4rem;
   padding: 0.5rem 1rem; border: none; border-radius: 8px;
-  cursor: pointer; font-size: 0.85rem; font-weight: 600; transition: all .2s;
+  cursor: pointer; font-size: 0.85rem; font-weight: 600; transition: background-color 0.2s, color 0.2s;
 }
 .ot-btn.primary { background: #3b82f6; color: white; }
 .ot-btn.primary:hover:not(:disabled) { background: #2563eb; }

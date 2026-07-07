@@ -197,7 +197,7 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside, true))
   border: 1px solid #e5e7eb;
   border-radius: 10px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s;
   font-size: 14px;
   text-align: left;
 }

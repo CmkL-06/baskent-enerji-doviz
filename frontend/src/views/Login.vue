@@ -61,7 +61,7 @@
           <!-- Error Message -->
           <transition name="fade">
             <div v-if="authStore.error" class="error-message">
-              <span class="material-symbols-outlined">error</span>
+              <span class="material-symbols-outlined" aria-hidden="true">error</span>
               {{ authStore.error }}
             </div>
           </transition>
@@ -73,7 +73,7 @@
               Giriş yapılıyor...
             </span>
             <span v-else class="btn-content">
-              <span class="material-symbols-outlined">login</span>
+              <span class="material-symbols-outlined" aria-hidden="true">login</span>
               Giriş Yap
             </span>
           </button>
@@ -83,12 +83,12 @@
             <p class="selector-title">Arayüz Stili</p>
             <div class="style-options">
               <div class="style-option selected">
-                <span class="material-symbols-outlined">dashboard</span>
+                <span class="material-symbols-outlined" aria-hidden="true">dashboard</span>
                 <span>İhtiyar Arayüz</span>
                 <span class="badge">Aktif</span>
               </div>
               <div class="style-option disabled">
-                <span class="material-symbols-outlined">desktop_windows</span>
+                <span class="material-symbols-outlined" aria-hidden="true">desktop_windows</span>
                 <span>Normal Arayüz</span>
                 <span class="badge disabled">Devre Dışı</span>
               </div>
@@ -159,7 +159,7 @@ onMounted(() => {
 .animated-bg {
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%);
   overflow: hidden;
 }
 
@@ -248,7 +248,7 @@ onMounted(() => {
   justify-content: center;
   width: 80px;
   height: 80px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%);
   border-radius: 20px;
   margin-bottom: 1.5rem;
   box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
@@ -289,12 +289,12 @@ onMounted(() => {
   background: #f7fafc;
   border: 2px solid #e2e8f0;
   border-radius: 12px;
-  transition: all 0.3s ease;
+  transition: border-color 0.3s ease, background-color 0.3s ease;
 }
 
 .input-wrapper:focus-within {
   background: white;
-  border-color: #667eea;
+  border-color: #6366f1;
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
@@ -307,7 +307,7 @@ onMounted(() => {
 }
 
 .input-wrapper:focus-within .input-icon {
-  color: #667eea;
+  color: #6366f1;
 }
 
 .form-input {
@@ -349,7 +349,7 @@ onMounted(() => {
 .remember-me input[type="checkbox"] {
   width: 18px;
   height: 18px;
-  accent-color: #667eea;
+  accent-color: #6366f1;
 }
 
 .forgot-password {
@@ -381,14 +381,14 @@ onMounted(() => {
 .submit-btn {
   width: 100%;
   padding: 1rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%);
   border: none;
   border-radius: 12px;
   color: white;
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: background 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
   box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
 }
 
@@ -464,12 +464,12 @@ onMounted(() => {
   border: 2px solid #e2e8f0;
   border-radius: 10px;
   position: relative;
-  transition: all 0.3s ease;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .style-option.selected {
   background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
-  border-color: #667eea;
+  border-color: #6366f1;
 }
 
 .style-option.disabled {
@@ -479,7 +479,7 @@ onMounted(() => {
 
 .style-option .material-symbols-outlined {
   font-size: 24px;
-  color: #667eea;
+  color: #6366f1;
 }
 
 .style-option.disabled .material-symbols-outlined {
@@ -494,7 +494,7 @@ onMounted(() => {
 
 .badge {
   padding: 0.25rem 0.5rem;
-  background: #667eea;
+  background: #6366f1;
   color: white;
   border-radius: 6px;
   font-size: 0.75rem;

@@ -303,7 +303,7 @@ onMounted(async () => {
   border-radius: 8px;
   color: #1a1a1a;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .filter-btn.active {
@@ -329,7 +329,7 @@ onMounted(async () => {
   color: white;
   font-weight: bold;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: background-color 0.3s ease, transform 0.3s ease;
 }
 
 .apply-btn:hover {
@@ -415,7 +415,7 @@ onMounted(async () => {
   cursor: pointer;
   padding: 5px;
   border-radius: 5px;
-  transition: all 0.3s ease;
+  transition: background-color 0.3s ease;
 }
 
 .action-btn:hover {

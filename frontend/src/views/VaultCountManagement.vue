@@ -6,7 +6,9 @@ import apiService from '@/services/apiservice'
 import AppKpiCard from '@/components/common/AppKpiCard.vue'
 import AppPageHeader from '@/components/common/AppPageHeader.vue'
 import AppEmptyState from '@/components/common/AppEmptyState.vue'
+import { useNotification } from '@/composables/useNotification'
 
+const notification = useNotification()
 const authStore = useAuthStore()
 const exchangeStore = useExchangeStore()
 
@@ -175,7 +177,7 @@ async function submitCount() {
     .map(d => ({ CurrencyId: d.currencyId, ActualAmount: d.actualAmount }))
 
   if (details.length === 0) {
-    alert('En az bir para birimi için sayım tutarı giriniz')
+    notification.warning('En az bir para birimi için sayım tutarı giriniz')
     return
   }
 
@@ -198,7 +200,7 @@ async function submitCount() {
     await loadVaults()
     if (activeTab.value === 'timeline') await loadTimeline()
   } catch (e: any) {
-    alert(e?.response?.data?.message || 'Sayım kaydedilemedi')
+    notification.error(e?.response?.data?.message || 'Sayım kaydedilemedi')
   } finally {
     saving.value = false
   }
@@ -226,7 +228,7 @@ async function createSnapshot() {
     if (activeTab.value === 'timeline') await loadTimeline()
     else await loadSnapshots()
   } catch (e: any) {
-    alert(e?.response?.data?.message || 'Snapshot oluşturulamadı')
+    notification.error(e?.response?.data?.message || 'Snapshot oluşturulamadı')
   } finally {
     saving.value = false
   }
@@ -238,7 +240,7 @@ async function deleteSnapshot(snap: any) {
     await apiService.deleteVaultSnapshot(snap.id)
     await loadTimeline()
   } catch (e: any) {
-    alert(e?.response?.data?.message || 'Silme başarısız')
+    notification.error(e?.response?.data?.message || 'Silme başarısız')
   }
 }
 
@@ -248,7 +250,7 @@ async function openSnapshotDetail(snap: any) {
     selectedSnapshot.value = await apiService.getVaultSnapshotById(snap.id)
     detailType.value = 'snapshot'
     showDetailModal.value = true
-  } catch { alert('Detay yüklenemedi') }
+  } catch { notification.error('Detay yüklenemedi') }
 }
 
 function openCountDetail(count: any) {
@@ -270,14 +272,14 @@ function groupDetailsByVault(details: any[]): Record<string, any[]> {
 // ── Compare
 async function runComparison() {
   if (!compareId1.value || !compareId2.value) {
-    alert('Karşılaştırma için 2 snapshot seçiniz')
+    notification.warning('Karşılaştırma için 2 snapshot seçiniz')
     return
   }
   try {
     comparisonResult.value = await apiService.compareVaultSnapshots(compareId1.value, compareId2.value)
     showCompareResult.value = true
   } catch (e: any) {
-    alert(e?.response?.data?.message || 'Karşılaştırma başarısız')
+    notification.error(e?.response?.data?.message || 'Karşılaştırma başarısız')
   }
 }
 
@@ -288,7 +290,7 @@ async function resetCountStatus(vault: any) {
     await apiService.resetVaultCountStatus(vault.vaultId ?? vault.id)
     await loadVaults()
   } catch (e: any) {
-    alert(e?.response?.data?.message || 'İşlem başarısız')
+    notification.error(e?.response?.data?.message || 'İşlem başarısız')
   }
 }
 
@@ -297,7 +299,7 @@ async function toggleCountFlag(vault: any) {
     await apiService.setVaultCountStatus(vault.vaultId ?? vault.id, !vault.shouldCount)
     await loadVaults()
   } catch (e: any) {
-    alert(e?.response?.data?.message || 'İşlem başarısız')
+    notification.error(e?.response?.data?.message || 'İşlem başarısız')
   }
 }
 
@@ -318,11 +320,11 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
     <!-- Header -->
     <AppPageHeader icon="fact_check" title="Kasa Kontrol">
       <button class="btn-secondary" @click="loadVaults">
-        <span class="material-symbols-outlined">refresh</span>
+        <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
         Yenile
       </button>
       <button v-if="authStore.isAdmin" class="btn-secondary" @click="openSnapshotModal">
-        <span class="material-symbols-outlined">add_a_photo</span>
+        <span class="material-symbols-outlined" aria-hidden="true">add_a_photo</span>
         Snapshot Al
       </button>
     </AppPageHeader>
@@ -338,16 +340,16 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
     <!-- Tabs -->
     <div class="tab-bar">
       <button :class="['tab-btn', activeTab === 'vaults' ? 'tab-active' : '']" @click="switchTab('vaults')">
-        <span class="material-symbols-outlined">inventory_2</span>
+        <span class="material-symbols-outlined" aria-hidden="true">inventory_2</span>
         Kasalar
         <span v-if="pendingCount > 0" class="badge">{{ pendingCount }}</span>
       </button>
       <button :class="['tab-btn', activeTab === 'timeline' ? 'tab-active' : '']" @click="switchTab('timeline')">
-        <span class="material-symbols-outlined">timeline</span>
+        <span class="material-symbols-outlined" aria-hidden="true">timeline</span>
         Zaman Çizelgesi
       </button>
       <button :class="['tab-btn', activeTab === 'compare' ? 'tab-active' : '']" @click="switchTab('compare')">
-        <span class="material-symbols-outlined">compare</span>
+        <span class="material-symbols-outlined" aria-hidden="true">compare</span>
         Karşılaştır
       </button>
     </div>
@@ -377,11 +379,11 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
               <span class="vault-office">{{ vault.officeName ?? '' }}</span>
             </div>
             <div v-if="vault.shouldCount" class="count-badge badge-pending">
-              <span class="material-symbols-outlined">schedule</span>
+              <span class="material-symbols-outlined" aria-hidden="true">schedule</span>
               Sayım Bekliyor
             </div>
             <div v-else class="count-badge badge-ok">
-              <span class="material-symbols-outlined">check_circle</span>
+              <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
               Tamamlandı
             </div>
           </div>
@@ -393,35 +395,35 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
               <span class="bal-amount">{{ formatCurrency(bal.balance ?? 0) }}</span>
             </div>
             <div v-if="!(vault.balances ?? []).some((b: any) => (b.balance ?? 0) !== 0)" class="no-balance">
-              <span class="material-symbols-outlined">account_balance</span>
+              <span class="material-symbols-outlined" aria-hidden="true">account_balance</span>
               Bakiye bilgisi yok
             </div>
           </div>
 
           <div class="vault-footer">
             <div class="vault-meta">
-              <span class="material-symbols-outlined">schedule</span>
+              <span class="material-symbols-outlined" aria-hidden="true">schedule</span>
               Son Sayım: {{ formatDateTime(vault.lastCountDate) }}
             </div>
 
             <!-- Actions -->
             <div class="vault-actions">
               <button class="btn-primary btn-sm" @click="openCountModal(vault)">
-                <span class="material-symbols-outlined">calculate</span>
+                <span class="material-symbols-outlined" aria-hidden="true">calculate</span>
                 Sayım Yap
               </button>
               <button class="btn-outline btn-sm" @click="loadVaultHistory(vault)">
-                <span class="material-symbols-outlined">history</span>
+                <span class="material-symbols-outlined" aria-hidden="true">history</span>
                 Geçmiş
               </button>
             </div>
             <div v-if="authStore.isAdmin" class="vault-admin-actions">
               <button v-if="vault.shouldCount" class="admin-btn" @click="resetCountStatus(vault)">
-                <span class="material-symbols-outlined">restart_alt</span>
+                <span class="material-symbols-outlined" aria-hidden="true">restart_alt</span>
                 Sıfırla
               </button>
               <button class="admin-btn" :class="vault.shouldCount ? 'admin-btn-off' : 'admin-btn-on'" @click="toggleCountFlag(vault)">
-                <span class="material-symbols-outlined">{{ vault.shouldCount ? 'cancel' : 'notification_add' }}</span>
+                <span class="material-symbols-outlined" aria-hidden="true">{{ vault.shouldCount ? 'cancel' : 'notification_add' }}</span>
                 {{ vault.shouldCount ? 'Kapat' : 'Sayım İste' }}
               </button>
             </div>
@@ -450,7 +452,7 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
 
         <div v-for="item in timeline" :key="item.id + item._type" class="tl-item" :class="'tl-' + item._type">
           <div class="tl-marker">
-            <span class="material-symbols-outlined">{{ item._type === 'snapshot' ? 'photo_camera' : 'calculate' }}</span>
+            <span class="material-symbols-outlined" aria-hidden="true">{{ item._type === 'snapshot' ? 'photo_camera' : 'calculate' }}</span>
           </div>
           <div class="tl-content">
             <div class="tl-header">
@@ -469,10 +471,10 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
               </div>
               <div class="tl-actions">
                 <button class="icon-btn" @click="openSnapshotDetail(item)" title="Detay">
-                  <span class="material-symbols-outlined">visibility</span>
+                  <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
                 </button>
                 <button v-if="authStore.isAdmin" class="icon-btn danger" @click="deleteSnapshot(item)" title="Sil">
-                  <span class="material-symbols-outlined">delete</span>
+                  <span class="material-symbols-outlined" aria-hidden="true">delete</span>
                 </button>
               </div>
             </template>
@@ -487,7 +489,7 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
               </div>
               <div class="tl-actions">
                 <button class="icon-btn" @click="openCountDetail(item)" title="Detay">
-                  <span class="material-symbols-outlined">visibility</span>
+                  <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
                 </button>
               </div>
             </template>
@@ -511,7 +513,7 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
             </select>
           </div>
           <div class="compare-arrow">
-            <span class="material-symbols-outlined">arrow_forward</span>
+            <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
           </div>
           <div class="form-group">
             <label>2. Snapshot (Yeni)</label>
@@ -523,7 +525,7 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
             </select>
           </div>
           <button class="btn-primary" @click="runComparison" :disabled="!compareId1 || !compareId2">
-            <span class="material-symbols-outlined">compare_arrows</span>
+            <span class="material-symbols-outlined" aria-hidden="true">compare_arrows</span>
             Karşılaştır
           </button>
         </div>
@@ -535,7 +537,7 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
               <span class="compare-label">Eski</span>
               <span>{{ formatDateTime(comparisonResult.snapshot1?.snapshotDate ?? comparisonResult.oldSnapshot?.snapshotDate) }}</span>
             </div>
-            <span class="material-symbols-outlined" style="color:#9ca3af;font-size:24px">arrow_forward</span>
+            <span class="material-symbols-outlined" aria-hidden="true" style="color:#9ca3af;font-size:24px">arrow_forward</span>
             <div class="compare-side">
               <span class="compare-label">Yeni</span>
               <span>{{ formatDateTime(comparisonResult.snapshot2?.snapshotDate ?? comparisonResult.newSnapshot?.snapshotDate) }}</span>
@@ -803,7 +805,7 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 9px 18px; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff;
   border: none; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer;
-  box-shadow: 0 2px 8px rgba(37,99,235,.25); transition: all .15s;
+  box-shadow: 0 2px 8px rgba(37,99,235,.25); transition: background-color 0.2s, box-shadow 0.2s, transform 0.2s;
 }
 .btn-primary:hover { background: linear-gradient(135deg, #1d4ed8, #1e40af); box-shadow: 0 4px 12px rgba(37,99,235,.35); transform: translateY(-1px); }
 .btn-primary:active { transform: translateY(0); }
@@ -812,21 +814,21 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 9px 18px; background: #fff; color: #374151;
   border: 1px solid #d1d5db; border-radius: 10px; font-size: 13px; font-weight: 500; cursor: pointer;
-  transition: all .15s;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
 }
 .btn-secondary:hover { background: #f8fafc; border-color: #93c5fd; color: #1d4ed8; }
 .btn-outline {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 9px 18px; background: transparent; color: #475569;
   border: 1px solid #cbd5e1; border-radius: 10px; font-size: 13px; font-weight: 500; cursor: pointer;
-  transition: all .15s;
+  transition: background-color 0.2s, border-color 0.2s;
 }
 .btn-outline:hover { background: #f1f5f9; border-color: #94a3b8; }
 .btn-sm { padding: 7px 14px; font-size: 12px; }
 .btn-sm .material-symbols-outlined { font-size: 16px; }
 .btn-cancel {
   padding: 9px 18px; background: #fff; color: #374151;
-  border: 1px solid #d1d5db; border-radius: 10px; font-size: 13px; cursor: pointer; transition: all .15s;
+  border: 1px solid #d1d5db; border-radius: 10px; font-size: 13px; cursor: pointer; transition: background-color 0.2s;
 }
 .btn-cancel:hover { background: #f3f4f6; }
 
@@ -838,7 +840,7 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
 .tab-btn {
   padding: 12px 20px; border: none; background: none; font-size: 13px; font-weight: 600;
   color: #94a3b8; cursor: pointer; border-bottom: 2px solid transparent;
-  display: flex; align-items: center; gap: 8px; margin-bottom: -2px; transition: all .15s;
+  display: flex; align-items: center; gap: 8px; margin-bottom: -2px; transition: color 0.2s, border-bottom-color 0.2s;
 }
 .tab-btn:hover { color: #475569; }
 .tab-active { color: #1d4ed8; border-bottom-color: #2563eb; }
@@ -850,7 +852,7 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
 .chip {
   padding: 7px 16px; border-radius: 20px; border: 1px solid #e2e8f0;
   background: #fff; font-size: 13px; cursor: pointer; color: #475569; font-weight: 500;
-  transition: all .15s;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
 }
 .chip:hover { background: #f1f5f9; border-color: #cbd5e1; }
 .chip-active { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; border-color: transparent; box-shadow: 0 2px 8px rgba(37,99,235,.3); }
@@ -865,7 +867,7 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
 .vault-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 18px; }
 .vault-card {
   background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
-  padding: 0; transition: all .2s; overflow: hidden;
+  padding: 0; transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s; overflow: hidden;
   box-shadow: 0 1px 3px rgba(0,0,0,.04);
   display: flex; flex-direction: column;
 }
@@ -915,7 +917,7 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: 500;
   cursor: pointer; border: 1px solid #e2e8f0; background: #f8fafc; color: #64748b;
-  transition: all .15s;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
 }
 .admin-btn:hover { background: #f1f5f9; border-color: #cbd5e1; }
 .admin-btn .material-symbols-outlined { font-size: 14px; }
@@ -956,7 +958,7 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
 /* Icon btn */
 .icon-btn {
   background: none; border: 1px solid transparent; cursor: pointer; padding: 6px; border-radius: 8px;
-  color: #64748b; display: flex; align-items: center; transition: all .15s;
+  color: #64748b; display: flex; align-items: center; transition: background-color 0.2s, color 0.2s, border-color 0.2s;
 }
 .icon-btn:hover { background: #f1f5f9; color: #2563eb; border-color: #e2e8f0; }
 .icon-btn.danger:hover { color: #dc2626; border-color: #fecaca; background: #fef2f2; }
@@ -1021,7 +1023,7 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
 .modal-close {
   background: #f1f5f9; border: none; width: 32px; height: 32px; border-radius: 8px;
   font-size: 18px; cursor: pointer; color: #64748b; display: flex; align-items: center; justify-content: center;
-  transition: all .15s;
+  transition: background-color 0.2s, color 0.2s;
 }
 .modal-close:hover { background: #e2e8f0; color: #0f172a; }
 .modal-body { padding: 24px 28px; overflow-y: auto; }
@@ -1036,7 +1038,7 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
 .form-group label { font-size: 12px; font-weight: 600; color: #334155; }
 .form-group input, .form-group select {
   padding: 9px 14px; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 13px; outline: none;
-  transition: all .15s;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 .form-group input:focus, .form-group select:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
 
@@ -1054,7 +1056,7 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
 .count-amount { font-size: 14px; font-weight: 600; color: #334155; font-family: 'Consolas', monospace; }
 .count-actual input {
   width: 100%; padding: 7px 12px; border: 1px solid #cbd5e1;
-  border-radius: 8px; font-size: 13px; outline: none; transition: all .15s;
+  border-radius: 8px; font-size: 13px; outline: none; transition: border-color 0.2s, box-shadow 0.2s;
 }
 .count-actual input:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
 .count-diff { min-width: 80px; }

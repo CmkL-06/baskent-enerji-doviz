@@ -6,6 +6,7 @@ import router from './router'
 import tr from './i18n/tr.json'
 import en from './i18n/en.json'
 import 'flag-icons/css/flag-icons.min.css'
+import './assets/design-tokens.css'
 
 const i18n = createI18n({
   legacy: false,

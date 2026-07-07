@@ -4,8 +4,10 @@ import { useAuthStore } from '@/stores/auth'
 import { useExchangeStore } from '@/stores/exchange'
 import apiService from '@/services/apiservice'
 import AppKpiCard from '@/components/common/AppKpiCard.vue'
+import { useNotification } from '@/composables/useNotification'
 
 const authStore = useAuthStore()
+const notification = useNotification()
 const exchangeStore = useExchangeStore()
 
 const loading = ref(true)
@@ -176,7 +178,7 @@ async function loadStatement(party: any) {
     partyStatement.value = await apiService.getPartyStatement(party.id)
     showStatementModal.value = true
   } catch {
-    alert('Ekstre yüklenemedi')
+    notification.error('Ekstre yüklenemedi')
   }
 }
 
@@ -221,7 +223,7 @@ function openEditModal(party: any) {
 
 async function saveParty() {
   if (!partyForm.value.partyCode || !partyForm.value.name) {
-    alert('Cari kodu ve adı zorunludur')
+    notification.warning('Cari kodu ve adı zorunludur')
     return
   }
   saving.value = true
@@ -240,7 +242,7 @@ async function saveParty() {
     showCreateModal.value = false
     await loadParties()
   } catch (e: any) {
-    alert(e?.response?.data?.message || 'Kayıt başarısız')
+    notification.error(e?.response?.data?.message || 'Kayıt başarısız')
   } finally {
     saving.value = false
   }
@@ -256,7 +258,7 @@ async function deleteParty(party: any) {
       activeTab.value = 'list'
     }
   } catch (e: any) {
-    alert(e?.response?.data?.message || 'Silme başarısız')
+    notification.error(e?.response?.data?.message || 'Silme başarısız')
   }
 }
 
@@ -280,7 +282,7 @@ function openPaymentModal(party?: any) {
 
 async function savePayment() {
   if (!paymentForm.value.amount || paymentForm.value.amount <= 0) {
-    alert('Tutar giriniz')
+    notification.warning('Tutar giriniz')
     return
   }
   saving.value = true
@@ -295,7 +297,7 @@ async function savePayment() {
       await selectParty(selectedParty.value)
     }
   } catch (e: any) {
-    alert(e?.response?.data?.message || 'Ödeme kaydedilemedi')
+    notification.error(e?.response?.data?.message || 'Ödeme kaydedilemedi')
   } finally {
     saving.value = false
   }
@@ -354,7 +356,7 @@ onUnmounted(() => {
     <div class="party-header">
       <div class="header-left">
         <button v-if="activeTab !== 'list'" class="btn-back" @click="backToList">
-          <span class="material-symbols-outlined">arrow_back</span>
+          <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
         </button>
         <h1 v-if="activeTab === 'list'">Cariler</h1>
         <h1 v-else-if="activeTab === 'accounts' && selectedParty">
@@ -364,15 +366,15 @@ onUnmounted(() => {
       </div>
       <div class="header-actions">
         <button v-if="activeTab === 'list'" class="btn-primary" @click="openCreateModal">
-          <span class="material-symbols-outlined">person_add</span>
+          <span class="material-symbols-outlined" aria-hidden="true">person_add</span>
           Yeni Cari
         </button>
         <button v-if="activeTab === 'accounts' && selectedParty" class="btn-primary" @click="openPaymentModal()">
-          <span class="material-symbols-outlined">payments</span>
+          <span class="material-symbols-outlined" aria-hidden="true">payments</span>
           Ödeme Ekle
         </button>
         <button v-if="activeTab === 'accounts' && selectedParty" class="btn-secondary" @click="loadStatement(selectedParty)">
-          <span class="material-symbols-outlined">receipt_long</span>
+          <span class="material-symbols-outlined" aria-hidden="true">receipt_long</span>
           Ekstre
         </button>
       </div>
@@ -389,7 +391,7 @@ onUnmounted(() => {
     <!-- Filters -->
     <div v-if="activeTab === 'list'" class="filter-bar">
       <div class="search-box">
-        <span class="material-symbols-outlined">search</span>
+        <span class="material-symbols-outlined" aria-hidden="true">search</span>
         <input v-model="searchQuery" placeholder="Cari ara (ad, kod, telefon)..." />
       </div>
       <select v-model="filterType" class="filter-select">
@@ -453,16 +455,16 @@ onUnmounted(() => {
             <td>{{ formatDate(party.lastTransactionDate) }}</td>
             <td class="text-center actions-cell" @click.stop>
               <button class="icon-btn" title="Düzenle" @click="openEditModal(party)">
-                <span class="material-symbols-outlined">edit</span>
+                <span class="material-symbols-outlined" aria-hidden="true">edit</span>
               </button>
               <button class="icon-btn" title="Ödeme" @click="openPaymentModal(party)">
-                <span class="material-symbols-outlined">payments</span>
+                <span class="material-symbols-outlined" aria-hidden="true">payments</span>
               </button>
               <button class="icon-btn" title="Ekstre" @click="loadStatement(party)">
-                <span class="material-symbols-outlined">receipt_long</span>
+                <span class="material-symbols-outlined" aria-hidden="true">receipt_long</span>
               </button>
               <button class="icon-btn danger" title="Sil" @click="deleteParty(party)">
-                <span class="material-symbols-outlined">delete</span>
+                <span class="material-symbols-outlined" aria-hidden="true">delete</span>
               </button>
             </td>
           </tr>

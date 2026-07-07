@@ -224,7 +224,7 @@ onMounted(() => {
   font-size: 17px;
   font-weight: 600;
   color: #ffffff;
-  transition: all 0.2s;
+  transition: background 0.2s, box-shadow 0.2s;
 }
 
 .start-button:hover {
@@ -257,7 +257,7 @@ onMounted(() => {
   justify-content: center;
   font-size: 20px;
   color: white;
-  transition: all 0.2s;
+  transition: background 0.2s;
   margin-left: 4px;
 }
 
@@ -298,7 +298,7 @@ onMounted(() => {
   gap: 8px;
   font-size: 13px;
   color: white;
-  transition: all 0.2s;
+  transition: background 0.2s;
   font-weight: 600;
 }
 

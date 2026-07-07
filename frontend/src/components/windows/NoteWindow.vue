@@ -33,7 +33,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue';
+import { ref, watch, onMounted, onUnmounted } from 'vue';
 import { useDesktopStore } from '../../stores/desktop';
 import type { Note } from '../../types';
 
@@ -104,6 +104,10 @@ watch([noteTitle, noteContent], () => {
     updateNote();
   }, 1000); // Auto-save after 1 second of inactivity
 });
+
+onUnmounted(() => {
+  if (saveTimeout) clearTimeout(saveTimeout);
+});
 </script>
 
 <style scoped>
@@ -156,7 +160,7 @@ watch([noteTitle, noteContent], () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: background-color 0.2s, color 0.2s;
 }
 
 .btn-icon:hover {

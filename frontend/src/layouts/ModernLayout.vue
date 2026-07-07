@@ -6,7 +6,9 @@ import { useAuthStore } from '@/stores/auth'
 import { useExchangeStore } from '@/stores/exchange'
 import apiService from '@/services/apiservice'
 import LanguageSelector from '@/components/common/LanguageSelector.vue'
+import { useNotification } from '@/composables/useNotification'
 
+const notification = useNotification()
 const router = useRouter()
 const route = useRoute()
 const { t } = useI18n()
@@ -231,7 +233,7 @@ const handleEndOfDay = async () => {
     const selectedOffice = exchangeStore.selectedOffice || exchangeStore.offices[0]
 
     if (!selectedOffice) {
-      alert('Lütfen bir ofis seçiniz!')
+      notification.warning('Lütfen bir ofis seçiniz!')
       return
     }
 
@@ -241,11 +243,11 @@ const handleEndOfDay = async () => {
 
     try {
       await apiService.endDay(selectedOffice.officeId)
-      alert('Gün sonu işlemi başarıyla tamamlandı!')
+      notification.success('Gün sonu işlemi başarıyla tamamlandı!')
       router.push('/ihtiyar/vaults')
     } catch (error) {
       console.error('Gün sonu işlemi başarısız:', error)
-      alert('Gün sonu işlemi başarısız oldu. Lütfen tekrar deneyiniz.')
+      notification.error('Gün sonu işlemi başarısız oldu. Lütfen tekrar deneyiniz.')
     }
   }
 }
@@ -262,6 +264,15 @@ const handleKeyPress = (e: KeyboardEvent) => {
 
 
 // Initialize on mount
+const handleVisibilityChange = () => {
+  if (document.hidden) {
+    if (tickerInterval) { clearInterval(tickerInterval); tickerInterval = null }
+  } else {
+    loadExchangeRates()
+    tickerInterval = setInterval(loadExchangeRates, 60000) as unknown as number
+  }
+}
+
 onMounted(async () => {
   // Load ticker preference from localStorage
   const savedTickerPreference = localStorage.getItem('showTicker')
@@ -272,6 +283,7 @@ onMounted(async () => {
   tickerInterval = setInterval(loadExchangeRates, 60000) as unknown as number
   // Add keyboard listener
   window.addEventListener('keydown', handleKeyPress)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
 })
 
 // Cleanup on unmount
@@ -280,6 +292,7 @@ onUnmounted(() => {
     clearInterval(tickerInterval)
   }
   window.removeEventListener('keydown', handleKeyPress)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 
 const reloadPage = () => window.location.reload()
@@ -299,7 +312,7 @@ const toggleTicker = () => {
       <!-- Brand -->
       <div class="nav-brand">
         <div class="brand-icon">
-          <span class="material-symbols-outlined">currency_exchange</span>
+          <span class="material-symbols-outlined" aria-hidden="true">currency_exchange</span>
         </div>
         <span class="brand-name">Exchange Office</span>
       </div>
@@ -349,10 +362,10 @@ const toggleTicker = () => {
             </div>
           </div>
           <div class="ud-info">
-            <div class="ud-row"><span class="material-symbols-outlined">mail</span>{{ authStore.user?.mail }}</div>
+            <div class="ud-row"><span class="material-symbols-outlined" aria-hidden="true">mail</span>{{ authStore.user?.mail }}</div>
           </div>
           <button class="ud-logout" @click="logout">
-            <span class="material-symbols-outlined">power_settings_new</span>
+            <span class="material-symbols-outlined" aria-hidden="true">power_settings_new</span>
             {{ t('navbar.logout') }}
           </button>
         </div>
@@ -368,12 +381,12 @@ const toggleTicker = () => {
       <!-- Top Header -->
       <header class="top-header">
         <button class="hamburger" @click="toggleMobileMenu">
-          <span class="material-symbols-outlined">menu</span>
+          <span class="material-symbols-outlined" aria-hidden="true">menu</span>
         </button>
         <h1 class="header-title">{{ pageTitle }}</h1>
         <div class="header-actions">
           <button class="header-icon-btn" @click="reloadPage" title="Sayfayı Yenile">
-            <span class="material-symbols-outlined">refresh</span>
+            <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
           </button>
           <button
             class="header-icon-btn"
@@ -381,12 +394,12 @@ const toggleTicker = () => {
             @click="toggleTicker"
             title="Kur Ticker'ı"
           >
-            <span class="material-symbols-outlined">show_chart</span>
+            <span class="material-symbols-outlined" aria-hidden="true">show_chart</span>
           </button>
           <button class="header-user-btn" @click="isUserMenuOpen = !isUserMenuOpen">
             <div class="header-avatar">{{ (authStore.user?.firstname || '?')[0].toUpperCase() }}</div>
             <span class="header-user-name">{{ authStore.user?.firstname }}</span>
-            <span class="material-symbols-outlined" style="font-size:16px">expand_more</span>
+            <span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px">expand_more</span>
           </button>
         </div>
       </header>
@@ -640,6 +653,7 @@ const toggleTicker = () => {
   display: inline-flex; align-items: center; gap: 12px;
   white-space: nowrap; font-size: 12px; font-weight: 500;
   animation: ticker 60s linear infinite;
+  will-change: transform;
 }
 .ticker-office { background: #d97706; color: #fff; padding: 2px 8px; border-radius: 4px; font-weight: 700; font-size: 11px; }
 .ticker-item { display: inline-flex; align-items: center; gap: 4px; }
@@ -662,6 +676,15 @@ const toggleTicker = () => {
   flex: 1; overflow-y: auto; padding: 20px 24px;
 }
 @media (max-width: 768px) { .main-content { padding: 12px 16px; } }
+@media (max-width: 640px) {
+  .header-icon-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .header-user-btn {
+    min-height: 44px;
+  }
+}
 
 /* Material symbols */
 .material-symbols-outlined {

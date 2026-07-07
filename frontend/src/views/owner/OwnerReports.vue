@@ -82,21 +82,21 @@ function plClass(n: number) {
 
 <template>
   <div>
-    <h3 class="or-title"><span class="material-symbols-outlined">insert_chart</span> Raporlar</h3>
+    <h3 class="or-title"><span class="material-symbols-outlined" aria-hidden="true">insert_chart</span> Raporlar</h3>
 
     <div class="or-controls">
       <div class="or-type-tabs">
         <button :class="{ active: reportType === 'daily' }" @click="reportType = 'daily'">
-          <span class="material-symbols-outlined">today</span> Günlük
+          <span class="material-symbols-outlined" aria-hidden="true">today</span> Günlük
         </button>
         <button :class="{ active: reportType === 'monthly' }" @click="reportType = 'monthly'">
-          <span class="material-symbols-outlined">calendar_month</span> Aylık
+          <span class="material-symbols-outlined" aria-hidden="true">calendar_month</span> Aylık
         </button>
         <button :class="{ active: reportType === 'consolidated' }" @click="reportType = 'consolidated'">
-          <span class="material-symbols-outlined">hub</span> Konsolide
+          <span class="material-symbols-outlined" aria-hidden="true">hub</span> Konsolide
         </button>
         <button :class="{ active: reportType === 'audit' }" @click="reportType = 'audit'">
-          <span class="material-symbols-outlined">history</span> Denetim İzi
+          <span class="material-symbols-outlined" aria-hidden="true">history</span> Denetim İzi
         </button>
       </div>
 
@@ -119,13 +119,13 @@ function plClass(n: number) {
       </div>
 
       <button v-if="reportType !== 'audit'" class="or-generate" :disabled="loading" @click="generate">
-        <span class="material-symbols-outlined">{{ loading ? 'progress_activity' : 'play_arrow' }}</span>
+        <span class="material-symbols-outlined" aria-hidden="true">{{ loading ? 'progress_activity' : 'play_arrow' }}</span>
         {{ loading ? 'Oluşturuluyor...' : 'Rapor Oluştur' }}
       </button>
     </div>
 
     <div v-if="error" class="or-alert error">
-      <span class="material-symbols-outlined">error</span> {{ error }}
+      <span class="material-symbols-outlined" aria-hidden="true">error</span> {{ error }}
     </div>
 
     <!-- Consolidated Report -->
@@ -222,7 +222,7 @@ function plClass(n: number) {
     </div>
 
     <div v-else-if="reportType !== 'audit' && !loading && !initialLoad && !reportData" class="or-empty">
-      <span class="material-symbols-outlined">assessment</span>
+      <span class="material-symbols-outlined" aria-hidden="true">assessment</span>
       <p>Rapor tipi seçin ve "Rapor Oluştur" butonuna tıklayın</p>
     </div>
 
@@ -240,7 +240,7 @@ function plClass(n: number) {
           <input v-model="auditDate" type="date" class="or-input" />
         </div>
         <button class="or-generate" :disabled="auditLoading" @click="loadAudit">
-          <span class="material-symbols-outlined">{{ auditLoading ? 'progress_activity' : 'search' }}</span>
+          <span class="material-symbols-outlined" aria-hidden="true">{{ auditLoading ? 'progress_activity' : 'search' }}</span>
           {{ auditLoading ? 'Yükleniyor...' : 'Sorgula' }}
         </button>
       </div>
@@ -270,7 +270,7 @@ function plClass(n: number) {
         </table>
       </div>
       <div v-else-if="!auditLoading && auditData.length === 0" class="or-empty" style="padding: 2rem">
-        <span class="material-symbols-outlined">history</span>
+        <span class="material-symbols-outlined" aria-hidden="true">history</span>
         <p>Denetim izi sorgulamak için ofis ve tarih seçin</p>
       </div>
     </div>
@@ -289,7 +289,7 @@ function plClass(n: number) {
 .or-type-tabs button {
   display: flex; align-items: center; gap: 0.3rem;
   padding: 0.5rem 1rem; background: #f1f5f9; border: 1px solid #e2e8f0;
-  border-radius: 8px; cursor: pointer; font-size: 0.85rem; color: #64748b; transition: all .2s;
+  border-radius: 8px; cursor: pointer; font-size: 0.85rem; color: #64748b; transition: background-color 0.2s, color 0.2s, border-color 0.2s;
 }
 .or-type-tabs button.active { background: #3b82f6; color: white; border-color: #3b82f6; }
 
@@ -306,7 +306,7 @@ function plClass(n: number) {
   display: flex; align-items: center; gap: 0.4rem;
   padding: 0.6rem 1.5rem; background: #3b82f6; color: white;
   border: none; border-radius: 8px; cursor: pointer; font-size: 0.9rem; font-weight: 600;
-  transition: all .2s;
+  transition: background-color 0.2s;
 }
 .or-generate:hover:not(:disabled) { background: #2563eb; }
 .or-generate:disabled { opacity: 0.5; cursor: not-allowed; }

@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import apiService from '@/services/apiservice'
+import { useNotification } from '@/composables/useNotification'
+
+const notification = useNotification()
 
 const loading = ref(true)
 const activeTab = ref('dashboard')
@@ -183,7 +186,7 @@ async function submitPayment() {
       await loadCariEntries(paymentForm.value.dealerCode)
     }
   } catch (e: any) {
-    alert(e?.response?.data?.message || e?.message || 'Ödeme kaydedilemedi')
+    notification.error(e?.response?.data?.message || e?.message || 'Ödeme kaydedilemedi')
   } finally { paymentLoading.value = false }
 }
 
@@ -203,7 +206,7 @@ async function createDealer() {
     newDealer.value = { username: '', name: '' }
     await loadDealers()
   } catch (e: any) {
-    alert(e?.response?.data?.message || e?.message || 'Hata oluştu')
+    notification.error(e?.response?.data?.message || e?.message || 'Hata oluştu')
   } finally { createLoading.value = false }
 }
 
@@ -227,7 +230,7 @@ async function createOperator() {
     newOperator.value = { username: '', telegramId: '' }
     await loadOperators()
   } catch (e: any) {
-    alert(e?.response?.data?.message || e?.message || 'Hata oluştu')
+    notification.error(e?.response?.data?.message || e?.message || 'Hata oluştu')
   } finally { createLoading.value = false }
 }
 
@@ -275,12 +278,26 @@ function statusLabel(s: string) {
   return map[s] || s
 }
 
+const handleVisibilityChange = () => {
+  if (document.hidden) {
+    if (refreshInterval) { clearInterval(refreshInterval); refreshInterval = null }
+  } else {
+    loadDashboard()
+    refreshInterval = window.setInterval(loadDashboard, 30000)
+  }
+}
+
 onMounted(async () => {
   await loadDashboard()
   loading.value = false
   refreshInterval = window.setInterval(loadDashboard, 30000)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
 })
-onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
+
+onUnmounted(() => {
+  if (refreshInterval) clearInterval(refreshInterval)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+})
 </script>
 
 <template>
@@ -299,7 +316,7 @@ onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
       ]" :key="tab.key"
         class="tg-tab" :class="{ active: activeTab === tab.key }"
         @click="switchTab(tab.key)">
-        <span class="material-symbols-outlined">{{ tab.icon }}</span>
+        <span class="material-symbols-outlined" aria-hidden="true">{{ tab.icon }}</span>
         <span class="tab-label">{{ tab.label }}</span>
       </button>
     </div>
@@ -314,28 +331,28 @@ onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
       <!-- Primary Stats -->
       <div class="stat-grid four">
         <div class="stat-card accent-green">
-          <div class="stat-icon-wrap green"><span class="material-symbols-outlined">swap_horiz</span></div>
+          <div class="stat-icon-wrap green"><span class="material-symbols-outlined" aria-hidden="true">swap_horiz</span></div>
           <div class="stat-body">
             <div class="stat-value">{{ dashboard.total_tx }}</div>
             <div class="stat-label">Toplam İşlem</div>
           </div>
         </div>
         <div class="stat-card accent-blue">
-          <div class="stat-icon-wrap blue"><span class="material-symbols-outlined">payments</span></div>
+          <div class="stat-icon-wrap blue"><span class="material-symbols-outlined" aria-hidden="true">payments</span></div>
           <div class="stat-body">
             <div class="stat-value">₺{{ formatMoney(dashboard.total_tl) }}</div>
             <div class="stat-label">Toplam TL Hacmi</div>
           </div>
         </div>
         <div class="stat-card accent-purple">
-          <div class="stat-icon-wrap purple"><span class="material-symbols-outlined">token</span></div>
+          <div class="stat-icon-wrap purple"><span class="material-symbols-outlined" aria-hidden="true">token</span></div>
           <div class="stat-body">
             <div class="stat-value">${{ formatMoney(dashboard.total_usdt) }}</div>
             <div class="stat-label">Toplam USDT</div>
           </div>
         </div>
         <div class="stat-card accent-orange">
-          <div class="stat-icon-wrap orange"><span class="material-symbols-outlined">currency_ruble</span></div>
+          <div class="stat-icon-wrap orange"><span class="material-symbols-outlined" aria-hidden="true">currency_ruble</span></div>
           <div class="stat-body">
             <div class="stat-value">₽{{ formatMoney(dashboard.total_rub) }}</div>
             <div class="stat-label">Toplam RUB</div>
@@ -373,7 +390,7 @@ onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
 
       <!-- Bot Status -->
       <div class="section-title">
-        <span class="material-symbols-outlined">smart_toy</span>
+        <span class="material-symbols-outlined" aria-hidden="true">smart_toy</span>
         Bot Durumu
       </div>
       <div class="bot-grid">
@@ -384,16 +401,16 @@ onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
             <span class="bot-status-badge" :style="{ background: statusColor(bot.status) }">{{ statusLabel(bot.status) }}</span>
           </div>
           <div class="bot-details">
-            <div class="bot-stat"><span class="material-symbols-outlined" style="font-size:14px">group</span> {{ bot.active_sessions }} oturum</div>
-            <div class="bot-stat" v-if="bot.last_heartbeat"><span class="material-symbols-outlined" style="font-size:14px">schedule</span> {{ formatDate(bot.last_heartbeat) }}</div>
-            <div class="bot-stat" v-if="bot.age_seconds != null"><span class="material-symbols-outlined" style="font-size:14px">timer</span> {{ bot.age_seconds < 60 ? `${bot.age_seconds}sn` : `${Math.floor(bot.age_seconds / 60)}dk` }} önce</div>
+            <div class="bot-stat"><span class="material-symbols-outlined" aria-hidden="true" style="font-size:14px">group</span> {{ bot.active_sessions }} oturum</div>
+            <div class="bot-stat" v-if="bot.last_heartbeat"><span class="material-symbols-outlined" aria-hidden="true" style="font-size:14px">schedule</span> {{ formatDate(bot.last_heartbeat) }}</div>
+            <div class="bot-stat" v-if="bot.age_seconds != null"><span class="material-symbols-outlined" aria-hidden="true" style="font-size:14px">timer</span> {{ bot.age_seconds < 60 ? `${bot.age_seconds}sn` : `${Math.floor(bot.age_seconds / 60)}dk` }} önce</div>
           </div>
         </div>
       </div>
 
       <!-- Recent Transactions -->
       <div class="section-title">
-        <span class="material-symbols-outlined">history</span>
+        <span class="material-symbols-outlined" aria-hidden="true">history</span>
         Son İşlemler
       </div>
       <div class="tg-table-wrap">
@@ -424,7 +441,7 @@ onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
       </div>
 
       <div class="refresh-indicator">
-        <span class="material-symbols-outlined" style="font-size:14px">autorenew</span>
+        <span class="material-symbols-outlined" aria-hidden="true" style="font-size:14px">autorenew</span>
         30 saniyede bir otomatik güncellenir
       </div>
     </div>
@@ -446,7 +463,7 @@ onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
           </button>
         </div>
         <div class="search-box">
-          <span class="material-symbols-outlined" style="font-size:16px;color:var(--color-text-secondary,#9ca3af)">search</span>
+          <span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px;color:var(--color-text-secondary,#9ca3af)">search</span>
           <input v-model="txSearch" placeholder="Ara (ID, müşteri, bayi, para)..." class="search-input" />
         </div>
       </div>
@@ -482,9 +499,9 @@ onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
     <!-- ═══════ DEALERS ═══════ -->
     <div v-else-if="activeTab === 'dealers'" class="tg-content">
       <div class="toolbar">
-        <div class="section-title" style="margin:0"><span class="material-symbols-outlined">storefront</span> Bayi Yönetimi</div>
+        <div class="section-title" style="margin:0"><span class="material-symbols-outlined" aria-hidden="true">storefront</span> Bayi Yönetimi</div>
         <button class="add-btn" @click="showCreateDealer = !showCreateDealer">
-          <span class="material-symbols-outlined" style="font-size:16px">{{ showCreateDealer ? 'close' : 'person_add' }}</span>
+          <span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px">{{ showCreateDealer ? 'close' : 'person_add' }}</span>
           {{ showCreateDealer ? 'Kapat' : 'Bayi Ata' }}
         </button>
       </div>
@@ -501,7 +518,7 @@ onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
             <input v-model="newDealer.name" placeholder="Görünen ad..." class="form-input" />
           </div>
           <button class="action-sm save" :disabled="createLoading" @click="createDealer">
-            <span class="material-symbols-outlined" style="font-size:14px">check</span>
+            <span class="material-symbols-outlined" aria-hidden="true" style="font-size:14px">check</span>
             {{ createLoading ? 'Kaydediliyor...' : 'Kaydet' }}
           </button>
         </div>
@@ -512,7 +529,7 @@ onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
       <div v-if="dealers.length" class="dealer-cards">
         <div v-for="d in dealers" :key="d.id" class="dealer-card">
           <div class="dealer-card-header">
-            <div class="dealer-card-icon"><span class="material-symbols-outlined">storefront</span></div>
+            <div class="dealer-card-icon"><span class="material-symbols-outlined" aria-hidden="true">storefront</span></div>
             <div class="dealer-card-info">
               <div class="dealer-card-name">{{ d.dealer_name }}</div>
               <div class="dealer-card-code"><code>{{ d.dealer_code }}</code></div>
@@ -534,15 +551,15 @@ onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
             </div>
           </div>
           <div class="dealer-card-footer">
-            <span class="dealer-card-user"><span class="material-symbols-outlined" style="font-size:14px">person</span> {{ d.username }} · {{ d.name }}</span>
+            <span class="dealer-card-user"><span class="material-symbols-outlined" aria-hidden="true" style="font-size:14px">person</span> {{ d.username }} · {{ d.name }}</span>
             <button class="icon-btn danger" @click="deleteDealer(d.id)" title="Atamasını kaldır">
-              <span class="material-symbols-outlined">person_remove</span>
+              <span class="material-symbols-outlined" aria-hidden="true">person_remove</span>
             </button>
           </div>
         </div>
       </div>
       <div v-else class="empty-state">
-        <span class="material-symbols-outlined" style="font-size:48px;color:var(--color-text-secondary,#d1d5db)">storefront</span>
+        <span class="material-symbols-outlined" aria-hidden="true" style="font-size:48px;color:var(--color-text-secondary,#d1d5db)">storefront</span>
         <div>Henüz bayi atanmamış</div>
       </div>
     </div>
@@ -550,9 +567,9 @@ onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
     <!-- ═══════ OPERATORS ═══════ -->
     <div v-else-if="activeTab === 'operators'" class="tg-content">
       <div class="toolbar">
-        <div class="section-title" style="margin:0"><span class="material-symbols-outlined">support_agent</span> Operatör Yönetimi</div>
+        <div class="section-title" style="margin:0"><span class="material-symbols-outlined" aria-hidden="true">support_agent</span> Operatör Yönetimi</div>
         <button class="add-btn" @click="showCreateOperator = !showCreateOperator">
-          <span class="material-symbols-outlined" style="font-size:16px">{{ showCreateOperator ? 'close' : 'person_add' }}</span>
+          <span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px">{{ showCreateOperator ? 'close' : 'person_add' }}</span>
           {{ showCreateOperator ? 'Kapat' : 'Operatör Ata' }}
         </button>
       </div>
@@ -569,7 +586,7 @@ onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
             <input v-model="newOperator.telegramId" placeholder="Telegram Chat ID..." class="form-input" />
           </div>
           <button class="action-sm save" :disabled="createLoading" @click="createOperator">
-            <span class="material-symbols-outlined" style="font-size:14px">check</span>
+            <span class="material-symbols-outlined" aria-hidden="true" style="font-size:14px">check</span>
             {{ createLoading ? 'Kaydediliyor...' : 'Kaydet' }}
           </button>
         </div>
@@ -590,7 +607,7 @@ onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
               <td>{{ formatDate(op.created_at) }}</td>
               <td>
                 <button class="icon-btn danger" @click="deleteOperator(op.id)" title="Kaldır">
-                  <span class="material-symbols-outlined">person_remove</span>
+                  <span class="material-symbols-outlined" aria-hidden="true">person_remove</span>
                 </button>
               </td>
             </tr>
@@ -612,9 +629,9 @@ onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
       <!-- Exchange Rates -->
       <div class="crypto-section">
         <div class="crypto-section-header">
-          <div class="crypto-section-title"><span class="material-symbols-outlined" style="font-size:18px">currency_exchange</span> Döviz Kurları</div>
+          <div class="crypto-section-title"><span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px">currency_exchange</span> Döviz Kurları</div>
           <button class="add-btn" @click="showNewRateForm = !showNewRateForm">
-            <span class="material-symbols-outlined" style="font-size:16px">{{ showNewRateForm ? 'close' : 'add' }}</span>
+            <span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px">{{ showNewRateForm ? 'close' : 'add' }}</span>
             {{ showNewRateForm ? 'Kapat' : 'Kur Ekle' }}
           </button>
         </div>
@@ -643,7 +660,7 @@ onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
               </div>
               <div class="rate-updated">Son: {{ formatDate(rate.updatedAt) }}</div>
               <button class="action-sm edit" @click="editingRate = { ...rate }">
-                <span class="material-symbols-outlined" style="font-size:14px">edit</span> Düzenle
+                <span class="material-symbols-outlined" aria-hidden="true" style="font-size:14px">edit</span> Düzenle
               </button>
             </template>
           </div>
@@ -653,7 +670,7 @@ onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
 
       <!-- Crypto Deposits -->
       <div class="crypto-section" style="margin-top:16px">
-        <div class="crypto-section-title"><span class="material-symbols-outlined" style="font-size:18px">account_balance</span> Kripto Deposit Geçmişi</div>
+        <div class="crypto-section-title"><span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px">account_balance</span> Kripto Deposit Geçmişi</div>
         <div class="tg-table-wrap" style="margin-top:10px">
           <table class="tg-table">
             <thead><tr><th>ID</th><th>İşlem</th><th>TXID</th><th>Tutar</th><th>Ağ</th><th>Onay</th><th>Durum</th><th>Tarih</th></tr></thead>
@@ -680,21 +697,21 @@ onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
       <!-- Özet Kartları -->
       <div class="stat-grid three" style="margin-bottom:16px">
         <div class="stat-card accent-green">
-          <div class="stat-icon-wrap green"><span class="material-symbols-outlined">arrow_downward</span></div>
+          <div class="stat-icon-wrap green"><span class="material-symbols-outlined" aria-hidden="true">arrow_downward</span></div>
           <div class="stat-body">
             <div class="stat-value">₺{{ formatMoney(cariSummary.totals?.totalReceivable) }}</div>
             <div class="stat-label">Toplam Alacak</div>
           </div>
         </div>
         <div class="stat-card accent-orange">
-          <div class="stat-icon-wrap orange"><span class="material-symbols-outlined">arrow_upward</span></div>
+          <div class="stat-icon-wrap orange"><span class="material-symbols-outlined" aria-hidden="true">arrow_upward</span></div>
           <div class="stat-body">
             <div class="stat-value">₺{{ formatMoney(cariSummary.totals?.totalPayable) }}</div>
             <div class="stat-label">Toplam Borç</div>
           </div>
         </div>
         <div class="stat-card" :class="{ 'accent-blue': (cariSummary.totals?.netPosition ?? 0) >= 0, 'accent-orange': (cariSummary.totals?.netPosition ?? 0) < 0 }">
-          <div class="stat-icon-wrap" :class="(cariSummary.totals?.netPosition ?? 0) >= 0 ? 'blue' : 'orange'"><span class="material-symbols-outlined">balance</span></div>
+          <div class="stat-icon-wrap" :class="(cariSummary.totals?.netPosition ?? 0) >= 0 ? 'blue' : 'orange'"><span class="material-symbols-outlined" aria-hidden="true">balance</span></div>
           <div class="stat-body">
             <div class="stat-value">₺{{ formatMoney(Math.abs(cariSummary.totals?.netPosition ?? 0)) }}</div>
             <div class="stat-label">Net Pozisyon ({{ (cariSummary.totals?.netPosition ?? 0) >= 0 ? 'Alacak' : 'Borç' }})</div>
@@ -704,7 +721,7 @@ onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
 
       <!-- Ödeme Formu -->
       <div v-if="showPaymentForm" class="create-form" style="margin-bottom:16px">
-        <div class="section-title" style="margin:0 0 10px"><span class="material-symbols-outlined">payments</span> Ödeme Kaydı — {{ paymentForm.dealerCode }}</div>
+        <div class="section-title" style="margin:0 0 10px"><span class="material-symbols-outlined" aria-hidden="true">payments</span> Ödeme Kaydı — {{ paymentForm.dealerCode }}</div>
         <div class="form-row">
           <div class="form-group">
             <label>Tutar (TL)</label>
@@ -719,7 +736,7 @@ onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
             <input v-model="paymentForm.paymentReference" placeholder="Makbuz no..." class="form-input" />
           </div>
           <button class="action-sm save" :disabled="paymentLoading" @click="submitPayment">
-            <span class="material-symbols-outlined" style="font-size:14px">check</span>
+            <span class="material-symbols-outlined" aria-hidden="true" style="font-size:14px">check</span>
             {{ paymentLoading ? 'Kaydediliyor...' : 'Kaydet' }}
           </button>
           <button class="action-sm cancel" @click="showPaymentForm = false">İptal</button>
@@ -731,7 +748,7 @@ onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
         <div v-for="d in cariSummary.dealers" :key="d.dealerCode" class="dealer-card cari-card">
           <div class="dealer-card-header">
             <div class="dealer-card-icon" :class="{ payable: d.balanceType === 'payable', receivable: d.balanceType === 'receivable' }">
-              <span class="material-symbols-outlined">{{ d.balanceType === 'payable' ? 'arrow_upward' : d.balanceType === 'receivable' ? 'arrow_downward' : 'check_circle' }}</span>
+              <span class="material-symbols-outlined" aria-hidden="true">{{ d.balanceType === 'payable' ? 'arrow_upward' : d.balanceType === 'receivable' ? 'arrow_downward' : 'check_circle' }}</span>
             </div>
             <div class="dealer-card-info">
               <div class="dealer-card-name">{{ d.dealerName }}</div>
@@ -763,23 +780,23 @@ onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
           </div>
           <div class="dealer-card-footer">
             <span class="dealer-card-user">
-              <span class="material-symbols-outlined" style="font-size:14px">percent</span>
+              <span class="material-symbols-outlined" aria-hidden="true" style="font-size:14px">percent</span>
               Komisyon: %{{ d.commissionRate }}
               <template v-if="d.lastTransaction"> · Son: {{ formatDate(d.lastTransaction) }}</template>
             </span>
             <div style="display:flex;gap:6px">
               <button class="action-sm edit" style="margin:0" @click="loadCariEntries(d.dealerCode)">
-                <span class="material-symbols-outlined" style="font-size:14px">receipt_long</span> Ekstre
+                <span class="material-symbols-outlined" aria-hidden="true" style="font-size:14px">receipt_long</span> Ekstre
               </button>
               <button v-if="d.balanceType !== 'settled'" class="action-sm save" style="margin:0" @click="openPaymentForm(d)">
-                <span class="material-symbols-outlined" style="font-size:14px">payments</span> Ödeme
+                <span class="material-symbols-outlined" aria-hidden="true" style="font-size:14px">payments</span> Ödeme
               </button>
             </div>
           </div>
         </div>
       </div>
       <div v-else class="empty-state">
-        <span class="material-symbols-outlined" style="font-size:48px;color:var(--color-text-secondary,#d1d5db)">account_balance_wallet</span>
+        <span class="material-symbols-outlined" aria-hidden="true" style="font-size:48px;color:var(--color-text-secondary,#d1d5db)">account_balance_wallet</span>
         <div>Cari hesap bağlantısı olan bayi yok</div>
       </div>
 
@@ -787,7 +804,7 @@ onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
       <div v-if="selectedCariDealer" class="cari-ekstre" style="margin-top:20px">
         <div class="toolbar">
           <div class="section-title" style="margin:0">
-            <span class="material-symbols-outlined">receipt_long</span>
+            <span class="material-symbols-outlined" aria-hidden="true">receipt_long</span>
             {{ cariEntries.dealerName }} — Ekstre
             <span class="cari-balance-badge sm" :class="cariEntries.balanceType" style="margin-left:8px">
               ₺{{ formatMoney(Math.abs(cariEntries.balance)) }}
@@ -795,7 +812,7 @@ onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
             </span>
           </div>
           <button class="action-sm cancel" @click="selectedCariDealer = null">
-            <span class="material-symbols-outlined" style="font-size:14px">close</span> Kapat
+            <span class="material-symbols-outlined" aria-hidden="true" style="font-size:14px">close</span> Kapat
           </button>
         </div>
         <div class="tg-table-wrap" style="margin-top:10px">
@@ -843,7 +860,7 @@ onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
               <td>{{ formatDate(q.createdAt) }}</td>
               <td>
                 <button v-if="q.status === 'failed'" class="icon-btn" @click="retryQueue(q.queueId)" title="Tekrar Dene">
-                  <span class="material-symbols-outlined">refresh</span>
+                  <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
                 </button>
               </td>
             </tr>
@@ -886,7 +903,7 @@ onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
 .tg-tab {
   display: flex; align-items: center; gap: 6px; padding: 8px 14px;
   border: none; background: transparent; color: var(--color-text-secondary, #6b7280);
-  border-radius: 8px; cursor: pointer; font-size: 13px; white-space: nowrap; transition: all 0.15s;
+  border-radius: 8px; cursor: pointer; font-size: 13px; white-space: nowrap; transition: background-color 0.15s, color 0.15s;
 }
 .tg-tab .material-symbols-outlined { font-size: 18px; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
 .tg-tab:hover { background: var(--color-hover, #f3f4f6); color: var(--color-text, #1f2937); }
@@ -972,7 +989,7 @@ onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
 /* Toolbar */
 .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .filter-bar { display: flex; gap: 6px; flex-wrap: wrap; }
-.filter-btn { padding: 6px 12px; border: 1px solid var(--color-border, #e5e7eb); background: var(--color-card, #fff); border-radius: 6px; font-size: 12px; cursor: pointer; color: var(--color-text-secondary, #6b7280); transition: all 0.15s; }
+.filter-btn { padding: 6px 12px; border: 1px solid var(--color-border, #e5e7eb); background: var(--color-card, #fff); border-radius: 6px; font-size: 12px; cursor: pointer; color: var(--color-text-secondary, #6b7280); transition: background-color 0.15s, color 0.15s, border-color 0.15s; }
 .filter-btn:hover { border-color: var(--color-primary, #2563eb); }
 .filter-btn.active { background: var(--color-primary, #2563eb); color: #fff; border-color: var(--color-primary, #2563eb); }
 
@@ -981,7 +998,7 @@ onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
 .result-count { font-size: 11px; color: var(--color-text-secondary, #9ca3af); margin-bottom: 8px; }
 
 /* Add Button */
-.add-btn { display: flex; align-items: center; gap: 4px; padding: 6px 14px; border: 1px solid var(--color-primary, #2563eb); background: transparent; color: var(--color-primary, #2563eb); border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+.add-btn { display: flex; align-items: center; gap: 4px; padding: 6px 14px; border: 1px solid var(--color-primary, #2563eb); background: transparent; color: var(--color-primary, #2563eb); border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background-color 0.15s, color 0.15s, border-color 0.15s; }
 .add-btn:hover { background: var(--color-primary, #2563eb); color: #fff; }
 .add-btn .material-symbols-outlined { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
 
