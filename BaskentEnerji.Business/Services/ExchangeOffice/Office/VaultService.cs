@@ -394,7 +394,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             var exchangeRates = await GetExchangeRatesForCurrenciesAsync(currencies.Values);
             var baseCurrencyId = await GetBaseCurrencyIdAsync();
 
-            var netDebtByOfficeId = await CalculateBranchNetDebtToMerkezAsync(offices);
+            var netDebtByOfficeId = await CalculateBranchNetDebtToMerkezAsync(offices, baseCurrencyId);
 
             var summaries = new List<vm_officesummary>();
 
@@ -472,7 +472,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
         // Şubelerin Merkez'e olan net borcunu, tamamlanmış OfficeTransfer kayıtlarından türetir.
         // Merkez → Şube transferi sermaye avansı (borcu artırır), Şube → Merkez transferi geri ödeme/kâr havalesi (borcu azaltır).
         // Kalıcı bir borç tablosu yok — bu değer her çağrıda mevcut transfer geçmişinden hesaplanır.
-        private async Task<Dictionary<Guid, decimal>> CalculateBranchNetDebtToMerkezAsync(List<BaskentEnerji.Entity.Entities.ExchangeOffice.Office.Office> offices)
+        private async Task<Dictionary<Guid, decimal>> CalculateBranchNetDebtToMerkezAsync(List<BaskentEnerji.Entity.Entities.ExchangeOffice.Office.Office> offices, Guid baseCurrencyId)
         {
             var netDebtByOfficeId = new Dictionary<Guid, decimal>();
 
@@ -498,9 +498,28 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                      (subeVaultIds.Contains(t.SourceVaultId) && merkezVaultIds.Contains(t.TargetVaultId))))
                 .ToListAsync();
 
+            if (transfers.Count == 0)
+                return netDebtByOfficeId;
+
+            // Transfer kurlarını tek seferde toplu çek (per-transfer sorgu yerine)
+            var transferCurrencyIds = transfers.Select(t => t.CurrencyId).Distinct();
+            var transferRates = await GetExchangeRatesForCurrenciesAsync(transferCurrencyIds);
+
             foreach (var t in transfers)
             {
-                var valueInBase = await ConvertToBaseCurrencyAsync(t.CurrencyId, t.Amount);
+                decimal valueInBase;
+                if (t.CurrencyId == baseCurrencyId)
+                {
+                    valueInBase = t.Amount;
+                }
+                else
+                {
+                    decimal rate = 0;
+                    if (transferRates.TryGetValue(t.CurrencyId, out var foundRate))
+                        rate = foundRate;
+                    valueInBase = t.Amount * rate;
+                }
+
                 if (merkezVaultIds.Contains(t.SourceVaultId))
                 {
                     var subeOfficeId = subeVaultToOfficeId[t.TargetVaultId];
