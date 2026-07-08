@@ -396,7 +396,7 @@ function fmtDate(d: string) { return new Date(d).toLocaleString('tr-TR', { day:'
   background: #5a8cff;
   color: white;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -420,7 +420,7 @@ function fmtDate(d: string) { return new Date(d).toLocaleString('tr-TR', { day:'
   background: #22c55e;
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -434,23 +434,23 @@ function fmtDate(d: string) { return new Date(d).toLocaleString('tr-TR', { day:'
   align-items: center;
   gap: 4px;
   padding: 6px 14px;
-  background: #ef4444;
+  background: var(--color-danger);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: background 0.2s;
 }
 
-.btn-reject:hover { background: #dc2626; }
+.btn-reject:hover { background: var(--color-danger); }
 
 .btn-cancel {
   padding: 8px 16px;
   background: none;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: #6b7280;
   font-size: 14px;
   cursor: pointer;
@@ -461,17 +461,17 @@ function fmtDate(d: string) { return new Date(d).toLocaleString('tr-TR', { day:'
 
 .btn-danger {
   padding: 8px 20px;
-  background: #ef4444;
+  background: var(--color-danger);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
   transition: background 0.2s;
 }
 
-.btn-danger:hover { background: #dc2626; }
+.btn-danger:hover { background: var(--color-danger); }
 .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .btn-icon {
@@ -480,7 +480,7 @@ function fmtDate(d: string) { return new Date(d).toLocaleString('tr-TR', { day:'
   color: #9ca3af;
   cursor: pointer;
   padding: 4px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   transition: color 0.2s;
 }
 
@@ -492,7 +492,7 @@ function fmtDate(d: string) { return new Date(d).toLocaleString('tr-TR', { day:'
   gap: 4px;
   padding: 4px;
   background: #f3f4f6;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   margin-bottom: 24px;
   width: fit-content;
 }
@@ -503,7 +503,7 @@ function fmtDate(d: string) { return new Date(d).toLocaleString('tr-TR', { day:'
   gap: 8px;
   padding: 8px 16px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 14px;
   color: #6b7280;
   background: transparent;
@@ -524,12 +524,12 @@ function fmtDate(d: string) { return new Date(d).toLocaleString('tr-TR', { day:'
 }
 
 .badge-count {
-  background: #f59e0b;
+  background: var(--color-warning);
   color: #1a1a1a;
   font-size: 11px;
   font-weight: 700;
   padding: 1px 7px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   line-height: 1.4;
 }
 
@@ -553,7 +553,7 @@ function fmtDate(d: string) { return new Date(d).toLocaleString('tr-TR', { day:'
 .error-box {
   background: #fef2f2;
   border: 1px solid #fecaca;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 12px 16px;
   color: #b91c1c;
   font-size: 14px;
@@ -638,7 +638,7 @@ function fmtDate(d: string) { return new Date(d).toLocaleString('tr-TR', { day:'
 .amount-highlight {
   font-family: monospace;
   font-weight: 700;
-  color: #d97706;
+  color: var(--color-warning);
   font-size: 15px;
 }
 
@@ -680,7 +680,7 @@ function fmtDate(d: string) { return new Date(d).toLocaleString('tr-TR', { day:'
   flex-wrap: wrap;
   background: white;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 12px 16px;
 }
 
@@ -702,14 +702,14 @@ function fmtDate(d: string) { return new Date(d).toLocaleString('tr-TR', { day:'
 
 .rejection-text {
   font-size: 12px;
-  color: #ef4444;
+  color: var(--color-danger);
 }
 
 /* Status badges */
 .status-badge {
   display: inline-block;
   padding: 3px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
   font-weight: 600;
   border: 1px solid;
@@ -723,13 +723,13 @@ function fmtDate(d: string) { return new Date(d).toLocaleString('tr-TR', { day:'
 }
 
 .status-completed {
-  background: #d1fae5;
+  background: var(--color-success-bg);
   color: #065f46;
   border-color: #6ee7b7;
 }
 
 .status-rejected {
-  background: #fee2e2;
+  background: var(--color-danger-bg);
   color: #991b1b;
   border-color: #fca5a5;
 }
@@ -766,7 +766,7 @@ function fmtDate(d: string) { return new Date(d).toLocaleString('tr-TR', { day:'
 
 .modal-card {
   background: white;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   width: 100%;
   max-width: 420px;
   box-shadow: 0 20px 60px rgba(0,0,0,0.2);
@@ -794,7 +794,7 @@ function fmtDate(d: string) { return new Date(d).toLocaleString('tr-TR', { day:'
 }
 
 .modal-title-danger {
-  color: #ef4444;
+  color: var(--color-danger);
 }
 
 .modal-body {
@@ -837,7 +837,7 @@ function fmtDate(d: string) { return new Date(d).toLocaleString('tr-TR', { day:'
   padding: 10px 12px;
   background: white;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 14px;
   color: #1a1a1a;
   outline: none;

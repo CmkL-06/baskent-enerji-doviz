@@ -215,7 +215,7 @@ function formatDate(d: string): string {
 }
 .dc-modal {
   background: #1a1a2e;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   width: 100%;
   max-width: 900px;
   max-height: 90vh;
@@ -242,7 +242,7 @@ function formatDate(d: string): string {
 }
 .dc-header-icon {
   font-size: 28px;
-  color: #f59e0b;
+  color: var(--color-warning);
   font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
 .dc-close-btn {
@@ -252,7 +252,7 @@ function formatDate(d: string): string {
   color: rgba(255,255,255,.5);
   cursor: pointer;
   padding: 4px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   transition: background-color 0.2s, color 0.2s;
 }
 .dc-close-btn:hover {
@@ -277,7 +277,7 @@ function formatDate(d: string): string {
 }
 .dc-status-ok .material-symbols-outlined {
   font-size: 48px;
-  color: #10b981;
+  color: var(--color-success);
   font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 48;
 }
 .dc-status-ok p { color: rgba(255,255,255,.8); margin: 0; }
@@ -288,7 +288,7 @@ function formatDate(d: string): string {
   gap: 8px;
   padding: 12px 24px;
   background: rgba(245,158,11,.12);
-  color: #f59e0b;
+  color: var(--color-warning);
   font-size: .9rem;
 }
 .dc-warning-bar .material-symbols-outlined {
@@ -352,12 +352,12 @@ function formatDate(d: string): string {
 }
 .text-right { text-align: right; }
 .mono { font-family: 'JetBrains Mono', monospace; font-size: .85rem; }
-.text-red { color: #ef4444; }
-.text-green { color: #10b981; }
+.text-red { color: var(--color-danger); }
+.text-green { color: var(--color-success); }
 .dc-input {
   background: rgba(255,255,255,.06);
   border: 1px solid rgba(255,255,255,.12);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: #fff;
   padding: 6px 10px;
   font-size: .9rem;
@@ -374,7 +374,7 @@ function formatDate(d: string): string {
   text-align: left;
 }
 .dc-required {
-  border-color: #ef4444 !important;
+  border-color: var(--color-danger) !important;
 }
 .dc-notes-section {
   padding: 0 24px 16px;
@@ -389,7 +389,7 @@ function formatDate(d: string): string {
   width: 100%;
   background: rgba(255,255,255,.06);
   border: 1px solid rgba(255,255,255,.12);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: #fff;
   padding: 10px 12px;
   font-size: .9rem;
@@ -411,7 +411,7 @@ function formatDate(d: string): string {
   align-items: center;
   gap: 6px;
   font-size: .85rem;
-  color: #ef4444;
+  color: var(--color-danger);
 }
 .dc-disc-warn .material-symbols-outlined {
   font-size: 18px;
@@ -427,7 +427,7 @@ function formatDate(d: string): string {
   align-items: center;
   gap: 6px;
   padding: 10px 20px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   font-size: .9rem;
   font-weight: 500;
   cursor: pointer;

@@ -428,12 +428,12 @@ onMounted(async () => {
 <style scoped>
 /* ═══ Design Tokens ═══ */
 .mr-page {
-  --mr-radius: 16px;
-  --mr-border: #e2e8f0;
-  --mr-indigo: #6366f1;
+  --mr-radius: var(--radius-lg);
+  --mr-border: var(--color-border);
+  --mr-indigo: var(--color-primary);
   --mr-green: #16a34a;
-  --mr-red: #dc2626;
-  --mr-amber: #d97706;
+  --mr-red: var(--color-danger);
+  --mr-amber: var(--color-warning);
   --mr-shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
   --mr-shadow-md: 0 4px 16px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
   --mr-shadow-lg: 0 8px 32px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
@@ -464,7 +464,7 @@ onMounted(async () => {
 .mr-topbar-icon {
   width: 40px;
   height: 40px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: rgba(99,102,241,0.08);
   display: flex;
   align-items: center;
@@ -473,7 +473,7 @@ onMounted(async () => {
 .mr-topbar-title {
   font-size: 18px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--color-text);
   margin: 0;
 }
 .mr-topbar-right {
@@ -487,8 +487,8 @@ onMounted(async () => {
   display: flex;
   gap: 4px;
   padding: 4px;
-  background: #f1f5f9;
-  border-radius: 12px;
+  background: var(--color-bg-page);
+  border-radius: var(--radius-lg);
   margin-bottom: 20px;
   box-shadow: inset 0 1px 2px rgba(0,0,0,0.06);
 }
@@ -500,16 +500,16 @@ onMounted(async () => {
   gap: 6px;
   padding: 10px 16px;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: transparent;
-  color: #64748b;
+  color: var(--color-text-secondary);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1), color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .mr-tab:hover {
-  color: #334155;
+  color: var(--color-text);
   background: rgba(255,255,255,0.6);
 }
 .mr-tab--active {
@@ -525,7 +525,7 @@ onMounted(async () => {
   gap: 6px;
   padding: 9px 18px;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -537,7 +537,7 @@ onMounted(async () => {
   box-shadow: 0 2px 8px rgba(99,102,241,0.25);
 }
 .mr-btn--primary:hover {
-  background: #4f46e5;
+  background: var(--color-primary-hover);
   box-shadow: 0 4px 16px rgba(99,102,241,0.35);
   transform: translateY(-1px);
 }
@@ -548,12 +548,12 @@ onMounted(async () => {
 }
 .mr-btn--ghost {
   background: white;
-  color: #475569;
+  color: var(--color-text-secondary);
   border: 1px solid var(--mr-border);
 }
 .mr-btn--ghost:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
+  background: var(--color-bg-page);
+  border-color: var(--color-border);
 }
 
 /* ═══ Alerts ═══ */
@@ -562,7 +562,7 @@ onMounted(async () => {
   align-items: center;
   gap: 8px;
   padding: 12px 16px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   font-size: 13px;
   font-weight: 500;
   margin-bottom: 16px;
@@ -594,7 +594,7 @@ onMounted(async () => {
   align-items: center;
   gap: 12px;
   padding: 64px 0;
-  color: #94a3b8;
+  color: var(--color-text-muted);
   font-size: 14px;
 }
 
@@ -605,7 +605,7 @@ onMounted(async () => {
   align-items: center;
   gap: 12px;
   padding: 64px 0;
-  color: #94a3b8;
+  color: var(--color-text-muted);
   font-size: 14px;
 }
 
@@ -647,7 +647,7 @@ onMounted(async () => {
 .mr-rate-code {
   font-size: 14px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--color-text);
 }
 .mr-rate-actions {
   display: flex;
@@ -658,9 +658,9 @@ onMounted(async () => {
   width: 32px;
   height: 32px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: rgba(99,102,241,0.06);
-  color: #64748b;
+  color: var(--color-text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -698,7 +698,7 @@ onMounted(async () => {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #94a3b8;
+  color: var(--color-text-muted);
   margin-bottom: 4px;
 }
 .mr-rate-value {
@@ -723,22 +723,22 @@ onMounted(async () => {
   align-items: center;
   gap: 4px;
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--color-text-muted);
 }
 .mr-rate-badge {
   font-size: 11px;
   font-weight: 600;
   padding: 2px 10px;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
 }
 .mr-rate-badge--active {
   background: #ecfdf5;
-  color: #059669;
+  color: var(--color-success);
   border: 1px solid #a7f3d0;
 }
 .mr-rate-badge--inactive {
   background: #fef2f2;
-  color: #dc2626;
+  color: var(--color-danger);
   border: 1px solid #fecaca;
 }
 
@@ -774,7 +774,7 @@ onMounted(async () => {
 .mr-form-header h2 {
   font-size: 16px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--color-text);
   margin: 0;
 }
 .mr-form {
@@ -800,7 +800,7 @@ onMounted(async () => {
 .mr-label {
   font-size: 12px;
   font-weight: 600;
-  color: #475569;
+  color: var(--color-text-secondary);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -816,10 +816,10 @@ onMounted(async () => {
 .mr-select, .mr-input {
   padding: 10px 14px;
   border: 1.5px solid var(--mr-border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   font-size: 14px;
   font-weight: 500;
-  color: #1e293b;
+  color: var(--color-text);
   background: white;
   transition: border-color 0.2s, box-shadow 0.2s;
   outline: none;
@@ -830,8 +830,8 @@ onMounted(async () => {
   box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
 }
 .mr-select:disabled {
-  background: #f8fafc;
-  color: #94a3b8;
+  background: var(--color-bg-page);
+  color: var(--color-text-muted);
 }
 .mr-input--buy:focus {
   border-color: var(--mr-green);
@@ -849,7 +849,7 @@ onMounted(async () => {
   padding: 10px 14px;
   background: #fffbeb;
   border: 1px solid #fde68a;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   font-size: 13px;
   color: #92400e;
 }
@@ -888,7 +888,7 @@ onMounted(async () => {
   gap: 8px;
   font-size: 15px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--color-text);
   margin: 0;
 }
 
@@ -904,15 +904,15 @@ onMounted(async () => {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #64748b;
-  background: #f8fafc;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-page);
   border-bottom: 1px solid var(--mr-border);
 }
 .mr-table td {
   padding: 12px 16px;
   font-size: 13px;
-  color: #334155;
-  border-bottom: 1px solid #f1f5f9;
+  color: var(--color-text);
+  border-bottom: 1px solid var(--color-bg-page);
   font-variant-numeric: tabular-nums;
 }
 .mr-table tr:hover td {

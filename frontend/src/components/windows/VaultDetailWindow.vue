@@ -486,7 +486,7 @@ onMounted(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #f8f9fb;
+  background: var(--color-bg-page);
   position: relative;
   overflow: hidden;
 }
@@ -534,7 +534,7 @@ onMounted(() => {
   height: 60px;
   background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(10px);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -554,11 +554,11 @@ onMounted(() => {
 }
 
 .status-indicator.active {
-  background: #10b981;
+  background: var(--color-success);
 }
 
 .status-indicator.inactive {
-  background: #ef4444;
+  background: var(--color-danger);
   animation: none;
 }
 
@@ -595,7 +595,7 @@ onMounted(() => {
 
 .meta-status {
   padding: 0.25rem 0.75rem;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   font-size: 0.85rem;
   font-weight: 500;
   background: rgba(255, 255, 255, 0.2);
@@ -619,7 +619,7 @@ onMounted(() => {
   background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   color: white;
   font-size: 0.9rem;
   font-weight: 500;
@@ -658,7 +658,7 @@ onMounted(() => {
 /* Unified Balance Card */
 .unified-balance-card {
   background: white;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   padding: 2rem;
   margin-bottom: 2rem;
@@ -694,7 +694,7 @@ onMounted(() => {
   display: block;
   font-size: 1.75rem;
   font-weight: 700;
-  color: #10b981;
+  color: var(--color-success);
   letter-spacing: -0.02em;
 }
 
@@ -713,8 +713,8 @@ onMounted(() => {
 }
 
 .currency-item {
-  background: #f8f9fb;
-  border-radius: 12px;
+  background: var(--color-bg-page);
+  border-radius: var(--radius-lg);
   padding: 1.25rem;
   transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.2s;
   border: 1px solid transparent;
@@ -722,7 +722,7 @@ onMounted(() => {
 
 .currency-item:hover {
   background: white;
-  border-color: #e5e7eb;
+  border-color: var(--color-border);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   transform: translateY(-2px);
 }
@@ -756,7 +756,7 @@ onMounted(() => {
   height: 40px;
   padding: 0 0.5rem;
   background: white;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   font-weight: 600;
   font-size: 0.9rem;
@@ -842,7 +842,7 @@ onMounted(() => {
 /* Balance History Section */
 .balance-history-section {
   background: white;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   padding: 2rem;
   margin-bottom: 2rem;
@@ -868,14 +868,14 @@ onMounted(() => {
   gap: 0.5rem;
   background: #f3f4f6;
   padding: 0.25rem;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
 }
 
 .range-btn {
   padding: 0.5rem 1rem;
   border: none;
   background: transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 0.85rem;
   font-weight: 500;
   color: #6b7280;
@@ -907,11 +907,11 @@ onMounted(() => {
 .history-table td {
   padding: 0.875rem;
   text-align: left;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .history-table th {
-  background: #f8f9fb;
+  background: var(--color-bg-page);
   font-weight: 600;
   color: #6b7280;
   font-size: 0.85rem;
@@ -920,7 +920,7 @@ onMounted(() => {
 }
 
 .history-table tbody tr:hover {
-  background: #f8f9fb;
+  background: var(--color-bg-page);
 }
 
 .currency-cell {
@@ -937,7 +937,7 @@ onMounted(() => {
   padding: 0.2em 0.4em;
   background: #f0f0f0;
   border: 1px solid #ddd;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 0.8em;
   font-weight: 600;
   color: #333;
@@ -954,7 +954,7 @@ onMounted(() => {
 
 .transaction-type {
   padding: 0.25rem 0.75rem;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   font-size: 0.85rem;
   font-weight: 500;
 }
@@ -970,12 +970,12 @@ onMounted(() => {
 }
 
 .amount-in {
-  color: #10b981;
+  color: var(--color-success);
   font-weight: 600;
 }
 
 .amount-out {
-  color: #ef4444;
+  color: var(--color-danger);
   font-weight: 600;
 }
 
@@ -993,19 +993,19 @@ onMounted(() => {
   align-items: center;
   gap: 0.4rem;
   padding: 0.3rem 0.6rem;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 .currency-received {
-  background-color: #d1fae5 !important;
+  background-color: var(--color-success-bg) !important;
   border: 1px solid #6ee7b7 !important;
-  color: #059669 !important;
+  color: var(--color-success) !important;
 }
 
 .currency-given {
-  background-color: #fee2e2 !important;
+  background-color: var(--color-danger-bg) !important;
   border: 1px solid #fca5a5 !important;
-  color: #dc2626 !important;
+  color: var(--color-danger) !important;
 }
 
 .exchange-sign {
@@ -1014,11 +1014,11 @@ onMounted(() => {
 }
 
 .exchange-sign.positive {
-  color: #059669 !important;
+  color: var(--color-success) !important;
 }
 
 .exchange-sign.negative {
-  color: #dc2626 !important;
+  color: var(--color-danger) !important;
 }
 
 .currency-received i,
@@ -1082,7 +1082,7 @@ onMounted(() => {
 
 .transaction-badge {
   padding: 0.25rem 0.75rem;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   font-size: 0.85rem;
   font-weight: 500;
   display: inline-block;
@@ -1094,12 +1094,12 @@ onMounted(() => {
 }
 
 .transaction-badge.deposit {
-  background: #d1fae5;
+  background: var(--color-success-bg);
   color: #065f46;
 }
 
 .transaction-badge.withdrawal {
-  background: #fee2e2;
+  background: var(--color-danger-bg);
   color: #991b1b;
 }
 
@@ -1124,14 +1124,14 @@ onMounted(() => {
 
 .status-badge {
   padding: 0.25rem 0.75rem;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   font-size: 0.85rem;
   font-weight: 500;
   display: inline-block;
 }
 
 .status-badge.completed {
-  background: #d1fae5;
+  background: var(--color-success-bg);
   color: #065f46;
 }
 
@@ -1146,12 +1146,12 @@ onMounted(() => {
 }
 
 .status-badge.failed {
-  background: #fee2e2;
+  background: var(--color-danger-bg);
   color: #991b1b;
 }
 
 .status-badge.unknown {
-  background: #e5e7eb;
+  background: var(--color-border);
   color: #4b5563;
 }
 
@@ -1167,8 +1167,8 @@ onMounted(() => {
 .spinner-small {
   width: 20px;
   height: 20px;
-  border: 2px solid #e5e7eb;
-  border-top-color: #3b82f6;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-secondary);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -1183,7 +1183,7 @@ onMounted(() => {
 .quick-actions {
   margin-bottom: 2rem;
   background: white;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   padding: 2rem;
   border: 1px solid rgba(0, 0, 0, 0.05);
@@ -1204,7 +1204,7 @@ onMounted(() => {
 
 .action-card {
   background: white;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   padding: 1.5rem;
   border: 2px solid transparent;
   cursor: pointer;
@@ -1225,7 +1225,7 @@ onMounted(() => {
 .action-icon {
   width: 48px;
   height: 48px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1289,7 +1289,7 @@ onMounted(() => {
   width: 100%;
   height: 100%;
   border: 3px solid transparent;
-  border-top-color: #3b82f6;
+  border-top-color: var(--color-secondary);
   border-radius: 50%;
   animation: spin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
 }
@@ -1344,17 +1344,17 @@ onMounted(() => {
 .retry-button {
   margin-top: 1rem;
   padding: 0.75rem 1.5rem;
-  background: #3b82f6;
+  background: var(--color-secondary);
   color: white;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   font-weight: 500;
   cursor: pointer;
   transition: background-color 0.2s, transform 0.2s;
 }
 
 .retry-button:hover {
-  background: #2563eb;
+  background: var(--color-secondary-hover);
   transform: translateY(-1px);
 }
 

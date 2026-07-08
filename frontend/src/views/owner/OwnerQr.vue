@@ -73,45 +73,45 @@ function download() {
 </template>
 
 <style scoped>
-.qr-title { display: flex; align-items: center; gap: 0.5rem; font-size: 1.1rem; font-weight: 700; color: #1e293b; margin: 0 0 1.25rem; }
+.qr-title { display: flex; align-items: center; gap: 0.5rem; font-size: 1.1rem; font-weight: 700; color: var(--color-text); margin: 0 0 1.25rem; }
 
 .qr-layout { display: grid; grid-template-columns: 1fr auto; gap: 1.5rem; align-items: start; }
 @media (max-width: 768px) { .qr-layout { grid-template-columns: 1fr; } }
 
-.qr-form-card { background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.qr-form-card { background: white; border-radius: var(--radius-lg); padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 .qr-field { margin-bottom: 1rem; }
-.qr-field label { display: block; font-size: 0.8rem; font-weight: 600; color: #475569; margin-bottom: 0.3rem; }
+.qr-field label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--color-text-secondary); margin-bottom: 0.3rem; }
 
 .qr-input {
-  width: 100%; padding: 0.6rem 0.75rem; border: 2px solid #e2e8f0;
-  border-radius: 8px; font-size: 0.9rem; color: #1e293b;
-  background: #f8fafc; outline: none; box-sizing: border-box;
+  width: 100%; padding: 0.6rem 0.75rem; border: 2px solid var(--color-border);
+  border-radius: var(--radius-md); font-size: 0.9rem; color: var(--color-text);
+  background: var(--color-bg-page); outline: none; box-sizing: border-box;
   transition: border-color .2s;
 }
-.qr-input:focus { border-color: #3b82f6; background: white; }
+.qr-input:focus { border-color: var(--color-secondary); background: white; }
 
 .qr-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
 .qr-color-row { display: flex; align-items: center; gap: 0.5rem; }
-.qr-color { width: 36px; height: 36px; border: 2px solid #e2e8f0; border-radius: 8px; cursor: pointer; padding: 2px; }
-.qr-color-hex { font-size: 0.8rem; font-family: monospace; color: #64748b; }
+.qr-color { width: 36px; height: 36px; border: 2px solid var(--color-border); border-radius: var(--radius-md); cursor: pointer; padding: 2px; }
+.qr-color-hex { font-size: 0.8rem; font-family: monospace; color: var(--color-text-secondary); }
 
 .qr-preview-card {
-  background: white; border-radius: 12px; padding: 1.5rem;
+  background: white; border-radius: var(--radius-lg); padding: 1.5rem;
   box-shadow: 0 1px 3px rgba(0,0,0,.08);
   display: flex; flex-direction: column; align-items: center; gap: 1rem;
 }
 .qr-preview-box {
-  border-radius: 12px; padding: 1rem;
+  border-radius: var(--radius-lg); padding: 1rem;
   display: flex; align-items: center; justify-content: center;
-  border: 2px dashed #e2e8f0;
+  border: 2px dashed var(--color-border);
 }
-.qr-preview-box img { border-radius: 4px; }
+.qr-preview-box img { border-radius: var(--radius-sm); }
 
 .qr-download {
   display: flex; align-items: center; gap: 0.4rem;
-  padding: 0.6rem 1.5rem; background: #3b82f6; color: white;
-  border: none; border-radius: 8px; cursor: pointer; font-size: 0.85rem;
+  padding: 0.6rem 1.5rem; background: var(--color-secondary); color: white;
+  border: none; border-radius: var(--radius-md); cursor: pointer; font-size: 0.85rem;
   font-weight: 600; transition: background-color 0.2s;
 }
-.qr-download:hover { background: #2563eb; }
+.qr-download:hover { background: var(--color-secondary-hover); }
 </style>

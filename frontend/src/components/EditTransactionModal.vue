@@ -135,7 +135,7 @@ updateForm()
   background: rgba(30, 20, 50, 0.95);
   backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   padding: 30px;
   min-width: 400px;
   max-width: 90vw;
@@ -187,7 +187,7 @@ h2 {
   padding: 12px 15px;
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: white;
   font-size: 16px;
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -219,7 +219,7 @@ h2 {
   flex: 1;
   padding: 12px 20px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;

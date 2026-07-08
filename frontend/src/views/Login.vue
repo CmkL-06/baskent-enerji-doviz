@@ -217,7 +217,7 @@ onMounted(() => {
 .login-card {
   background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(20px);
-  border-radius: 24px;
+  border-radius: var(--radius-xl);
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.3);
   width: 100%;
   max-width: 480px;
@@ -249,7 +249,7 @@ onMounted(() => {
   width: 80px;
   height: 80px;
   background: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%);
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   margin-bottom: 1.5rem;
   box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
 }
@@ -263,14 +263,14 @@ onMounted(() => {
   margin: 0;
   font-size: 2rem;
   font-weight: 800;
-  color: #1a202c;
+  color: var(--color-text);
   letter-spacing: -0.02em;
 }
 
 .app-subtitle {
   margin: 0.5rem 0 0;
   font-size: 1rem;
-  color: #718096;
+  color: var(--color-text-secondary);
 }
 
 /* Form Styles */
@@ -286,28 +286,28 @@ onMounted(() => {
   position: relative;
   display: flex;
   align-items: center;
-  background: #f7fafc;
-  border: 2px solid #e2e8f0;
-  border-radius: 12px;
+  background: var(--color-bg-page);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
   transition: border-color 0.3s ease, background-color 0.3s ease;
 }
 
 .input-wrapper:focus-within {
   background: white;
-  border-color: #6366f1;
+  border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
 .input-icon {
   position: absolute;
   left: 1rem;
-  color: #a0aec0;
+  color: var(--color-text-muted);
   font-size: 22px;
   transition: color 0.3s ease;
 }
 
 .input-wrapper:focus-within .input-icon {
-  color: #6366f1;
+  color: var(--color-primary);
 }
 
 .form-input {
@@ -316,12 +316,12 @@ onMounted(() => {
   background: transparent;
   border: none;
   font-size: 1rem;
-  color: #2d3748;
+  color: var(--color-text);
   outline: none;
 }
 
 .form-input::placeholder {
-  color: #a0aec0;
+  color: var(--color-text-muted);
 }
 
 .form-input:disabled {
@@ -342,18 +342,18 @@ onMounted(() => {
   align-items: center;
   gap: 0.5rem;
   cursor: pointer;
-  color: #4a5568;
+  color: var(--color-text-secondary);
   font-size: 0.9rem;
 }
 
 .remember-me input[type="checkbox"] {
   width: 18px;
   height: 18px;
-  accent-color: #6366f1;
+  accent-color: var(--color-primary);
 }
 
 .forgot-password {
-  color: #a0aec0;
+  color: var(--color-text-muted);
   font-size: 0.9rem;
   font-weight: 500;
   cursor: default;
@@ -365,10 +365,10 @@ onMounted(() => {
   align-items: center;
   gap: 0.5rem;
   padding: 0.875rem 1rem;
-  background: #fed7d7;
-  border: 1px solid #fc8181;
-  border-radius: 10px;
-  color: #c53030;
+  background: var(--color-danger-bg);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-md);
+  color: var(--color-danger);
   font-size: 0.9rem;
   margin-bottom: 1.5rem;
 }
@@ -383,7 +383,7 @@ onMounted(() => {
   padding: 1rem;
   background: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%);
   border: none;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   color: white;
   font-size: 1rem;
   font-weight: 600;
@@ -437,14 +437,14 @@ onMounted(() => {
 .ui-selector {
   margin-top: 2rem;
   padding-top: 2rem;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--color-border);
 }
 
 .selector-title {
   margin: 0 0 1rem;
   font-size: 0.875rem;
   font-weight: 600;
-  color: #4a5568;
+  color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   text-align: center;
@@ -460,16 +460,16 @@ onMounted(() => {
   align-items: center;
   gap: 0.75rem;
   padding: 0.875rem 1rem;
-  background: #f7fafc;
-  border: 2px solid #e2e8f0;
-  border-radius: 10px;
+  background: var(--color-bg-page);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
   position: relative;
   transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .style-option.selected {
   background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
-  border-color: #6366f1;
+  border-color: var(--color-primary);
 }
 
 .style-option.disabled {
@@ -479,31 +479,31 @@ onMounted(() => {
 
 .style-option .material-symbols-outlined {
   font-size: 24px;
-  color: #6366f1;
+  color: var(--color-primary);
 }
 
 .style-option.disabled .material-symbols-outlined {
-  color: #a0aec0;
+  color: var(--color-text-muted);
 }
 
 .style-option span:nth-child(2) {
   flex: 1;
   font-weight: 500;
-  color: #2d3748;
+  color: var(--color-text);
 }
 
 .badge {
   padding: 0.25rem 0.5rem;
-  background: #6366f1;
+  background: var(--color-primary);
   color: white;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 0.75rem;
   font-weight: 600;
 }
 
 .badge.disabled {
-  background: #cbd5e0;
-  color: #718096;
+  background: var(--color-border);
+  color: var(--color-text-secondary);
 }
 
 /* Footer */
@@ -515,7 +515,7 @@ onMounted(() => {
 .login-footer p {
   margin: 0;
   font-size: 0.875rem;
-  color: #a0aec0;
+  color: var(--color-text-muted);
 }
 
 /* Transitions */

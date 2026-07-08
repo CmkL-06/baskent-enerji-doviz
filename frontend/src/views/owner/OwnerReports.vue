@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import apiService from '@/services/apiservice'
 
@@ -278,76 +278,76 @@ function plClass(n: number) {
 </template>
 
 <style scoped>
-.or-title { display: flex; align-items: center; gap: 0.5rem; font-size: 1.1rem; font-weight: 700; color: #1e293b; margin: 0 0 1.25rem; }
+.or-title { display: flex; align-items: center; gap: 0.5rem; font-size: 1.1rem; font-weight: 700; color: var(--color-text); margin: 0 0 1.25rem; }
 
 .or-controls {
-  background: white; border-radius: 12px; padding: 1.25rem;
+  background: white; border-radius: var(--radius-lg); padding: 1.25rem;
   box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 1.25rem;
 }
 
 .or-type-tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
 .or-type-tabs button {
   display: flex; align-items: center; gap: 0.3rem;
-  padding: 0.5rem 1rem; background: #f1f5f9; border: 1px solid #e2e8f0;
-  border-radius: 8px; cursor: pointer; font-size: 0.85rem; color: #64748b; transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+  padding: 0.5rem 1rem; background: var(--color-bg-page); border: 1px solid var(--color-border);
+  border-radius: var(--radius-md); cursor: pointer; font-size: 0.85rem; color: var(--color-text-secondary); transition: background-color 0.2s, color 0.2s, border-color 0.2s;
 }
-.or-type-tabs button.active { background: #3b82f6; color: white; border-color: #3b82f6; }
+.or-type-tabs button.active { background: var(--color-secondary); color: white; border-color: var(--color-secondary); }
 
 .or-filters { display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
-.or-field label { display: block; font-size: 0.75rem; font-weight: 600; color: #64748b; margin-bottom: 0.25rem; }
+.or-field label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--color-text-secondary); margin-bottom: 0.25rem; }
 .or-input {
-  padding: 0.5rem 0.75rem; border: 2px solid #e2e8f0; border-radius: 8px;
-  font-size: 0.85rem; color: #1e293b; background: #f8fafc; outline: none;
+  padding: 0.5rem 0.75rem; border: 2px solid var(--color-border); border-radius: var(--radius-md);
+  font-size: 0.85rem; color: var(--color-text); background: var(--color-bg-page); outline: none;
   transition: border-color .2s;
 }
-.or-input:focus { border-color: #3b82f6; background: white; }
+.or-input:focus { border-color: var(--color-secondary); background: white; }
 
 .or-generate {
   display: flex; align-items: center; gap: 0.4rem;
-  padding: 0.6rem 1.5rem; background: #3b82f6; color: white;
-  border: none; border-radius: 8px; cursor: pointer; font-size: 0.9rem; font-weight: 600;
+  padding: 0.6rem 1.5rem; background: var(--color-secondary); color: white;
+  border: none; border-radius: var(--radius-md); cursor: pointer; font-size: 0.9rem; font-weight: 600;
   transition: background-color 0.2s;
 }
-.or-generate:hover:not(:disabled) { background: #2563eb; }
+.or-generate:hover:not(:disabled) { background: var(--color-secondary-hover); }
 .or-generate:disabled { opacity: 0.5; cursor: not-allowed; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.or-alert { display: flex; align-items: center; gap: 0.4rem; padding: 0.6rem 1rem; border-radius: 8px; font-size: 0.85rem; margin-bottom: 1rem; }
-.or-alert.error { background: #fef2f2; color: #ef4444; }
+.or-alert { display: flex; align-items: center; gap: 0.4rem; padding: 0.6rem 1rem; border-radius: var(--radius-md); font-size: 0.85rem; margin-bottom: 1rem; }
+.or-alert.error { background: #fef2f2; color: var(--color-danger); }
 
 .or-result { margin-top: 0.5rem; }
-.or-result-title { font-size: 1rem; font-weight: 700; color: #1e293b; margin: 0 0 1rem; }
+.or-result-title { font-size: 1rem; font-weight: 700; color: var(--color-text); margin: 0 0 1rem; }
 
-.or-table-wrap { overflow-x: auto; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.or-table-wrap { overflow-x: auto; background: white; border-radius: var(--radius-lg); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 .or-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-.or-table th { text-align: left; padding: 0.75rem 1rem; background: #f8fafc; color: #64748b; font-weight: 600; border-bottom: 1px solid #e2e8f0; }
-.or-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; }
-.or-table tfoot td { background: #f8fafc; font-weight: 700; border-top: 2px solid #e2e8f0; }
-.or-date-col { font-size: 0.8rem; color: #64748b; }
+.or-table th { text-align: left; padding: 0.75rem 1rem; background: var(--color-bg-page); color: var(--color-text-secondary); font-weight: 600; border-bottom: 1px solid var(--color-border); }
+.or-table td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--color-bg-page); }
+.or-table tfoot td { background: var(--color-bg-page); font-weight: 700; border-top: 2px solid var(--color-border); }
+.or-date-col { font-size: 0.8rem; color: var(--color-text-secondary); }
 .or-mono { font-family: monospace; }
-.or-cur-tag { background: #eff6ff; color: #3b82f6; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+.or-cur-tag { background: var(--color-secondary-light); color: var(--color-secondary); padding: 2px 8px; border-radius: var(--radius-sm); font-size: 0.75rem; font-weight: 600; }
 
-.or-type-badge { padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 600; }
+.or-type-badge { padding: 2px 10px; border-radius: var(--radius-xl); font-size: 0.7rem; font-weight: 600; }
 .or-type-badge.merkez { background: #fffbeb; color: #b45309; }
-.or-type-badge.sube { background: #eff6ff; color: #2563eb; }
+.or-type-badge.sube { background: var(--color-secondary-light); color: var(--color-secondary-hover); }
 
 .or-pnl-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.25rem; }
-.or-pnl-card { background: white; border-radius: 12px; padding: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
-.or-pnl-card.highlight { border: 2px solid #3b82f6; }
-.or-pnl-label { font-size: 0.75rem; color: #64748b; margin-bottom: 0.25rem; }
+.or-pnl-card { background: white; border-radius: var(--radius-lg); padding: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.or-pnl-card.highlight { border: 2px solid var(--color-secondary); }
+.or-pnl-label { font-size: 0.75rem; color: var(--color-text-secondary); margin-bottom: 0.25rem; }
 .or-pnl-val { font-size: 1.25rem; font-weight: 800; font-family: monospace; }
 
 .text-green { color: #16a34a; }
-.text-red { color: #ef4444; }
+.text-red { color: var(--color-danger); }
 
-.or-empty { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; padding: 3rem; color: #94a3b8; }
+.or-empty { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; padding: 3rem; color: var(--color-text-muted); }
 
 .at-controls { display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; }
-.at-type-badge { padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
-.at-exchange { background: #eff6ff; color: #2563eb; }
+.at-type-badge { padding: 2px 8px; border-radius: var(--radius-sm); font-size: 0.7rem; font-weight: 600; }
+.at-exchange { background: var(--color-secondary-light); color: var(--color-secondary-hover); }
 .at-deposit { background: #f0fdf4; color: #16a34a; }
-.at-withdrawal { background: #fef2f2; color: #ef4444; }
+.at-withdrawal { background: #fef2f2; color: var(--color-danger); }
 .at-adjustment { background: #fefce8; color: #ca8a04; }
 .at-transfer { background: #f5f3ff; color: #7c3aed; }
-.at-desc { font-size: 0.8rem; color: #64748b; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.at-desc { font-size: 0.8rem; color: var(--color-text-secondary); max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>

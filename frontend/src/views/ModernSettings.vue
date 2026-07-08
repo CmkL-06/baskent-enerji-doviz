@@ -149,10 +149,10 @@ const toggleTicker = () => {
 
 /* Success Alert */
 .success-alert {
-  background: #10b981;
+  background: var(--color-success);
   color: white;
   padding: 1rem 1.5rem;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -181,21 +181,21 @@ const toggleTicker = () => {
 /* Settings Section */
 .settings-section {
   background: white;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   overflow: hidden;
 }
 
 .section-header {
   padding: 1.5rem;
-  border-bottom: 1px solid #f3f4f6;
-  background: #fafbfc;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-page);
 }
 
 .section-title {
   font-size: 1.25rem;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--color-text);
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -203,7 +203,7 @@ const toggleTicker = () => {
 
 .section-title .material-symbols-outlined {
   font-size: 1.5rem;
-  color: #6b7280;
+  color: var(--color-text-secondary);
 }
 
 /* Settings Grid */
@@ -214,9 +214,9 @@ const toggleTicker = () => {
 /* Setting Item */
 .setting-item {
   padding: 1.5rem;
-  border-radius: 12px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-page);
+  border: 1px solid var(--color-border);
   transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
 }
 
@@ -245,13 +245,13 @@ const toggleTicker = () => {
 .setting-title {
   font-size: 1.1rem;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--color-text);
   margin-bottom: 0.5rem;
 }
 
 .setting-description {
   font-size: 0.95rem;
-  color: #6b7280;
+  color: var(--color-text-secondary);
   line-height: 1.5;
 }
 
@@ -280,7 +280,7 @@ const toggleTicker = () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: #cbd5e1;
+  background-color: var(--color-border);
   transition: 0.4s;
   border-radius: 34px;
 }
@@ -314,8 +314,8 @@ input:checked + .toggle-slider:before {
 .setting-preview {
   margin-top: 1rem;
   padding: 1rem;
-  background: #1f2937;
-  border-radius: 8px;
+  background: var(--color-text);
+  border-radius: var(--radius-md);
   overflow: hidden;
 }
 

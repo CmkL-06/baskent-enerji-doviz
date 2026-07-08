@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import apiService from '@/services/apiservice'
 
@@ -188,72 +188,72 @@ function fmtMoney(n: number) {
 </template>
 
 <style scoped>
-.ob-title { display: flex; align-items: center; gap: 0.5rem; font-size: 1.1rem; font-weight: 700; color: #1e293b; margin: 0 0 1.25rem; }
-.ob-center { display: flex; align-items: center; gap: 0.75rem; padding: 3rem; justify-content: center; color: #94a3b8; }
+.ob-title { display: flex; align-items: center; gap: 0.5rem; font-size: 1.1rem; font-weight: 700; color: var(--color-text); margin: 0 0 1.25rem; }
+.ob-center { display: flex; align-items: center; gap: 0.75rem; padding: 3rem; justify-content: center; color: var(--color-text-muted); }
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin { animation: spin 1s linear infinite; }
 
-.ob-form-card { background: white; border-radius: 16px; padding: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,.08); max-width: 640px; }
+.ob-form-card { background: white; border-radius: var(--radius-lg); padding: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,.08); max-width: 640px; }
 
 .ob-step {
   display: flex; gap: 1rem; padding: 1.25rem 0;
-  border-bottom: 1px solid #f1f5f9; transition: opacity .2s;
+  border-bottom: 1px solid var(--color-bg-page); transition: opacity .2s;
 }
 .ob-step:last-child { border-bottom: none; }
 .ob-step.disabled { opacity: 0.4; pointer-events: none; }
 .ob-step-num {
-  width: 28px; height: 28px; border-radius: 50%; background: #3b82f6;
+  width: 28px; height: 28px; border-radius: 50%; background: var(--color-secondary);
   color: white; display: flex; align-items: center; justify-content: center;
   font-size: 0.8rem; font-weight: 700; flex-shrink: 0; margin-top: 0.15rem;
 }
 .ob-step-content { flex: 1; }
-.ob-step-content > label { font-size: 0.85rem; font-weight: 600; color: #475569; margin-bottom: 0.5rem; display: block; }
+.ob-step-content > label { font-size: 0.85rem; font-weight: 600; color: var(--color-text-secondary); margin-bottom: 0.5rem; display: block; }
 
 .ob-input {
-  width: 100%; padding: 0.6rem 0.75rem; border: 2px solid #e2e8f0;
-  border-radius: 8px; font-size: 0.9rem; color: #1e293b;
-  background: #f8fafc; outline: none; box-sizing: border-box;
+  width: 100%; padding: 0.6rem 0.75rem; border: 2px solid var(--color-border);
+  border-radius: var(--radius-md); font-size: 0.9rem; color: var(--color-text);
+  background: var(--color-bg-page); outline: none; box-sizing: border-box;
   transition: border-color .2s;
 }
-.ob-input:focus { border-color: #3b82f6; background: white; }
+.ob-input:focus { border-color: var(--color-secondary); background: white; }
 
-.ob-current-bals { margin-top: 0.75rem; padding: 0.75rem; background: #f8fafc; border-radius: 10px; }
-.ob-bals-title { font-size: 0.75rem; font-weight: 600; color: #64748b; margin-bottom: 0.4rem; }
+.ob-current-bals { margin-top: 0.75rem; padding: 0.75rem; background: var(--color-bg-page); border-radius: var(--radius-md); }
+.ob-bals-title { font-size: 0.75rem; font-weight: 600; color: var(--color-text-secondary); margin-bottom: 0.4rem; }
 .ob-bals-grid { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .ob-bal-chip {
   display: flex; gap: 0.5rem; padding: 0.3rem 0.6rem; background: white;
-  border-radius: 6px; font-size: 0.8rem; border: 1px solid #e2e8f0;
+  border-radius: var(--radius-sm); font-size: 0.8rem; border: 1px solid var(--color-border);
 }
-.ob-bal-cur { font-weight: 600; color: #3b82f6; }
-.ob-bal-amt { font-family: monospace; color: #1e293b; }
+.ob-bal-cur { font-weight: 600; color: var(--color-secondary); }
+.ob-bal-amt { font-family: monospace; color: var(--color-text); }
 
 .ob-op-toggle { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
 .ob-op-toggle button {
   display: flex; align-items: center; gap: 0.3rem; flex: 1;
-  padding: 0.6rem; border: 2px solid #e2e8f0; border-radius: 10px;
+  padding: 0.6rem; border: 2px solid var(--color-border); border-radius: var(--radius-md);
   background: white; cursor: pointer; font-size: 0.85rem; font-weight: 600;
-  color: #64748b; transition: border-color 0.2s, color 0.2s, background-color 0.2s;
+  color: var(--color-text-secondary); transition: border-color 0.2s, color 0.2s, background-color 0.2s;
 }
 .ob-op-toggle button.active { border-color: #22c55e; color: #16a34a; background: #f0fdf4; }
-.ob-op-toggle button.sub.active { border-color: #ef4444; color: #dc2626; background: #fef2f2; }
+.ob-op-toggle button.sub.active { border-color: var(--color-danger); color: var(--color-danger); background: #fef2f2; }
 
 .ob-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
 .ob-field { margin-bottom: 0.75rem; }
-.ob-field label { display: block; font-size: 0.75rem; font-weight: 600; color: #64748b; margin-bottom: 0.3rem; }
+.ob-field label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--color-text-secondary); margin-bottom: 0.3rem; }
 
 .ob-alert {
   display: flex; align-items: center; gap: 0.4rem;
-  padding: 0.6rem 1rem; border-radius: 8px; font-size: 0.85rem; margin-bottom: 0.75rem;
+  padding: 0.6rem 1rem; border-radius: var(--radius-md); font-size: 0.85rem; margin-bottom: 0.75rem;
 }
 .ob-alert.success { background: #f0fdf4; color: #16a34a; }
-.ob-alert.error { background: #fef2f2; color: #ef4444; }
+.ob-alert.error { background: #fef2f2; color: var(--color-danger); }
 
 .ob-submit {
   display: flex; align-items: center; justify-content: center; gap: 0.4rem;
-  width: 100%; padding: 0.75rem; background: #3b82f6; color: white;
-  border: none; border-radius: 10px; cursor: pointer; font-size: 0.9rem;
+  width: 100%; padding: 0.75rem; background: var(--color-secondary); color: white;
+  border: none; border-radius: var(--radius-md); cursor: pointer; font-size: 0.9rem;
   font-weight: 600; transition: background-color 0.2s;
 }
-.ob-submit:hover:not(:disabled) { background: #2563eb; }
+.ob-submit:hover:not(:disabled) { background: var(--color-secondary-hover); }
 .ob-submit:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>

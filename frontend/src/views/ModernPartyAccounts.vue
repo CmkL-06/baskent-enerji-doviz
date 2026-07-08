@@ -840,7 +840,7 @@ onUnmounted(() => {
 .btn-back {
   background: none;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 6px 8px;
   cursor: pointer;
   color: #374151;
@@ -854,10 +854,10 @@ onUnmounted(() => {
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  background: #2563eb;
+  background: var(--color-secondary-hover);
   color: #fff;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -873,7 +873,7 @@ onUnmounted(() => {
   background: #fff;
   color: #374151;
   border: 1px solid #d1d5db;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -885,7 +885,7 @@ onUnmounted(() => {
   background: #fff;
   color: #374151;
   border: 1px solid #d1d5db;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 13px;
   cursor: pointer;
 }
@@ -912,7 +912,7 @@ onUnmounted(() => {
   gap: 8px;
   background: #fff;
   border: 1px solid #d1d5db;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 6px 12px;
   flex: 1;
   min-width: 220px;
@@ -931,7 +931,7 @@ onUnmounted(() => {
 .filter-select {
   padding: 8px 12px;
   border: 1px solid #d1d5db;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 13px;
   background: #fff;
   color: #374151;
@@ -942,7 +942,7 @@ onUnmounted(() => {
 }
 .chip {
   padding: 6px 14px;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   border: 1px solid #d1d5db;
   background: #fff;
   font-size: 12px;
@@ -951,9 +951,9 @@ onUnmounted(() => {
 }
 .chip:hover { background: #f3f4f6; }
 .chip-active {
-  background: #2563eb;
+  background: var(--color-secondary-hover);
   color: #fff;
-  border-color: #2563eb;
+  border-color: var(--color-secondary-hover);
 }
 
 /* Loading / Error */
@@ -963,7 +963,7 @@ onUnmounted(() => {
   color: #6b7280;
   font-size: 14px;
 }
-.error-state { color: #dc2626; }
+.error-state { color: var(--color-danger); }
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -971,7 +971,7 @@ onUnmounted(() => {
 .party-table-wrap {
   background: #fff;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   overflow-x: auto;
 }
 .party-table {
@@ -1018,14 +1018,14 @@ onUnmounted(() => {
   color: #9ca3af;
   font-size: 11px;
 }
-.balance-pos { color: #059669; font-weight: 600; }
-.balance-neg { color: #dc2626; font-weight: 600; }
+.balance-pos { color: var(--color-success); font-weight: 600; }
+.balance-neg { color: var(--color-danger); font-weight: 600; }
 
 /* Type badges */
 .type-badge {
   display: inline-block;
   padding: 2px 10px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   font-size: 11px;
   font-weight: 500;
 }
@@ -1041,10 +1041,10 @@ onUnmounted(() => {
   border-radius: 50%;
   margin-right: 4px;
 }
-.status-1 { background: #10b981; }
+.status-1 { background: var(--color-success); }
 .status-2 { background: #9ca3af; }
-.status-3 { background: #f59e0b; }
-.status-4 { background: #ef4444; }
+.status-3 { background: var(--color-warning); }
+.status-4 { background: var(--color-danger); }
 
 /* Action buttons */
 .actions-cell {
@@ -1057,20 +1057,20 @@ onUnmounted(() => {
   border: none;
   cursor: pointer;
   padding: 4px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: #6b7280;
   display: flex;
   align-items: center;
 }
-.icon-btn:hover { background: #f3f4f6; color: #2563eb; }
-.icon-btn.danger:hover { color: #dc2626; }
+.icon-btn:hover { background: #f3f4f6; color: var(--color-secondary-hover); }
+.icon-btn.danger:hover { color: var(--color-danger); }
 .icon-btn .material-symbols-outlined { font-size: 18px; }
 
 /* Party Info Card */
 .party-info-card {
   background: #fff;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 20px;
   margin-bottom: 20px;
 }
@@ -1109,13 +1109,13 @@ onUnmounted(() => {
 .account-card {
   background: #fff;
   border: 1px solid #e5e7eb;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 16px;
   cursor: pointer;
   transition: border-color .15s, box-shadow .15s;
 }
 .account-card:hover { border-color: #93c5fd; }
-.account-selected { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37, 99, 235, .15); }
+.account-selected { border-color: var(--color-secondary-hover); box-shadow: 0 0 0 2px rgba(37, 99, 235, .15); }
 .acc-header {
   display: flex;
   justify-content: space-between;
@@ -1155,7 +1155,7 @@ onUnmounted(() => {
 .entries-section {
   background: #fff;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   overflow-x: auto;
 }
 .entries-section .section-title {
@@ -1166,12 +1166,12 @@ onUnmounted(() => {
 .payment-status {
   font-size: 11px;
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
 }
 .ps-1 { background: #fef3c7; color: #92400e; }
-.ps-2 { background: #d1fae5; color: #065f46; }
+.ps-2 { background: var(--color-success-bg); color: #065f46; }
 .ps-3 { background: #e0e7ff; color: #4338ca; }
-.ps-4 { background: #fee2e2; color: #991b1b; }
+.ps-4 { background: var(--color-danger-bg); color: #991b1b; }
 .ps-5 { background: #f3f4f6; color: #6b7280; }
 
 /* Modal */
@@ -1187,7 +1187,7 @@ onUnmounted(() => {
 }
 .modal {
   background: #fff;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   width: 100%;
   max-width: 560px;
   max-height: 90vh;
@@ -1252,7 +1252,7 @@ onUnmounted(() => {
 .form-group textarea {
   padding: 8px 12px;
   border: 1px solid #d1d5db;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 13px;
   outline: none;
   transition: border-color .15s;
@@ -1260,7 +1260,7 @@ onUnmounted(() => {
 .form-group input:focus,
 .form-group select:focus,
 .form-group textarea:focus {
-  border-color: #2563eb;
+  border-color: var(--color-secondary-hover);
   box-shadow: 0 0 0 2px rgba(37, 99, 235, .1);
 }
 .form-group textarea { resize: vertical; }
@@ -1286,7 +1286,7 @@ onUnmounted(() => {
 .aging-card {
   background: #f9fafb;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 12px;
   text-align: center;
 }
@@ -1309,7 +1309,7 @@ onUnmounted(() => {
 /* Statement table */
 .stmt-table { margin-top: 8px; }
 .overdue-row { background: #fef2f2; }
-.overdue-text { color: #dc2626; font-weight: 500; }
+.overdue-text { color: var(--color-danger); font-weight: 500; }
 
 /* Responsive */
 @media (max-width: 768px) {

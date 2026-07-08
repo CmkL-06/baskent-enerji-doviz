@@ -259,9 +259,9 @@ onMounted(async () => {
 /* Filter Section */
 .filter-section {
   background: white;
-  border-radius: 15px;
+  border-radius: var(--radius-lg);
   padding: 20px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
@@ -282,7 +282,7 @@ onMounted(async () => {
   padding: 10px 15px;
   background: white;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: #1a1a1a;
   font-size: 14px;
 }
@@ -300,7 +300,7 @@ onMounted(async () => {
   padding: 10px 20px;
   background: #f9fafb;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: #1a1a1a;
   cursor: pointer;
   transition: background-color 0.3s ease, color 0.3s ease;
@@ -316,7 +316,7 @@ onMounted(async () => {
   padding: 10px 15px;
   background: white;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: #1a1a1a;
   font-size: 14px;
 }
@@ -325,7 +325,7 @@ onMounted(async () => {
   padding: 10px 30px;
   background: #5a8cff;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: white;
   font-weight: bold;
   cursor: pointer;
@@ -341,7 +341,7 @@ onMounted(async () => {
 .transaction-table-container {
   flex: 1;
   background: white;
-  border-radius: 15px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   border: 1px solid #e5e7eb;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
@@ -383,7 +383,7 @@ onMounted(async () => {
 .currency-badge {
   display: inline-block;
   padding: 5px 15px;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   color: white;
   font-weight: bold;
   font-size: 12px;
@@ -414,7 +414,7 @@ onMounted(async () => {
   font-size: 16px;
   cursor: pointer;
   padding: 5px;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   transition: background-color 0.3s ease;
 }
 
@@ -435,7 +435,7 @@ onMounted(async () => {
   padding: 10px 15px;
   background: white;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: #1a1a1a;
   font-size: 14px;
   min-width: 150px;
@@ -468,7 +468,7 @@ onMounted(async () => {
 .status-badge {
   display: inline-block;
   padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 11px;
   font-weight: 600;
 }

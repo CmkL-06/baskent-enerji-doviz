@@ -328,63 +328,63 @@ onUnmounted(() => {
 .dealer-info { display: flex; align-items: center; gap: 12px; }
 .dealer-name { font-size: 18px; font-weight: 700; color: var(--color-text, #1f2937); }
 .dealer-code { font-size: 13px; color: var(--color-text-secondary, #6b7280); }
-.dealer-code code { background: var(--color-hover, #f3f4f6); padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+.dealer-code code { background: var(--color-hover, #f3f4f6); padding: 2px 8px; border-radius: var(--radius-sm); font-weight: 600; }
 .dealer-staff { font-size: 12px; color: var(--color-text-secondary, #9ca3af); margin-top: 2px; }
 
 .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
-.summary-card { padding: 16px; background: var(--color-card, #fff); border: 1px solid var(--color-border, #e5e7eb); border-radius: 10px; text-align: center; }
+.summary-card { padding: 16px; background: var(--color-card, #fff); border: 1px solid var(--color-border, var(--color-border)); border-radius: var(--radius-md); text-align: center; }
 .summary-icon .material-symbols-outlined { font-size: 28px; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
 .summary-value { font-size: 22px; font-weight: 700; color: var(--color-text, #1f2937); margin: 4px 0; }
 .summary-label { font-size: 12px; color: var(--color-text-secondary, #6b7280); }
 
-.qr-section { margin-top: 16px; padding: 16px; background: var(--color-card, #fff); border: 1px solid var(--color-border, #e5e7eb); border-radius: 10px; }
+.qr-section { margin-top: 16px; padding: 16px; background: var(--color-card, #fff); border: 1px solid var(--color-border, var(--color-border)); border-radius: var(--radius-md); }
 .qr-section-header { display: flex; justify-content: space-between; align-items: center; }
-.qr-download-btn { display: flex; align-items: center; gap: 4px; padding: 6px 12px; border: 1px solid var(--color-primary, #2563eb); background: transparent; color: var(--color-primary, #2563eb); border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background-color 0.15s, color 0.15s, border-color 0.15s; }
+.qr-download-btn { display: flex; align-items: center; gap: 4px; padding: 6px 12px; border: 1px solid var(--color-primary, var(--color-secondary-hover)); background: transparent; color: var(--color-primary, var(--color-secondary-hover)); border-radius: var(--radius-sm); font-size: 12px; font-weight: 600; cursor: pointer; transition: background-color 0.15s, color 0.15s, border-color 0.15s; }
 .qr-download-btn:hover { background: var(--color-primary, #2563eb); color: #fff; }
 .qr-body { display: flex; gap: 20px; margin-top: 14px; align-items: flex-start; }
-.qr-image-wrap { flex-shrink: 0; padding: 8px; background: #fff; border: 1px solid var(--color-border, #e5e7eb); border-radius: 8px; }
+.qr-image-wrap { flex-shrink: 0; padding: 8px; background: #fff; border: 1px solid var(--color-border, var(--color-border)); border-radius: var(--radius-md); }
 .qr-image { width: 160px; height: 160px; display: block; }
 .qr-details { flex: 1; min-width: 0; }
 .qr-link-label { font-size: 11px; font-weight: 600; color: var(--color-text-secondary, #6b7280); text-transform: uppercase; letter-spacing: 0.05em; }
 .qr-link-value { font-size: 13px; color: var(--color-text, #1f2937); margin-top: 2px; word-break: break-all; }
 .qr-link-value a { color: var(--color-primary, #2563eb); text-decoration: none; }
 .qr-link-value a:hover { text-decoration: underline; }
-.qr-link-value code { background: var(--color-hover, #f3f4f6); padding: 2px 8px; border-radius: 4px; font-weight: 600; font-size: 14px; }
+.qr-link-value code { background: var(--color-hover, #f3f4f6); padding: 2px 8px; border-radius: var(--radius-sm); font-weight: 600; font-size: 14px; }
 .qr-hint { margin-top: 12px; font-size: 12px; color: var(--color-text-secondary, #6b7280); line-height: 1.5; }
 
 .section-title { display: flex; align-items: center; gap: 8px; margin: 16px 0 10px; font-size: 14px; font-weight: 600; color: var(--color-text, #1f2937); }
 .section-title .material-symbols-outlined { font-size: 20px; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
 
 .filter-bar { display: flex; gap: 6px; margin-bottom: 12px; }
-.filter-btn { padding: 6px 12px; border: 1px solid var(--color-border, #e5e7eb); background: var(--color-card, #fff); border-radius: 6px; font-size: 12px; cursor: pointer; color: var(--color-text-secondary, #6b7280); transition: background-color 0.15s, color 0.15s, border-color 0.15s; }
+.filter-btn { padding: 6px 12px; border: 1px solid var(--color-border, var(--color-border)); background: var(--color-card, #fff); border-radius: var(--radius-sm); font-size: 12px; cursor: pointer; color: var(--color-text-secondary, var(--color-text-secondary)); transition: background-color 0.15s, color 0.15s, border-color 0.15s; }
 .filter-btn:hover { border-color: var(--color-primary, #2563eb); }
 .filter-btn.active { background: var(--color-primary, #2563eb); color: #fff; border-color: var(--color-primary, #2563eb); }
 
-.tg-table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--color-border, #e5e7eb); }
+.tg-table-wrap { overflow-x: auto; border-radius: var(--radius-md); border: 1px solid var(--color-border, var(--color-border)); }
 .tg-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .tg-table th { padding: 10px 12px; text-align: left; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-secondary, #6b7280); background: var(--color-hover, #f9fafb); border-bottom: 1px solid var(--color-border, #e5e7eb); }
 .tg-table td { padding: 10px 12px; border-bottom: 1px solid var(--color-border, #f3f4f6); color: var(--color-text, #1f2937); }
 .tg-table tbody tr:hover { background: var(--color-hover, #f9fafb); }
 
-.status-badge { padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; color: #fff; }
+.status-badge { padding: 3px 8px; border-radius: var(--radius-md); font-size: 11px; font-weight: 600; color: #fff; }
 .empty-msg { text-align: center; color: var(--color-text-secondary, #6b7280); padding: 30px !important; }
 
-.crypto-overview { margin-top: 16px; padding: 16px; background: var(--color-card, #fff); border: 1px solid var(--color-border, #e5e7eb); border-radius: 10px; }
+.crypto-overview { margin-top: 16px; padding: 16px; background: var(--color-card, #fff); border: 1px solid var(--color-border, var(--color-border)); border-radius: var(--radius-md); }
 .crypto-stats { display: flex; gap: 16px; margin-top: 10px; }
-.crypto-stat { flex: 1; text-align: center; padding: 12px; background: var(--color-hover, #f9fafb); border-radius: 8px; }
+.crypto-stat { flex: 1; text-align: center; padding: 12px; background: var(--color-hover, #f9fafb); border-radius: var(--radius-md); }
 .crypto-stat-val { display: block; font-size: 18px; font-weight: 700; color: var(--color-text, #1f2937); }
 .crypto-stat-label { font-size: 11px; color: var(--color-text-secondary, #6b7280); }
 .txid-cell { font-family: monospace; font-size: 12px; }
 
-.cari-section { margin-top: 16px; padding: 16px; background: var(--color-card, #fff); border: 1px solid var(--color-border, #e5e7eb); border-radius: 10px; }
-.cari-badge { padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; color: #fff; margin-left: 8px; }
-.cari-badge.payable { background: #f59e0b; }
-.cari-badge.receivable { background: #10b981; }
+.cari-section { margin-top: 16px; padding: 16px; background: var(--color-card, #fff); border: 1px solid var(--color-border, var(--color-border)); border-radius: var(--radius-md); }
+.cari-badge { padding: 3px 8px; border-radius: var(--radius-md); font-size: 11px; font-weight: 600; color: #fff; margin-left: 8px; }
+.cari-badge.payable { background: var(--color-warning); }
+.cari-badge.receivable { background: var(--color-success); }
 .cari-badge.settled { background: #6b7280; }
-.cari-debit { color: #ef4444; font-weight: 500; }
-.cari-credit { color: #10b981; font-weight: 500; }
-.cari-neg { color: #f59e0b; font-weight: 600; }
-.cari-pos { color: #10b981; font-weight: 600; }
+.cari-debit { color: var(--color-danger); font-weight: 500; }
+.cari-credit { color: var(--color-success); font-weight: 500; }
+.cari-neg { color: var(--color-warning); font-weight: 600; }
+.cari-pos { color: var(--color-success); font-weight: 600; }
 
 .refresh-indicator { display: flex; align-items: center; gap: 4px; justify-content: center; margin-top: 16px; font-size: 11px; color: var(--color-text-secondary, #9ca3af); }
 

@@ -250,14 +250,14 @@ onMounted(async () => {
 .vm-wrap { padding: 24px; max-width: 1400px; margin: 0 auto; }
 .btn-primary {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 8px 16px; background: #2563eb; color: #fff;
-  border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;
+  padding: 8px 16px; background: var(--color-secondary-hover); color: #fff;
+  border: none; border-radius: var(--radius-md); font-size: 13px; font-weight: 600; cursor: pointer;
 }
 .btn-primary:hover { background: #1d4ed8; }
 .btn-primary:disabled { opacity: .6; cursor: not-allowed; }
 .btn-cancel {
   padding: 8px 16px; background: #fff; color: #374151;
-  border: 1px solid #d1d5db; border-radius: 8px; font-size: 13px; cursor: pointer;
+  border: 1px solid #d1d5db; border-radius: var(--radius-md); font-size: 13px; cursor: pointer;
 }
 .btn-cancel:hover { background: #f3f4f6; }
 
@@ -268,7 +268,7 @@ onMounted(async () => {
 }
 /* Loading */
 .loading-state, .error-state { text-align: center; padding: 60px 20px; color: #6b7280; font-size: 14px; }
-.error-state { color: #dc2626; }
+.error-state { color: var(--color-danger); }
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -277,7 +277,7 @@ onMounted(async () => {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px;
 }
 .vault-card {
-  background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px;
+  background: #fff; border: 1px solid #e5e7eb; border-radius: var(--radius-lg); padding: 20px;
   transition: border-color .15s;
 }
 .vault-card:hover { border-color: #93c5fd; }
@@ -287,28 +287,28 @@ onMounted(async () => {
 .vault-office { font-size: 12px; color: #9ca3af; }
 .vault-badges { display: flex; gap: 4px; }
 .badge-inactive {
-  font-size: 10px; padding: 2px 8px; border-radius: 10px; background: #fee2e2; color: #991b1b;
+  font-size: 10px; padding: 2px 8px; border-radius: var(--radius-md); background: var(--color-danger-bg); color: #991b1b;
 }
 .badge-count {
-  font-size: 10px; padding: 2px 8px; border-radius: 10px; background: #fef3c7; color: #92400e;
+  font-size: 10px; padding: 2px 8px; border-radius: var(--radius-md); background: #fef3c7; color: #92400e;
 }
 .vault-desc { font-size: 12px; color: #6b7280; margin-bottom: 8px; }
 .balance-list { margin-bottom: 8px; }
 .balance-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 13px; }
 .bal-currency { font-weight: 600; color: #374151; }
 .bal-amount { font-weight: 600; color: #1a1a2e; font-family: 'Consolas', monospace; }
-.bal-neg { color: #dc2626; }
+.bal-neg { color: var(--color-danger); }
 .no-balance { font-size: 12px; color: #9ca3af; text-align: center; padding: 8px 0; }
 .vault-meta {
   display: flex; justify-content: space-between; font-size: 11px; color: #9ca3af; margin-bottom: 10px;
 }
 .vault-actions { display: flex; gap: 4px; }
 .icon-btn {
-  background: none; border: none; cursor: pointer; padding: 4px; border-radius: 6px;
+  background: none; border: none; cursor: pointer; padding: 4px; border-radius: var(--radius-sm);
   color: #6b7280; display: flex; align-items: center;
 }
-.icon-btn:hover { background: #f3f4f6; color: #2563eb; }
-.icon-btn.danger:hover { color: #dc2626; }
+.icon-btn:hover { background: #f3f4f6; color: var(--color-secondary-hover); }
+.icon-btn.danger:hover { color: var(--color-danger); }
 .icon-btn .material-symbols-outlined { font-size: 18px; }
 /* Modal */
 .modal-overlay {
@@ -316,7 +316,7 @@ onMounted(async () => {
   display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px;
 }
 .modal {
-  background: #fff; border-radius: 16px; width: 100%; max-width: 480px;
+  background: #fff; border-radius: var(--radius-lg); width: 100%; max-width: 480px;
   box-shadow: 0 20px 60px rgba(0,0,0,.15);
 }
 .modal-header {
@@ -334,10 +334,10 @@ onMounted(async () => {
 .form-group { display: flex; flex-direction: column; gap: 4px; }
 .form-group label { font-size: 12px; font-weight: 500; color: #374151; }
 .form-group input, .form-group select {
-  padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 13px; outline: none;
+  padding: 8px 12px; border: 1px solid #d1d5db; border-radius: var(--radius-md); font-size: 13px; outline: none;
 }
 .form-group input:focus, .form-group select:focus {
-  border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,.1);
+  border-color: var(--color-secondary-hover); box-shadow: 0 0 0 2px rgba(37,99,235,.1);
 }
 .form-row { display: flex; gap: 20px; }
 .checkbox-label {

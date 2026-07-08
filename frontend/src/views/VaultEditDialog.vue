@@ -152,7 +152,7 @@ onMounted(() => {
 <style scoped>
 .vault-edit-dialog {
   background: white;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   max-width: 600px;
   width: 100%;
@@ -186,7 +186,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   transition: background-color 0.2s, color 0.2s;
 }
 
@@ -226,7 +226,7 @@ onMounted(() => {
   width: 100%;
   padding: 0.75rem;
   border: 1px solid #ced4da;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 1rem;
   transition: border-color 0.2s;
 }
@@ -276,7 +276,7 @@ onMounted(() => {
   background: #fff3cd;
   color: #856404;
   padding: 1rem;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   margin-bottom: 1.5rem;
 }
 
@@ -301,7 +301,7 @@ onMounted(() => {
 .btn-secondary {
   padding: 0.75rem 1.5rem;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 1rem;
   font-weight: 500;
   cursor: pointer;

@@ -443,7 +443,7 @@ defineExpose({ loadTransactions, printAllTransactions })
 .th-root {
   background: white;
   border: 1px solid #e5e7eb;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
 }
 
@@ -470,9 +470,9 @@ defineExpose({ loadTransactions, printAllTransactions })
   font-size: 11px;
   font-weight: 600;
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: #ede9fe;
-  color: #6366f1;
+  color: var(--color-primary);
 }
 .th-header-right {
   display: flex;
@@ -483,7 +483,7 @@ defineExpose({ loadTransactions, printAllTransactions })
 .th-filter-group {
   display: flex;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   overflow: hidden;
 }
 .th-filter-btn {
@@ -499,7 +499,7 @@ defineExpose({ loadTransactions, printAllTransactions })
 .th-filter-btn:not(:last-child) { border-right: 1px solid #e5e7eb; }
 .th-filter-btn:hover { background: #f9fafb; }
 .th-filter-btn--active {
-  background: #6366f1;
+  background: var(--color-primary);
   color: white;
 }
 
@@ -510,13 +510,13 @@ defineExpose({ loadTransactions, printAllTransactions })
   width: 32px;
   height: 32px;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: white;
   color: #6b7280;
   cursor: pointer;
   transition: border-color 0.2s, color 0.2s;
 }
-.th-action-btn:hover:not(:disabled) { border-color: #6366f1; color: #6366f1; }
+.th-action-btn:hover:not(:disabled) { border-color: var(--color-primary); color: var(--color-primary); }
 .th-action-btn:disabled { opacity: 0.4; }
 
 .th-loading, .th-empty {
@@ -576,10 +576,10 @@ defineExpose({ loadTransactions, printAllTransactions })
   font-weight: 700;
   letter-spacing: 0.3px;
   padding: 3px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 .th-type-badge--buy { background: #dcfce7; color: #15803d; }
-.th-type-badge--sell { background: #fee2e2; color: #b91c1c; }
+.th-type-badge--sell { background: var(--color-danger-bg); color: #b91c1c; }
 .th-type-badge--lg { font-size: 13px; padding: 5px 14px; }
 
 .th-currency-cell {
@@ -639,7 +639,7 @@ defineExpose({ loadTransactions, printAllTransactions })
 .th-profit--neg {
   font-family: 'JetBrains Mono', ui-monospace, monospace;
   font-weight: 600;
-  color: #dc2626;
+  color: var(--color-danger);
 }
 .th-profit--zero { color: #d1d5db; }
 
@@ -658,13 +658,13 @@ defineExpose({ loadTransactions, printAllTransactions })
   width: 32px;
   height: 32px;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: white;
   color: #374151;
   cursor: pointer;
   transition: border-color 0.2s, color 0.2s;
 }
-.th-page-btn:hover:not(:disabled) { border-color: #6366f1; color: #6366f1; }
+.th-page-btn:hover:not(:disabled) { border-color: var(--color-primary); color: var(--color-primary); }
 .th-page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 .th-page-info {
   font-size: 13px;
@@ -685,7 +685,7 @@ defineExpose({ loadTransactions, printAllTransactions })
 }
 .th-detail-card {
   background: white;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   width: 100%;
   max-width: 520px;
   box-shadow: 0 20px 60px rgba(0,0,0,0.2);
@@ -719,16 +719,16 @@ defineExpose({ loadTransactions, printAllTransactions })
   align-items: center;
   gap: 4px;
   padding: 6px 14px;
-  border: 1px solid #6366f1;
-  border-radius: 8px;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
   background: white;
-  color: #6366f1;
+  color: var(--color-primary);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: background-color 0.2s, color 0.2s;
 }
-.th-print-btn:hover { background: #6366f1; color: white; }
+.th-print-btn:hover { background: var(--color-primary); color: white; }
 .th-close-btn {
   display: flex;
   align-items: center;
@@ -736,7 +736,7 @@ defineExpose({ loadTransactions, printAllTransactions })
   width: 32px;
   height: 32px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: #f3f4f6;
   color: #6b7280;
   cursor: pointer;
@@ -768,7 +768,7 @@ defineExpose({ loadTransactions, printAllTransactions })
   flex: 1;
   background: #f9fafb;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 14px;
   text-align: center;
 }
@@ -828,7 +828,7 @@ defineExpose({ loadTransactions, printAllTransactions })
   gap: 6px;
   margin-top: 16px;
   padding: 10px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: #fef2f2;
   border: 1px solid #fecaca;
   color: #b91c1c;
@@ -850,9 +850,9 @@ defineExpose({ loadTransactions, printAllTransactions })
   gap: 4px;
   padding: 6px 14px;
   border: 1px solid #fecaca;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: white;
-  color: #dc2626;
+  color: var(--color-danger);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -865,8 +865,8 @@ defineExpose({ loadTransactions, printAllTransactions })
   gap: 4px;
   padding: 6px 14px;
   border: none;
-  border-radius: 8px;
-  background: #dc2626;
+  border-radius: var(--radius-md);
+  background: var(--color-danger);
   color: white;
   font-size: 12px;
   font-weight: 600;
@@ -875,7 +875,7 @@ defineExpose({ loadTransactions, printAllTransactions })
 .th-detail-del-cancel {
   padding: 6px 14px;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: white;
   color: #6b7280;
   font-size: 12px;
