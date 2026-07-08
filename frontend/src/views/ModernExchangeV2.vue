@@ -2599,7 +2599,7 @@ watch(() => exchangeItems.value.map(item => ({
 .ex-chip--usd { border-color: rgba(34,197,94,0.3); }
 .ex-chip--usd:hover { border-color: #22c55e; color: #15803d; background: linear-gradient(135deg, #f0fdf4, #dcfce7); box-shadow: 0 6px 20px rgba(34,197,94,0.2); }
 .ex-chip--eur { border-color: rgba(59,130,246,0.3); }
-.ex-chip--eur:hover { border-color: #3b82f6; color: #1d4ed8; background: linear-gradient(135deg, #eff6ff, #dbeafe); box-shadow: 0 6px 20px rgba(59,130,246,0.2); }
+.ex-chip--eur:hover { border-color: var(--color-secondary); color: #1d4ed8; background: linear-gradient(135deg, #eff6ff, #dbeafe); box-shadow: 0 6px 20px rgba(59,130,246,0.2); }
 .ex-chip--rub { border-color: rgba(239,68,68,0.3); }
 .ex-chip--rub:hover { border-color: var(--color-danger); color: #b91c1c; background: linear-gradient(135deg, #fef2f2, #fee2e2); box-shadow: 0 6px 20px rgba(239,68,68,0.2); }
 .ex-chip--krub { border-color: rgba(139,92,246,0.3); }
@@ -2614,7 +2614,7 @@ watch(() => exchangeItems.value.map(item => ({
   transform: translateY(-2px);
 }
 .ex-chip--active.ex-chip--usd { box-shadow: 0 0 0 2px #22c55e, 0 4px 16px rgba(34,197,94,0.25); border-color: #22c55e; background: linear-gradient(135deg, #f0fdf4, #dcfce7); color: #15803d; }
-.ex-chip--active.ex-chip--eur { box-shadow: 0 0 0 2px #3b82f6, 0 4px 16px rgba(59,130,246,0.25); border-color: #3b82f6; background: linear-gradient(135deg, #eff6ff, #dbeafe); color: #1d4ed8; }
+.ex-chip--active.ex-chip--eur { box-shadow: 0 0 0 2px var(--color-secondary), 0 4px 16px rgba(59,130,246,0.25); border-color: var(--color-secondary); background: linear-gradient(135deg, #eff6ff, #dbeafe); color: #1d4ed8; }
 .ex-chip--active.ex-chip--rub { box-shadow: 0 0 0 2px var(--color-danger), 0 4px 16px rgba(239,68,68,0.25); border-color: var(--color-danger); background: linear-gradient(135deg, #fef2f2, #fee2e2); color: #b91c1c; }
 .ex-chip--active.ex-chip--krub { box-shadow: 0 0 0 2px #8b5cf6, 0 4px 16px rgba(139,92,246,0.25); border-color: #8b5cf6; background: linear-gradient(135deg, #f5f3ff, #ede9fe); color: #6b46c1; }
 .ex-chip--active.ex-chip--usdt { box-shadow: 0 0 0 2px #14b8a6, 0 4px 16px rgba(20,184,166,0.25); border-color: #14b8a6; background: linear-gradient(135deg, #f0fdfa, #ccfbf1); color: #0f766e; }
@@ -2680,7 +2680,7 @@ watch(() => exchangeItems.value.map(item => ({
   background: linear-gradient(135deg, #fafffe, #f0fdf4);
 }
 .ex-item--sell {
-  border-left: 4px solid #ef4444;
+  border-left: 4px solid var(--color-danger);
   background: linear-gradient(135deg, #fffafa, #fef2f2);
 }
 .ex-item:hover {
@@ -3522,8 +3522,8 @@ watch(() => exchangeItems.value.map(item => ({
   transition: background-color 0.15s, color 0.15s;
 }
 .ex-batch-type-btn:first-child { border-right: 1px solid var(--ex-border); }
-.ex-batch-type--buy { background: #dcfce7; color: #15803d; }
-.ex-batch-type--sell { background: #fee2e2; color: #b91c1c; }
+.ex-batch-type--buy { background: var(--color-success-bg); color: #15803d; }
+.ex-batch-type--sell { background: var(--color-danger-bg); color: #b91c1c; }
 .ex-batch-arrow { color: var(--color-border); font-weight: 700; }
 .ex-batch-input { width: 100px; padding: 7px 10px; font-size: 13px; }
 .ex-batch-input--rate { width: 90px; }

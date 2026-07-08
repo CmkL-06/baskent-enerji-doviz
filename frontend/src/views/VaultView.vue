@@ -1535,7 +1535,7 @@ onUnmounted(() => {
   padding: 0.625rem 1.25rem;
   background: rgba(255, 255, 255, 0.15);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   color: white;
   font-weight: 500;
   cursor: pointer;
@@ -1562,7 +1562,7 @@ onUnmounted(() => {
   width: 80px;
   height: 80px;
   background: rgba(255, 255, 255, 0.15);
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1575,7 +1575,7 @@ onUnmounted(() => {
   bottom: -8px;
   right: -8px;
   padding: 0.375rem 0.875rem;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   font-size: 0.75rem;
   font-weight: 600;
 }
@@ -1624,7 +1624,7 @@ onUnmounted(() => {
   padding: 0.75rem;
   background: rgba(255, 255, 255, 0.15);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   color: white;
   cursor: pointer;
   transition: background-color 0.2s ease, transform 0.2s ease;
@@ -1663,7 +1663,7 @@ onUnmounted(() => {
 .balances-card,
 .history-card {
   background: white;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   padding: 2rem;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   margin-bottom: 2rem;
@@ -2205,7 +2205,7 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   padding: 0.375rem 0.875rem;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -2399,7 +2399,7 @@ onUnmounted(() => {
 
 .modal-container {
   background: white;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   width: 100%;
   max-width: 500px;
   max-height: 90vh;
@@ -3162,8 +3162,8 @@ onUnmounted(() => {
   display: inline-block;
   padding: 2px 8px;
   background: #ede9fe;
-  color: #6366f1;
-  border-radius: 6px;
+  color: var(--color-primary);
+  border-radius: var(--radius-sm);
   font-size: 12px;
   font-weight: 600;
 }
