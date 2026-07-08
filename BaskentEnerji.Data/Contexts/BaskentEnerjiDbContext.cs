@@ -30,17 +30,18 @@ namespace BaskentEnerji.Data.Contexts
             // modelBuilder.HasDefaultSchema("mtturkey_exchange");
 
             // Currency <-> ExchangeRate cok-yonlu iliski
-            modelBuilder.Entity<ExchangeRate>()
-                .HasOne(e => e.SourceCurrency)
-                .WithMany(c => c.SourceRates)
-                .HasForeignKey(e => e.SourceCurrencyId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            modelBuilder.Entity<ExchangeRate>()
-                .HasOne(e => e.TargetCurrency)
-                .WithMany(c => c.TargetRates)
-                .HasForeignKey(e => e.TargetCurrencyId)
-                .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<ExchangeRate>(entity =>
+            {
+                entity.ToTable(tb => tb.HasTrigger("trg_SyncTgExchangeRates"));
+                entity.HasOne(e => e.SourceCurrency)
+                    .WithMany(c => c.SourceRates)
+                    .HasForeignKey(e => e.SourceCurrencyId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.TargetCurrency)
+                    .WithMany(c => c.TargetRates)
+                    .HasForeignKey(e => e.TargetCurrencyId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
 
             // Party <-> User (CreatedBy / ModifiedBy) FK esleme
             modelBuilder.Entity<Party>()
@@ -182,6 +183,331 @@ namespace BaskentEnerji.Data.Contexts
                 .WithMany(t => t.CryptoDeposits)
                 .HasForeignKey(d => d.TransactionId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // ============================================================
+            // DECIMAL PRECISION — Rate fields: (18,6), Amount fields: (18,4)
+            // ============================================================
+
+            // --- ExchangeRate ---
+            modelBuilder.Entity<ExchangeRate>(entity =>
+            {
+                entity.Property(e => e.BuyRate).HasPrecision(18, 6);
+                entity.Property(e => e.SellRate).HasPrecision(18, 6);
+            });
+
+            // --- ExchangeRateHistory ---
+            modelBuilder.Entity<ExchangeRateHistory>(entity =>
+            {
+                entity.Property(e => e.OldBuyRate).HasPrecision(18, 6);
+                entity.Property(e => e.OldSellRate).HasPrecision(18, 6);
+                entity.Property(e => e.NewBuyRate).HasPrecision(18, 6);
+                entity.Property(e => e.NewSellRate).HasPrecision(18, 6);
+                entity.Property(e => e.ChangePercent).HasPrecision(18, 6);
+            });
+
+            // --- ExchangeSettings ---
+            modelBuilder.Entity<ExchangeSettings>(entity =>
+            {
+                entity.Property(e => e.TryBasedMarginPercent).HasPrecision(18, 6);
+                entity.Property(e => e.CrossFiatMarginPercent).HasPrecision(18, 6);
+                entity.Property(e => e.CryptoMarginPercent).HasPrecision(18, 6);
+                entity.Property(e => e.MaxPriceChangePercent).HasPrecision(18, 6);
+            });
+
+            // --- ExternalRateCache ---
+            modelBuilder.Entity<ExternalRateCache>(entity =>
+            {
+                entity.Property(e => e.BuyRate).HasPrecision(18, 6);
+                entity.Property(e => e.SellRate).HasPrecision(18, 6);
+                entity.Property(e => e.SpreadPercent).HasPrecision(18, 6);
+            });
+
+            // --- PendingRateApproval ---
+            modelBuilder.Entity<PendingRateApproval>(entity =>
+            {
+                entity.Property(e => e.CurrentBuyRate).HasPrecision(18, 6);
+                entity.Property(e => e.CurrentSellRate).HasPrecision(18, 6);
+                entity.Property(e => e.ProposedBuyRate).HasPrecision(18, 6);
+                entity.Property(e => e.ProposedSellRate).HasPrecision(18, 6);
+                entity.Property(e => e.ChangePercent).HasPrecision(18, 6);
+            });
+
+            // --- TransactionDetail ---
+            modelBuilder.Entity<TransactionDetail>(entity =>
+            {
+                entity.Property(e => e.Amount).HasPrecision(18, 4);
+                entity.Property(e => e.Rate).HasPrecision(18, 6);
+                entity.Property(e => e.Commission).HasPrecision(18, 4);
+                entity.Property(e => e.NetAmount).HasPrecision(18, 4);
+                entity.Property(e => e.ActualBuyRate).HasPrecision(18, 6);
+                entity.Property(e => e.ActualSellRate).HasPrecision(18, 6);
+                entity.Property(e => e.CustomRate).HasPrecision(18, 6);
+            });
+
+            // --- Transaction ---
+            modelBuilder.Entity<Transaction>(entity =>
+            {
+                entity.Property(e => e.Profit).HasPrecision(18, 4);
+            });
+
+            // --- CurrencySale ---
+            modelBuilder.Entity<CurrencySale>(entity =>
+            {
+                entity.Property(e => e.SaleRate).HasPrecision(18, 6);
+                entity.Property(e => e.OriginalSaleRate).HasPrecision(18, 6);
+                entity.Property(e => e.Revenue).HasPrecision(18, 4);
+                entity.Property(e => e.RevenuePercent).HasPrecision(18, 6);
+            });
+
+            // --- DailySummary ---
+            modelBuilder.Entity<DailySummary>(entity =>
+            {
+                entity.Property(e => e.OpeningBalance).HasPrecision(18, 4);
+                entity.Property(e => e.TotalIn).HasPrecision(18, 4);
+                entity.Property(e => e.TotalOut).HasPrecision(18, 4);
+                entity.Property(e => e.ClosingBalance).HasPrecision(18, 4);
+                entity.Property(e => e.ProfitLoss).HasPrecision(18, 4);
+            });
+
+            // --- CurrencyWac ---
+            modelBuilder.Entity<CurrencyWac>(entity =>
+            {
+                entity.Property(e => e.Wac).HasPrecision(18, 6);
+                entity.Property(e => e.Quantity).HasPrecision(18, 4);
+            });
+
+            // --- CurrencyWacHistory ---
+            modelBuilder.Entity<CurrencyWacHistory>(entity =>
+            {
+                entity.Property(e => e.OldWac).HasPrecision(18, 6);
+                entity.Property(e => e.NewWac).HasPrecision(18, 6);
+                entity.Property(e => e.OldQuantity).HasPrecision(18, 4);
+                entity.Property(e => e.NewQuantity).HasPrecision(18, 4);
+                entity.Property(e => e.TransactionAmount).HasPrecision(18, 4);
+                entity.Property(e => e.TransactionRate).HasPrecision(18, 6);
+            });
+
+            // --- Office ---
+            modelBuilder.Entity<Office>(entity =>
+            {
+                entity.Property(e => e.DailyTransactionLimit).HasPrecision(18, 4);
+                entity.Property(e => e.MonthlyTransactionLimit).HasPrecision(18, 4);
+                entity.Property(e => e.CommissionRate).HasPrecision(18, 6);
+                entity.Property(e => e.TransferApprovalThreshold).HasPrecision(18, 4);
+            });
+
+            // --- OfficeTransfer ---
+            modelBuilder.Entity<OfficeTransfer>(entity =>
+            {
+                entity.Property(e => e.Amount).HasPrecision(18, 4);
+            });
+
+            // --- Vault ---
+            modelBuilder.Entity<Vault>(entity =>
+            {
+                entity.Property(e => e.ClosingBalance).HasPrecision(18, 4);
+            });
+
+            // --- VaultBalance ---
+            modelBuilder.Entity<VaultBalance>(entity =>
+            {
+                entity.Property(e => e.Balance).HasPrecision(18, 4);
+                entity.Property(e => e.ReservedAmount).HasPrecision(18, 4);
+            });
+
+            // --- VaultBalanceHistory ---
+            modelBuilder.Entity<VaultBalanceHistory>(entity =>
+            {
+                entity.Property(e => e.Balance).HasPrecision(18, 4);
+            });
+
+            // --- VaultBalanceSnapshotDetail ---
+            modelBuilder.Entity<VaultBalanceSnapshotDetail>(entity =>
+            {
+                entity.Property(e => e.Balance).HasPrecision(18, 4);
+                entity.Property(e => e.ReservedAmount).HasPrecision(18, 4);
+            });
+
+            // --- VaultCountDetail ---
+            modelBuilder.Entity<VaultCountDetail>(entity =>
+            {
+                entity.Property(e => e.ActualAmount).HasPrecision(18, 4);
+                entity.Property(e => e.SystemAmount).HasPrecision(18, 4);
+                entity.Property(e => e.Discrepancy).HasPrecision(18, 4);
+            });
+
+            // --- DayClosure ---
+            modelBuilder.Entity<DayClosure>(entity =>
+            {
+                entity.Property(e => e.TotalRealizedProfit).HasPrecision(18, 4);
+            });
+
+            // --- DayClosureDetail ---
+            modelBuilder.Entity<DayClosureDetail>(entity =>
+            {
+                entity.Property(e => e.SystemBalance).HasPrecision(18, 4);
+                entity.Property(e => e.PhysicalCount).HasPrecision(18, 4);
+                entity.Property(e => e.Discrepancy).HasPrecision(18, 4);
+                entity.Property(e => e.WacAtClose).HasPrecision(18, 6);
+                entity.Property(e => e.OpeningBalance).HasPrecision(18, 4);
+                entity.Property(e => e.OpeningWac).HasPrecision(18, 6);
+            });
+
+            // --- Party ---
+            modelBuilder.Entity<Party>(entity =>
+            {
+                entity.Property(e => e.TotalVolume).HasPrecision(18, 4);
+            });
+
+            // --- PartyAccount ---
+            modelBuilder.Entity<PartyAccount>(entity =>
+            {
+                entity.Property(e => e.Balance).HasPrecision(18, 4);
+                entity.Property(e => e.BlockedAmount).HasPrecision(18, 4);
+                entity.Property(e => e.CreditLimit).HasPrecision(18, 4);
+                entity.Property(e => e.TotalDebits).HasPrecision(18, 4);
+                entity.Property(e => e.TotalCredits).HasPrecision(18, 4);
+            });
+
+            // --- PartyAccountEntry ---
+            modelBuilder.Entity<PartyAccountEntry>(entity =>
+            {
+                entity.Property(e => e.Amount).HasPrecision(18, 4);
+                entity.Property(e => e.RunningBalance).HasPrecision(18, 4);
+                entity.Property(e => e.OriginalAmount).HasPrecision(18, 4);
+                entity.Property(e => e.ExchangeRate).HasPrecision(18, 6);
+            });
+
+            // --- PartyCreditLimit ---
+            modelBuilder.Entity<PartyCreditLimit>(entity =>
+            {
+                entity.Property(e => e.CreditLimit).HasPrecision(18, 4);
+                entity.Property(e => e.UtilizedAmount).HasPrecision(18, 4);
+                entity.Property(e => e.TemporaryLimit).HasPrecision(18, 4);
+                entity.Property(e => e.InterestRate).HasPrecision(18, 6);
+            });
+
+            // --- PartyStatement ---
+            modelBuilder.Entity<PartyStatement>(entity =>
+            {
+                entity.Property(e => e.OpeningBalance).HasPrecision(18, 4);
+                entity.Property(e => e.ClosingBalance).HasPrecision(18, 4);
+                entity.Property(e => e.TotalDebits).HasPrecision(18, 4);
+                entity.Property(e => e.TotalCredits).HasPrecision(18, 4);
+                entity.Property(e => e.CurrentAmount).HasPrecision(18, 4);
+                entity.Property(e => e.Amount30Days).HasPrecision(18, 4);
+                entity.Property(e => e.Amount60Days).HasPrecision(18, 4);
+                entity.Property(e => e.Amount90Days).HasPrecision(18, 4);
+                entity.Property(e => e.AmountOver90Days).HasPrecision(18, 4);
+            });
+
+            // --- GhostPartyAccount ---
+            modelBuilder.Entity<GhostPartyAccount>(entity =>
+            {
+                entity.Property(e => e.Balance).HasPrecision(18, 4);
+                entity.Property(e => e.BlockedAmount).HasPrecision(18, 4);
+                entity.Property(e => e.TotalDebits).HasPrecision(18, 4);
+                entity.Property(e => e.TotalCredits).HasPrecision(18, 4);
+            });
+
+            // --- GhostPartyAccountEntry ---
+            modelBuilder.Entity<GhostPartyAccountEntry>(entity =>
+            {
+                entity.Property(e => e.Amount).HasPrecision(18, 4);
+                entity.Property(e => e.RunningBalance).HasPrecision(18, 4);
+            });
+
+            // --- ExpenseDefinition ---
+            modelBuilder.Entity<ExpenseDefinition>(entity =>
+            {
+                entity.Property(e => e.DefaultAmount).HasPrecision(18, 4);
+            });
+
+            // --- ExpensePayment ---
+            modelBuilder.Entity<ExpensePayment>(entity =>
+            {
+                entity.Property(e => e.Amount).HasPrecision(18, 4);
+            });
+
+            // --- Coin_User ---
+            modelBuilder.Entity<Coin_User>(entity =>
+            {
+                entity.Property(e => e.Quantity).HasPrecision(18, 4);
+                entity.Property(e => e.EffQuantity).HasPrecision(18, 4);
+                entity.Property(e => e.BuyPrice).HasPrecision(18, 6);
+                entity.Property(e => e.SellPrice).HasPrecision(18, 6);
+                entity.Property(e => e.FeeRate).HasPrecision(18, 6);
+                entity.Property(e => e.Profit).HasPrecision(18, 4);
+            });
+
+            // --- Coin_Profit ---
+            modelBuilder.Entity<Coin_Profit>(entity =>
+            {
+                entity.Property(e => e.Quantity).HasPrecision(18, 4);
+                entity.Property(e => e.EffQuantity).HasPrecision(18, 4);
+                entity.Property(e => e.BuyPrice).HasPrecision(18, 6);
+                entity.Property(e => e.SellPrice).HasPrecision(18, 6);
+                entity.Property(e => e.FeeRate).HasPrecision(18, 6);
+                entity.Property(e => e.Profit).HasPrecision(18, 4);
+            });
+
+            // --- TgTransaction ---
+            modelBuilder.Entity<TgTransaction>(entity =>
+            {
+                entity.Property(e => e.Amount).HasPrecision(18, 4);
+                entity.Property(e => e.ExchangeRate).HasPrecision(18, 6);
+                entity.Property(e => e.TryAmount).HasPrecision(18, 4);
+            });
+
+            // --- TgExchangeRate ---
+            modelBuilder.Entity<TgExchangeRate>(entity =>
+            {
+                entity.Property(e => e.BuyRate).HasPrecision(18, 6);
+                entity.Property(e => e.SellRate).HasPrecision(18, 6);
+            });
+
+            // --- TgDealer ---
+            modelBuilder.Entity<TgDealer>(entity =>
+            {
+                entity.Property(e => e.Balance).HasPrecision(18, 4);
+                entity.Property(e => e.CommissionRate).HasPrecision(18, 6);
+            });
+
+            // --- TgCryptoDeposit ---
+            modelBuilder.Entity<TgCryptoDeposit>(entity =>
+            {
+                entity.Property(e => e.Amount).HasPrecision(18, 6);
+            });
+
+            // ============================================================
+            // PERFORMANCE INDEXES
+            // ============================================================
+
+            // Transaction: vault + date + soft-delete filter
+            modelBuilder.Entity<Transaction>()
+                .HasIndex(t => new { t.VaultId, t.TransactionDate, t.IsDeleted })
+                .HasDatabaseName("IX_Transaction_Vault_Date_Deleted");
+
+            // Transaction: vault + date (without soft-delete)
+            modelBuilder.Entity<Transaction>()
+                .HasIndex(t => new { t.VaultId, t.TransactionDate })
+                .HasDatabaseName("IX_Transaction_Vault_Date");
+
+            // Transaction: number lookup
+            modelBuilder.Entity<Transaction>()
+                .HasIndex(t => t.TransactionNumber)
+                .HasDatabaseName("IX_Transaction_Number");
+
+            // VaultBalanceHistory: vault + currency + date range queries
+            modelBuilder.Entity<VaultBalanceHistory>()
+                .HasIndex(v => new { v.VaultId, v.CurrencyId, v.CreatedDate })
+                .HasDatabaseName("IX_VaultBalanceHistory_Vault_Currency_Date");
+
+            // VaultBalance: unique constraint per vault-currency pair
+            modelBuilder.Entity<VaultBalance>()
+                .HasIndex(v => new { v.VaultId, v.CurrencyId })
+                .IsUnique()
+                .HasDatabaseName("IX_VaultBalance_Vault_Currency_Unique");
         }
 
         // User

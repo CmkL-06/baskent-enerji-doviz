@@ -18,7 +18,7 @@ namespace BaskentEnerji.Entity.Entities.Telegram
 
         public bool IsActive { get; set; }
 
-        [Column(TypeName = "decimal(18,2)")]
+        [Column(TypeName = "decimal(18,4)")]
         public decimal Balance { get; set; }
 
         [MaxLength(100)]
@@ -43,7 +43,7 @@ namespace BaskentEnerji.Entity.Entities.Telegram
 
         public Guid? PartyId { get; set; }
 
-        [Column(TypeName = "decimal(5,2)")]
+        [Column(TypeName = "decimal(18,6)")]
         public decimal CommissionRate { get; set; } = 1.5m;
     }
 }

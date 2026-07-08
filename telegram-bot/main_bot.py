@@ -844,8 +844,8 @@ def _get_dealer_from_transaction(transaction_id: int) -> dict | None:
                     'api_secret': row[4], 'amount': row[5],
                     'pending_completion_code': row[6],
                 }
-    except:
-        pass
+    except Exception as e:
+        logger.error(f"DB error in _get_dealer_from_transaction: {e}")
     return None
 
 
@@ -952,8 +952,8 @@ async def _auto_update_progress(context, chat_id, message_id, transaction_id,
                                txid=deposit['txid'], confirmations=confirmations),
                         parse_mode="Markdown"
                     )
-                except:
-                    pass
+                except Exception:
+                    pass  # Message may already be deleted or unchanged
                 return
             else:
                 db.update_crypto_deposit(txid=deposit['txid'], confirmations=confirmations)
@@ -970,7 +970,7 @@ async def _auto_update_progress(context, chat_id, message_id, transaction_id,
                         ),
                         parse_mode="Markdown"
                     )
-                except:
+                except Exception:
                     pass  # Mesaj zaten güncel veya silinmiş
 
         except Exception as e:
@@ -1057,8 +1057,8 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 chat_id=trans['assigned_operator_id'],
                 text=f"📎 Müşteri dosya gönderdi: {original_name}"
             )
-        except:
-            pass
+        except Exception:
+            pass  # Operator may have blocked the bot
 
 
 async def _send_receipt_to_channel(update, context, transaction_id,
@@ -1165,8 +1165,8 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
             try:
                 await temp_msg.delete()
                 await update.message.delete()
-            except:
-                pass
+            except Exception:
+                pass  # Message may already be deleted
         return
 
     # /start komutu grupta
@@ -1298,5 +1298,6 @@ if __name__ == "__main__":
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         level=logging.INFO
     )
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     db.init_database()
     asyncio.run(start())

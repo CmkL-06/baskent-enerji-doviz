@@ -1137,5 +1137,6 @@ if __name__ == "__main__":
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         level=logging.INFO
     )
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     db.init_database()
     asyncio.run(start())

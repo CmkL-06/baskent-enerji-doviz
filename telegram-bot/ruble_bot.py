@@ -610,6 +610,7 @@ if __name__ == "__main__":
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         level=logging.INFO
     )
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     db.init_database()
     db.seed_bank_providers(Config.BANK_PROVIDERS)
     asyncio.run(start())

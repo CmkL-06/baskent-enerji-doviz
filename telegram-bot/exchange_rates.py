@@ -101,8 +101,8 @@ def get_rates(use_cache=True):
         )
         if resp.status_code == 200:
             rates['USDT'] = float(resp.json()['price'])
-    except:
-        pass
+    except Exception as e:
+        logger.warning(f"Binance USDT rate fetch error: {e}")
 
     if 'USDT' not in rates:
         rates['USDT'] = Config.DEFAULT_USDT_RATE
@@ -118,8 +118,8 @@ def get_rates(use_cache=True):
             usd_try = data.get('TRY', 34.0)
             usd_rub = data.get('RUB', 90.0)
             rates['RUB'] = usd_try / usd_rub
-    except:
-        pass
+    except Exception as e:
+        logger.warning(f"ExchangeRate API RUB rate fetch error: {e}")
 
     if 'RUB' not in rates:
         rates['RUB'] = Config.DEFAULT_RUB_RATE

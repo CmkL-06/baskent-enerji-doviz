@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using BaskentEnerji.Business.Exceptions;
 using BaskentEnerji.Business.Infrastructure.User;
 using BaskentEnerji.Business.Services.Permission;
@@ -29,6 +30,7 @@ namespace BaskentEnerji.API.Controllers
 
         [HttpPost("login")]
         [AllowAnonymous]
+        [EnableRateLimiting("login")]
         public async Task<rsp_user_login> Login(rm_user_login requestData)
         {
             return await _userServiceCommand.Authenticate(requestData, HttpContext);
@@ -46,6 +48,7 @@ namespace BaskentEnerji.API.Controllers
 
         [HttpPost("forgot-password")]
         [AllowAnonymous]
+        [EnableRateLimiting("sensitive")]
         public async Task<IActionResult> ForgotPassword([FromBody] rm_forgot_password requestData)
         {
             await _userServiceCommand.GeneratePasswordResetToken(requestData.Email);
@@ -54,6 +57,7 @@ namespace BaskentEnerji.API.Controllers
 
         [HttpPost("reset-password")]
         [AllowAnonymous]
+        [EnableRateLimiting("sensitive")]
         public async Task<IActionResult> ResetPassword([FromBody] rm_reset_password requestData)
         {
             var result = await _userServiceCommand.ResetPassword(requestData.Email, requestData.Token, requestData.NewPassword);
@@ -105,6 +109,7 @@ namespace BaskentEnerji.API.Controllers
 
         [HttpPost("change-password")]
         [Authorize]
+        [EnableRateLimiting("sensitive")]
         public async Task<IActionResult> ChangeUserPassword([FromBody] rm_change_user_password requestData)
         {
             var result = await _userServiceCommand.ChangeUserPassword(requestData);

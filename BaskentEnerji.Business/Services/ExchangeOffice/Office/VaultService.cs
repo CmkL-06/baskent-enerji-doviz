@@ -269,6 +269,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             {
                 var summary = new vm_vaultsummary
                 {
+                    Id = vault.Id,
                     VaultId = vault.Id,
                     VaultName = vault.Name,
                     OfficeId = vault.OfficeId,
@@ -510,9 +511,6 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
         public async Task UpdateVaultBalanceAsync(rm_updatevaultbalance data)
         {
-            // Clear cache when balance is updated
-            ClearVaultCaches();
-
             // Get vault for later cache invalidation
             var vault = await _context.Vaults.FirstOrDefaultAsync(v => v.Id == data.vaultId);
 
@@ -588,6 +586,9 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
             await _context.SaveChangesAsync();
 
+            // Clear vault caches AFTER commit
+            ClearVaultCaches();
+
             // Invalidate Z-report cache AFTER saving changes
             if (vault != null)
             {
@@ -599,9 +600,6 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
         public async Task SaveVault(rm_savevault data)
         {
-            // Clear cache when vault data is modified
-            ClearVaultCaches();
-
             var dbVault = await _context.Vaults.FindAsync(data.Id);
 
             if (dbVault != null)
@@ -659,6 +657,9 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
             await _context.SaveChangesAsync();
 
+            // Clear vault caches AFTER commit
+            ClearVaultCaches();
+
             // Invalidate Z-report cache AFTER saving changes
             InvalidateZReportCache(data.OfficeId, DateTime.Today);
             InvalidateZReportCache(data.OfficeId, DateTime.Now.Date);
@@ -666,9 +667,6 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
         public async Task RemoveVault(Guid id)
         {
-            // Clear cache when vault is removed
-            ClearVaultCaches();
-
             var dbVault = await _context.Vaults.FindAsync(id);
             var officeId = dbVault?.OfficeId;
 
@@ -677,6 +675,9 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             await _context.SaveChangesAsync();
             _context.Vaults.Remove(dbVault);
             await _context.SaveChangesAsync();
+
+            // Clear vault caches AFTER commit
+            ClearVaultCaches();
 
             // Invalidate Z-report cache AFTER removing
             if (officeId != null)

@@ -47,10 +47,10 @@ def get_conn():
         try:
             conn.cursor().execute("SELECT 1")
             break
-        except:
+        except Exception:
             try:
                 conn.close()
-            except:
+            except Exception:
                 pass
             conn = None
 
@@ -65,7 +65,7 @@ def get_conn():
     except Exception:
         try:
             conn.rollback()
-        except:
+        except Exception:
             pass
         raise
     finally:
@@ -73,15 +73,15 @@ def get_conn():
             try:
                 conn.rollback()
                 _pool.append(conn)
-            except:
+            except Exception:
                 try:
                     conn.close()
-                except:
+                except Exception:
                     pass
         else:
             try:
                 conn.close()
-            except:
+            except Exception:
                 pass
 
 
@@ -183,8 +183,8 @@ def get_customer_language(customer_id):
                 lang = row[0][:2].lower()
                 if lang in ('tr', 'en', 'ru', 'de'):
                     return lang
-    except:
-        pass
+    except Exception as e:
+        logger.error(f"DB error in get_customer_language: {e}")
     return 'tr'
 
 
@@ -356,8 +356,8 @@ def get_active_transaction(customer_id):
             if row:
                 cols = [d[0] for d in c.description]
                 return dict(zip(cols, row))
-    except:
-        pass
+    except Exception as e:
+        logger.error(f"DB error in get_active_transaction: {e}")
     return None
 
 
@@ -411,7 +411,8 @@ def cancel_transaction(transaction_id, customer_id):
             """, transaction_id, customer_id)
             conn.commit()
             return c.rowcount > 0
-    except:
+    except Exception as e:
+        logger.error(f"DB error in cancel_transaction: {e}")
         return False
 
 
@@ -456,8 +457,8 @@ def get_operator(operator_id):
                     'operator_id': row[0], 'first_name': row[1],
                     'is_active': row[2], 'is_admin': row[3]
                 }
-    except:
-        pass
+    except Exception as e:
+        logger.error(f"DB error in get_operator: {e}")
     return None
 
 
@@ -488,7 +489,8 @@ def get_active_operators():
                 FROM TgOperators WHERE IsActive = 1
             """)
             return [{'id': r[0], 'name': r[1], 'username': r[2]} for r in c.fetchall()]
-    except:
+    except Exception as e:
+        logger.error(f"DB error in get_active_operators: {e}")
         return []
 
 
@@ -514,7 +516,8 @@ def get_operator_stats(operator_id):
             total = c.fetchone()[0] or 0
 
             return {'today': today, 'total': total}
-    except:
+    except Exception as e:
+        logger.error(f"DB error in get_operator_stats: {e}")
         return {'today': 0, 'total': 0}
 
 
@@ -706,8 +709,8 @@ def get_dealer(dealer_code):
             if row:
                 cols = [d[0] for d in c.description]
                 return dict(zip(cols, row))
-    except:
-        pass
+    except Exception as e:
+        logger.error(f"DB error in get_dealer: {e}")
     return None
 
 
@@ -721,7 +724,8 @@ def reduce_dealer_balance(dealer_code, amount_try):
             """, amount_try, dealer_code)
             conn.commit()
             return True
-    except:
+    except Exception as e:
+        logger.error(f"DB error in reduce_dealer_balance: {e}")
         return False
 
 
@@ -742,7 +746,8 @@ def get_exchange_rates_from_db():
             for currency, rate in c.fetchall():
                 rates[currency] = float(rate)
             return rates if rates else None
-    except:
+    except Exception as e:
+        logger.error(f"DB error in get_exchange_rates_from_db: {e}")
         return None
 
 
@@ -757,7 +762,8 @@ def check_txid_used(txid):
             c = conn.cursor()
             c.execute("SELECT DepositId FROM TgCryptoDeposits WHERE Txid = ?", txid)
             return c.fetchone() is not None
-    except:
+    except Exception as e:
+        logger.error(f"DB error in check_txid_used: {e}")
         return False
 
 
@@ -808,7 +814,8 @@ def update_crypto_deposit(txid=None, transaction_id=None, **kwargs):
             )
             conn.commit()
             return True
-    except:
+    except Exception as e:
+        logger.error(f"DB error in update_crypto_deposit: {e}")
         return False
 
 
@@ -832,8 +839,8 @@ def get_pending_crypto_deposit(transaction_id):
             if row:
                 cols = [d[0] for d in c.description]
                 return dict(zip(cols, row))
-    except:
-        pass
+    except Exception as e:
+        logger.error(f"DB error in get_pending_crypto_deposit: {e}")
     return None
 
 
@@ -851,8 +858,8 @@ def notify_web_panel(transaction_id):
             headers={'X-Notify-Secret': Config.NOTIFY_SECRET},
             timeout=0.5
         )
-    except:
-        pass
+    except Exception:
+        pass  # Non-critical notification, fail silently
 
 
 # ===================================================
@@ -878,8 +885,8 @@ def get_user_state(customer_id):
                 if row[2]:
                     try:
                         state_data = json.loads(row[2])
-                    except:
-                        pass
+                    except Exception:
+                        pass  # Invalid JSON in StateData, use empty dict
                 return {
                     'transaction_id': row[0],
                     'state': state_data.get('state', row[1]),
@@ -937,8 +944,8 @@ def get_all_active_states():
                 if raw:
                     try:
                         state_data = json.loads(raw)
-                    except:
-                        pass
+                    except Exception:
+                        pass  # Invalid JSON in StateData, use empty dict
                 result[cid] = {
                     'transaction_id': tid,
                     'state': state_data.get('state', status),
@@ -970,8 +977,8 @@ def check_idempotency_key(key):
             row = c.fetchone()
             if row:
                 return row[0]
-    except:
-        pass
+    except Exception as e:
+        logger.error(f"DB error in check_idempotency_key: {e}")
     return None
 
 
