@@ -78,6 +78,9 @@ async function verifyCrypto() {
       selectedTx.value.cryptoVerifiedAt = res.cryptoVerifiedAt
     }
     await loadTransactions()
+    if (selectedTx.value) {
+      selectedTx.value = transactions.value.find((t: any) => t.id === selectedTx.value.id) || null
+    }
   } catch (e: any) {
     notification.error(e?.response?.data?.message || 'Doğrulama başarısız')
   } finally { verifyingCrypto.value = false }
@@ -94,6 +97,9 @@ async function doAction(action: string) {
     const res = await apiService.post(`/tg/operator/transaction/${selectedTx.value.id}/${action}`)
     if (res?.status) selectedTx.value.status = res.status
     await loadTransactions()
+    if (selectedTx.value) {
+      selectedTx.value = transactions.value.find((t: any) => t.id === selectedTx.value.id) || null
+    }
   } catch (e) { console.error(e) }
 }
 
@@ -127,18 +133,29 @@ function connectSSE() {
     loadTransactions()
     playNotificationSound()
     if (selectedTx.value) {
-      const data = JSON.parse(e.data)
-      if (data.transaction_id === selectedTx.value.id)
-        selectTransaction(selectedTx.value)
+      try {
+        const data = JSON.parse(e.data)
+        if (data.transaction_id === selectedTx.value.id)
+          selectTransaction(selectedTx.value)
+      } catch {}
     }
   })
 
   eventSource.addEventListener('new_message', (e: any) => {
-    const data = JSON.parse(e.data)
-    if (selectedTx.value && data.transaction_id === selectedTx.value.id)
-      selectTransaction(selectedTx.value)
+    try {
+      const data = JSON.parse(e.data)
+      if (selectedTx.value && data.transaction_id === selectedTx.value.id)
+        selectTransaction(selectedTx.value)
+    } catch {}
     playNotificationSound()
   })
+
+  eventSource.onerror = () => {
+    if (eventSource && eventSource.readyState === EventSource.CLOSED) {
+      eventSource.close()
+      setTimeout(connectSSE, 5000)
+    }
+  }
 }
 
 function formatDate(d: string | null) {

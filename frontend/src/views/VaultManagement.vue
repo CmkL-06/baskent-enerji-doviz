@@ -6,6 +6,7 @@ import { useExchangeStore } from '@/stores/exchange'
 import apiService from '@/services/apiservice'
 import AppKpiCard from '@/components/common/AppKpiCard.vue'
 import AppPageHeader from '@/components/common/AppPageHeader.vue'
+import AppEmptyState from '@/components/common/AppEmptyState.vue'
 import { useNotification } from '@/composables/useNotification'
 
 const notification = useNotification()

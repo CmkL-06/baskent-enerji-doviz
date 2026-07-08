@@ -164,7 +164,11 @@ function toggleExpand(id: string) {
   expandedId.value = expandedId.value === id ? null : id
 }
 
-const formatDate = (d: string) => new Date(d).toLocaleDateString('tr-TR')
+const formatDate = (d: string) => {
+  if (!d) return '—'
+  const date = new Date(d)
+  return isNaN(date.getTime()) ? '—' : date.toLocaleDateString('tr-TR')
+}
 
 onMounted(loadCurrencies)
 </script>

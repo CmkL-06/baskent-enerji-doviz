@@ -1458,8 +1458,19 @@ onMounted(async () => {
   document.addEventListener('click', closeDropdowns)
   if (!route.params.id) {
     try {
-      const vaultsData = await apiService.getVaults()
-      const allVaults = vaultsData.data || vaultsData
+      const userOfficeId = localStorage.getItem('selectedOfficeId')
+      let allVaults: any[] = []
+      if (userOfficeId) {
+        try {
+          const officeVaults = await apiService.getVaultsByOfficeId(userOfficeId)
+          allVaults = officeVaults.data || officeVaults
+          if (!Array.isArray(allVaults)) allVaults = []
+        } catch { allVaults = [] }
+      }
+      if (allVaults.length === 0) {
+        const vaultsData = await apiService.getVaults()
+        allVaults = vaultsData.data || vaultsData
+      }
       if (allVaults && allVaults.length > 0) {
         const firstId = allVaults[0].vaultId || allVaults[0].id
         if (!firstId) return

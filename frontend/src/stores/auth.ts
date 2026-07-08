@@ -6,7 +6,9 @@ import apiService from '@/services/apiservice'
 export const useAuthStore = defineStore('auth', () => {
 
   const token      = ref<string | null>(localStorage.getItem('token'))
-  const user       = ref<any | null>(JSON.parse(localStorage.getItem('user') || 'null'))
+  let _parsedUser: any = null
+  try { _parsedUser = JSON.parse(localStorage.getItem('user') || 'null') } catch { localStorage.removeItem('user') }
+  const user       = ref<any | null>(_parsedUser)
   const isLoading  = ref(false)
   const error      = ref<string | null>(null)
   const userOffices = ref<any[]>([])
@@ -71,7 +73,7 @@ export const useAuthStore = defineStore('auth', () => {
     const u = localStorage.getItem('user')
     if (t && u) {
       token.value = t
-      user.value  = JSON.parse(u)
+      try { user.value = JSON.parse(u) } catch { localStorage.removeItem('user'); user.value = null }
     }
   }
 

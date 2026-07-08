@@ -119,11 +119,11 @@ const saveChanges = async () => {
   try {
     // Use saveVault with correct data structure
     const updatedVault = await apiService.saveVault({
-      id: props.vault.vaultId || props.vault.id,
-      name: editForm.value.vaultName,
-      description: editForm.value.description,
-      officeId: editForm.value.officeId,
-      isActive: editForm.value.isActive
+      Id: props.vault.vaultId || props.vault.id,
+      Name: editForm.value.vaultName,
+      Description: editForm.value.description,
+      OfficeId: editForm.value.officeId,
+      IsActive: editForm.value.isActive
     })
     
     // Refresh vault data in store

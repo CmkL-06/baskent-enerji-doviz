@@ -45,8 +45,8 @@ const tryCurrency = computed(() =>
 )
 
 const spreadPercent = computed(() => {
-  const buy = parseFloat(form.value.buyRate.replace(',', '.'))
-  const sell = parseFloat(form.value.sellRate.replace(',', '.'))
+  const buy = parseNum(form.value.buyRate)
+  const sell = parseNum(form.value.sellRate)
   if (!buy || !sell || buy <= 0) return null
   return ((sell - buy) / buy * 100).toFixed(2)
 })

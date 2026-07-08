@@ -160,7 +160,7 @@ const topCurrencies = (obj: Record<string, number> | null | undefined) => {
           class="od-office-card"
           :class="{ 'od-merkez': o.officeType === 1 }"
           style="cursor: pointer"
-          @click="router.push('/ihtiyar/vaults')"
+          @click="goToOfficeVault(o.officeId)"
         >
           <div class="od-office-header">
             <div class="od-office-name-row">

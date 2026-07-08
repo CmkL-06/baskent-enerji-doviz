@@ -908,7 +908,6 @@ const submitExchange = async () => {
     buildReceiptFromCurrent()
     await apiService.createExchangeTransaction(transactions)
 
-    notification.success(t('exchange.messages.transactionSuccess'))
     showReceiptPanel.value = true
 
     resetForm()

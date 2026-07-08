@@ -84,6 +84,10 @@ async function createTransfer() {
     notification.warning('Hedef ofis seçiniz')
     return
   }
+  if (transferForm.value.sourceOfficeId === transferForm.value.targetOfficeId) {
+    notification.warning('Kaynak ve hedef ofis aynı olamaz')
+    return
+  }
   saving.value = true
   try {
     await apiService.createTransferRequest({

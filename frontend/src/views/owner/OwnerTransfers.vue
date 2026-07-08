@@ -85,7 +85,7 @@ async function submitReject() {
 }
 
 async function submitCreate() {
-  if (!form.value.sourceVaultId || !form.value.targetVaultId || !form.value.currencyId || !form.value.amount) return
+  if (!form.value.sourceVaultId || !form.value.targetVaultId || !form.value.currencyId || !form.value.amount || form.value.amount <= 0) return
   saving.value = true
   try {
     await apiService.createTransferRequest(form.value)

@@ -18,10 +18,11 @@ export interface NotifyOptions {
 }
 
 const notifications = ref<Notification[]>([])
+let _notifId = 0
 
 export function useNotification() {
   function notify(n: Omit<Notification, 'id'>) {
-    const id = Math.random().toString(36).slice(2)
+    const id = String(++_notifId)
     notifications.value.push({ id, duration: 4000, ...n })
     setTimeout(() => dismiss(id), n.duration ?? 4000)
   }

@@ -26,18 +26,13 @@ apiClient.interceptors.response.use(
     const status = err.response?.status
 
     if (status === 401 && !_redirecting) {
-      const hadToken = !!localStorage.getItem('token')
-      if (hadToken) {
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      if (window.location.pathname !== '/login') {
         _redirecting = true
-        localStorage.removeItem('token')
-        localStorage.removeItem('user')
-        if (window.location.pathname !== '/login') {
-          import('@/router').then(m => {
-            m.default.push('/login').finally(() => { _redirecting = false })
-          })
-        } else {
-          _redirecting = false
-        }
+        import('@/router')
+          .then(m => m.default.push('/login').finally(() => { _redirecting = false }))
+          .catch(() => { _redirecting = false })
       }
     } else if (status !== 401) {
       const msg = err.response?.data?.message
