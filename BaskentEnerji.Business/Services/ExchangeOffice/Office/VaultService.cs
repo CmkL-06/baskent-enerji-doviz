@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Caching.Memory;
+using BaskentEnerji.Entity;
 using BaskentEnerji.Business.Infrastructure.ExchangeOffice.Office;
 using BaskentEnerji.Business.Services.Permission;
 using BaskentEnerji.Data.Contexts;
@@ -393,6 +394,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             var exchangeRates = await GetExchangeRatesForCurrenciesAsync(currencies.Values);
             var baseCurrencyId = await GetBaseCurrencyIdAsync();
 
+            var netDebtByOfficeId = await CalculateBranchNetDebtToMerkezAsync(offices);
+
             var summaries = new List<vm_officesummary>();
 
             foreach (var office in offices)
@@ -456,12 +459,61 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     DateTime.Today.AddDays(1).AddSeconds(-1)
                 );
 
+                summary.NetDebtToMerkez = netDebtByOfficeId.GetValueOrDefault(office.Id, 0m);
+
                 summaries.Add(summary);
             }
 
             // Cache the result
             _memoryCache.Set(cacheKey, summaries, CacheDuration);
             return summaries;
+        }
+
+        // Şubelerin Merkez'e olan net borcunu, tamamlanmış OfficeTransfer kayıtlarından türetir.
+        // Merkez → Şube transferi sermaye avansı (borcu artırır), Şube → Merkez transferi geri ödeme/kâr havalesi (borcu azaltır).
+        // Kalıcı bir borç tablosu yok — bu değer her çağrıda mevcut transfer geçmişinden hesaplanır.
+        private async Task<Dictionary<Guid, decimal>> CalculateBranchNetDebtToMerkezAsync(List<BaskentEnerji.Entity.Entities.ExchangeOffice.Office.Office> offices)
+        {
+            var netDebtByOfficeId = new Dictionary<Guid, decimal>();
+
+            var merkezOffice = offices.FirstOrDefault(o => o.OfficeType == OfficeType.Merkez);
+            var subeOffices = offices.Where(o => o.OfficeType == OfficeType.Sube).ToList();
+            if (merkezOffice == null || subeOffices.Count == 0)
+                return netDebtByOfficeId;
+
+            var merkezVaultIds = merkezOffice.Vaults.Select(v => v.Id).ToHashSet();
+            var subeVaultToOfficeId = subeOffices
+                .SelectMany(o => o.Vaults.Select(v => new { v.Id, OfficeId = o.Id }))
+                .ToDictionary(x => x.Id, x => x.OfficeId);
+
+            if (subeVaultToOfficeId.Count == 0)
+                return netDebtByOfficeId;
+
+            var subeVaultIds = subeVaultToOfficeId.Keys.ToList();
+
+            var transfers = await _context.OfficeTransfers
+                .AsNoTracking()
+                .Where(t => t.Status == TransferStatus.Completed &&
+                    ((merkezVaultIds.Contains(t.SourceVaultId) && subeVaultIds.Contains(t.TargetVaultId)) ||
+                     (subeVaultIds.Contains(t.SourceVaultId) && merkezVaultIds.Contains(t.TargetVaultId))))
+                .ToListAsync();
+
+            foreach (var t in transfers)
+            {
+                var valueInBase = await ConvertToBaseCurrencyAsync(t.CurrencyId, t.Amount);
+                if (merkezVaultIds.Contains(t.SourceVaultId))
+                {
+                    var subeOfficeId = subeVaultToOfficeId[t.TargetVaultId];
+                    netDebtByOfficeId[subeOfficeId] = netDebtByOfficeId.GetValueOrDefault(subeOfficeId, 0m) + valueInBase;
+                }
+                else
+                {
+                    var subeOfficeId = subeVaultToOfficeId[t.SourceVaultId];
+                    netDebtByOfficeId[subeOfficeId] = netDebtByOfficeId.GetValueOrDefault(subeOfficeId, 0m) - valueInBase;
+                }
+            }
+
+            return netDebtByOfficeId;
         }
 
         public async Task<decimal> CalculateProfitLossAsync(Guid officeId, DateTime startDate, DateTime endDate)

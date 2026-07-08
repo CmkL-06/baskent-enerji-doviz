@@ -26,6 +26,7 @@ const g = (o: any, k: string) => {
 
 // ── Owner data
 const offices = ref<any[]>([])
+const dealerSummary = ref<any>(null)
 const pendingTransfers = ref<any[]>([])
 const ownerAlerts = ref<any[]>([])
 const liveRates = ref<any[]>([])
@@ -64,6 +65,10 @@ function txUser(t: any) {
 // ── Loaders
 async function loadOffices() {
   try { offices.value = await apiService.getOfficeSummaries() ?? [] } catch { offices.value = [] }
+}
+
+async function loadDealerSummary() {
+  try { dealerSummary.value = await apiService.getTgCariSummary() } catch { dealerSummary.value = null }
 }
 
 async function loadLiveRates() {
@@ -194,6 +199,24 @@ const sortedOffices = computed(() =>
   [...offices.value].sort((a, b) => (isMerkez(b) ? 1 : 0) - (isMerkez(a) ? 1 : 0))
 )
 
+// ── Merkez / Şubeler / Bayiler kartları
+const merkezOffice = computed(() => offices.value.find(o => o.officeType === 1))
+const subeOfficeList = computed(() => offices.value.filter(o => o.officeType === 2))
+const subeAggregate = computed(() => {
+  const list = subeOfficeList.value
+  return {
+    count: list.length,
+    vaultCount: list.reduce((s, o) => s + (o.vaultCount ?? 0), 0),
+    userCount: list.reduce((s, o) => s + (o.userCount ?? 0), 0),
+    dailyProfitLoss: list.reduce((s, o) => s + (o.dailyProfitLoss ?? 0), 0),
+    monthlyProfitLoss: list.reduce((s, o) => s + (o.monthlyProfitLoss ?? 0), 0),
+    totalValueInBaseCurrency: list.reduce((s, o) => s + (o.totalValueInBaseCurrency ?? 0), 0),
+    netDebtToMerkez: list.reduce((s, o) => s + (o.netDebtToMerkez ?? 0), 0),
+  }
+})
+const dealerCards = computed(() => dealerSummary.value?.dealers ?? [])
+const dealerTotals = computed(() => dealerSummary.value?.totals ?? { totalPayable: 0, totalReceivable: 0, netPosition: 0 })
+
 const pendingActionCount = computed(() => pendingTransfers.value.length + ownerAlerts.value.length)
 
 // ── Z-Report history → sparklines + bugün vs dün
@@ -305,7 +328,7 @@ async function load() {
   dateStr.value = new Date().toLocaleDateString('tr-TR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
   try {
     const calls: Promise<any>[] = [apiService.getDashboardData(), loadRecentTx(), loadMyAccess()]
-    if (authStore.isOwner) calls.push(loadOffices(), loadPendingTransfers(), loadAlerts(), loadZHistory())
+    if (authStore.isOwner) calls.push(loadOffices(), loadDealerSummary(), loadPendingTransfers(), loadAlerts(), loadZHistory())
     const [db] = await Promise.all(calls)
     dashboard.value = db
     // Use rates from dashboard response for owner; separate call for staff
@@ -699,41 +722,61 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- 4. Şube Performansı -->
-        <div class="ow-card" v-if="offices.length">
-          <div class="ow-card-head">
-            <span class="material-symbols-outlined" aria-hidden="true">leaderboard</span>
-            <h3>Şube Performansı</h3>
-            <button class="ow-link" @click="router.push('/ihtiyar/owner-panel')">Detay <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></button>
+        <!-- 4. Merkez / Şubeler / Bayiler -->
+        <div class="msb-grid" v-if="offices.length || dealerSummary">
+          <!-- Başkent Ana Kasa -->
+          <div class="msb-card msb-card--merkez" v-if="merkezOffice" @click="router.push('/ihtiyar/owner-panel?tab=branches')">
+            <div class="msb-card-head">
+              <span class="material-symbols-outlined" aria-hidden="true">hub</span>
+              <h3>Başkent Ana Kasa</h3>
+            </div>
+            <div class="msb-card-name">{{ merkezOffice.officeName }}</div>
+            <div class="msb-stats">
+              <div class="msb-stat"><span class="msb-stat-label">Kasalar</span><span class="msb-stat-value">{{ merkezOffice.vaultCount ?? 0 }}</span></div>
+              <div class="msb-stat"><span class="msb-stat-label">Personel</span><span class="msb-stat-value">{{ merkezOffice.userCount ?? 0 }}</span></div>
+              <div class="msb-stat"><span class="msb-stat-label">Günlük K/Z</span><span class="msb-stat-value" :style="{ color: plColor(merkezOffice.dailyProfitLoss ?? 0) }">{{ plSign(merkezOffice.dailyProfitLoss ?? 0) }}{{ fmtNum(merkezOffice.dailyProfitLoss ?? 0) }} ₺</span></div>
+              <div class="msb-stat"><span class="msb-stat-label">Aylık K/Z</span><span class="msb-stat-value" :style="{ color: plColor(merkezOffice.monthlyProfitLoss ?? 0) }">{{ plSign(merkezOffice.monthlyProfitLoss ?? 0) }}{{ fmtNum(merkezOffice.monthlyProfitLoss ?? 0) }} ₺</span></div>
+            </div>
+            <div class="msb-total">Toplam Varlık <strong>{{ fmtNum(merkezOffice.totalValueInBaseCurrency ?? 0) }} ₺</strong></div>
+            <div class="msb-debt" :class="subeAggregate.netDebtToMerkez >= 0 ? 'msb-debt--credit' : 'msb-debt--owe'">
+              {{ subeAggregate.netDebtToMerkez >= 0 ? 'Şubelerden Alacağı' : 'Şubelere Borçlu' }}
+              <strong>{{ fmtNum(Math.abs(subeAggregate.netDebtToMerkez)) }} ₺</strong>
+            </div>
           </div>
-          <div class="branch-table-wrap">
-            <table class="branch-table">
-              <thead>
-                <tr>
-                  <th class="bt-name">Şube</th>
-                  <th class="bt-num">Kasalar</th>
-                  <th class="bt-num">Personel</th>
-                  <th class="bt-num">Günlük K/Z</th>
-                  <th class="bt-num">Aylık K/Z</th>
-                  <th class="bt-num">Toplam Varlık</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="o in sortedOffices" :key="o.officeId" :class="{ 'bt-merkez': isMerkez(o) }">
-                  <td class="bt-name">
-                    <div class="bt-name-inner">
-                      <span class="bt-office-badge" :class="isMerkez(o) ? 'merkez' : 'sube'">{{ isMerkez(o) ? 'Merkez' : 'Şube' }}</span>
-                      <span class="bt-office-name">{{ o.officeName }}</span>
-                    </div>
-                  </td>
-                  <td class="bt-num">{{ o.vaultCount ?? 0 }}</td>
-                  <td class="bt-num">{{ o.userCount ?? 0 }}</td>
-                  <td class="bt-num" :style="{ color: plColor(o.dailyProfitLoss ?? 0) }">{{ plSign(o.dailyProfitLoss ?? 0) }}{{ fmtNum(o.dailyProfitLoss ?? 0) }} ₺</td>
-                  <td class="bt-num" :style="{ color: plColor(o.monthlyProfitLoss ?? 0) }">{{ plSign(o.monthlyProfitLoss ?? 0) }}{{ fmtNum(o.monthlyProfitLoss ?? 0) }} ₺</td>
-                  <td class="bt-num bt-total">{{ fmtNum(o.totalValueInBaseCurrency ?? 0) }} ₺</td>
-                </tr>
-              </tbody>
-            </table>
+
+          <!-- Şubeler -->
+          <div class="msb-card msb-card--sube" @click="router.push('/ihtiyar/owner-panel?tab=branches')">
+            <div class="msb-card-head">
+              <span class="material-symbols-outlined" aria-hidden="true">store</span>
+              <h3>Şubeler</h3>
+            </div>
+            <div class="msb-card-name">{{ subeAggregate.count }} şube</div>
+            <div class="msb-stats">
+              <div class="msb-stat"><span class="msb-stat-label">Kasalar</span><span class="msb-stat-value">{{ subeAggregate.vaultCount }}</span></div>
+              <div class="msb-stat"><span class="msb-stat-label">Personel</span><span class="msb-stat-value">{{ subeAggregate.userCount }}</span></div>
+              <div class="msb-stat"><span class="msb-stat-label">Günlük K/Z</span><span class="msb-stat-value" :style="{ color: plColor(subeAggregate.dailyProfitLoss) }">{{ plSign(subeAggregate.dailyProfitLoss) }}{{ fmtNum(subeAggregate.dailyProfitLoss) }} ₺</span></div>
+              <div class="msb-stat"><span class="msb-stat-label">Aylık K/Z</span><span class="msb-stat-value" :style="{ color: plColor(subeAggregate.monthlyProfitLoss) }">{{ plSign(subeAggregate.monthlyProfitLoss) }}{{ fmtNum(subeAggregate.monthlyProfitLoss) }} ₺</span></div>
+            </div>
+            <div class="msb-total">Toplam Varlık <strong>{{ fmtNum(subeAggregate.totalValueInBaseCurrency) }} ₺</strong></div>
+            <div class="msb-debt" :class="subeAggregate.netDebtToMerkez >= 0 ? 'msb-debt--owe' : 'msb-debt--credit'">
+              {{ subeAggregate.netDebtToMerkez >= 0 ? "Merkez'e Toplam Borç" : "Merkez'den Alacaklı" }}
+              <strong>{{ fmtNum(Math.abs(subeAggregate.netDebtToMerkez)) }} ₺</strong>
+            </div>
+          </div>
+
+          <!-- Bayiler -->
+          <div class="msb-card msb-card--bayi" v-if="dealerSummary" @click="router.push('/ihtiyar/tg-admin')">
+            <div class="msb-card-head">
+              <span class="material-symbols-outlined" aria-hidden="true">storefront</span>
+              <h3>Bayiler</h3>
+              <span class="msb-badge-light">Cari Özet</span>
+            </div>
+            <div class="msb-card-name">{{ dealerCards.length }} bayi</div>
+            <div class="msb-stats msb-stats--bayi">
+              <div class="msb-stat"><span class="msb-stat-label">Alacak</span><span class="msb-stat-value" style="color:#22c55e">{{ fmtNum(dealerTotals.totalReceivable) }} ₺</span></div>
+              <div class="msb-stat"><span class="msb-stat-label">Borç</span><span class="msb-stat-value" style="color:#ef4444">{{ fmtNum(dealerTotals.totalPayable) }} ₺</span></div>
+            </div>
+            <div class="msb-total">Net Pozisyon <strong :style="{ color: plColor(dealerTotals.netPosition) }">{{ plSign(dealerTotals.netPosition) }}{{ fmtNum(dealerTotals.netPosition) }} ₺</strong></div>
           </div>
         </div>
 
@@ -1187,30 +1230,53 @@ onUnmounted(() => {
 .action-count.ok { background: #f0fdf4; color: #22c55e; }
 .action-count.info { background: var(--color-primary-light); color: var(--color-primary); }
 
-/* ═══ Branch Table ═══ */
-.branch-table-wrap { overflow-x: auto; }
-.branch-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-.branch-table thead th {
-  padding: 12px 18px; font-size: 11px; font-weight: 700;
-  color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.04em;
-  text-align: left; background: var(--color-bg-page); border-bottom: 1px solid #eef0f4;
+/* ═══ Merkez / Şubeler / Bayiler kartları ═══ */
+.msb-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
 }
-.branch-table thead th.bt-num { text-align: right; }
-.branch-table tbody tr { border-bottom: 1px solid #f5f5f5; transition: background .12s; }
-.branch-table tbody tr:last-child { border-bottom: none; }
-.branch-table tbody tr:hover { background: #fafbfe; }
-.branch-table tbody tr.bt-merkez { background: linear-gradient(135deg, #fffbeb, #fefce8); }
-.branch-table tbody td { padding: 14px 18px; font-size: 13px; }
-.branch-table tbody td.bt-num { text-align: right; font-weight: 700; }
-.bt-name-inner { display: flex; align-items: center; gap: 10px; }
-.bt-office-badge {
-  padding: 3px 10px; border-radius: var(--radius-sm); font-size: 10px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.3px;
+@media (max-width: 900px) { .msb-grid { grid-template-columns: 1fr; } }
+.msb-card {
+  background: var(--color-bg-card); border: 1px solid #eef0f4; border-radius: var(--radius-lg);
+  padding: 18px 20px; cursor: pointer;
+  transition: box-shadow .2s, border-color .2s, transform .2s;
 }
-.bt-office-badge.merkez { background: #fef3c7; color: #92400e; }
-.bt-office-badge.sube { background: var(--color-primary-light); color: var(--color-primary-hover); }
-.bt-office-name { font-weight: 700; color: var(--color-text); }
-.bt-total { color: #1e1b4b !important; font-weight: 800 !important; }
+.msb-card:hover { box-shadow: 0 4px 20px rgba(99,102,241,0.08); transform: translateY(-1px); }
+.msb-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.msb-card-head h3 { margin: 0; font-size: 14px; font-weight: 800; color: #1e1b4b; flex: 1; }
+.msb-card-head .material-symbols-outlined { font-size: 20px; }
+.msb-card-name { font-size: 12px; color: var(--color-text-secondary); font-weight: 600; margin-bottom: 14px; }
+.msb-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin-bottom: 12px; }
+.msb-stats--bayi { grid-template-columns: 1fr 1fr; }
+.msb-stat { display: flex; flex-direction: column; gap: 2px; }
+.msb-stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-muted); }
+.msb-stat-value { font-size: 14px; font-weight: 700; color: var(--color-text); font-variant-numeric: tabular-nums; }
+.msb-total {
+  font-size: 12px; color: var(--color-text-secondary); padding-top: 10px;
+  border-top: 1px solid var(--color-bg-page); font-variant-numeric: tabular-nums;
+}
+.msb-total strong { color: #1e1b4b; font-weight: 800; margin-left: 4px; }
+.msb-debt {
+  margin-top: 8px; font-size: 11px; font-weight: 600; padding: 6px 10px;
+  border-radius: var(--radius-sm); font-variant-numeric: tabular-nums;
+}
+.msb-debt strong { margin-left: 4px; font-weight: 800; }
+.msb-debt--owe { background: #fef2f2; color: #b91c1c; }
+.msb-debt--credit { background: #f0fdf4; color: #15803d; }
+
+.msb-card--merkez { border-color: #fde68a; background: linear-gradient(135deg, #fffbeb, #fefce8); }
+.msb-card--merkez .msb-card-head .material-symbols-outlined { color: #92400e; }
+
+.msb-card--sube .msb-card-head .material-symbols-outlined { color: var(--color-primary); }
+
+.msb-card--bayi {
+  border-style: dashed; border-color: #cbd5e1; background: #fafbfc; opacity: 0.92;
+}
+.msb-card--bayi:hover { opacity: 1; border-color: #94a3b8; }
+.msb-card--bayi .msb-card-head .material-symbols-outlined { color: #64748b; }
+.msb-badge-light {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px;
+  background: #f1f5f9; color: #64748b; padding: 2px 8px; border-radius: var(--radius-sm);
+}
 
 /* ═══ Transaction Feed ═══ */
 .tx-feed { max-height: 460px; overflow-y: auto; }

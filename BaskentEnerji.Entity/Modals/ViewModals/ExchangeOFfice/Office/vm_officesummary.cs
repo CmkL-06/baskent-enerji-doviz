@@ -19,5 +19,6 @@ namespace BaskentEnerji.Entity.Modals.ViewModals.ExchangeOFfice.Office
         public decimal TotalValueInBaseCurrency { get; set; }
         public decimal DailyProfitLoss { get; set; }
         public decimal MonthlyProfitLoss { get; set; }
+        public decimal NetDebtToMerkez { get; set; }
     }
 }

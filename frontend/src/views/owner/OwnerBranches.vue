@@ -293,6 +293,13 @@ function assetPercent(o: any) {
                 <span :class="['ob-type-badge', 'type-' + o.officeType]">{{ officeTypeLabel(o.officeType) }}</span>
                 <span class="ob-active-dot" :class="o.isActive !== false ? 'active' : 'inactive'"></span>
                 <span class="ob-active-text">{{ o.isActive !== false ? 'Aktif' : 'Pasif' }}</span>
+                <span
+                  v-if="o.officeType === 2"
+                  class="ob-debt-badge"
+                  :class="(o.netDebtToMerkez ?? 0) > 0 ? 'owe' : 'credit'"
+                >
+                  {{ (o.netDebtToMerkez ?? 0) > 0 ? "Merkez'e Net Borç" : "Merkez'e Fazla Ödeme" }}: {{ fmtMoney(Math.abs(o.netDebtToMerkez ?? 0)) }} ₺
+                </span>
               </div>
             </div>
           </div>
@@ -687,6 +694,13 @@ function assetPercent(o: any) {
 .ob-active-dot.active { background: #22c55e; box-shadow: 0 0 0 2px rgba(34,197,94,.2); }
 .ob-active-dot.inactive { background: var(--color-danger); }
 .ob-active-text { font-size: 0.7rem; color: var(--color-text-muted); }
+
+.ob-debt-badge {
+  font-size: 0.65rem; font-weight: 700; padding: 1px 8px;
+  border-radius: var(--radius-sm); font-variant-numeric: tabular-nums;
+}
+.ob-debt-badge.owe { background: #fef2f2; color: #b91c1c; }
+.ob-debt-badge.credit { background: #f0fdf4; color: #15803d; }
 
 /* Stats */
 .ob-office-stats {
