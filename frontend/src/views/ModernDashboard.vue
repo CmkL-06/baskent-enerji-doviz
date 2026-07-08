@@ -1143,7 +1143,7 @@ onUnmounted(() => {
 }
 .pos-row:hover { background: #fafbfe; }
 .pos-code { font-weight: 800; font-size: 14px; color: #1e1b4b; letter-spacing: 0.3px; }
-.pos-amount { font-size: 13px; font-weight: 600; color: #475569; font-variant-numeric: tabular-nums; text-align: right; }
+.pos-amount { font-size: 13px; font-weight: 600; color: var(--color-text-secondary); font-variant-numeric: tabular-nums; text-align: right; }
 .pos-bar-wrap { height: 22px; background: var(--color-bg-page); border-radius: var(--radius-sm); overflow: hidden; position: relative; }
 .pos-bar {
   height: 100%; border-radius: var(--radius-sm);
@@ -1386,14 +1386,14 @@ onUnmounted(() => {
 .sf-tx-row:last-child { border-bottom: none; }
 .sf-tx-row:hover { background: #fafbfe; }
 .sf-tx-badge {
-  padding: 3px 10px; border-radius: 6px;
+  padding: 3px 10px; border-radius: var(--radius-sm);
   font-size: 11px; font-weight: 700; text-align: center; letter-spacing: 0.3px;
 }
 .sf-tx-cur { font-weight: 800; color: #1e1b4b; letter-spacing: 0.3px; }
-.sf-tx-amount { font-weight: 700; color: #0f172a; text-align: right; font-variant-numeric: tabular-nums; }
-.sf-tx-rate { font-size: 11px; color: #94a3b8; font-variant-numeric: tabular-nums; }
+.sf-tx-amount { font-weight: 700; color: var(--color-text); text-align: right; font-variant-numeric: tabular-nums; }
+.sf-tx-rate { font-size: 11px; color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
 .sf-tx-total { font-weight: 700; color: #4338ca; text-align: right; font-variant-numeric: tabular-nums; }
-.sf-tx-time { font-size: 11px; color: #94a3b8; text-align: right; }
+.sf-tx-time { font-size: 11px; color: var(--color-text-muted); text-align: right; }
 
 /* ═══ Responsive ═══ */
 @media(max-width: 1200px) {
