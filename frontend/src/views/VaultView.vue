@@ -1215,7 +1215,7 @@ async function submitVaultCount() {
 }
 
 const goBack = () => {
-  router.push({ name: 'VaultManagement' })
+  router.push({ name: 'Vaults' })
 }
 
 const editVault = () => {
