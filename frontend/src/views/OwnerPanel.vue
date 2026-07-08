@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import apiService from '@/services/apiservice'
 import OwnerDashboard from './owner/OwnerDashboard.vue'
@@ -12,10 +12,14 @@ import OwnerQr from './owner/OwnerQr.vue'
 import OwnerVaultInspect from './owner/OwnerVaultInspect.vue'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 
 onMounted(() => {
   if (!authStore.isOwner) { router.push('/ihtiyar/dashboard'); return }
+  const tab = route.query.tab as Tab | undefined
+  if (tab && tabs.some(t => t.id === tab)) activeTab.value = tab
+  if (route.query.alerts === '1') showAlertPanel.value = true
   loadAlerts()
 })
 

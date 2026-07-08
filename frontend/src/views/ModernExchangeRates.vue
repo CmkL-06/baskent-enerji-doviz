@@ -65,7 +65,30 @@ async function loadRates() {
   error.value = ''
   try {
     const data = await apiService.getExchangeRates(officeId.value)
-    rates.value = Array.isArray(data) ? data : (data?.items ?? data?.data ?? [])
+    const existing = Array.isArray(data) ? data : (data?.items ?? data?.data ?? [])
+    const tryId = tryCurrency.value?.id
+    if (tryId && nonTryCurrencies.value.length) {
+      const existingKeys = new Set(existing.map((r: any) => `${r.sourceCurrencyId}_${r.targetCurrencyId}`))
+      const missing: any[] = []
+      for (const c of nonTryCurrencies.value) {
+        const key = `${c.id}_${tryId}`
+        if (!existingKeys.has(key)) {
+          missing.push({
+            id: `placeholder_${c.id}`,
+            sourceCurrencyId: c.id,
+            targetCurrencyId: tryId,
+            buyRate: 0,
+            sellRate: 0,
+            isActive: false,
+            effectiveFrom: null,
+            _placeholder: true,
+          })
+        }
+      }
+      rates.value = [...existing, ...missing]
+    } else {
+      rates.value = existing
+    }
   } catch (e: any) {
     error.value = 'Kurlar yüklenemedi'
     console.error(e)
@@ -107,6 +130,18 @@ function startAdd() {
   form.value = {
     sourceCurrencyId: nonTryCurrencies.value[0]?.id ?? '',
     targetCurrencyId: tryCurrency.value?.id ?? '',
+    buyRate: '',
+    sellRate: '',
+  }
+  activeTab.value = 'add'
+}
+
+function startAddFor(sourceId: string, targetId: string) {
+  editMode.value = false
+  editingRate.value = null
+  form.value = {
+    sourceCurrencyId: sourceId,
+    targetCurrencyId: targetId,
     buyRate: '',
     sellRate: '',
   }
@@ -255,7 +290,7 @@ onMounted(async () => {
         <button class="mr-btn mr-btn--primary" @click="startAdd">İlk Kuru Ekle</button>
       </div>
 
-      <div v-for="rate in rates" :key="rate.id" class="mr-rate-card">
+      <div v-for="rate in rates" :key="rate.id" class="mr-rate-card" :class="{ 'mr-rate-card--placeholder': rate._placeholder }" @click="rate._placeholder && startAddFor(rate.sourceCurrencyId, rate.targetCurrencyId)">
         <div class="mr-rate-header">
           <div class="mr-rate-pair">
             <img v-if="getCurrencyFlagImg(getCurrencyCode(rate.sourceCurrencyId))"
@@ -268,7 +303,7 @@ onMounted(async () => {
                  class="mr-flag" />
             <span class="mr-rate-code">{{ getCurrencyCode(rate.targetCurrencyId) }}</span>
           </div>
-          <div class="mr-rate-actions">
+          <div v-if="!rate._placeholder" class="mr-rate-actions">
             <button class="mr-icon-btn" @click="loadHistory(rate.sourceCurrencyId, rate.targetCurrencyId)" title="Geçmiş">
               <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 18px">history</span>
             </button>
@@ -276,33 +311,40 @@ onMounted(async () => {
               <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 18px">edit</span>
             </button>
           </div>
+          <span v-else class="mr-rate-badge mr-rate-badge--undefined">Kur Tanımlanmamış</span>
         </div>
-        <div class="mr-rate-body">
-          <div class="mr-rate-col mr-rate-col--buy">
-            <span class="mr-rate-label">Alış</span>
-            <span class="mr-rate-value mr-rate-value--buy">{{ formatExchangeRate(rate.buyRate) }}</span>
+        <template v-if="!rate._placeholder">
+          <div class="mr-rate-body">
+            <div class="mr-rate-col mr-rate-col--buy">
+              <span class="mr-rate-label">Alış</span>
+              <span class="mr-rate-value mr-rate-value--buy">{{ formatExchangeRate(rate.buyRate) }}</span>
+            </div>
+            <div class="mr-rate-divider"></div>
+            <div class="mr-rate-col mr-rate-col--sell">
+              <span class="mr-rate-label">Satış</span>
+              <span class="mr-rate-value mr-rate-value--sell">{{ formatExchangeRate(rate.sellRate) }}</span>
+            </div>
+            <div class="mr-rate-divider"></div>
+            <div class="mr-rate-col">
+              <span class="mr-rate-label">Spread</span>
+              <span class="mr-rate-value mr-rate-value--spread">
+                {{ rate.buyRate > 0 ? ((rate.sellRate - rate.buyRate) / rate.buyRate * 100).toFixed(2) : '0' }}%
+              </span>
+            </div>
           </div>
-          <div class="mr-rate-divider"></div>
-          <div class="mr-rate-col mr-rate-col--sell">
-            <span class="mr-rate-label">Satış</span>
-            <span class="mr-rate-value mr-rate-value--sell">{{ formatExchangeRate(rate.sellRate) }}</span>
-          </div>
-          <div class="mr-rate-divider"></div>
-          <div class="mr-rate-col">
-            <span class="mr-rate-label">Spread</span>
-            <span class="mr-rate-value mr-rate-value--spread">
-              {{ rate.buyRate > 0 ? ((rate.sellRate - rate.buyRate) / rate.buyRate * 100).toFixed(2) : '0' }}%
+          <div class="mr-rate-footer">
+            <span class="mr-rate-date">
+              <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 14px">schedule</span>
+              {{ formatDateTime(rate.effectiveFrom) }}
+            </span>
+            <span class="mr-rate-badge" :class="rate.isActive ? 'mr-rate-badge--active' : 'mr-rate-badge--inactive'">
+              {{ rate.isActive ? 'Aktif' : 'Pasif' }}
             </span>
           </div>
-        </div>
-        <div class="mr-rate-footer">
-          <span class="mr-rate-date">
-            <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 14px">schedule</span>
-            {{ formatDateTime(rate.effectiveFrom) }}
-          </span>
-          <span class="mr-rate-badge" :class="rate.isActive ? 'mr-rate-badge--active' : 'mr-rate-badge--inactive'">
-            {{ rate.isActive ? 'Aktif' : 'Pasif' }}
-          </span>
+        </template>
+        <div v-else class="mr-placeholder-body">
+          <span class="material-symbols-outlined" aria-hidden="true" style="font-size: 24px; color: #94a3b8">add_circle</span>
+          <span class="mr-placeholder-text">Kur eklemek için tıklayın</span>
         </div>
       </div>
     </div>
@@ -920,6 +962,41 @@ onMounted(async () => {
 }
 .mr-td-buy { color: var(--mr-green); font-weight: 600; }
 .mr-td-sell { color: var(--mr-red); font-weight: 600; }
+
+/* ═══ Placeholder Card ═══ */
+.mr-rate-card--placeholder {
+  border-style: dashed;
+  border-color: #cbd5e1;
+  background: #fafbfc;
+  cursor: pointer;
+  opacity: 0.75;
+}
+.mr-rate-card--placeholder:hover {
+  opacity: 1;
+  border-color: var(--mr-indigo);
+  background: rgba(99,102,241,0.03);
+}
+.mr-rate-badge--undefined {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: var(--radius-xl);
+}
+.mr-placeholder-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px 16px;
+}
+.mr-placeholder-text {
+  font-size: 13px;
+  color: #94a3b8;
+  font-weight: 500;
+}
 
 /* ═══ Spin ═══ */
 .mr-spin { animation: mr-rotate 1s linear infinite; }

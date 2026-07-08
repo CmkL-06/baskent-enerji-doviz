@@ -665,7 +665,7 @@ onUnmounted(() => {
               <h3>Bekleyen Aksiyonlar</h3>
             </div>
             <div class="action-list">
-              <div class="action-item" @click="router.push('/ihtiyar/owner-panel')" style="cursor:pointer">
+              <div class="action-item" @click="router.push('/ihtiyar/owner-panel?tab=transfers')" style="cursor:pointer">
                 <div class="action-icon" :class="pendingTransfers.length ? 'warn' : 'ok'">
                   <span class="material-symbols-outlined" aria-hidden="true">swap_horiz</span>
                 </div>
@@ -675,7 +675,7 @@ onUnmounted(() => {
                 </div>
                 <span class="action-count" :class="pendingTransfers.length ? 'warn' : 'ok'">{{ pendingTransfers.length }}</span>
               </div>
-              <div class="action-item" @click="router.push('/ihtiyar/owner-panel')" style="cursor:pointer">
+              <div class="action-item" @click="router.push('/ihtiyar/owner-panel?alerts=1')" style="cursor:pointer">
                 <div class="action-icon" :class="ownerAlerts.length ? 'warn' : 'ok'">
                   <span class="material-symbols-outlined" aria-hidden="true">notifications</span>
                 </div>
@@ -685,7 +685,7 @@ onUnmounted(() => {
                 </div>
                 <span class="action-count" :class="ownerAlerts.length ? 'warn' : 'ok'">{{ ownerAlerts.length }}</span>
               </div>
-              <div class="action-item" @click="router.push('/ihtiyar/owner-panel')" style="cursor:pointer">
+              <div class="action-item" @click="router.push('/ihtiyar/owner-panel?tab=branches')" style="cursor:pointer">
                 <div class="action-icon info">
                   <span class="material-symbols-outlined" aria-hidden="true">store</span>
                 </div>
