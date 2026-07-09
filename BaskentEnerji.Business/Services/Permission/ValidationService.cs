@@ -103,6 +103,27 @@ namespace BaskentEnerji.Business.Services.Permission
                 throw new ApiException(HttpStatusCode.Forbidden, "Bu ofise erişim yetkiniz yok");
         }
 
+        public async Task<OfficeRole?> GetOfficeRoleAsync(Guid officeId)
+        {
+            var userId = GetCurrentUserId();
+            if (!userId.HasValue) return null;
+
+            return await _dbContext.User_Offices
+                .Where(uo => uo.UserId == userId.Value && uo.OfficeId == officeId && uo.IsActive)
+                .Select(uo => (OfficeRole?)uo.Role)
+                .FirstOrDefaultAsync();
+        }
+
+        public async Task EnsureNotViewerAsync(Guid officeId)
+        {
+            if (await IsAdminAsync()) return; // Owner + Admin her zaman muaf
+
+            var role = await GetOfficeRoleAsync(officeId);
+            if (role == OfficeRole.Viewer)
+                throw new ApiException(HttpStatusCode.Forbidden,
+                    "İzleyici (Viewer) rolündeki kullanıcılar bu işlemi gerçekleştiremez. Sadece görüntüleme yetkiniz var.");
+        }
+
         private Guid? GetCurrentUserId()
         {
             var userIdClaim = _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;

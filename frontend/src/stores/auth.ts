@@ -77,5 +77,15 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { token, user, isLoading, error, isAuthenticated, isOwner, isAdmin, isModerator, userOffices, login, logout, initialize, loadUserOffices }
+  function getOfficeRole(officeId: string | undefined | null): string | null {
+    if (!officeId) return null
+    return userOffices.value.find((o: any) => o.officeId === officeId)?.role ?? null
+  }
+
+  function isViewerForOffice(officeId: string | undefined | null): boolean {
+    if (isAdmin.value) return false
+    return getOfficeRole(officeId) === 'Viewer'
+  }
+
+  return { token, user, isLoading, error, isAuthenticated, isOwner, isAdmin, isModerator, userOffices, login, logout, initialize, loadUserOffices, getOfficeRole, isViewerForOffice }
 })

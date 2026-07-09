@@ -49,6 +49,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Expense
             if (!definition.IsActive)
                 throw new InvalidOperationException("Expense definition is not active");
 
+            await _validationService.EnsureNotViewerAsync(definition.OfficeId);
+
             // Get active vault for the office
             var vault = await _context.Vaults
                 .FirstOrDefaultAsync(v => v.OfficeId == definition.OfficeId && v.IsActive);
@@ -182,6 +184,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Expense
 
             if (payment == null || payment.IsDeleted)
                 return false;
+
+            await _validationService.EnsureNotViewerAsync(payment.ExpenseDefinition.OfficeId);
 
             // Mark as deleted
             payment.IsDeleted = true;

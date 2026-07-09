@@ -1,5 +1,6 @@
 using BaskentEnerji.Business.Exceptions;
 using BaskentEnerji.Business.Infrastructure.ExchangeOffice.Office;
+using BaskentEnerji.Business.Services.Permission;
 using BaskentEnerji.Data.Contexts;
 using BaskentEnerji.Entity;
 using BaskentEnerji.Entity.Entities.ExchangeOffice.Office;
@@ -17,10 +18,12 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
     public class OfficeTransferService : IOfficeTransferService
     {
         private readonly BaskentEnerjiDbContext _db;
+        private readonly ValidationService _validationService;
 
-        public OfficeTransferService(BaskentEnerjiDbContext db)
+        public OfficeTransferService(BaskentEnerjiDbContext db, ValidationService validationService)
         {
             _db = db;
+            _validationService = validationService;
         }
 
         public async Task<vm_officetransfer> CreateTransferRequestAsync(
@@ -38,6 +41,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     .Include(v => v.Office)
                     .FirstOrDefaultAsync(v => v.Id == model.TargetVaultId)
                     ?? throw new ApiException(HttpStatusCode.NotFound, "Hedef kasa bulunamadı.");
+
+                await _validationService.EnsureNotViewerAsync(sourceVault.OfficeId);
 
                 if (model.Amount <= 0)
                     throw new ApiException(HttpStatusCode.BadRequest, "Transfer miktarı sıfırdan büyük olmalıdır.");

@@ -601,6 +601,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
         {
             // Get vault for later cache invalidation
             var vault = await _context.Vaults.FirstOrDefaultAsync(v => v.Id == data.vaultId);
+            if (vault != null)
+                await _validationService.EnsureNotViewerAsync(vault.OfficeId);
 
             // Use UPDLOCK to prevent concurrent read-modify-write race conditions
             // When called within a transaction (exchange, transfer), this holds a write lock
@@ -688,6 +690,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
         public async Task SaveVault(rm_savevault data)
         {
+            await _validationService.EnsureNotViewerAsync(data.OfficeId);
+
             var dbVault = await _context.Vaults.FindAsync(data.Id);
 
             if (dbVault != null)
@@ -757,6 +761,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
         {
             var dbVault = await _context.Vaults.FindAsync(id);
             var officeId = dbVault?.OfficeId;
+            if (officeId.HasValue)
+                await _validationService.EnsureNotViewerAsync(officeId.Value);
 
             var dbTransactions = _context.Transactions.Where(x => x.VaultId == dbVault.Id);
             _context.Transactions.RemoveRange(dbTransactions);

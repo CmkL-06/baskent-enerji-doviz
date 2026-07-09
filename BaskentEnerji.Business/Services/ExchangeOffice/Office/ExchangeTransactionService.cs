@@ -75,6 +75,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 if (vault == null)
                     throw new InvalidOperationException("Vault not found");
 
+                await _validationService.EnsureNotViewerAsync(vault.OfficeId);
+
                 // Check day closure status — block transactions if unclosed days exist
                 var canTransact = await _dayClosureService.CanTransactAsync(vault.OfficeId);
                 if (!canTransact)
@@ -341,6 +343,15 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
             try
             {
+                // Viewer, kaynak veya hedef ofislerden herhangi birinde ise transfer yapamaz
+                var transferVaultOfficeIds = await _context.Vaults
+                    .Where(v => v.Id == request.SourceVaultId || v.Id == request.TargetVaultId)
+                    .Select(v => v.OfficeId)
+                    .Distinct()
+                    .ToListAsync();
+                foreach (var officeId in transferVaultOfficeIds)
+                    await _validationService.EnsureNotViewerAsync(officeId);
+
                 // Verify source vault has sufficient balance
                 var hasBalance = await _vaultService.CheckVaultBalanceAsync(
                     request.SourceVaultId,

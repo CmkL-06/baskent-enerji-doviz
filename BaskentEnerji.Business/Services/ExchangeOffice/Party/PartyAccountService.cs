@@ -87,6 +87,9 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
                 if (account == null)
                     throw new InvalidOperationException("Party account not found");
 
+                if (account.Party != null)
+                    await _validationService.EnsureNotViewerAsync(account.Party.OfficeId);
+
                 var entry = new PartyAccountEntry
                 {
                     PartyAccountId = request.PartyAccountId,
@@ -161,6 +164,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
             var party = await _context.Parties.FindAsync(request.PartyId);
             if (party == null)
                 throw new InvalidOperationException("Party not found");
+
+            await _validationService.EnsureNotViewerAsync(party.OfficeId);
 
             var tryCurrency = await _context.Currencies.FirstOrDefaultAsync(c => c.CurrencyCode == "TRY");
             if (tryCurrency == null)
