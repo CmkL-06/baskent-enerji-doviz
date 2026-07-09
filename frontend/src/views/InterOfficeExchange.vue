@@ -18,7 +18,7 @@ const pendingTransfers = ref<any[]>([])
 const officeTransfers = ref<any[]>([])
 const selectedTransfer = ref<any>(null)
 
-const activeTab = ref<'pending' | 'history'>('pending')
+const activeTab = ref<'pending' | 'history'>(authStore.isAdmin ? 'pending' : 'history')
 const showCreateModal = ref(false)
 const showDetailModal = ref(false)
 
@@ -43,6 +43,7 @@ const formatDateTime = (d: string | null | undefined): string => {
 }
 
 async function loadPending() {
+  if (!authStore.isAdmin) return // Bekleyen transferleri onaylama yetkisi sadece Admin/Owner'da
   try {
     const data = await apiService.getPendingTransfers()
     pendingTransfers.value = Array.isArray(data) ? data : (data?.items ?? [])
@@ -156,13 +157,13 @@ onMounted(async () => {
 
     <!-- KPI -->
     <div class="kpi-grid">
-      <AppKpiCard icon="pending_actions" label="Bekleyen" :value="pendingTransfers.length" color="#d97706" bg="#fffbeb" />
+      <AppKpiCard v-if="authStore.isAdmin" icon="pending_actions" label="Bekleyen" :value="pendingTransfers.length" color="#d97706" bg="#fffbeb" />
       <AppKpiCard icon="sync_alt" label="Toplam Transfer" :value="officeTransfers.length" color="#6366f1" bg="#eef2ff" />
     </div>
 
     <!-- Tabs -->
     <div class="tab-bar">
-      <button :class="['tab-btn', activeTab === 'pending' ? 'tab-active' : '']" @click="activeTab = 'pending'">
+      <button v-if="authStore.isAdmin" :class="['tab-btn', activeTab === 'pending' ? 'tab-active' : '']" @click="activeTab = 'pending'">
         Bekleyenler
         <span v-if="pendingTransfers.length" class="badge">{{ pendingTransfers.length }}</span>
       </button>
@@ -176,7 +177,7 @@ onMounted(async () => {
     </div>
 
     <!-- Pending -->
-    <div v-else-if="activeTab === 'pending'" class="table-wrap">
+    <div v-else-if="activeTab === 'pending' && authStore.isAdmin" class="table-wrap">
       <table class="io-table">
         <thead>
           <tr>
