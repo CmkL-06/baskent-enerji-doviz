@@ -623,7 +623,7 @@ onUnmounted(() => {
 
         <!-- 2. KPI Kartları -->
         <div class="ok-grid">
-          <div v-for="k in ownerKpi" :key="k.label" class="ok-card">
+          <div v-for="k in ownerKpi" :key="k.label" class="ok-card" :style="{ borderLeftColor: k.color }">
             <div class="ok-icon" :style="{ background: k.bg }">
               <span class="material-symbols-outlined" aria-hidden="true" :style="{ color: k.color }">{{ k.icon }}</span>
             </div>
@@ -1036,10 +1036,10 @@ onUnmounted(() => {
 .ok-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
 .ok-card {
   display: flex; align-items: center; gap: 12px; position: relative;
-  background: var(--color-bg-card); border: 1px solid #eef0f4; border-radius: var(--radius-lg);
-  padding: 16px; transition: border-color .2s, box-shadow .2s; overflow: hidden;
+  background: var(--color-bg-card); border: 1.5px solid #e4e7f0; border-left-width: 4px; border-radius: var(--radius-lg);
+  padding: 16px; transition: border-color .2s, box-shadow .2s, transform .2s; overflow: hidden;
 }
-.ok-card:hover { border-color: #d4d8e8; box-shadow: 0 4px 16px -6px rgba(0,0,0,0.08); }
+.ok-card:hover { border-color: #d4d8e8; box-shadow: 0 6px 18px -6px rgba(0,0,0,0.1); transform: translateY(-2px); }
 .ok-icon {
   width: 42px; height: 42px; border-radius: var(--radius-md);
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
@@ -1068,8 +1068,13 @@ onUnmounted(() => {
   padding: 16px 20px; overflow: hidden;
 }
 .qa-head {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 8px; position: relative;
   font-size: 15px; font-weight: 800; color: #1e1b4b; margin-bottom: 14px;
+  padding-left: 12px; padding-bottom: 10px; border-bottom: 2px solid var(--color-border);
+}
+.qa-head::before {
+  content: ''; position: absolute; left: 0; top: 1px; bottom: 11px; width: 3px;
+  background: var(--color-warning); border-radius: 2px;
 }
 .qa-head .material-symbols-outlined { font-size: 22px; color: var(--color-warning); }
 .qa-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
@@ -1156,8 +1161,12 @@ onUnmounted(() => {
 }
 .ow-card:hover { box-shadow: 0 4px 20px rgba(99,102,241,0.06); }
 .ow-card-head {
-  display: flex; align-items: center; gap: 10px;
-  padding: 16px 20px; border-bottom: 1px solid var(--color-bg-page);
+  display: flex; align-items: center; gap: 10px; position: relative;
+  padding: 16px 20px 14px 24px; border-bottom: 2px solid var(--color-border);
+}
+.ow-card-head::before {
+  content: ''; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px;
+  background: var(--color-primary); border-radius: 2px;
 }
 .ow-card-head .material-symbols-outlined { font-size: 22px; color: var(--color-primary); }
 .ow-card-head h3 { margin: 0; font-size: 15px; font-weight: 800; color: #1e1b4b; flex: 1; }
@@ -1236,12 +1245,16 @@ onUnmounted(() => {
 }
 @media (max-width: 900px) { .msb-grid { grid-template-columns: 1fr; } }
 .msb-card {
-  background: var(--color-bg-card); border: 1px solid #eef0f4; border-radius: var(--radius-lg);
+  background: var(--color-bg-card); border: 1.5px solid #e4e7f0; border-top-width: 4px; border-radius: var(--radius-lg);
   padding: 18px 20px; cursor: pointer;
   transition: box-shadow .2s, border-color .2s, transform .2s;
 }
-.msb-card:hover { box-shadow: 0 4px 20px rgba(99,102,241,0.08); transform: translateY(-1px); }
-.msb-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.msb-card:hover { box-shadow: 0 4px 20px rgba(99,102,241,0.08); transform: translateY(-2px); }
+.msb-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; position: relative; padding-left: 11px; }
+.msb-card-head::before {
+  content: ''; position: absolute; left: 0; top: 1px; bottom: 1px; width: 3px;
+  background: currentColor; border-radius: 2px; opacity: 0.55;
+}
 .msb-card-head h3 { margin: 0; font-size: 14px; font-weight: 800; color: #1e1b4b; flex: 1; }
 .msb-card-head .material-symbols-outlined { font-size: 20px; }
 .msb-card-name { font-size: 12px; color: var(--color-text-secondary); font-weight: 600; margin-bottom: 14px; }
@@ -1263,16 +1276,18 @@ onUnmounted(() => {
 .msb-debt--owe { background: #fef2f2; color: #b91c1c; }
 .msb-debt--credit { background: #f0fdf4; color: #15803d; }
 
-.msb-card--merkez { border-color: #fde68a; background: linear-gradient(135deg, #fffbeb, #fefce8); }
-.msb-card--merkez .msb-card-head .material-symbols-outlined { color: #92400e; }
+.msb-card--merkez { border-top-color: #d97706; border-color: #fde68a; background: linear-gradient(135deg, #fffbeb, #fefce8); }
+.msb-card--merkez .msb-card-head { color: #92400e; }
 
-.msb-card--sube .msb-card-head .material-symbols-outlined { color: var(--color-primary); }
+.msb-card--sube { border-top-color: var(--color-primary); }
+.msb-card--sube .msb-card-head { color: var(--color-primary); }
 
 .msb-card--bayi {
-  border-style: dashed; border-color: #cbd5e1; background: #fafbfc; opacity: 0.92;
+  border-style: dashed; border-color: #cbd5e1; border-top-width: 1.5px;
+  background: #fafbfc; opacity: 0.92;
 }
 .msb-card--bayi:hover { opacity: 1; border-color: #94a3b8; }
-.msb-card--bayi .msb-card-head .material-symbols-outlined { color: #64748b; }
+.msb-card--bayi .msb-card-head { color: #64748b; }
 .msb-badge-light {
   font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px;
   background: #f1f5f9; color: #64748b; padding: 2px 8px; border-radius: var(--radius-sm);
