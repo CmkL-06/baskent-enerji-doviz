@@ -144,7 +144,12 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     }
 
                     var targetAmount = singleRequest.SourceAmount * rate;
-                    var netTargetAmount = targetAmount; // No commission deduction
+                    var netTargetAmount = targetAmount; // Komisyon müşteri tutarını etkilemez, ayrı bir gelir kalemi olarak izlenir
+
+                    // Komisyon: office.CommissionRate tanımlıysa raporlama amaçlı hesaplanır (müşteriye yansıtılmaz)
+                    var commission = vault.Office.CommissionRate.HasValue
+                        ? targetAmount * vault.Office.CommissionRate.Value / 100m
+                        : 0m;
 
                     // Calculate profit using WAC (Weighted Average Cost)
                     decimal profit = 0;
@@ -200,7 +205,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                             Side = TransactionSide.Debit,
                             Amount = targetAmount,
                             Rate = rate,
-                            Commission = 0,
+                            Commission = commission,
                             NetAmount = netTargetAmount,
                             CreatedDate = DateTime.UtcNow,
                             ActualBuyRate = exchangeRate.BuyRate,
@@ -248,7 +253,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                             Side = TransactionSide.Credit,
                             Amount = targetAmount,
                             Rate = rate,
-                            Commission = 0,
+                            Commission = commission,
                             NetAmount = netTargetAmount,
                             CreatedDate = DateTime.UtcNow,
                             ActualBuyRate = exchangeRate.BuyRate,
@@ -265,7 +270,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                         SourceAmount = singleRequest.SourceAmount,
                         TargetAmount = targetAmount,
                         AppliedRate = rate,
-                        Commission = 0,
+                        Commission = commission,
                         ProfitLoss = profit
                     });
                 }
@@ -387,6 +392,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     currencyId = request.CurrencyId,
                     description = null,
                     vaultId = request.SourceVaultId,
+                    TransactionType = TransactionType.Transfer,
                 };
                 var nDataTarget = new rm_updatevaultbalance
                 {
@@ -394,6 +400,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     currencyId = request.CurrencyId,
                     vaultId = request.TargetVaultId,
                     description = null,
+                    TransactionType = TransactionType.Transfer,
                 };
 
                 // Update balances

@@ -16,6 +16,7 @@ namespace BaskentEnerji.Entity.Entities.ExchangeOffice.Party
         public string? ReferenceNumber { get; set; }
         public EntryType Type { get; set; }
         public decimal Amount { get; set; } // TL karşılığı
+        public decimal PaidAmount { get; set; } = 0; // Bu kaleme kısmi/tam olarak ödenmiş toplam tutar
         public decimal RunningBalance { get; set; }
         public string Description { get; set; }
         public PaymentStatus PaymentStatus { get; set; }

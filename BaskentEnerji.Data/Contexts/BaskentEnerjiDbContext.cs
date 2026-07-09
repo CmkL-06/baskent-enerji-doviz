@@ -373,6 +373,7 @@ namespace BaskentEnerji.Data.Contexts
             modelBuilder.Entity<PartyAccountEntry>(entity =>
             {
                 entity.Property(e => e.Amount).HasPrecision(18, 4);
+                entity.Property(e => e.PaidAmount).HasPrecision(18, 4);
                 entity.Property(e => e.RunningBalance).HasPrecision(18, 4);
                 entity.Property(e => e.OriginalAmount).HasPrecision(18, 4);
                 entity.Property(e => e.ExchangeRate).HasPrecision(18, 6);

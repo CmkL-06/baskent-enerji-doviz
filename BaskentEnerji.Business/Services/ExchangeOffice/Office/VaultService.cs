@@ -501,9 +501,28 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             if (transfers.Count == 0)
                 return netDebtByOfficeId;
 
-            // Transfer kurlarını tek seferde toplu çek (per-transfer sorgu yerine)
-            var transferCurrencyIds = transfers.Select(t => t.CurrencyId).Distinct();
-            var transferRates = await GetExchangeRatesForCurrenciesAsync(transferCurrencyIds);
+            // Her transferin kendi tarihindeki kuru kullanılmalı — güncel kur değil,
+            // yoksa geçmiş bir borcun TRY karşılığı gün geçtikçe kayar. Tüm kur geçmişini
+            // tek seferde çekip bellekte (transfer tarihi, kur) eşlemesi yapıyoruz.
+            var transferCurrencyIds = transfers.Select(t => t.CurrencyId).Distinct().ToList();
+            var rateHistory = await _context.ExchangeRates
+                .AsNoTracking()
+                .Where(r => transferCurrencyIds.Contains(r.SourceCurrencyId) && r.TargetCurrencyId == baseCurrencyId)
+                .OrderBy(r => r.EffectiveFrom)
+                .Select(r => new { r.SourceCurrencyId, r.EffectiveFrom, r.BuyRate })
+                .ToListAsync();
+
+            var ratesByCurrency = rateHistory
+                .GroupBy(r => r.SourceCurrencyId)
+                .ToDictionary(g => g.Key, g => g.OrderBy(r => r.EffectiveFrom).ToList());
+
+            decimal GetRateAtDate(Guid currencyId, DateTime asOf)
+            {
+                if (!ratesByCurrency.TryGetValue(currencyId, out var history) || history.Count == 0)
+                    return 0m;
+                var applicable = history.LastOrDefault(r => r.EffectiveFrom <= asOf);
+                return (applicable ?? history[0]).BuyRate;
+            }
 
             foreach (var t in transfers)
             {
@@ -514,9 +533,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 }
                 else
                 {
-                    decimal rate = 0;
-                    if (transferRates.TryGetValue(t.CurrencyId, out var foundRate))
-                        rate = foundRate;
+                    var rate = GetRateAtDate(t.CurrencyId, t.CreatedDate);
                     valueInBase = t.Amount * rate;
                 }
 
@@ -616,7 +633,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             balance.LastUpdated = DateTime.UtcNow;
             TransactionType iType;
 
-            if (data.TransactionType != TransactionType.Exchange && data.TransactionType != TransactionType.Buy)
+            if (data.TransactionType != TransactionType.Exchange && data.TransactionType != TransactionType.Buy && data.TransactionType != TransactionType.Transfer)
             {
                 if (data.isEntireBalance)
                 {

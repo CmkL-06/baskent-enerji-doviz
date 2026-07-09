@@ -461,7 +461,9 @@ namespace BaskentEnerji.API.Controllers.Telegram
                 _db.PartyAccountEntries.Add(entry);
 
                 var pendingEntries = await _db.PartyAccountEntries
-                    .Where(e => e.PartyAccountId == account.Id && e.PaymentStatus == PaymentStatus.Pending && !e.IsReversed)
+                    .Where(e => e.PartyAccountId == account.Id
+                        && (e.PaymentStatus == PaymentStatus.Pending || e.PaymentStatus == PaymentStatus.PartiallyPaid)
+                        && !e.IsReversed)
                     .OrderBy(e => e.EntryDate)
                     .ToListAsync();
 
@@ -469,15 +471,20 @@ namespace BaskentEnerji.API.Controllers.Telegram
                 foreach (var pe in pendingEntries)
                 {
                     if (remaining <= 0) break;
-                    if (remaining >= pe.Amount)
+                    var remainingOnEntry = pe.Amount - pe.PaidAmount;
+                    if (remainingOnEntry <= 0) continue;
+
+                    if (remaining >= remainingOnEntry)
                     {
+                        pe.PaidAmount += remainingOnEntry;
                         pe.PaymentStatus = PaymentStatus.Paid;
                         pe.PaymentDate = DateTime.UtcNow;
                         pe.PaymentReference = req.PaymentReference ?? "";
-                        remaining -= pe.Amount;
+                        remaining -= remainingOnEntry;
                     }
                     else
                     {
+                        pe.PaidAmount += remaining;
                         pe.PaymentStatus = PaymentStatus.PartiallyPaid;
                         remaining = 0;
                     }
