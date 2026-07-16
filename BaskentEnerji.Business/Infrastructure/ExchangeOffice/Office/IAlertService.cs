@@ -30,5 +30,6 @@ namespace BaskentEnerji.Business.Infrastructure.ExchangeOffice.Office
         Task ResolveAlertAsync(Guid alertId);
         Task CreateAlertAsync(Guid officeId, AlertType type, AlertSeverity severity, string title, string message, string? referenceId = null, string? referenceType = null);
         Task CheckLowBalancesAsync(decimal threshold = 100);
+        Task CheckStaffDailyAnomaliesAsync(DateTime businessDate);
     }
 }

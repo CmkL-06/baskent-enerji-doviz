@@ -119,9 +119,21 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = user.id
     lang = get_lang(user)
 
-    # QR kodu (referral) kontrolü
+    # QR kodu (referral) kontrolü — yoksa uzaktan müşteri akışı (Bayi/Banka/Kurye seçimi)
     if not context.args:
-        await update.message.reply_text(t('qr_required', lang), parse_mode="Markdown")
+        db.upsert_customer(user)
+        kb = [
+            [InlineKeyboardButton("🏪 Bayi", callback_data="payment_method_bayi")],
+            [InlineKeyboardButton("🏦 Banka Hesabı", callback_data="payment_method_banka")],
+            [InlineKeyboardButton("🛵 Kurye (Nakit Kapıya)", callback_data="payment_method_kurye")],
+        ]
+        await update.message.reply_text(
+            "🏦 *Money Transfer Turkey Bot*\n\n"
+            "Bir bayi QR kodunuz yok — sorun değil! İşleminizi nasıl tamamlamak istersiniz?",
+            reply_markup=InlineKeyboardMarkup(kb),
+            parse_mode="Markdown"
+        )
+        set_state(user_id, 'selecting_payment_method')
         return
 
     param = context.args[0]
@@ -154,29 +166,30 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Grup üyeliği kontrolü
+    context.user_data['referral'] = param
+    context.user_data['dealer_name'] = dealer.get('dealer_name')
+    await _proceed_after_referral(update.message, context, user_id, lang)
+
+
+async def _proceed_after_referral(message, context, user_id: int, lang: str):
+    """Referral (bayi kodu veya MERKEZ) belirlendikten sonra ortak devam noktası:
+    grup üyeliği kontrolü + para birimi seçimi. QR, Bayi-şehir-eşleşmesi, Banka ve
+    Kurye yollarının hepsi buradan geçer."""
     is_member = await check_group_membership(context, user_id)
     if not is_member:
-        context.user_data['referral'] = param
-        context.user_data['dealer_name'] = dealer.get('dealer_name')
         kb = [
             [InlineKeyboardButton(t('join_group', lang),
                                    url="https://t.me/MoneyTransferTurkeyOfficial")],
             [InlineKeyboardButton("✅ Katıldım, Devam Et", callback_data="check_joined")]
         ]
-        await update.message.reply_text(
+        await message.reply_text(
             t('group_check_failed', lang),
             reply_markup=InlineKeyboardMarkup(kb),
             parse_mode="Markdown"
         )
         return
 
-    # Referral'ı sakla
-    context.user_data['referral'] = param
-    context.user_data['dealer_name'] = dealer.get('dealer_name')
-
-    # Para birimi seçimi
-    await _show_currency_selection(update.message, lang)
+    await _show_currency_selection(message, lang)
     set_state(user_id, 'selecting_currency')
 
 
@@ -295,6 +308,39 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = user.id
     lang = get_lang_by_id(user_id) or get_lang(user)
     data = query.data
+
+    # ── QR'sız (uzaktan) müşteri — ödeme/teslimat yöntemi seçimi ──
+    if data == "payment_method_bayi":
+        await query.edit_message_text(
+            "🏪 *Bayi Seçildi*\n\nHangi şehirdesiniz? En yakın bayi/şube adresini bulalım.",
+            parse_mode="Markdown"
+        )
+        set_state(user_id, 'waiting_city')
+        return
+
+    if data == "payment_method_banka":
+        context.user_data['referral'] = 'MERKEZ'
+        context.user_data['dealer_name'] = 'Merkez'
+        context.user_data['delivery_method'] = 'Banka'
+        await query.edit_message_text(
+            "🏦 *Banka Hesabı Seçildi*\n\nÖdemeniz/tahsilatınız Başkent Ana Kasa üzerinden banka havalesi ile yapılacak.",
+            parse_mode="Markdown"
+        )
+        await _proceed_after_referral(query.message, context, user_id, lang)
+        return
+
+    if data == "payment_method_kurye":
+        context.user_data['referral'] = 'MERKEZ'
+        context.user_data['dealer_name'] = 'Merkez'
+        context.user_data['delivery_method'] = 'Kurye'
+        await query.edit_message_text(
+            "🛵 *Kurye (Nakit Kapıya) Seçildi*\n\n"
+            "Lütfen açık adresinizi ve telefon numaranızı TEK mesajda yazın.\n"
+            "Örnek: `Kadıköy, İstanbul, Bahariye Cad. No:12 — 05XX XXX XX XX`",
+            parse_mode="Markdown"
+        )
+        set_state(user_id, 'waiting_courier_address')
+        return
 
     # ── Kanala Katıldım Kontrolü ──
     if data == "check_joined":
@@ -440,6 +486,39 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     state_name = get_user_state_name(user_id)
 
+    # ── Uzaktan müşteri: şehir girişi (Bayi eşleşmesi) ──
+    if state_name == 'waiting_city':
+        dealer = db.find_dealer_by_city(text)
+        if not dealer:
+            await update.message.reply_text(
+                f"😔 '{text}' şehrinde aktif bir bayimiz bulunamadı.\n\n"
+                f"Bunun yerine 🏦 Banka Hesabı veya 🛵 Kurye (Nakit Kapıya) seçeneklerinden birini "
+                f"deneyebilirsiniz — tekrar başlamak için /start yazın."
+            )
+            clear_state(user_id)
+            return
+        context.user_data['referral'] = dealer['dealer_code']
+        context.user_data['dealer_name'] = dealer['dealer_name']
+        context.user_data['delivery_method'] = 'Bayi'
+        address_line = f"\n📍 Adres: {dealer['address']}" if dealer.get('address') else ""
+        await update.message.reply_text(
+            f"✅ *{dealer['dealer_name']}* bulundu!{address_line}\n\n"
+            f"İşleminiz bu bayi üzerinden yürütülecek.",
+            parse_mode="Markdown"
+        )
+        await _proceed_after_referral(update.message, context, user_id, lang)
+        return
+
+    # ── Uzaktan müşteri: kurye adres/telefon girişi ──
+    if state_name == 'waiting_courier_address':
+        context.user_data['customer_address'] = text.strip()
+        await update.message.reply_text(
+            "✅ Adres bilgisi alındı. İşleminiz tamamlandığında kurye ile size ulaştırılacak.\n\n"
+            "Şimdi işlem türünü seçin:"
+        )
+        await _proceed_after_referral(update.message, context, user_id, lang)
+        return
+
     # ── Miktar Girişi ──
     if state_name == 'waiting_amount':
         await _handle_amount(update, context, user_id, text, lang)
@@ -529,8 +608,19 @@ async def _handle_amount(update: Update, context: ContextTypes.DEFAULT_TYPE,
     context.user_data['completion_code'] = completion_code
     context.user_data['pending_completion_code'] = completion_code
 
+    # QR'sız (uzaktan) müşteri akışı — teslimat/ödeme yöntemi bilgisini işleme yaz
+    delivery_method = context.user_data.get('delivery_method')
+    if delivery_method:
+        db.update_transaction(
+            tid,
+            delivery_method=delivery_method,
+            customer_address=context.user_data.get('customer_address'),
+        )
+
     # Operatörlere bildirim
-    await _notify_operators(context, update.message.from_user, currency, amount, try_amount, referral, tid)
+    await _notify_operators(context, update.message.from_user, currency, amount, try_amount, referral, tid,
+                            delivery_method=delivery_method,
+                            customer_address=context.user_data.get('customer_address'))
 
     # RUBLE akışı
     if currency == 'RUBLE':
@@ -542,9 +632,18 @@ async def _handle_amount(update: Update, context: ContextTypes.DEFAULT_TYPE,
                            referral, completion_code, lang)
 
 
-async def _notify_operators(context, user, currency, amount, try_amount, referral, tid):
+async def _notify_operators(context, user, currency, amount, try_amount, referral, tid,
+                            delivery_method=None, customer_address=None):
     import html as _html
     customer_name = _html.escape(user.first_name or "Müşteri")
+
+    delivery_line = ""
+    if delivery_method == "Kurye":
+        delivery_line = f"\n🛵 Teslimat: Kurye (Nakit Kapıya) — {_html.escape(customer_address or '—')}"
+    elif delivery_method == "Banka":
+        delivery_line = "\n🏦 Teslimat: Banka Havalesi"
+    elif delivery_method == "Bayi":
+        delivery_line = "\n🏪 Teslimat: Bayi (uzaktan eşleştirilen)"
 
     # Operatör kanalına bildirim gönder (MoneyTransferTurkey_Operator)
     operator_channel = Config.OPERATOR_CHANNEL_ID or Config.RUBLE_CHANNEL_ID
@@ -561,7 +660,8 @@ async def _notify_operators(context, user, currency, amount, try_amount, referra
                         f"💰 TL Karşılığı: {try_amount:,.2f} TL\n"
                         f"🔗 Referans: {referral}\n"
                         f"🔖 İşlem ID: #{tid}\n"
-                        f"⏰ Saat: {datetime.now().strftime('%H:%M')}\n"
+                        f"⏰ Saat: {datetime.now().strftime('%H:%M')}"
+                        f"{delivery_line}\n"
                         f"━━━━━━━━━━━━━━━\n"
                         f"💰 İşlem Türü: Alış"
                     ),

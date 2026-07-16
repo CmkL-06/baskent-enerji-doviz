@@ -14,5 +14,7 @@ namespace BaskentEnerji.Business.Infrastructure.ExchangeOffice.Office
         Task<List<vm_dayclosure>> GetClosureHistoryAsync(Guid officeId, DateTime? startDate = null, DateTime? endDate = null);
         Task<vm_dayclosure> GetDayClosureAsync(Guid officeId, DateTime businessDate);
         Task<vm_consolidated_dayclosure> GetConsolidatedDayClosureAsync(DateTime businessDate);
+        Task<List<vm_dayclosure>> GetPendingApprovalsAsync();
+        Task<vm_dayclosure> ApproveDayClosureAsync(Guid closureId, bool approve, string rejectionNote);
     }
 }

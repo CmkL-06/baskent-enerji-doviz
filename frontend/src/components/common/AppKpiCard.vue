@@ -6,6 +6,8 @@ defineProps<{
   unit?: string
   color?: string
   bg?: string
+  delta?: number | null
+  deltaLabel?: string
 }>()
 </script>
 
@@ -17,6 +19,11 @@ defineProps<{
     <div class="app-kpi-body">
       <p class="app-kpi-label">{{ label }}</p>
       <p class="app-kpi-value" :style="{ color: color ?? '#111' }">{{ value }} <span v-if="unit" class="app-kpi-unit">{{ unit }}</span></p>
+      <p v-if="delta !== undefined && delta !== null" class="app-kpi-delta" :class="delta >= 0 ? 'pos' : 'neg'">
+        <span class="material-symbols-outlined" aria-hidden="true">{{ delta >= 0 ? 'arrow_upward' : 'arrow_downward' }}</span>
+        <span>{{ delta >= 0 ? '+' : '' }}{{ delta.toFixed(1) }}%</span>
+        <span v-if="deltaLabel" class="app-kpi-delta-label">{{ deltaLabel }}</span>
+      </p>
     </div>
   </div>
 </template>
@@ -67,5 +74,25 @@ defineProps<{
   font-size: 11px;
   font-weight: 400;
   color: #9ca3af;
+}
+.app-kpi-delta {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin: 4px 0 0;
+  font-size: 11px;
+  font-weight: 700;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+.app-kpi-delta .material-symbols-outlined {
+  font-size: 13px;
+}
+.app-kpi-delta.pos { color: var(--color-success, #059669); }
+.app-kpi-delta.neg { color: var(--color-danger, #dc2626); }
+.app-kpi-delta-label {
+  font-weight: 400;
+  color: var(--color-text-muted, #94a3b8);
+  margin-left: 2px;
 }
 </style>

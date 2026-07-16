@@ -58,8 +58,6 @@ router.beforeEach((to, _from, next) => {
   const auth = useAuthStore()
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     next('/login')
-  } else if (to.path === '/login' && auth.isAuthenticated) {
-    next('/ihtiyar/dashboard')
   } else if (to.meta.ownerOnly && !auth.isOwner) {
     next('/ihtiyar/dashboard')
   } else if (to.meta.adminOnly && !auth.isAdmin) {

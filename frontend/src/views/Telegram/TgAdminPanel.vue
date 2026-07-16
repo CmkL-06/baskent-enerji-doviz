@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import apiService from '@/services/apiservice'
+import { formatAmount } from '@/utils/currency'
 import { useNotification } from '@/composables/useNotification'
 
 const notification = useNotification()
@@ -43,7 +44,16 @@ const paymentLoading = ref(false)
 
 // Create forms
 const showCreateDealer = ref(false)
-const newDealer = ref({ username: '', name: '' })
+const newDealer = ref({ username: '', name: '', dealerType: 'External', vaultId: '' })
+const vaults = ref<any[]>([])
+const createdDealerResult = ref<{ dealerCode: string; qrLink: string; qrImageUrl: string } | null>(null)
+const BOT_USERNAME = 'MoneyExchangeTurkeyBot'
+
+// Bayi Kur Yönetimi — settlement (alış/satış) kuru, para birimi bazında
+const DEALER_RATE_CURRENCIES = ['USDT', 'KRUB']
+const editingDealerRatesFor = ref<string | null>(null)
+const dealerRateForm = ref<Record<string, { buyRate: number; sellRate: number }>>({})
+const dealerRateLoading = ref(false)
 const showCreateOperator = ref(false)
 const newOperator = ref({ username: '', telegramId: '' })
 const createLoading = ref(false)
@@ -197,17 +207,198 @@ async function retryQueue(queueId: number) {
   } catch (e) { console.error(e) }
 }
 
+async function loadVaults() {
+  if (vaults.value.length) return
+  try {
+    const res = await apiService.getVaults()
+    vaults.value = Array.isArray(res) ? res : (res?.data ?? [])
+  } catch { vaults.value = [] }
+}
+
 async function createDealer() {
-  if (!newDealer.value.username.trim()) return
+  if (!newDealer.value.username.trim() || !newDealer.value.name.trim()) return
+  if (newDealer.value.dealerType === 'Branch' && !newDealer.value.vaultId) {
+    notification.error('Şube tipi için bir Kasa seçmelisiniz.')
+    return
+  }
   createLoading.value = true
   try {
-    await apiService.post('/tg/admin/dealers', { username: newDealer.value.username, name: newDealer.value.name || newDealer.value.username })
-    showCreateDealer.value = false
-    newDealer.value = { username: '', name: '' }
+    const res = await apiService.post('/tg/admin/dealers', {
+      username: newDealer.value.username,
+      name: newDealer.value.name,
+      dealerType: newDealer.value.dealerType,
+      vaultId: newDealer.value.dealerType === 'Branch' ? newDealer.value.vaultId : null
+    })
+    const dealerCode = res?.dealer_code
+    const qrLink = `https://t.me/${BOT_USERNAME}?start=${dealerCode}`
+    createdDealerResult.value = {
+      dealerCode,
+      qrLink,
+      qrImageUrl: `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrLink)}`
+    }
+    newDealer.value = { username: '', name: '', dealerType: 'External', vaultId: '' }
     await loadDealers()
   } catch (e: any) {
     notification.error(e?.response?.data?.message || e?.message || 'Hata oluştu')
   } finally { createLoading.value = false }
+}
+
+function closeCreateDealer() {
+  showCreateDealer.value = false
+  createdDealerResult.value = null
+}
+
+// Şube (Branch) bayilerde gerçek ofis kuru (branch-rates), Harici bayilerde settlement
+// kuru (rates) düzenlenir — endpoint tabanı buna göre seçilir.
+function rateBasePath(code: string, isBranch: boolean) {
+  return isBranch ? `/tg/admin/dealers/${code}/branch-rates` : `/tg/admin/dealers/${code}/rates`
+}
+
+const editingDealerIsBranch = ref(false)
+const dealerRateHistory = ref<Record<string, any[]>>({})
+const showHistoryFor = ref<string | null>(null)
+const merkezRatesCache = ref<any[] | null>(null)
+const bulkApplyLoading = ref<string | null>(null)
+
+// --- Bayi/Şube bilgisi düzenleme (Owner Panel'deki ile aynı desen: sayfa içinde, ayrı yere gitmeden) ---
+const DEALER_RANKS = [
+  { value: 0, label: 'Yasaklı' },
+  { value: 1, label: 'Kullanıcı' },
+  { value: 50, label: 'Personel' },
+  { value: 99, label: 'Admin' },
+]
+const editingDealerInfoFor = ref<string | null>(null)
+const dealerInfoForm = ref({ dealerName: '', city: '', address: '', rank: 50 })
+const dealerInfoSaving = ref(false)
+
+function openDealerInfoEdit(d: any) {
+  if (editingDealerInfoFor.value === d.dealer_code) { editingDealerInfoFor.value = null; return }
+  editingDealerRatesFor.value = null
+  editingDealerInfoFor.value = d.dealer_code
+  dealerInfoForm.value = {
+    dealerName: d.dealer_name || '',
+    city: d.city || '',
+    address: d.address || '',
+    rank: d.rank ?? (d.is_active ? 50 : 0)
+  }
+}
+
+async function saveDealerInfo(code: string) {
+  dealerInfoSaving.value = true
+  try {
+    await apiService.put(`/tg/admin/dealers/${code}`, {
+      dealerName: dealerInfoForm.value.dealerName,
+      city: dealerInfoForm.value.city,
+      address: dealerInfoForm.value.address,
+      rank: dealerInfoForm.value.rank
+    })
+    notification.success('Bayi bilgileri güncellendi')
+    editingDealerInfoFor.value = null
+    await loadDealers()
+  } catch (e: any) {
+    notification.error(e.response?.data?.message || 'Güncelleme başarısız')
+  } finally {
+    dealerInfoSaving.value = false
+  }
+}
+
+async function openDealerRates(code: string, isBranch: boolean) {
+  if (editingDealerRatesFor.value === code) { editingDealerRatesFor.value = null; return }
+  editingDealerInfoFor.value = null
+  editingDealerRatesFor.value = code
+  editingDealerIsBranch.value = isBranch
+  showHistoryFor.value = null
+  const form: Record<string, { buyRate: number; sellRate: number }> = {}
+  for (const c of DEALER_RATE_CURRENCIES) form[c] = { buyRate: 0, sellRate: 0 }
+  try {
+    const res = await apiService.get(rateBasePath(code, isBranch))
+    for (const r of (res?.rates ?? [])) {
+      if (form[r.currency]) form[r.currency] = { buyRate: r.buyRate, sellRate: r.sellRate }
+    }
+  } catch (e) { console.error(e) }
+  dealerRateForm.value = form
+}
+
+async function saveDealerRate(code: string, currency: string) {
+  const rate = dealerRateForm.value[currency]
+  if (!rate || rate.buyRate <= 0 || rate.sellRate <= 0) {
+    notification.error('Alış ve satış kuru sıfırdan büyük olmalı.')
+    return
+  }
+  dealerRateLoading.value = true
+  try {
+    await apiService.post(rateBasePath(code, editingDealerIsBranch.value), {
+      currency, buyRate: rate.buyRate, sellRate: rate.sellRate
+    })
+    notification.success(`${currency} kuru güncellendi.`)
+    await loadDealers()
+    if (showHistoryFor.value === currency) await loadRateHistory(code, currency)
+  } catch (e: any) {
+    notification.error(e?.response?.data?.message || e?.message || 'Kur güncellenemedi')
+  } finally { dealerRateLoading.value = false }
+}
+
+async function toggleRateHistory(code: string, currency: string) {
+  if (showHistoryFor.value === currency) { showHistoryFor.value = null; return }
+  showHistoryFor.value = currency
+  await loadRateHistory(code, currency)
+}
+
+async function loadRateHistory(code: string, currency: string) {
+  try {
+    const res = await apiService.get(`${rateBasePath(code, editingDealerIsBranch.value)}/${currency}/history`)
+    dealerRateHistory.value = { ...dealerRateHistory.value, [currency]: res?.history ?? [] }
+  } catch (e) { console.error(e) }
+}
+
+async function copyFromMerkez(currency: string) {
+  try {
+    if (!merkezRatesCache.value) {
+      const res = await apiService.get('/tg/admin/exchange-rates')
+      merkezRatesCache.value = res?.rates ?? []
+    }
+    const match = merkezRatesCache.value?.find((r: any) => r.currency === currency)
+    if (!match) {
+      notification.error(`Merkez'de ${currency} için tanımlı bir kur bulunamadı.`)
+      return
+    }
+    dealerRateForm.value[currency] = { buyRate: match.buyRate, sellRate: match.sellRate }
+    notification.success(`Merkez kuru getirildi — kaydetmeden önce spread'i ayarlayabilirsiniz.`)
+  } catch (e) { console.error(e) }
+}
+
+async function applyRateToAllExternal(code: string, currency: string) {
+  const rate = dealerRateForm.value[currency]
+  if (!rate || rate.buyRate <= 0 || rate.sellRate <= 0) {
+    notification.error('Alış ve satış kuru sıfırdan büyük olmalı.')
+    return
+  }
+  if (!confirm(`${currency} kuru (Alış ${rate.buyRate} / Satış ${rate.sellRate}) TÜM harici bayilere uygulansın mı?`)) return
+  bulkApplyLoading.value = currency
+  try {
+    const res = await apiService.post('/tg/admin/dealers/rates/bulk', {
+      currency, buyRate: rate.buyRate, sellRate: rate.sellRate
+    })
+    notification.success(`${res?.dealersUpdated ?? 0} harici bayiye ${currency} kuru uygulandı.`)
+    await loadDealers()
+  } catch (e: any) {
+    notification.error(e?.response?.data?.message || e?.message || 'Toplu güncelleme başarısız')
+  } finally { bulkApplyLoading.value = null }
+}
+
+function marginPreview(currency: string) {
+  const rate = dealerRateForm.value[currency]
+  if (!rate || rate.buyRate <= 0 || rate.sellRate <= 0) return null
+  return {
+    buyTl: (100 * rate.buyRate).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    sellTl: (100 * rate.sellRate).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }
+}
+
+function rateStalenessDays(oldestRateUpdate: string | null): number | null {
+  if (!oldestRateUpdate) return null
+  const diffMs = Date.now() - new Date(oldestRateUpdate).getTime()
+  return Math.floor(diffMs / (1000 * 60 * 60 * 24))
 }
 
 async function deleteDealer(userId: string) {
@@ -258,8 +449,7 @@ function formatDate(d: string | null) {
   return new Date(d).toLocaleString('tr-TR')
 }
 function formatMoney(n: number | null) {
-  if (n == null) return '0,00'
-  return n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return formatAmount(n ?? 0, 2)
 }
 function statusColor(status: string) {
   const map: Record<string, string> = {
@@ -500,7 +690,7 @@ onUnmounted(() => {
     <div v-else-if="activeTab === 'dealers'" class="tg-content">
       <div class="toolbar">
         <div class="section-title" style="margin:0"><span class="material-symbols-outlined" aria-hidden="true">storefront</span> Bayi Yönetimi</div>
-        <button class="add-btn" @click="showCreateDealer = !showCreateDealer">
+        <button class="add-btn" @click="showCreateDealer ? closeCreateDealer() : (showCreateDealer = true, loadVaults())">
           <span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px">{{ showCreateDealer ? 'close' : 'person_add' }}</span>
           {{ showCreateDealer ? 'Kapat' : 'Bayi Ata' }}
         </button>
@@ -508,21 +698,55 @@ onUnmounted(() => {
 
       <!-- Create Dealer Form -->
       <div v-if="showCreateDealer" class="create-form">
-        <div class="form-row">
-          <div class="form-group">
-            <label>Sistem Kullanıcı Adı</label>
-            <input v-model="newDealer.username" placeholder="Mevcut kullanıcı adı..." class="form-input" />
+        <template v-if="!createdDealerResult">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Sistem Kullanıcı Adı</label>
+              <input v-model="newDealer.username" placeholder="Mevcut kullanıcı adı..." class="form-input" />
+            </div>
+            <div class="form-group">
+              <label>Bayi / Şube Adı</label>
+              <input v-model="newDealer.name" placeholder="örn. Ankara" class="form-input" />
+            </div>
           </div>
-          <div class="form-group">
-            <label>Bayi Adı (opsiyonel)</label>
-            <input v-model="newDealer.name" placeholder="Görünen ad..." class="form-input" />
+          <div class="form-row">
+            <div class="form-group">
+              <label>Tip</label>
+              <select v-model="newDealer.dealerType" class="form-input">
+                <option value="External">Harici Bayi (sadece cari hesap)</option>
+                <option value="Branch">Şube (Kasa'ya işler)</option>
+              </select>
+            </div>
+            <div class="form-group" v-if="newDealer.dealerType === 'Branch'">
+              <label>Kasa</label>
+              <select v-model="newDealer.vaultId" class="form-input">
+                <option value="">-- Kasa seçin --</option>
+                <option v-for="v in vaults" :key="v.id || v.vaultId" :value="v.id || v.vaultId">
+                  {{ v.name || v.vaultName }}{{ v.officeName ? ' — ' + v.officeName : '' }}
+                </option>
+              </select>
+            </div>
           </div>
-          <button class="action-sm save" :disabled="createLoading" @click="createDealer">
-            <span class="material-symbols-outlined" aria-hidden="true" style="font-size:14px">check</span>
-            {{ createLoading ? 'Kaydediliyor...' : 'Kaydet' }}
-          </button>
-        </div>
-        <div class="form-hint">Mevcut bir sistem kullanıcısını bayi olarak atayın. Otomatik referral kodu üretilir.</div>
+          <div class="form-row">
+            <button class="action-sm save" :disabled="createLoading" @click="createDealer">
+              <span class="material-symbols-outlined" aria-hidden="true" style="font-size:14px">check</span>
+              {{ createLoading ? 'Kaydediliyor...' : 'Kaydet' }}
+            </button>
+          </div>
+          <div class="form-hint">Mevcut bir sistem kullanıcısını bayi/şube olarak atar; cari hesap ve (Şube ise) Kasa bağlantısı otomatik kurulur. Harici bayiler için oluşturduktan sonra "Kur Ayarla"dan alış/satış kurunu tanımlamanız gerekir.</div>
+        </template>
+
+        <!-- Oluşturma sonucu: hazır QR + link -->
+        <template v-else>
+          <div class="dealer-result">
+            <img :src="createdDealerResult.qrImageUrl" alt="QR" width="180" height="180" />
+            <div class="dealer-result-info">
+              <div><strong>Bayi Kodu:</strong> <code>{{ createdDealerResult.dealerCode }}</code></div>
+              <div class="dealer-result-link">{{ createdDealerResult.qrLink }}</div>
+              <button class="action-sm save" @click="closeCreateDealer">Tamam</button>
+            </div>
+          </div>
+        </template>
       </div>
 
       <!-- Dealer Cards -->
@@ -534,7 +758,14 @@ onUnmounted(() => {
               <div class="dealer-card-name">{{ d.dealer_name }}</div>
               <div class="dealer-card-code"><code>{{ d.dealer_code }}</code></div>
             </div>
-            <span class="status-badge sm" :style="{ background: d.is_active ? '#10b981' : '#ef4444' }">{{ d.is_active ? 'Aktif' : 'Pasif' }}</span>
+            <div class="dealer-card-badges">
+              <span class="status-badge sm" :style="{ background: d.dealer_type === 'Branch' ? '#f59e0b' : '#6366f1' }">{{ d.dealer_type === 'Branch' ? 'Şube' : 'Bayi' }}</span>
+              <span class="status-badge sm" :style="{ background: d.is_active ? '#10b981' : '#ef4444' }">{{ d.is_active ? 'Aktif' : 'Pasif' }}</span>
+              <span v-if="rateStalenessDays(d.oldest_rate_update) !== null && rateStalenessDays(d.oldest_rate_update)! >= 3"
+                    class="status-badge sm rate-stale-badge" title="Kur bir süredir güncellenmedi">
+                ⚠️ {{ rateStalenessDays(d.oldest_rate_update) }} gündür güncellenmedi
+              </span>
+            </div>
           </div>
           <div class="dealer-card-stats">
             <div class="dealer-stat">
@@ -552,9 +783,90 @@ onUnmounted(() => {
           </div>
           <div class="dealer-card-footer">
             <span class="dealer-card-user"><span class="material-symbols-outlined" aria-hidden="true" style="font-size:14px">person</span> {{ d.username }} · {{ d.name }}</span>
-            <button class="icon-btn danger" @click="deleteDealer(d.id)" title="Atamasını kaldır">
-              <span class="material-symbols-outlined" aria-hidden="true">person_remove</span>
-            </button>
+            <div style="display:flex;gap:6px">
+              <button class="action-sm edit" style="margin:0" @click="openDealerInfoEdit(d)">
+                <span class="material-symbols-outlined" aria-hidden="true" style="font-size:14px">edit</span> Düzenle
+              </button>
+              <button class="action-sm edit" style="margin:0" @click="openDealerRates(d.dealer_code, d.dealer_type === 'Branch')">
+                <span class="material-symbols-outlined" aria-hidden="true" style="font-size:14px">currency_exchange</span> Kur Ayarla
+              </button>
+              <button class="icon-btn danger" @click="deleteDealer(d.id)" title="Atamasını kaldır">
+                <span class="material-symbols-outlined" aria-hidden="true">person_remove</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Bayi/Şube Bilgisi Düzenleme -->
+          <div v-if="editingDealerInfoFor === d.dealer_code" class="dealer-rate-panel">
+            <div class="dealer-info-field">
+              <label>Görünen Ad</label>
+              <input v-model="dealerInfoForm.dealerName" type="text" class="rate-input" style="width:100%" />
+            </div>
+            <div class="dealer-info-row">
+              <div class="dealer-info-field">
+                <label>Şehir</label>
+                <input v-model="dealerInfoForm.city" type="text" class="rate-input" style="width:100%" />
+              </div>
+              <div class="dealer-info-field">
+                <label>Adres</label>
+                <input v-model="dealerInfoForm.address" type="text" class="rate-input" style="width:100%" />
+              </div>
+            </div>
+            <div class="dealer-info-field">
+              <label>Yetki Seviyesi</label>
+              <div class="dealer-rank-chips">
+                <button
+                  v-for="r in DEALER_RANKS" :key="r.value"
+                  type="button"
+                  :class="['dealer-rank-chip', { active: dealerInfoForm.rank === r.value }]"
+                  @click="dealerInfoForm.rank = r.value"
+                >{{ r.label }}</button>
+              </div>
+            </div>
+            <div class="dealer-info-actions">
+              <button class="action-sm save" :disabled="dealerInfoSaving" @click="saveDealerInfo(d.dealer_code)">
+                {{ dealerInfoSaving ? 'Kaydediliyor...' : 'Kaydet' }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Bayi Kur Yönetimi -->
+          <div v-if="editingDealerRatesFor === d.dealer_code" class="dealer-rate-panel">
+            <div class="dealer-rate-hint">
+              {{ d.dealer_type === 'Branch'
+                ? 'Bu Şube\'nin gerçek Kasa/Ofis kuru — Manuel Kur Yönetimi\'ndeki ile aynı, buradan da düzenlenebilir.'
+                : 'Owner\'ın bu bayiden alış/satış yaparken kullanacağı kur — müşteriye gösterilen kurdan bağımsız, kâr aradaki farktan doğar.' }}
+            </div>
+            <div v-for="cur in DEALER_RATE_CURRENCIES" :key="cur" class="dealer-rate-row-wrap">
+              <div class="dealer-rate-row">
+                <span class="dealer-rate-currency">{{ cur }}</span>
+                <label>Alış</label>
+                <input v-model.number="dealerRateForm[cur].buyRate" type="number" step="0.01" min="0" class="rate-input sm" />
+                <label>Satış</label>
+                <input v-model.number="dealerRateForm[cur].sellRate" type="number" step="0.01" min="0" class="rate-input sm" />
+                <button class="action-sm save" :disabled="dealerRateLoading" @click="saveDealerRate(d.dealer_code, cur)">Kaydet</button>
+              </div>
+              <div class="dealer-rate-tools">
+                <span v-if="marginPreview(cur)" class="dealer-rate-margin">
+                  100 {{ cur }} → Alışta ₺{{ marginPreview(cur)!.buyTl }} · Satışta ₺{{ marginPreview(cur)!.sellTl }}
+                </span>
+                <button class="dealer-rate-link" @click="copyFromMerkez(cur)">Merkez kurunu getir</button>
+                <button v-if="d.dealer_type !== 'Branch'" class="dealer-rate-link" :disabled="bulkApplyLoading === cur" @click="applyRateToAllExternal(d.dealer_code, cur)">
+                  {{ bulkApplyLoading === cur ? 'Uygulanıyor...' : 'Tüm harici bayilere uygula' }}
+                </button>
+                <button class="dealer-rate-link" @click="toggleRateHistory(d.dealer_code, cur)">
+                  {{ showHistoryFor === cur ? 'Geçmişi gizle' : 'Geçmiş' }}
+                </button>
+              </div>
+              <div v-if="showHistoryFor === cur" class="dealer-rate-history">
+                <div v-if="!dealerRateHistory[cur]?.length" class="dealer-rate-history-empty">Henüz kayıtlı değişiklik yok.</div>
+                <div v-for="(h, hi) in dealerRateHistory[cur]" :key="hi" class="dealer-rate-history-row">
+                  <span>{{ formatDate(h.changedAt) }}</span>
+                  <span>Alış {{ h.oldBuyRate }} → {{ h.newBuyRate }}</span>
+                  <span>Satış {{ h.oldSellRate }} → {{ h.newSellRate }}</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -780,9 +1092,8 @@ onUnmounted(() => {
           </div>
           <div class="dealer-card-footer">
             <span class="dealer-card-user">
-              <span class="material-symbols-outlined" aria-hidden="true" style="font-size:14px">percent</span>
-              Komisyon: %{{ d.commissionRate }}
-              <template v-if="d.lastTransaction"> · Son: {{ formatDate(d.lastTransaction) }}</template>
+              <template v-if="d.lastTransaction">Son işlem: {{ formatDate(d.lastTransaction) }}</template>
+              <template v-else>Henüz işlem yok</template>
             </span>
             <div style="display:flex;gap:6px">
               <button class="action-sm edit" style="margin:0" @click="loadCariEntries(d.dealerCode)">
@@ -897,8 +1208,8 @@ onUnmounted(() => {
 /* Tabs */
 .tg-tabs {
   display: flex; gap: 4px; padding: 12px 16px;
-  border-bottom: 1px solid var(--color-border, #e5e7eb);
-  overflow-x: auto; background: var(--color-card, #fff);
+  border-bottom: 2px solid var(--border-strong, #cbd5e1);
+  overflow-x: auto; background: var(--color-bg-card, #fff);
 }
 .tg-tab {
   display: flex; align-items: center; gap: 6px; padding: 8px 14px;
@@ -907,7 +1218,7 @@ onUnmounted(() => {
 }
 .tg-tab .material-symbols-outlined { font-size: 18px; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
 .tg-tab:hover { background: var(--color-hover, #f3f4f6); color: var(--color-text, #1f2937); }
-.tg-tab.active { background: var(--color-primary, #2563eb); color: #fff; }
+.tg-tab.active { background: var(--color-primary, #2563eb); color: #fff; box-shadow: var(--shadow-glow-primary); border-bottom: 3px solid var(--color-primary, #2563eb); }
 
 .tg-content { padding: 16px; }
 .tg-loading { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 60px; color: var(--color-text-secondary, #6b7280); }
@@ -919,8 +1230,9 @@ onUnmounted(() => {
 .stat-grid.three { grid-template-columns: repeat(3, 1fr); }
 
 .stat-card {
-  padding: 16px; background: var(--color-card, #fff);
+  padding: 16px; background: var(--color-bg-card, #fff);
   border: 1px solid var(--color-border, var(--color-border)); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-bold);
   display: flex; align-items: center; gap: 12px;
 }
 .stat-card.mini { flex-direction: column; text-align: center; padding: 12px; }
@@ -931,12 +1243,13 @@ onUnmounted(() => {
 
 .stat-icon-wrap {
   width: 42px; height: 42px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center;
+  box-shadow: var(--shadow-md);
 }
 .stat-icon-wrap .material-symbols-outlined { font-size: 24px; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
-.stat-icon-wrap.green { background: var(--color-success-bg); color: var(--color-success); }
-.stat-icon-wrap.blue { background: var(--color-secondary-light); color: var(--color-secondary); }
-.stat-icon-wrap.purple { background: #f5f3ff; color: #8b5cf6; }
-.stat-icon-wrap.orange { background: #fffbeb; color: var(--color-warning); }
+.stat-icon-wrap.green { background: var(--color-success); color: #fff; }
+.stat-icon-wrap.blue { background: var(--color-secondary); color: #fff; }
+.stat-icon-wrap.purple { background: #8b5cf6; color: #fff; }
+.stat-icon-wrap.orange { background: var(--color-warning); color: #fff; }
 
 .stat-body { flex: 1; }
 .stat-value { font-size: 20px; font-weight: 700; color: var(--color-text, #1f2937); }
@@ -950,15 +1263,24 @@ onUnmounted(() => {
 /* Section Title */
 .section-title {
   display: flex; align-items: center; gap: 8px; margin: 20px 0 10px;
+  padding: 8px 12px 8px 10px;
   font-size: 14px; font-weight: 600; color: var(--color-text, #1f2937);
+  position: relative; border-bottom: 3px solid var(--color-border, #e5e7eb);
+  background: linear-gradient(90deg, var(--color-hover, #f3f4f6), transparent);
+  border-radius: var(--radius-sm);
+}
+.section-title::before {
+  content: ''; position: absolute; left: 0; top: 6px; bottom: 6px; width: 5px;
+  background: var(--color-primary, #2563eb); border-radius: var(--radius-sm);
 }
 .section-title .material-symbols-outlined { font-size: 20px; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
 
 /* Bot Grid */
 .bot-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
 .bot-card {
-  padding: 14px; background: var(--color-card, #fff);
+  padding: 14px; background: var(--color-bg-card, #fff);
   border: 1px solid var(--color-border, var(--color-border)); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
 }
 .bot-card.online { border-left: 3px solid var(--color-success); }
 .bot-card.offline { border-left: 3px solid var(--color-danger); }
@@ -971,9 +1293,9 @@ onUnmounted(() => {
 .bot-stat .material-symbols-outlined { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
 
 /* Tables */
-.tg-table-wrap { overflow-x: auto; border-radius: var(--radius-md); border: 1px solid var(--color-border, var(--color-border)); }
+.tg-table-wrap { overflow-x: auto; border-radius: var(--radius-md); border: 1px solid var(--color-border, var(--color-border)); box-shadow: var(--shadow-md); }
 .tg-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.tg-table th { padding: 10px 12px; text-align: left; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-secondary, #6b7280); background: var(--color-hover, #f9fafb); border-bottom: 1px solid var(--color-border, #e5e7eb); }
+.tg-table th { padding: 10px 12px; text-align: left; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-secondary, #6b7280); background: var(--color-hover, #f9fafb); border-bottom: 2px solid var(--border-strong, #cbd5e1); }
 .tg-table td { padding: 10px 12px; border-bottom: 1px solid var(--color-border, #f3f4f6); color: var(--color-text, #1f2937); }
 .tg-table tbody tr:hover { background: var(--color-hover, #f9fafb); }
 
@@ -989,11 +1311,11 @@ onUnmounted(() => {
 /* Toolbar */
 .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .filter-bar { display: flex; gap: 6px; flex-wrap: wrap; }
-.filter-btn { padding: 6px 12px; border: 1px solid var(--color-border, var(--color-border)); background: var(--color-card, #fff); border-radius: var(--radius-sm); font-size: 12px; cursor: pointer; color: var(--color-text-secondary, var(--color-text-secondary)); transition: background-color 0.15s, color 0.15s, border-color 0.15s; }
+.filter-btn { padding: 6px 12px; border: 1px solid var(--color-border, var(--color-border)); background: var(--color-bg-card, #fff); border-radius: var(--radius-sm); font-size: 12px; cursor: pointer; color: var(--color-text-secondary, var(--color-text-secondary)); transition: background-color 0.15s, color 0.15s, border-color 0.15s; }
 .filter-btn:hover { border-color: var(--color-primary, #2563eb); }
 .filter-btn.active { background: var(--color-primary, #2563eb); color: #fff; border-color: var(--color-primary, #2563eb); }
 
-.search-box { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--color-border, var(--color-border)); border-radius: var(--radius-sm); background: var(--color-card, #fff); }
+.search-box { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--color-border, var(--color-border)); border-radius: var(--radius-sm); background: var(--color-bg-card, #fff); }
 .search-input { border: none; outline: none; font-size: 12px; background: transparent; color: var(--color-text, #1f2937); width: 200px; }
 .result-count { font-size: 11px; color: var(--color-text-secondary, #9ca3af); margin-bottom: 8px; }
 
@@ -1003,31 +1325,57 @@ onUnmounted(() => {
 .add-btn .material-symbols-outlined { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
 
 /* Create Forms */
-.create-form { padding: 14px; background: var(--color-hover, #f9fafb); border: 1px solid var(--color-border, var(--color-border)); border-radius: var(--radius-md); margin-bottom: 16px; }
+.create-form { padding: 14px; background: var(--color-hover, #f9fafb); border: 1px solid var(--color-border, var(--color-border)); border-radius: var(--radius-md); box-shadow: var(--shadow-md); margin-bottom: 16px; }
 .form-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
 .form-group { flex: 1; min-width: 160px; }
 .form-group label { display: block; font-size: 11px; font-weight: 600; color: var(--color-text-secondary, #6b7280); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
-.form-input { width: 100%; padding: 7px 10px; border: 1px solid var(--color-border, var(--color-border)); border-radius: var(--radius-sm); font-size: 13px; background: var(--color-card, #fff); color: var(--color-text, var(--color-text)); }
+.form-input { width: 100%; padding: 7px 10px; border: 1px solid var(--color-border, var(--color-border)); border-radius: var(--radius-sm); font-size: 13px; background: var(--color-bg-card, #fff); color: var(--color-text, var(--color-text)); }
 .form-input:focus { outline: none; border-color: var(--color-primary, #2563eb); }
 .form-hint { font-size: 11px; color: var(--color-text-secondary, #9ca3af); margin-top: 8px; }
 
+/* Dealer Onboarding Result */
+.dealer-result { display: flex; gap: 16px; align-items: center; }
+.dealer-result img { border-radius: var(--radius-sm); border: 1px solid var(--color-border, var(--color-border)); background: #fff; }
+.dealer-result-info { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.dealer-result-link { font-family: var(--font-mono, monospace); font-size: 12px; color: var(--color-text-secondary, #6b7280); word-break: break-all; max-width: 320px; }
+
 /* Dealer Cards */
 .dealer-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
-.dealer-card { background: var(--color-card, #fff); border: 1px solid var(--color-border, var(--color-border)); border-radius: var(--radius-md); padding: 16px; }
-.dealer-card-header { display: flex; align-items: center; gap: 10px; }
-.dealer-card-icon { width: 38px; height: 38px; border-radius: var(--radius-md); background: var(--color-secondary-light); color: var(--color-secondary); display: flex; align-items: center; justify-content: center; }
+.dealer-card { background: var(--color-bg-card, #fff); border: 1px solid var(--color-border, var(--color-border)); border-radius: var(--radius-md); padding: 16px; box-shadow: var(--shadow-bold); }
+.dealer-card-header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.dealer-card-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.dealer-card-icon { width: 38px; height: 38px; border-radius: var(--radius-md); background: var(--color-secondary); color: #fff; box-shadow: var(--shadow-md); display: flex; align-items: center; justify-content: center; }
 .dealer-card-icon .material-symbols-outlined { font-size: 20px; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
-.dealer-card-info { flex: 1; min-width: 0; }
+.dealer-card-info { flex: 1 1 120px; min-width: 120px; }
 .dealer-card-name { font-weight: 700; font-size: 14px; color: var(--color-text, #1f2937); }
 .dealer-card-code code { background: var(--color-hover, #f3f4f6); padding: 1px 6px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 600; }
 .dealer-card-stats { display: flex; gap: 1px; margin: 12px -16px; background: var(--color-border, var(--color-border)); }
-.dealer-stat { flex: 1; text-align: center; padding: 10px; background: var(--color-card, #fff); }
+.dealer-stat { flex: 1; text-align: center; padding: 10px; background: var(--color-bg-card, #fff); }
 .dealer-stat:first-child { background: var(--color-hover, #f9fafb); }
 .dealer-stat-val { font-size: 16px; font-weight: 700; color: var(--color-text, #1f2937); }
 .dealer-stat-label { font-size: 10px; color: var(--color-text-secondary, #6b7280); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.05em; }
 .dealer-card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
 .dealer-card-user { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--color-text-secondary, #6b7280); }
 .dealer-card-user .material-symbols-outlined { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+
+/* Bayi Kur Yönetimi */
+.dealer-rate-panel { margin: 12px -16px -16px; padding: 12px 16px; background: var(--color-hover, #f9fafb); border-top: 1px solid var(--color-border, var(--color-border)); border-radius: 0 0 var(--radius-md) var(--radius-md); display: flex; flex-direction: column; gap: 10px; }
+.dealer-rate-hint { font-size: 11px; color: var(--color-text-secondary, #6b7280); }
+.dealer-rate-row-wrap { display: flex; flex-direction: column; gap: 4px; padding-bottom: 8px; border-bottom: 1px dashed var(--color-border, #e5e7eb); }
+.dealer-rate-row-wrap:last-child { border-bottom: none; padding-bottom: 0; }
+.dealer-rate-row { display: flex; align-items: center; gap: 6px; font-size: 12px; flex-wrap: wrap; }
+.dealer-rate-currency { font-weight: 700; width: 36px; flex-shrink: 0; }
+.dealer-rate-row label { color: var(--color-text-secondary, #6b7280); }
+.dealer-rate-row .rate-input.sm { width: 70px; min-width: 0; flex: 1 1 60px; }
+.dealer-rate-row .action-sm.save { flex-shrink: 0; }
+.dealer-rate-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-left: 50px; }
+.dealer-rate-margin { font-size: 11px; color: var(--color-text-secondary, #6b7280); }
+.dealer-rate-link { background: none; border: none; padding: 0; font-size: 11px; color: var(--color-primary, #2563eb); cursor: pointer; text-decoration: underline; }
+.dealer-rate-link:disabled { opacity: 0.5; cursor: not-allowed; }
+.dealer-rate-history { padding-left: 50px; display: flex; flex-direction: column; gap: 3px; }
+.dealer-rate-history-empty { font-size: 11px; color: var(--color-text-secondary, #9ca3af); font-style: italic; }
+.dealer-rate-history-row { display: flex; gap: 12px; font-size: 11px; color: var(--color-text-secondary, #6b7280); }
+.rate-stale-badge { background: var(--color-warning, #f59e0b) !important; }
 
 /* Icon & Action Buttons */
 .icon-btn { border: none; background: transparent; cursor: pointer; padding: 4px; border-radius: var(--radius-sm); color: var(--color-text-secondary, var(--color-text-secondary)); }
@@ -1046,18 +1394,31 @@ onUnmounted(() => {
 .empty-state { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 48px; color: var(--color-text-secondary, #9ca3af); font-size: 13px; }
 
 /* Crypto */
-.crypto-section { background: var(--color-card, #fff); border: 1px solid var(--color-border, var(--color-border)); border-radius: var(--radius-md); padding: 14px; }
+.crypto-section { background: var(--color-bg-card, #fff); border: 1px solid var(--color-border, var(--color-border)); border-radius: var(--radius-md); padding: 14px; box-shadow: var(--shadow-bold); }
 .crypto-section-header { display: flex; justify-content: space-between; align-items: center; }
 .crypto-section-title { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: var(--color-text, #1f2937); }
 .crypto-section-title .material-symbols-outlined { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
 
+.dealer-info-field { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.dealer-info-field label { font-size: 11px; font-weight: 600; color: var(--color-text-secondary, #6b7280); }
+.dealer-info-row { display: flex; gap: 10px; }
+.dealer-rank-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.dealer-rank-chip {
+  padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 600;
+  border: 1.5px solid var(--color-border, #e5e7eb); background: var(--color-bg-card, #fff); color: var(--color-text-secondary, #6b7280);
+  cursor: pointer; transition: all 0.15s;
+}
+.dealer-rank-chip:hover { border-color: var(--color-primary, #2563eb); }
+.dealer-rank-chip.active { background: var(--color-primary, #2563eb); border-color: var(--color-primary, #2563eb); color: #fff; }
+.dealer-info-actions { display: flex; justify-content: flex-end; }
+
 .rate-form { display: flex; gap: 8px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
-.rate-input { padding: 6px 10px; border: 1px solid var(--color-border, var(--color-border)); border-radius: var(--radius-sm); font-size: 13px; background: var(--color-card, #fff); color: var(--color-text, var(--color-text)); width: 140px; }
+.rate-input { padding: 6px 10px; border: 1px solid var(--color-border, var(--color-border)); border-radius: var(--radius-sm); font-size: 13px; background: var(--color-bg-card, #fff); color: var(--color-text, var(--color-text)); width: 140px; }
 .rate-input.sm { width: 100px; }
 .rate-input:focus { outline: none; border-color: var(--color-primary, #2563eb); }
 
 .rate-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 12px; }
-.rate-card { padding: 14px; background: var(--color-hover, #f9fafb); border: 1px solid var(--color-border, var(--color-border)); border-radius: var(--radius-md); }
+.rate-card { padding: 14px; background: var(--color-hover, #f9fafb); border: 1px solid var(--color-border, var(--color-border)); border-radius: var(--radius-md); box-shadow: var(--shadow-md); }
 .rate-currency { font-size: 16px; font-weight: 700; color: var(--color-text, #1f2937); margin-bottom: 8px; }
 .rate-values { display: flex; flex-direction: column; gap: 4px; }
 .rate-row { display: flex; justify-content: space-between; align-items: center; }
@@ -1078,8 +1439,8 @@ code { background: var(--color-hover, #f3f4f6); padding: 2px 6px; border-radius:
 
 /* Cari Hesap */
 .cari-card .dealer-card-stats { display: grid; grid-template-columns: repeat(4, 1fr); }
-.cari-card .dealer-card-icon.payable { background: #fff7ed; color: var(--color-warning); }
-.cari-card .dealer-card-icon.receivable { background: var(--color-success-bg); color: var(--color-success); }
+.cari-card .dealer-card-icon.payable { background: var(--color-warning); color: #fff; box-shadow: 0 3px 8px -2px rgba(0,0,0,.28); }
+.cari-card .dealer-card-icon.receivable { background: var(--color-success); color: #fff; box-shadow: 0 3px 8px -2px rgba(0,0,0,.28); }
 .cari-balance-badge { padding: 3px 8px; border-radius: var(--radius-md); font-size: 11px; font-weight: 600; color: #fff; }
 .cari-balance-badge.sm { font-size: 10px; padding: 2px 6px; }
 .cari-balance-badge.payable { background: var(--color-warning); }
@@ -1089,7 +1450,7 @@ code { background: var(--color-hover, #f3f4f6); padding: 2px 6px; border-radius:
 .cari-receivable { color: var(--color-success); font-weight: 600; }
 .cari-debit { color: var(--color-danger); font-weight: 500; }
 .cari-credit { color: var(--color-success); font-weight: 500; }
-.cari-ekstre { background: var(--color-card, #fff); border: 1px solid var(--color-border, var(--color-border)); border-radius: var(--radius-md); padding: 14px; }
+.cari-ekstre { background: var(--color-bg-card, #fff); border: 1px solid var(--color-border, var(--color-border)); border-radius: var(--radius-md); padding: 14px; box-shadow: var(--shadow-bold); }
 
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

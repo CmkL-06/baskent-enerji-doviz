@@ -21,6 +21,8 @@ namespace BaskentEnerji.Entity.Entities.ExchangeOffice.Office
         public Vault Vault { get; set; }
         public Currency.Currency Currency { get; set; }
         public bool IsDeleted { get; set; }
+        public string? DeletedReason { get; set; }
+        public Guid? DeletedByUserId { get; set; }
         public TransactionType TransactionType { get; set; }
         public bool IsGhost { get; set; } = false;
         public bool IsParty { get; set; } = false;

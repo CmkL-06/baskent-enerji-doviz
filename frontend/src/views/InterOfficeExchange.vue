@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useExchangeStore } from '@/stores/exchange'
 import apiService from '@/services/apiservice'
+import { formatAmount } from '@/utils/currency'
 import AppKpiCard from '@/components/common/AppKpiCard.vue'
 import AppPageHeader from '@/components/common/AppPageHeader.vue'
 import { useNotification } from '@/composables/useNotification'
@@ -13,6 +14,7 @@ const exchangeStore = useExchangeStore()
 
 const loading = ref(true)
 const saving = ref(false)
+const processingIds = ref(new Set<string>())
 
 const pendingTransfers = ref<any[]>([])
 const officeTransfers = ref<any[]>([])
@@ -34,8 +36,7 @@ const officeId = computed(() =>
   exchangeStore.selectedOffice?.officeId ?? exchangeStore.offices[0]?.officeId
 )
 
-const formatCurrency = (amount: number): string =>
-  new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount)
+const formatCurrency = (amount: number): string => formatAmount(amount, 2)
 
 const formatDateTime = (d: string | null | undefined): string => {
   if (!d) return '-'
@@ -108,10 +109,13 @@ async function createTransfer() {
 }
 
 async function processAction(transfer: any, isApproved: boolean) {
+  const id = String(transfer.id)
+  if (processingIds.value.has(id)) return
   const notes = isApproved ? '' : (prompt('Red sebebi:') ?? '')
   if (!isApproved && notes === '') return
+  processingIds.value.add(id)
   try {
-    await apiService.processTransfer(String(transfer.id), {
+    await apiService.processTransfer(id, {
       IsApproved: isApproved,
       Notes: notes,
     })
@@ -119,6 +123,8 @@ async function processAction(transfer: any, isApproved: boolean) {
     await loadHistory()
   } catch (e: any) {
     notification.error(e?.response?.data?.message || 'İşlem başarısız')
+  } finally {
+    processingIds.value.delete(id)
   }
 }
 
@@ -202,10 +208,10 @@ onMounted(async () => {
             <td>{{ t.description || '-' }}</td>
             <td>{{ formatDateTime(t.createdAt ?? t.requestDate) }}</td>
             <td class="text-center actions-cell">
-              <button class="btn-approve" @click="processAction(t, true)" title="Onayla">
+              <button class="btn-approve" @click="processAction(t, true)" :disabled="processingIds.has(String(t.id))" title="Onayla">
                 <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
               </button>
-              <button class="btn-reject" @click="processAction(t, false)" title="Reddet">
+              <button class="btn-reject" @click="processAction(t, false)" :disabled="processingIds.has(String(t.id))" title="Reddet">
                 <span class="material-symbols-outlined" aria-hidden="true">cancel</span>
               </button>
               <button class="icon-btn" title="Detay" @click="loadDetail(t)">

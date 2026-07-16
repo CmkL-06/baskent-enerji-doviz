@@ -3,8 +3,10 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using BaskentEnerji.Business.Exceptions;
 using BaskentEnerji.Business.Services.Permission;
+using BaskentEnerji.Business.Services.Telegram;
 using BaskentEnerji.Data.Contexts;
 using BaskentEnerji.Entity.Entities.ExchangeOffice.Party;
+using BaskentEnerji.Entity.Entities.Telegram;
 using System;
 using System.Linq;
 using System.Net;
@@ -176,6 +178,13 @@ namespace BaskentEnerji.API.Controllers.Telegram
             if (dealer?.PartyId == null)
                 throw new ApiException(HttpStatusCode.BadRequest, "Bayi cari hesabı bulunamadı");
 
+            // Şube (Branch) tipi bayilerin işlemleri zaten TelegramOperatorController üzerinden
+            // gerçek Kasa'ya (Vault/WAC) işleniyor. Bot, bayi tipinden habersiz her tamamlanan
+            // işlemde bu endpoint'i çağırır — burada ikinci kez cari hesaba yazmak çift
+            // muhasebeye (aynı işlemin hem Kasa'da hem cari hesapta görünmesine) yol açar.
+            if (dealer.DealerType == TgDealerType.Branch)
+                return Ok(new { skipped = true, reason = "Şube tipi bayilerin işlemleri Kasa'ya işlenir, cari hesaba ayrıca yazılmaz." });
+
             // Duplicate kontrolü: aynı transaction_id ile kayıt varsa reddet
             if (req.TransactionId.HasValue)
             {
@@ -198,18 +207,32 @@ namespace BaskentEnerji.API.Controllers.Telegram
             if (account == null)
                 throw new ApiException(HttpStatusCode.BadRequest, "Bayi TRY hesabı bulunamadı");
 
-            var commission = req.AmountTry * dealer.CommissionRate / 100m;
+            var mappedCurrencyCode = TgCurrencyMapper.ToSystemCurrencyCode(req.Currency);
+
+            // Kâr, sabit bir komisyon yüzdesinden değil, bu bayi için tanımlı settlement
+            // kurunun (Owner'ın bu bayiden alış/satış yaptığı kur) müşteri kuruna göre
+            // farkından doğar. Kurlar her gün değişebileceği için bayiye özel, güncel
+            // TgDealerRate kaydı zorunludur — sessizce eski/yanlış bir değere düşülmez.
+            var dealerRate = await _db.TgDealerRates
+                .FirstOrDefaultAsync(r => r.DealerId == dealer.DealerId && r.Currency == mappedCurrencyCode);
+            if (dealerRate == null)
+                throw new ApiException(HttpStatusCode.BadRequest,
+                    $"Bu bayi için {mappedCurrencyCode} kuru tanımlı değil. Önce 'Bayi Kur Yönetimi'nden ayarlayın.");
+
+            var settlementRate = req.IsBuy ? dealerRate.BuyRate : dealerRate.SellRate;
+            if (settlementRate <= 0)
+                throw new ApiException(HttpStatusCode.BadRequest, $"Bu bayi için {mappedCurrencyCode} {(req.IsBuy ? "alış" : "satış")} kuru sıfır veya negatif olamaz.");
+
             var entryType = req.IsBuy ? EntryType.Credit : EntryType.Debit;
-            var entryAmount = req.IsBuy
-                ? req.AmountTry + commission
-                : req.AmountTry - commission;
+            var entryAmount = req.Amount * settlementRate;
+            var marginAmount = req.AmountTry - entryAmount;
 
             if (entryAmount <= 0)
-                throw new ApiException(HttpStatusCode.BadRequest, "Komisyon hesabı sonrası tutar sıfır veya negatif olamaz");
+                throw new ApiException(HttpStatusCode.BadRequest, "Kur hesabı sonrası tutar sıfır veya negatif olamaz");
 
             Guid? originalCurrencyId = null;
             var cur = await _db.Set<BaskentEnerji.Entity.Entities.ExchangeOffice.Currency.Currency>()
-                .FirstOrDefaultAsync(c => c.CurrencyCode == req.Currency.ToUpper());
+                .FirstOrDefaultAsync(c => c.CurrencyCode == mappedCurrencyCode);
             if (cur != null) originalCurrencyId = cur.Id;
 
             using var tx = await _db.Database.BeginTransactionAsync();
@@ -237,11 +260,12 @@ namespace BaskentEnerji.API.Controllers.Telegram
                     Type = entryType,
                     Amount = entryAmount,
                     RunningBalance = account.Balance,
-                    Description = $"{req.Currency.ToUpper()} {direction} - {req.Amount} {req.Currency.ToUpper()} @ {req.ExchangeRate:F2}",
+                    Description = $"{req.Currency.ToUpper()} {direction} - {req.Amount} {req.Currency.ToUpper()} @ {settlementRate:F2} (müşteri kuru: {req.ExchangeRate:F2})",
                     PaymentStatus = PaymentStatus.Pending,
+                    PaymentReference = "",
                     OriginalCurrencyId = originalCurrencyId,
                     OriginalAmount = req.Amount,
-                    ExchangeRate = req.ExchangeRate,
+                    ExchangeRate = settlementRate,
                     ReferenceNumber = req.TransactionId?.ToString()
                 };
 
@@ -255,7 +279,8 @@ namespace BaskentEnerji.API.Controllers.Telegram
                     entryNumber = entry.EntryNumber,
                     entryType = entryType == EntryType.Credit ? "Credit" : "Debit",
                     amount = entryAmount,
-                    commission,
+                    settlementRate,
+                    marginAmount,
                     runningBalance = account.Balance,
                     description = entry.Description
                 });

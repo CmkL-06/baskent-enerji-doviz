@@ -1,6 +1,7 @@
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using BaskentEnerji.Business.Infrastructure.ExchangeOffice.Party;
+using BaskentEnerji.Business.Services.Permission;
 using BaskentEnerji.Data.Contexts;
 using BaskentEnerji.Entity.Entities.ExchangeOffice.Office;
 using BaskentEnerji.Entity.Entities.ExchangeOffice.Party;
@@ -18,16 +19,20 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
     {
         private readonly BaskentEnerjiDbContext _context;
         private readonly IMapper _mapper;
+        private readonly ValidationService _validationService;
 
-        public GhostPartyService(BaskentEnerjiDbContext context, IMapper mapper)
+        public GhostPartyService(BaskentEnerjiDbContext context, IMapper mapper, ValidationService validationService)
         {
             _context = context;
             _mapper = mapper;
+            _validationService = validationService;
         }
 
         // Account Management
         public async Task<vm_ghostpartyaccount> CreateGhostAccountAsync(rm_ghostpartyaccount request)
         {
+            await _validationService.EnsureNotViewerAsync(request.OfficeId);
+
             var existingAccount = await _context.Set<GhostPartyAccount>()
                 .FirstOrDefaultAsync(x => x.PartyId == request.PartyId && 
                                         x.CurrencyId == request.CurrencyId && 
@@ -168,6 +173,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
             if (account == null)
                 throw new Exception("Ghost account not found");
 
+            await _validationService.EnsureNotViewerAsync(account.OfficeId);
+
             if (account.AvailableBalance < amount)
                 throw new Exception("Insufficient available balance");
 
@@ -183,6 +190,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
             var account = await _context.Set<GhostPartyAccount>().FindAsync(accountId);
             if (account == null)
                 throw new Exception("Ghost account not found");
+
+            await _validationService.EnsureNotViewerAsync(account.OfficeId);
 
             if (account.BlockedAmount < amount)
                 throw new Exception("Blocked amount is less than the amount to unblock");
@@ -363,6 +372,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
             if (originalEntry.Status == "Reversed")
                 throw new Exception("Entry is already reversed");
 
+            await _validationService.EnsureNotViewerAsync(originalEntry.OfficeId);
+
             var reverseEntry = new GhostPartyAccountEntry
             {
                 Id = Guid.NewGuid(),
@@ -432,6 +443,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
         // Transaction Processing
         public async Task<vm_ghostpartyentry> ProcessGhostPaymentAsync(rm_ghostpartypayment request)
         {
+            await _validationService.EnsureNotViewerAsync(request.OfficeId);
+
             // Get or create ghost account
             var account = await _context.Set<GhostPartyAccount>()
                 .FirstOrDefaultAsync(x => x.PartyId == request.PartyId && 
@@ -473,6 +486,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
 
         public async Task<vm_ghostpartyentry> ProcessGhostCollectionAsync(rm_ghostpartycollection request)
         {
+            await _validationService.EnsureNotViewerAsync(request.OfficeId);
+
             // Get or create ghost account
             var account = await _context.Set<GhostPartyAccount>()
                 .FirstOrDefaultAsync(x => x.PartyId == request.PartyId && 

@@ -123,8 +123,111 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 // Process each exchange request
                 foreach (var singleRequest in request)
                 {
+                    // Determine which currency is the foreign one (non-TRY) — needed before rate lookup
+                    var sourceCurrencyEntity = currencyDict.GetValueOrDefault(singleRequest.SourceCurrencyId);
+                    var targetCurrencyEntity = currencyDict.GetValueOrDefault(singleRequest.TargetCurrencyId);
+                    var isTrySource = sourceCurrencyEntity?.CurrencyCode == "TRY";
+                    var isTryTarget = targetCurrencyEntity?.CurrencyCode == "TRY";
+                    var isArbitrage = !isTrySource && !isTryTarget;
+
+                    ExchangeRate exchangeRate = null;
+                    decimal rate;
+                    decimal targetAmount;
+                    decimal netTargetAmount;
+                    decimal commission;
+                    decimal profit = 0;
+
+                    if (isArbitrage)
+                    {
+                        // Arbitraj (çapraz kur): iki yabancı para birimi arasında doğrudan değişim, TRY bacağı yok.
+                        // Alınan (source) birim ALIŞ kuruyla, verilen (target) birim SATIŞ kuruyla değerlenir.
+                        if (!singleRequest.SourceCustomRate.HasValue || !singleRequest.TargetCustomRate.HasValue)
+                            throw new ApiException(HttpStatusCode.BadRequest, "Arbitraj işlemi için hem alınan hem verilen birimin kuru girilmelidir.");
+
+                        var sourceRate = singleRequest.SourceCustomRate.Value;
+                        var targetRate = singleRequest.TargetCustomRate.Value;
+
+                        // Piyasa sapma kontrolü: her birim için kendi TRY bazlı piyasa kuruna göre ayrı ayrı (varsa)
+                        var tryCurrency = currencyDict.Values.FirstOrDefault(c => c.CurrencyCode == "TRY");
+                        if (tryCurrency != null)
+                        {
+                            var sourceMarketRate = await GetExchangeRateAsync(vault.OfficeId, singleRequest.SourceCurrencyId, tryCurrency.Id);
+                            if (sourceMarketRate != null && sourceMarketRate.BuyRate > 0)
+                                EnsureRateWithinMarketDeviation(sourceRate, sourceMarketRate.BuyRate, singleRequest.OwnerOverrideLoss, "Alınan birimin kuru");
+
+                            var targetMarketRate = await GetExchangeRateAsync(vault.OfficeId, singleRequest.TargetCurrencyId, tryCurrency.Id);
+                            if (targetMarketRate != null && targetMarketRate.SellRate > 0)
+                                EnsureRateWithinMarketDeviation(targetRate, targetMarketRate.SellRate, singleRequest.OwnerOverrideLoss, "Verilen birimin kuru");
+                        }
+
+                        rate = sourceRate; // Raporlama amaçlı (AppliedRate) alınan birimin kuru gösterilir
+                        targetAmount = singleRequest.SourceAmount * sourceRate / targetRate;
+                        netTargetAmount = targetAmount;
+                        commission = vault.Office.CommissionRate.HasValue
+                            ? targetAmount * vault.Office.CommissionRate.Value / 100m
+                            : 0m;
+
+                        // Alınan bacak: satın alma (WAC güncelle)
+                        await _wacService.RecalculateWacOnPurchaseAsync(vaultId, singleRequest.SourceCurrencyId, singleRequest.SourceAmount, sourceRate, exchangeTransaction.Id);
+
+                        // Verilen bacak: satış — yeterli bakiye kontrolü + gerçekleşen kâr
+                        var currentTargetBalance = await _vaultService.GetLockedBalanceAsync(vaultId, singleRequest.TargetCurrencyId);
+                        if (currentTargetBalance < targetAmount)
+                            throw new ApiException(HttpStatusCode.BadRequest, "Insufficient vault balance");
+
+                        profit = await _wacService.CalculateRealizedProfitAsync(targetRate, targetAmount, vaultId, singleRequest.TargetCurrencyId);
+                        var newTargetQty = currentTargetBalance - targetAmount;
+                        await _wacService.AdjustWacQuantityAsync(vaultId, singleRequest.TargetCurrencyId, newTargetQty, Infrastructure.ExchangeOffice.Office.WacAdjustReason.Sale, exchangeTransaction.Id);
+
+                        totalProfit += profit;
+
+                        // Alınan (source) = Credit (vault'a giriyor), Verilen (target) = Debit (vault'tan çıkıyor)
+                        pendingDetails.Add(new TransactionDetail
+                        {
+                            Id = Guid.NewGuid(),
+                            CurrencyId = singleRequest.SourceCurrencyId,
+                            Side = TransactionSide.Credit,
+                            Amount = singleRequest.SourceAmount,
+                            Rate = sourceRate,
+                            Commission = 0,
+                            NetAmount = singleRequest.SourceAmount,
+                            CreatedDate = DateTime.UtcNow,
+                            ActualBuyRate = sourceRate,
+                            ActualSellRate = null,
+                            CustomRate = sourceRate
+                        });
+
+                        pendingDetails.Add(new TransactionDetail
+                        {
+                            Id = Guid.NewGuid(),
+                            CurrencyId = singleRequest.TargetCurrencyId,
+                            Side = TransactionSide.Debit,
+                            Amount = targetAmount,
+                            Rate = targetRate,
+                            Commission = commission,
+                            NetAmount = netTargetAmount,
+                            CreatedDate = DateTime.UtcNow,
+                            ActualBuyRate = null,
+                            ActualSellRate = targetRate,
+                            CustomRate = targetRate
+                        });
+
+                        results.Add(new vm_exchangetransaction
+                        {
+                            SourceCurrencyId = singleRequest.SourceCurrencyId,
+                            TargetCurrencyId = singleRequest.TargetCurrencyId,
+                            SourceAmount = singleRequest.SourceAmount,
+                            TargetAmount = targetAmount,
+                            AppliedRate = rate,
+                            Commission = commission,
+                            ProfitLoss = profit
+                        });
+
+                        continue;
+                    }
+
                     // Get exchange rate for this specific exchange
-                    var exchangeRate = await GetExchangeRateAsync(
+                    exchangeRate = await GetExchangeRateAsync(
                         vault.OfficeId,
                         singleRequest.SourceCurrencyId,
                         singleRequest.TargetCurrencyId
@@ -135,32 +238,19 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
                     // Calculate amounts for this exchange
                     var marketRate = singleRequest.IsBuyingFromCustomer ? exchangeRate.BuyRate : exchangeRate.SellRate;
-                    var rate = singleRequest.CustomRate ?? marketRate;
+                    rate = singleRequest.CustomRate ?? marketRate;
 
                     // Validate custom rate is within acceptable bounds (max 20% deviation from market)
                     if (singleRequest.CustomRate.HasValue && marketRate > 0)
-                    {
-                        var deviation = Math.Abs(rate - marketRate) / marketRate;
-                        if (deviation > 0.20m && !singleRequest.OwnerOverrideLoss)
-                            throw new ApiException(HttpStatusCode.BadRequest, $"Özel kur piyasa kurundan %{deviation * 100:F1} sapıyor. Onay için Owner yetkisi gereklidir.");
-                    }
+                        EnsureRateWithinMarketDeviation(rate, marketRate, singleRequest.OwnerOverrideLoss, "Özel kur");
 
-                    var targetAmount = singleRequest.SourceAmount * rate;
-                    var netTargetAmount = targetAmount; // Komisyon müşteri tutarını etkilemez, ayrı bir gelir kalemi olarak izlenir
+                    targetAmount = singleRequest.SourceAmount * rate;
+                    netTargetAmount = targetAmount; // Komisyon müşteri tutarını etkilemez, ayrı bir gelir kalemi olarak izlenir
 
                     // Komisyon: office.CommissionRate tanımlıysa raporlama amaçlı hesaplanır (müşteriye yansıtılmaz)
-                    var commission = vault.Office.CommissionRate.HasValue
+                    commission = vault.Office.CommissionRate.HasValue
                         ? targetAmount * vault.Office.CommissionRate.Value / 100m
                         : 0m;
-
-                    // Calculate profit using WAC (Weighted Average Cost)
-                    decimal profit = 0;
-
-                    // Determine which currency is the foreign one (non-TRY)
-                    var sourceCurrencyEntity = currencyDict.GetValueOrDefault(singleRequest.SourceCurrencyId);
-                    var targetCurrencyEntity = currencyDict.GetValueOrDefault(singleRequest.TargetCurrencyId);
-                    var isTrySource = sourceCurrencyEntity?.CurrencyCode == "TRY";
-                    var isTryTarget = targetCurrencyEntity?.CurrencyCode == "TRY";
 
                     if (singleRequest.IsBuyingFromCustomer)
                     {
@@ -177,10 +267,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                         if (!isTrySource)
                         {
                             // Verify sufficient balance before selling
-                            var currentBalance = await _context.VaultBalances
-                                .Where(vb => vb.VaultId == vaultId && vb.CurrencyId == singleRequest.SourceCurrencyId)
-                                .Select(vb => vb.Balance)
-                                .FirstOrDefaultAsync();
+                            var currentBalance = await _vaultService.GetLockedBalanceAsync(vaultId, singleRequest.SourceCurrencyId);
                             if (currentBalance < singleRequest.SourceAmount)
                                 throw new ApiException(HttpStatusCode.BadRequest, $"Insufficient vault balance");
 
@@ -487,7 +574,6 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
       DateTime? startDate,
       DateTime? endDate)
         {
-            //var isAdmin = await _validationService.IsAdminAsync();
             var query = _context.Transactions
                 .AsNoTracking()
                 .Include(t => t.Vault)
@@ -495,8 +581,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 .Include(t => t.Details)
                     .ThenInclude(d => d.Currency)
                 .AsSplitQuery() // PERFORMANCE FIX: Avoid cartesian explosion
+                .Where(t => !t.IsDeleted)
                 .AsQueryable();
-            // .Where( t=> isAdmin || !t.IsDeleted );
 
 
 
@@ -565,6 +651,15 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 .FirstOrDefaultAsync();
         }
 
+        // %20 piyasa sapma kuralı üç ayrı yerde (arbitraj alış/satış bacakları + normal özel kur)
+        // neredeyse birebir kopyalanmıştı — tek bir yerde toplandı.
+        private static void EnsureRateWithinMarketDeviation(decimal actualRate, decimal marketRate, bool ownerOverrideLoss, string rateLabel)
+        {
+            var deviation = Math.Abs(actualRate - marketRate) / marketRate;
+            if (deviation > 0.20m && !ownerOverrideLoss)
+                throw new ApiException(HttpStatusCode.BadRequest, $"{rateLabel} piyasa kurundan %{deviation * 100:F1} sapıyor. Onay için Owner yetkisi gereklidir.");
+        }
+
         private string GenerateTransactionNumber()
         {
             // Format: EX-YYYYMMDD-XXXXXX
@@ -608,6 +703,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 Type = dbTransaction.Type,
                 VaultName = dbTransaction.Vault.Name,
                 VaultId = dbTransaction.VaultId,
+                OfficeId = dbTransaction.Vault.OfficeId,
                 CustomerId = dbTransaction.CustomerId,
 
                 IsCustomRate = dbTransaction.IsCustomRate,
@@ -710,13 +806,20 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                         }
                         else if (detail.Side == TransactionSide.Debit && detail.Amount > 0)
                         {
-                            var currentBalance = await _context.VaultBalances
-                                .Where(vb => vb.VaultId == dbTransaction.VaultId && vb.CurrencyId == detail.CurrencyId)
-                                .Select(vb => vb.Balance)
+                            // Denetim bulgusu düzeltmesi: eskiden burada "güncel bakiye" VaultBalances'tan
+                            // projeksiyon sorgusuyla okunup Quantity'ye eşitleniyordu — hem bu okuma henüz
+                            // commit edilmemiş bakiye restore'undan dolayı STALE oluyordu, hem de WAC alanı
+                            // hiç düzeltilmiyordu (satış öncesi doğru maliyet tabanına dönmüyordu). Şimdi
+                            // satış anında loglanan gerçek WAC değeri kullanılarak simetrik biçimde geri ekleniyor.
+                            var saleWacHistory = await _context.CurrencyWacHistories
+                                .Where(h => h.TransactionId == dbTransaction.Id && h.CurrencyId == detail.CurrencyId)
+                                .OrderBy(h => h.CreatedDate)
                                 .FirstOrDefaultAsync();
-                            await _wacService.AdjustWacQuantityAsync(
+                            var wacAtSaleTime = saleWacHistory?.OldWac ?? 0;
+
+                            await _wacService.ReverseWacOnSaleDeleteAsync(
                                 dbTransaction.VaultId, detail.CurrencyId,
-                                currentBalance, WacAdjustReason.TransactionDelete, dbTransaction.Id);
+                                Math.Abs(detail.Amount), wacAtSaleTime, dbTransaction.Id);
                         }
                     }
                 }

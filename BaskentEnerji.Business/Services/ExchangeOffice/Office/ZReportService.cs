@@ -283,10 +283,26 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     }
                 }
 
+                // İşlemin kaç yabancı (TRY-olmayan) bacağı var? Arbitraj (çapraz kur) işlemlerinde 2
+                // yabancı bacak olur; normal alım-satımda 1 yabancı + 1 TRY bacağı olur.
+                var foreignLegCount = transaction.Details.Count(d => d.Currency.CurrencyCode != "TRY");
+                var isArbitrage = foreignLegCount >= 2;
+
+                if ((transaction.Type == TransactionType.Exchange || transaction.Type == TransactionType.Buy) && isArbitrage)
+                {
+                    summary.TotalArbitrageProfit += transaction.Profit;
+                }
+
                 // Process transaction details
                 foreach (var detail in transaction.Details)
                 {
                     var currencyCode = detail.Currency.CurrencyCode;
+
+                    // TRY, alınıp satılan bir "döviz" değil — sadece karşı bacağın (yabancı para biriminin)
+                    // bedelidir. TRY'yi kendi satırı olarak Ciro/döviz tablosuna sokmak, o para biriminin
+                    // TRY karşılığını sanki ayrı bir işlemmiş gibi ikinci kez göstermek anlamına gelir.
+                    if (currencyCode == "TRY")
+                        continue;
 
                     // Initialize currency detail if needed
                     if (!currencyDetailsMap.ContainsKey(currencyCode))
@@ -300,17 +316,17 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
                     var currencyDetail = currencyDetailsMap[currencyCode];
                     var amount = Math.Abs(detail.Amount);
-                    // For TRY, the amount is already in TRY, no need to multiply by rate
-                    var amountInTRY = currencyCode == "TRY" ? amount : amount * detail.Rate;
-
-                    // Update total volumes
-                    if (!summary.TotalVolumesByCurrency.ContainsKey(currencyCode))
-                        summary.TotalVolumesByCurrency[currencyCode] = 0;
-                    summary.TotalVolumesByCurrency[currencyCode] += amount;
+                    var amountInTRY = amount * detail.Rate;
 
                     // For exchange transactions
                     if (transaction.Type == TransactionType.Exchange || transaction.Type == TransactionType.Buy)
                     {
+                        // Update total volumes — sadece gerçek müşteri alım-satımı (Exchange/Buy) hacme
+                        // sayılır; Transfer/Deposit/Withdrawal gerçek bir alış-satış değildir.
+                        if (!summary.TotalVolumesByCurrency.ContainsKey(currencyCode))
+                            summary.TotalVolumesByCurrency[currencyCode] = 0;
+                        summary.TotalVolumesByCurrency[currencyCode] += amount;
+
                         // Correct interpretation from exchange office perspective:
                         // Debit = We are giving out/selling this currency
                         // Credit = We are receiving/buying this currency
@@ -327,11 +343,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                             currencyDetail.SellTransactionCount++;
                         }
 
-                        // Track foreign currency processing (non-TRY)
-                        if (currencyCode != "TRY")
-                        {
-                            summary.TotalForeignCurrencyProcessed += amountInTRY;
-                        }
+                        summary.TotalForeignCurrencyProcessed += amountInTRY;
 
                         // Track cash volumes
                         if (transaction.PartyId == null)
@@ -349,15 +361,17 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 }
             }
 
-            // Allocate transaction profits to foreign currencies only
+            // Allocate transaction profits to foreign currencies only. Arbitraj (çapraz kur) işlemlerinin
+            // İKİ yabancı bacağı olduğundan, kârı rastgele "ilk bulunan" para birimine atamak yanıltıcıdır
+            // (bkz. summary.TotalArbitrageProfit — bu işlemlerin kârı orada ayrıca toplanıyor). Bu yüzden
+            // sadece TEK yabancı bacaklı (normal alım-satım) işlemler burada para birimine atanır.
             var transactionProfitsByForeignCurrency = new Dictionary<string, decimal>();
             foreach (var transaction in transactions.Where(t => t.Type == TransactionType.Exchange || t.Type == TransactionType.Buy))
             {
-                // Find the foreign currency in this transaction (non-TRY)
-                var foreignCurrencyDetail = transaction.Details.FirstOrDefault(d => d.Currency.CurrencyCode != "TRY");
-                if (foreignCurrencyDetail != null)
+                var foreignCurrencyDetails = transaction.Details.Where(d => d.Currency.CurrencyCode != "TRY").ToList();
+                if (foreignCurrencyDetails.Count == 1)
                 {
-                    var foreignCurrencyCode = foreignCurrencyDetail.Currency.CurrencyCode;
+                    var foreignCurrencyCode = foreignCurrencyDetails[0].Currency.CurrencyCode;
                     if (!transactionProfitsByForeignCurrency.ContainsKey(foreignCurrencyCode))
                         transactionProfitsByForeignCurrency[foreignCurrencyCode] = 0;
 
@@ -416,8 +430,11 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     detail.Profit = detail.TotalSellRevenue - detail.TotalBuyCost;
                 }
 
-                if (detail.TotalBuyCost > 0 && currencyCode != "TRY")
-                    detail.ProfitMargin = (detail.Profit / detail.TotalBuyCost) * 100;
+                // Marj = Kâr / Satış Hasılatı — o gün satılan miktarın TL karşılığına göre standart kâr marjı.
+                // Önceki formül (Kâr / Alış Maliyeti) alım hacmi düşük/sıfırken (ör. eski ucuz stoktan satış
+                // yapılan bir günde) anlamsız yüzdeler üretiyordu (ör. %295,6).
+                if (detail.TotalSellRevenue > 0 && currencyCode != "TRY")
+                    detail.ProfitMargin = (detail.Profit / detail.TotalSellRevenue) * 100;
                 else
                     detail.ProfitMargin = 0;
 
@@ -441,6 +458,40 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     detail.RealizedProfit = detail.Profit;
                     if (detail.Wac > 0 && detail.CurrentBalance > 0 && detail.CurrentSellRate > 0)
                         detail.UnrealizedProfit = (detail.CurrentSellRate - detail.Wac) * detail.CurrentBalance;
+                }
+            }
+
+            // O gün hiç işlem görmemiş ama kasada bakiyesi duran para birimleri de rapora dahil edilir —
+            // aksi halde "Tüm Şubeler" görünümünde bu bakiyeler sessizce kaybolur (bkz. denetim bulgusu).
+            if (mainVault != null)
+            {
+                foreach (var kvp in vaultBalanceDict)
+                {
+                    if (kvp.Value <= 0)
+                        continue;
+
+                    var idleCurrency = allCurrencies.Values.FirstOrDefault(c => c.Id == kvp.Key);
+                    if (idleCurrency == null || idleCurrency.CurrencyCode == "TRY" || currencyDetailsMap.ContainsKey(idleCurrency.CurrencyCode))
+                        continue;
+
+                    var idleDetail = new vm_zreport_currency_detail
+                    {
+                        CurrencyCode = idleCurrency.CurrencyCode,
+                        CurrencyName = idleCurrency.CurrencyName,
+                        Wac = wacDict.GetValueOrDefault(kvp.Key),
+                        CurrentBalance = kvp.Value
+                    };
+
+                    if (allExchangeRates.TryGetValue(kvp.Key, out var idleRate))
+                    {
+                        idleDetail.CurrentBuyRate = idleRate.BuyRate;
+                        idleDetail.CurrentSellRate = idleRate.SellRate;
+                        idleDetail.Spread = idleRate.SellRate - idleRate.BuyRate;
+                        if (idleDetail.Wac > 0 && idleDetail.CurrentSellRate > 0)
+                            idleDetail.UnrealizedProfit = (idleDetail.CurrentSellRate - idleDetail.Wac) * idleDetail.CurrentBalance;
+                    }
+
+                    currencyDetailsMap[idleCurrency.CurrencyCode] = idleDetail;
                 }
             }
 
@@ -572,6 +623,9 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             };
 
             var aggregatedCurrencyDetails = new Dictionary<string, vm_zreport_currency_detail>();
+            // WAC ofisler arasında toplanamaz (ağırlıklı ortalama gerekir) — maliyet tabanını (Wac × Bakiye)
+            // biriktirip sonda bakiyeye bölerek doğru bir ağırlıklı ortalama WAC elde ediyoruz.
+            var wacCostBasisByCurrency = new Dictionary<string, decimal>();
             var aggregatedBalanceHistories = new List<vm_vaultbalancehistory>();
             var totalPartyDebtsInTRY = 0m;
             var totalPartyReceivablesInTRY = 0m;
@@ -616,6 +670,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     totalSummary.TotalDepositTransactions += officeReport.Summary.TotalDepositTransactions;
                     totalSummary.TotalWithdrawalTransactions += officeReport.Summary.TotalWithdrawalTransactions;
                     totalSummary.TotalForeignCurrencyProcessed += officeReport.Summary.TotalForeignCurrencyProcessed;
+                    totalSummary.TotalArbitrageProfit += officeReport.Summary.TotalArbitrageProfit;
 
                     // Aggregate vault operations
                     totalSummary.VaultDeposits += officeReport.Summary.VaultDeposits;
@@ -657,6 +712,13 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                         aggDetail.SellTransactionCount += detail.SellTransactionCount;
                         aggDetail.Profit += detail.Profit;
                         aggDetail.NetPosition += detail.NetPosition;
+                        aggDetail.CurrentBalance += detail.CurrentBalance;
+
+                        if (detail.Wac > 0 && detail.CurrentBalance > 0)
+                        {
+                            wacCostBasisByCurrency.TryGetValue(detail.CurrencyCode, out var existingCostBasis);
+                            wacCostBasisByCurrency[detail.CurrencyCode] = existingCostBasis + (detail.Wac * detail.CurrentBalance);
+                        }
                     }
                 }
 
@@ -696,8 +758,15 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     detail.AverageBuyRate = detail.TotalBuyCost / detail.TotalBoughtAmount;
                 if (detail.SellTransactionCount > 0)
                     detail.AverageSellRate = detail.TotalSellRevenue / detail.TotalSoldAmount;
-                if (detail.TotalBuyCost > 0)
-                    detail.ProfitMargin = (detail.Profit / detail.TotalBuyCost) * 100;
+                if (detail.TotalSellRevenue > 0)
+                    detail.ProfitMargin = (detail.Profit / detail.TotalSellRevenue) * 100;
+
+                if (detail.CurrentBalance > 0 && wacCostBasisByCurrency.TryGetValue(detail.CurrencyCode, out var costBasis))
+                {
+                    detail.Wac = costBasis / detail.CurrentBalance;
+                    if (detail.Wac > 0 && detail.CurrentSellRate > 0)
+                        detail.UnrealizedProfit = (detail.CurrentSellRate - detail.Wac) * detail.CurrentBalance;
+                }
             }
 
             // Calculate final summary metrics including vault operations

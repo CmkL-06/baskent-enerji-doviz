@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import apiService from '@/services/apiservice'
+import { formatAmount } from '@/utils/currency'
 import { useNotification } from '@/composables/useNotification'
 
 const notification = useNotification()
@@ -169,8 +170,7 @@ function formatTime(d: string | null) {
 }
 
 function formatMoney(n: number | null) {
-  if (n == null) return '0'
-  return n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return formatAmount(n, 2)
 }
 
 function statusColor(status: string) {
@@ -275,6 +275,14 @@ onUnmounted(() => {
             <div class="detail-row"><span class="dl">TL Tutar</span><span class="dv">₺{{ formatMoney(selectedTx.tlAmount) }}</span></div>
             <div class="detail-row"><span class="dl">Kur</span><span class="dv">{{ selectedTx.exchangeRate }}</span></div>
             <div class="detail-row"><span class="dl">Bayi</span><span class="dv">{{ selectedTx.referralCode || '—' }}</span></div>
+            <div class="detail-row" v-if="selectedTx.deliveryMethod">
+              <span class="dl">Teslimat</span>
+              <span class="dv">
+                {{ selectedTx.deliveryMethod === 'Kurye' ? '🛵 Kurye (Nakit Kapıya)' : selectedTx.deliveryMethod === 'Banka' ? '🏦 Banka Havalesi' : '🏪 Bayi' }}
+              </span>
+            </div>
+            <div class="detail-row" v-if="selectedTx.customerAddress"><span class="dl">Adres</span><span class="dv">{{ selectedTx.customerAddress }}</span></div>
+            <div class="detail-row" v-if="selectedTx.customerPhone"><span class="dl">Telefon</span><span class="dv">{{ selectedTx.customerPhone }}</span></div>
             <div class="detail-row"><span class="dl">Tür</span><span class="dv">{{ selectedTx.isBuy ? 'Alım' : 'Satım' }}</span></div>
             <div class="detail-row">
               <span class="dl">Durum</span>
@@ -347,18 +355,18 @@ onUnmounted(() => {
 .operator-layout { display: grid; grid-template-columns: 280px 1fr 300px; height: 100%; }
 
 /* Sidebar */
-.tx-sidebar { border-right: 1px solid var(--color-border, #e5e7eb); display: flex; flex-direction: column; overflow: hidden; }
-.sidebar-tabs { display: flex; border-bottom: 1px solid var(--color-border, #e5e7eb); }
+.tx-sidebar { background: var(--color-bg-card); border-right: 1px solid var(--color-border); display: flex; flex-direction: column; overflow: hidden; }
+.sidebar-tabs { display: flex; border-bottom: 1px solid var(--color-border); }
 .stab { flex: 1; padding: 10px; border: none; background: transparent; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--color-text-secondary, #6b7280); }
 .stab.active { color: var(--color-primary, #2563eb); border-bottom: 2px solid var(--color-primary, #2563eb); }
 
-.search-box { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--color-border, #e5e7eb); color: var(--color-text-secondary, #9ca3af); }
+.search-box { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--color-border); color: var(--color-text-secondary, #9ca3af); }
 .search-box input { flex: 1; border: none; outline: none; font-size: 12px; background: transparent; color: var(--color-text, #1f2937); }
 
 .tx-list { flex: 1; overflow-y: auto; }
-.tx-item { padding: 10px 12px; border-bottom: 1px solid var(--color-border, #f3f4f6); cursor: pointer; transition: background 0.1s; }
+.tx-item { padding: 10px 12px; border-bottom: 1px solid var(--color-border); cursor: pointer; transition: background 0.1s; }
 .tx-item:hover { background: var(--color-hover, #f9fafb); }
-.tx-item.selected { background: var(--color-primary-light, #eff6ff); border-left: 3px solid var(--color-primary, #2563eb); }
+.tx-item.selected { background: var(--color-primary-light, #eff6ff); border-left: 6px solid var(--color-primary, #2563eb); box-shadow: var(--shadow-md); }
 .tx-item-header { display: flex; justify-content: space-between; align-items: center; }
 .tx-id { font-size: 12px; font-weight: 600; color: var(--color-text, #1f2937); }
 .status-dot { width: 8px; height: 8px; border-radius: 50%; }
@@ -367,23 +375,23 @@ onUnmounted(() => {
 .tx-empty { text-align: center; padding: 30px; font-size: 13px; color: var(--color-text-secondary, #9ca3af); }
 
 /* Chat */
-.chat-area { display: flex; flex-direction: column; overflow: hidden; }
-.chat-header { padding: 12px 16px; border-bottom: 1px solid var(--color-border, #e5e7eb); font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; color: var(--color-text, #1f2937); }
+.chat-area { background: var(--color-bg-card); display: flex; flex-direction: column; overflow: hidden; }
+.chat-header { padding: 12px 16px; border-bottom: 1px solid var(--color-border); font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 8px; color: var(--color-text, #1f2937); }
 
 .chat-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
 .chat-msg { display: flex; }
 .chat-msg.sent { justify-content: flex-end; }
 .chat-msg.received { justify-content: flex-start; }
-.msg-bubble { max-width: 70%; padding: 8px 12px; border-radius: var(--radius-lg); font-size: 13px; line-height: 1.4; position: relative; }
+.msg-bubble { max-width: 70%; padding: 8px 12px; border-radius: var(--radius-lg); font-size: 13px; line-height: 1.4; position: relative; box-shadow: var(--shadow-sm); }
 .sent .msg-bubble { background: var(--color-primary, var(--color-secondary-hover)); color: #fff; border-bottom-right-radius: var(--radius-sm); }
 .received .msg-bubble { background: var(--color-hover, #f3f4f6); color: var(--color-text, var(--color-text)); border-bottom-left-radius: var(--radius-sm); }
 .msg-time { font-size: 10px; opacity: 0.6; margin-left: 8px; white-space: nowrap; }
 .chat-empty { text-align: center; padding: 40px; color: var(--color-text-secondary, #9ca3af); font-size: 13px; }
 
-.chat-input { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--color-border, #e5e7eb); }
-.chat-input input { flex: 1; padding: 8px 14px; border: 1px solid var(--color-border, var(--color-border)); border-radius: var(--radius-xl); outline: none; font-size: 13px; background: var(--color-card, #fff); color: var(--color-text, var(--color-text)); }
+.chat-input { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--color-border); }
+.chat-input input { flex: 1; padding: 8px 14px; border: 1px solid var(--color-border); border-radius: var(--radius-xl); outline: none; font-size: 13px; background: var(--color-bg-card); color: var(--color-text, var(--color-text)); }
 .chat-input input:focus { border-color: var(--color-primary, #2563eb); }
-.send-btn { width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--color-primary, #2563eb); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.send-btn { width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--color-primary, #2563eb); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-glow-primary); }
 .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .send-btn .material-symbols-outlined { font-size: 18px; }
 
@@ -391,17 +399,17 @@ onUnmounted(() => {
 .chat-placeholder p { color: var(--color-text-secondary, #9ca3af); font-size: 14px; }
 
 /* Detail Panel */
-.tx-detail-panel { border-left: 1px solid var(--color-border, #e5e7eb); padding: 16px; overflow-y: auto; }
-.detail-title { font-size: 14px; font-weight: 600; margin-bottom: 16px; color: var(--color-text, #1f2937); }
+.tx-detail-panel { background: var(--color-bg-card); border-left: 1px solid var(--color-border); padding: 16px; overflow-y: auto; box-shadow: var(--shadow-bold); }
+.detail-title { font-size: 14px; font-weight: 700; margin-bottom: 16px; color: var(--color-text, #1f2937); }
 .detail-grid { display: flex; flex-direction: column; gap: 8px; }
 .detail-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
 .dl { color: var(--color-text-secondary, #6b7280); }
 .dv { font-weight: 500; color: var(--color-text, #1f2937); }
 
-.status-badge { padding: 3px 8px; border-radius: var(--radius-md); font-size: 11px; font-weight: 600; color: #fff; }
+.status-badge { padding: 3px 8px; border-radius: var(--radius-md); font-size: 11px; font-weight: 700; color: #fff; }
 
-.action-buttons { display: flex; flex-direction: column; gap: 8px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--color-border, #e5e7eb); }
-.action-btn { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px; border: none; border-radius: var(--radius-md); font-size: 13px; font-weight: 600; cursor: pointer; color: #fff; transition: opacity 0.15s; }
+.action-buttons { display: flex; flex-direction: column; gap: 8px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--color-border); }
+.action-btn { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px; border: none; border-radius: var(--radius-md); font-size: 13px; font-weight: 700; cursor: pointer; color: #fff; transition: opacity 0.15s; box-shadow: var(--shadow-md); }
 .action-btn:hover { opacity: 0.9; }
 .action-btn .material-symbols-outlined { font-size: 18px; }
 .action-btn.approve { background: var(--color-secondary); }

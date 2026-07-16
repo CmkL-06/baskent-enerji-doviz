@@ -79,10 +79,14 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
             using var tx = await _context.Database.BeginTransactionAsync();
             try
             {
+                // VaultBalance/CurrencyWac'ta tutarlı kullanılan UPDLOCK deseni — eşzamanlı iki
+                // manuel kayıt/ödemenin aynı cari hesabı okuyup birbirinin güncellemesini sessizce
+                // ezmesini (lost update) engeller.
                 var account = await _context.PartyAccounts
+                    .FromSqlRaw("SELECT * FROM PartyAccounts WITH (UPDLOCK) WHERE Id = {0}", request.PartyAccountId)
                     .Include(a => a.Party)
                     .Include(a => a.Currency)
-                    .FirstOrDefaultAsync(a => a.Id == request.PartyAccountId);
+                    .FirstOrDefaultAsync();
 
                 if (account == null)
                     throw new InvalidOperationException("Party account not found");
@@ -171,16 +175,25 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
             if (tryCurrency == null)
                 throw new InvalidOperationException("TRY currency not found");
 
+            // Denetim raporu düzeltmesi: ödeme her zaman TRY hesabına yazılıyordu (TL karşılığına
+            // çevrilerek), bu da CreateManualEntryAsync'in aynı hesabı KENDİ döviz cinsinden
+            // güncellemesiyle tutarsızdı (çifte muhasebe hatası — müşterinin ayrı bir USD hesabı
+            // varsa, USD ödemesi kasadan gerçek USD düşürür ama USD hesap bakiyesi hiç değişmezdi).
+            // Artık ödemenin yapıldığı para biriminin KENDİ PartyAccount'u güncelleniyor.
+            //
+            // UPDLOCK: eşzamanlı iki ödeme/tahsilat kaydının aynı cari hesabı okuyup birbirinin
+            // güncellemesini sessizce ezmesini (lost update) engeller.
             var account = await _context.PartyAccounts
+                .FromSqlRaw("SELECT * FROM PartyAccounts WITH (UPDLOCK) WHERE PartyId = {0} AND CurrencyId = {1}", request.PartyId, request.CurrencyId)
                 .Include(a => a.Currency)
-                .FirstOrDefaultAsync(a => a.PartyId == request.PartyId && a.CurrencyId == tryCurrency.Id);
+                .FirstOrDefaultAsync();
 
             if (account == null)
             {
                 account = new PartyAccount
                 {
                     PartyId = request.PartyId,
-                    CurrencyId = tryCurrency.Id,
+                    CurrencyId = request.CurrencyId,
                     AccountNumber = GenerateAccountNumber(),
                     Balance = 0,
                     BlockedAmount = 0,
@@ -241,7 +254,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
                     ? DateTime.SpecifyKind(request.PaymentDate, DateTimeKind.Local)
                     : request.PaymentDate,
                 Type = request.Type,
-                Amount = tlAmount, // TL karşılığı
+                Amount = positiveAmount, // Hesabın kendi para birimi cinsinden (TL karşılığı değil — bkz. yukarıdaki düzeltme notu)
                 Description = request.CurrencyId != tryCurrency.Id
                     ? $"{positiveAmount} {currencyCode} @ {exchangeRate:F4} = {tlAmount:F2} TRY - {request.Notes ?? request.PaymentMethod}"
                     : request.Notes ?? $"Payment - {request.PaymentMethod}",
@@ -267,13 +280,13 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
 
             if (request.Type == EntryType.Credit) // Tahsilat (party'den para alıyoruz)
             {
-                account.Balance -= tlAmount; // Party'nin borcu azalır
-                account.TotalCredits += tlAmount;
+                account.Balance -= positiveAmount; // Party'nin borcu azalır (hesabın kendi para biriminde)
+                account.TotalCredits += positiveAmount;
             }
             else if (request.Type == EntryType.Debit) // Ödeme (party'ye para veriyoruz)
             {
-                account.Balance += tlAmount; // Party'nin borcu artar (veya alacağı azalır)
-                account.TotalDebits += tlAmount;
+                account.Balance += positiveAmount; // Party'nin borcu artar (veya alacağı azalır)
+                account.TotalDebits += positiveAmount;
             }
 
             account.LastActivityDate = DateTime.UtcNow;

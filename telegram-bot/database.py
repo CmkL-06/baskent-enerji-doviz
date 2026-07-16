@@ -102,6 +102,9 @@ _TX_COL_MAP = {
     'amount': 'Amount',
     'referral_code': 'ReferralCode',
     'isBuy': 'IsBuy',
+    'delivery_method': 'DeliveryMethod',
+    'customer_address': 'CustomerAddress',
+    'customer_phone': 'CustomerPhone',
 }
 
 _CD_COL_MAP = {
@@ -711,6 +714,27 @@ def get_dealer(dealer_code):
                 return dict(zip(cols, row))
     except Exception as e:
         logger.error(f"DB error in get_dealer: {e}")
+    return None
+
+
+def find_dealer_by_city(city_text):
+    """Sehir adina gore aktif bayi bul (basit metin eslesmesi, MERKEZ haric)"""
+    try:
+        with get_conn() as conn:
+            c = conn.cursor()
+            c.execute("""
+                SELECT TOP 1 DealerCode AS dealer_code, DealerName AS dealer_name,
+                       City AS city, Address AS address
+                FROM TgDealers
+                WHERE IsActive = 1 AND DealerCode <> 'MERKEZ'
+                      AND City IS NOT NULL AND City LIKE '%' + ? + '%'
+            """, city_text.strip())
+            row = c.fetchone()
+            if row:
+                cols = [d[0] for d in c.description]
+                return dict(zip(cols, row))
+    except Exception as e:
+        logger.error(f"DB error in find_dealer_by_city: {e}")
     return None
 
 

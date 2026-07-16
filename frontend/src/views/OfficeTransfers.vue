@@ -23,6 +23,8 @@ const rejectTarget   = ref<string | null>(null)
 const rejectReason   = ref('')
 const rejectSaving   = ref(false)
 
+const approvingIds = ref(new Set<string>())
+
 const createModal  = ref(false)
 const createSaving = ref(false)
 const createError  = ref('')
@@ -95,11 +97,15 @@ async function switchTab(tab: Tab) {
 }
 
 async function approve(id: string) {
+  if (approvingIds.value.has(id)) return
+  approvingIds.value.add(id)
   try {
     await apiService.processTransfer(id, { approve: true })
     await loadPending()
   } catch (e: any) {
     error.value = e?.response?.data?.error || e.message || 'Onaylama başarısız'
+  } finally {
+    approvingIds.value.delete(id)
   }
 }
 
@@ -236,11 +242,11 @@ function fmtDate(d: string) { return new Date(d).toLocaleString('tr-TR', { day:'
               </div>
             </div>
             <div class="transfer-actions">
-              <button class="btn-approve" @click="approve(t.id)">
+              <button class="btn-approve" @click="approve(t.id)" :disabled="approvingIds.has(t.id)">
                 <span class="material-symbols-outlined" aria-hidden="true">check</span>
-                Onayla
+                {{ approvingIds.has(t.id) ? 'Onaylanıyor…' : 'Onayla' }}
               </button>
-              <button class="btn-reject" @click="openReject(t.id)">
+              <button class="btn-reject" @click="openReject(t.id)" :disabled="approvingIds.has(t.id)">
                 <span class="material-symbols-outlined" aria-hidden="true">close</span>
                 Reddet
               </button>

@@ -79,6 +79,19 @@ namespace BaskentEnerji.Business.Services.User
             var jwtTokenString = GenerateJwtToken(user);
 
             user.LastIp = tools_string.GetIpAddress(httpContext);
+            var now = DateTime.UtcNow;
+            user.LastLoginDate = now;
+            user.LastActivityDate = now;
+
+            _dbContext.UserLoginHistories.Add(new UserLoginHistory
+            {
+                UserId = user.Id,
+                LoginDate = now,
+                IpAddress = user.LastIp,
+                UserAgent = httpContext?.Request?.Headers["User-Agent"].ToString()
+            });
+
+            await _dbContext.SaveChangesAsync();
 
             var userOffice = await _dbContext.User_Offices
                 .Where(uo => uo.UserId == user.Id && uo.IsActive)

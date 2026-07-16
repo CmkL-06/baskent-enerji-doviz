@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useExchangeStore } from '@/stores/exchange'
 import { useAuthStore } from '@/stores/auth'
 import apiService from '@/services/apiservice'
+import { formatAmount } from '@/utils/currency'
 import CurrencySelector from '@/components/common/CurrencySelector.vue'
 import TransactionHistory from '@/components/common/TransactionHistory.vue'
 import USDTPaymentsModal from './USDTPaymentsModal.vue'
@@ -64,6 +65,7 @@ interface ExchangeItem {
   targetAmount: number
   exchangeRate: number
   customRate: string | number | null
+  targetCustomRate?: string | number | null // Arbitraj modu: verilen birimin satış kuru
   rateManuallySet?: boolean
 }
 
@@ -231,12 +233,7 @@ const isBalanceSufficient = computed(() => {
 })
 
 // Helper to format numbers with thousand separators
-const formatNumber = (value: number, decimals: number = 2): string => {
-  return new Intl.NumberFormat('tr-TR', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals
-  }).format(value)
-}
+const formatNumber = (value: number, decimals: number = 2): string => formatAmount(value, decimals)
 
 // Türkçe sayı girişini güvenli parse et.
 // "1.234,56" → 1234.56 (binlik ayraçlı), "38,75" → 38.75, "38.75" → 38.75 (sayı toString).
@@ -646,8 +643,13 @@ const removeExchangeItem = (index: number) => {
 }
 
 const updateAmount = (item: ExchangeItem, value: string) => {
-  const amount = parseNum(value)
+  const amount = Math.max(0, parseNum(value))
   item.sourceAmount = amount
+
+  if (terminalMode.value === 'arbitrage') {
+    recomputeArbitrageAmount(item)
+    return
+  }
 
   // Calculate target amount using exchange rate
   let rate = item.exchangeRate
@@ -781,7 +783,12 @@ const updateExchangeRate = async (item: ExchangeItem) => {
 const handleRateInput = (item: ExchangeItem, value: string) => {
   item.rateManuallySet = true
   item.customRate = value
-  
+
+  if (terminalMode.value === 'arbitrage') {
+    recomputeArbitrageAmount(item)
+    return
+  }
+
   if (value !== '') {
     const rate = parseNum(value)
 
@@ -795,6 +802,23 @@ const handleRateInput = (item: ExchangeItem, value: string) => {
     if (item.sourceAmount > 0 && item.exchangeRate > 0) {
       item.targetAmount = item.sourceAmount * item.exchangeRate
     }
+  }
+}
+
+// Arbitraj modu: verilen birimin manuel satış kuru girişi
+const handleTargetRateInput = (item: ExchangeItem, value: string) => {
+  item.targetCustomRate = value
+  recomputeArbitrageAmount(item)
+}
+
+// Arbitraj modu: alınan miktarın TRY karşılığı (alış kuru) verilen birimin satış kuruna bölünür
+function recomputeArbitrageAmount(item: ExchangeItem) {
+  const sourceRate = item.customRate ? parseNum(item.customRate) : 0
+  const targetRate = item.targetCustomRate ? parseNum(item.targetCustomRate) : 0
+  if (sourceRate > 0 && targetRate > 0 && item.sourceAmount > 0) {
+    item.targetAmount = item.sourceAmount * sourceRate / targetRate
+  } else {
+    item.targetAmount = 0
   }
 }
 
@@ -856,11 +880,16 @@ const validateExchange = async () => {
       notification.error('Kur bilgisi bulunamadı')
       return false
     }
+
+    if (terminalMode.value === 'arbitrage' && (!item.customRate || !item.targetCustomRate)) {
+      notification.error('Arbitraj işlemi için hem alınan hem verilen birimin kuru girilmelidir')
+      return false
+    }
   }
-  
-  // Satışta bakiye kontrolü — her farklı hedef döviz için AYRI kontrol
+
+  // Satışta / arbitrajda bakiye kontrolü — her farklı hedef (verilen) döviz için AYRI kontrol
   // (backend de doğruluyor; bu erken/kullanıcı-dostu uyarı)
-  if (transactionType.value === 'sell') {
+  if (transactionType.value === 'sell' || terminalMode.value === 'arbitrage') {
     const neededByCurrency = new Map<string, number>()
     for (const i of exchangeItems.value) {
       if (i.targetCurrencyId && i.targetCurrencyId !== tryId.value) {
@@ -873,7 +902,7 @@ const validateExchange = async () => {
     for (const [currencyId, needed] of neededByCurrency) {
       try {
         const bal = await apiService.getVaultBalance(selectedVaultId.value, currencyId)
-        const available = bal.balance || 0
+        const available = bal.availableBalance ?? bal.totalBalance ?? 0
         if (needed > available) {
           notification.error(`Yetersiz bakiye. Gerekli: ${formatNumber(needed)}, Mevcut: ${formatNumber(available)} ${bal.currencyCode || ''}`)
           return false
@@ -892,6 +921,7 @@ const submitExchange = async () => {
   
   isLoading.value = true
   try {
+    const isArbitrageMode = terminalMode.value === 'arbitrage'
     const transactions = exchangeItems.value.map(item => ({
       vaultId: selectedVaultId.value,
       customerId: undefined,
@@ -900,7 +930,9 @@ const submitExchange = async () => {
       targetCurrencyId: item.targetCurrencyId,
       sourceAmount: item.sourceAmount,
       isBuyingFromCustomer: transactionType.value === 'buy',
-      customRate: item.customRate ? parseNum(item.customRate) : undefined,
+      customRate: isArbitrageMode ? undefined : (item.customRate ? parseNum(item.customRate) : undefined),
+      sourceCustomRate: isArbitrageMode && item.customRate ? parseNum(item.customRate) : undefined,
+      targetCustomRate: isArbitrageMode && item.targetCustomRate ? parseNum(item.targetCustomRate) : undefined,
       notes: notes.value || undefined,
       ownerOverrideLoss: ownerOverrideLoss.value
     }))
@@ -1700,6 +1732,9 @@ watch(() => exchangeItems.value.map(item => ({
         <button @click="openManualVaultCounting" :disabled="!selectedVaultId" class="ex-topbar-btn" title="Kasa Sayımı">
           <span class="material-symbols-outlined" aria-hidden="true">calculate</span>
         </button>
+        <button @click="openDayClosureModal" :disabled="!selectedOfficeId" class="ex-topbar-btn" title="Gün Sonu Yap">
+          <span class="material-symbols-outlined" aria-hidden="true">lock_clock</span>
+        </button>
         <button @click="transactionHistoryRef?.printAllTransactions?.()" :disabled="!selectedOfficeId" class="ex-topbar-btn" title="Yazdır">
           <span class="material-symbols-outlined" aria-hidden="true">print</span>
         </button>
@@ -1861,7 +1896,7 @@ watch(() => exchangeItems.value.map(item => ({
             placeholder="Hedef"
             :compact="true"
           />
-          <input type="text" :value="batchAmount || ''" @input="batchAmount = parseNum(($event.target as HTMLInputElement).value)" class="ex-input ex-input--mono ex-batch-input" placeholder="Miktar" inputmode="decimal" />
+          <input type="text" :value="batchAmount || ''" @input="batchAmount = Math.max(0, parseNum(($event.target as HTMLInputElement).value))" class="ex-input ex-input--mono ex-batch-input" placeholder="Miktar" inputmode="decimal" />
           <input type="text" :value="batchCustomRate !== null && batchCustomRate !== '' ? batchCustomRate : batchRate || ''" @input="batchCustomRate = ($event.target as HTMLInputElement).value" class="ex-input ex-input--mono ex-batch-input ex-batch-input--rate" placeholder="Kur" inputmode="decimal" :class="{ 'ex-input--custom': batchCustomRate !== null && batchCustomRate !== '' }" />
           <input type="text" v-model="batchNote" class="ex-input ex-batch-input ex-batch-input--note" placeholder="Not..." />
           <button @click="addToBatch" class="ex-btn ex-btn--indigo ex-btn--sm">
@@ -1982,7 +2017,7 @@ watch(() => exchangeItems.value.map(item => ({
                 </div>
                 <div class="ex-field ex-field--grow">
                   <label class="ex-field-label">
-                    {{ t('exchange.operations.rate') }}
+                    {{ terminalMode === 'arbitrage' ? `Alınan (${getCurrencyById(item.sourceCurrencyId)?.currencyCode || ''}) Alış Kuru` : t('exchange.operations.rate') }}
                     <span v-if="item.customRate !== null && item.customRate !== ''" class="ex-custom-badge">{{ t('exchange.operations.customRate') }}</span>
                   </label>
                   <input
@@ -1993,6 +2028,21 @@ watch(() => exchangeItems.value.map(item => ({
                     @focus="($event.target as HTMLInputElement).select()"
                     class="ex-input ex-input--mono"
                     :class="{ 'ex-input--custom': item.customRate !== null && item.customRate !== '' }"
+                    placeholder="0,00"
+                    inputmode="decimal"
+                    :disabled="!selectedOfficeId || !selectedVaultId"
+                  />
+                </div>
+                <div v-if="terminalMode === 'arbitrage'" class="ex-field ex-field--grow">
+                  <label class="ex-field-label">
+                    Verilen ({{ getCurrencyById(item.targetCurrencyId)?.currencyCode || '' }}) Satış Kuru
+                  </label>
+                  <input
+                    type="text"
+                    :value="item.targetCustomRate ?? ''"
+                    @input="handleTargetRateInput(item, ($event.target as HTMLInputElement).value)"
+                    @focus="($event.target as HTMLInputElement).select()"
+                    class="ex-input ex-input--mono ex-input--custom"
                     placeholder="0,00"
                     inputmode="decimal"
                     :disabled="!selectedOfficeId || !selectedVaultId"
@@ -2640,10 +2690,10 @@ watch(() => exchangeItems.value.map(item => ({
   border: 1px solid var(--ex-border);
   border-radius: var(--ex-radius);
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
+  box-shadow: var(--shadow-bold);
   transition: box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.ex-card:hover { box-shadow: 0 8px 28px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04); }
+.ex-card:hover { box-shadow: 0 12px 34px -6px rgba(15, 23, 42, 0.2), 0 2px 6px rgba(15, 23, 42, 0.08); }
 .ex-card-header {
   display: flex;
   align-items: center;
@@ -2675,11 +2725,11 @@ watch(() => exchangeItems.value.map(item => ({
   position: relative;
 }
 .ex-item--buy {
-  border-left: 4px solid #22c55e;
+  border-left: 6px solid #22c55e;
   background: linear-gradient(135deg, #fafffe, #f0fdf4);
 }
 .ex-item--sell {
-  border-left: 4px solid var(--color-danger);
+  border-left: 6px solid var(--color-danger);
   background: linear-gradient(135deg, #fffafa, #fef2f2);
 }
 .ex-item:hover {
@@ -2984,6 +3034,8 @@ watch(() => exchangeItems.value.map(item => ({
   letter-spacing: 0.8px;
   color: #9ca3af;
   margin-bottom: 8px;
+  padding-left: 8px;
+  border-left: 3px solid var(--color-primary);
 }
 .ex-summary-items {
   display: flex;
@@ -3497,6 +3549,7 @@ watch(() => exchangeItems.value.map(item => ({
   border: 1px solid var(--ex-border);
   border-radius: var(--ex-radius);
   padding: 16px;
+  box-shadow: var(--shadow-md);
 }
 .ex-batch-form-row {
   display: flex;
@@ -3534,6 +3587,7 @@ watch(() => exchangeItems.value.map(item => ({
   border: 1px solid var(--ex-border);
   border-radius: var(--ex-radius);
   overflow: hidden;
+  box-shadow: var(--shadow-md);
 }
 .ex-batch-queue-header {
   display: flex;
@@ -3573,7 +3627,7 @@ watch(() => exchangeItems.value.map(item => ({
   gap: 12px;
   padding: 10px 16px;
   background: #f9fafb;
-  border-top: 1px solid #e5e7eb;
+  border-top: 2px solid var(--border-strong);
   font-family: 'JetBrains Mono', ui-monospace, monospace;
   font-size: 12px;
   font-weight: 600;

@@ -1453,9 +1453,7 @@ const closeDropdowns = () => {
   transferDropdownOpen.value = false
 }
 
-// Lifecycle
-onMounted(async () => {
-  document.addEventListener('click', closeDropdowns)
+async function loadForCurrentRoute() {
   if (!route.params.id) {
     try {
       const userOfficeId = localStorage.getItem('selectedOfficeId')
@@ -1483,6 +1481,19 @@ onMounted(async () => {
   } else {
     loadVaultData()
   }
+}
+
+// Lifecycle
+onMounted(async () => {
+  document.addEventListener('click', closeDropdowns)
+  await loadForCurrentRoute()
+})
+
+// Router aynı bileşeni yeniden kullandığından (vaults/:id?), "Geri" gibi
+// sadece param'ı değiştiren navigasyonlarda onMounted tekrar tetiklenmez —
+// bu yüzden route.params.id'yi ayrıca izlememiz gerekiyor.
+watch(() => route.params.id, () => {
+  loadForCurrentRoute()
 })
 
 onUnmounted(() => {
@@ -1505,7 +1516,7 @@ onUnmounted(() => {
   color: white;
   padding: 1.5rem 0 2rem;
   overflow: hidden;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-bold);
   transition: box-shadow 0.3s ease;
 }
 
@@ -1673,15 +1684,18 @@ onUnmounted(() => {
 .quick-actions-card,
 .balances-card,
 .history-card {
-  background: white;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
   padding: 2rem;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-bold);
   margin-bottom: 2rem;
 }
 
 .section-title {
   margin: 0 0 1.5rem;
+  padding-left: 0.75rem;
+  border-left: 5px solid var(--color-primary);
   font-size: 1.5rem;
   font-weight: 700;
   color: var(--color-text);
@@ -1695,7 +1709,7 @@ onUnmounted(() => {
 }
 
 .action-button {
-  background: white;
+  background: var(--color-bg-card);
   border: 2px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: 1.5rem 1rem;
@@ -1720,7 +1734,7 @@ onUnmounted(() => {
 
 .action-button:hover {
   transform: translateY(-4px);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-bold);
 }
 
 .action-icon {
@@ -1821,9 +1835,9 @@ onUnmounted(() => {
 }
 
 .view-btn.active {
-  background: white;
+  background: var(--color-bg-card);
   color: var(--color-secondary);
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+  box-shadow: var(--shadow-glow-primary);
 }
 
 .total-section {
@@ -1850,7 +1864,8 @@ onUnmounted(() => {
   overflow-x: auto;
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
-  background: white;
+  background: var(--color-bg-card);
+  box-shadow: var(--shadow-md);
 }
 
 .balances-table table {
@@ -1862,12 +1877,12 @@ onUnmounted(() => {
   background: linear-gradient(to bottom, #f8fafc, #f1f5f9);
   padding: 1rem 1.5rem;
   text-align: left;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--color-text-secondary);
   font-size: 0.875rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  border-bottom: 2px solid var(--color-border);
+  border-bottom: 2px solid var(--border-strong);
   white-space: nowrap;
 }
 
@@ -1978,13 +1993,15 @@ onUnmounted(() => {
   padding: 1.5rem;
   transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
   border: 1px solid transparent;
+  border-left: 6px solid transparent;
 }
 
 .currency-card:hover {
-  background: white;
+  background: var(--color-bg-card);
   border-color: var(--color-border);
+  border-left-color: var(--color-primary);
   transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-md);
 }
 
 .currency-card.is-negative {
@@ -2128,9 +2145,9 @@ onUnmounted(() => {
 
 .time-btn.active,
 .filter-btn.active {
-  background: white;
+  background: var(--color-bg-card);
   color: var(--color-text);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-md);
 }
 
 .show-exchanges-check {
@@ -2175,11 +2192,12 @@ onUnmounted(() => {
 
 .balance-history-table th {
   background: var(--color-bg-page);
-  font-weight: 600;
+  font-weight: 700;
   color: var(--color-text-secondary);
   font-size: 0.875rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  border-bottom: 2px solid var(--border-strong);
 }
 
 .balance-history-table tbody tr:hover {
@@ -2401,6 +2419,7 @@ onUnmounted(() => {
   right: 0;
   bottom: 0;
   background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2409,7 +2428,7 @@ onUnmounted(() => {
 }
 
 .modal-container {
-  background: white;
+  background: var(--color-bg-card);
   border-radius: var(--radius-xl);
   width: 100%;
   max-width: 500px;
@@ -2417,7 +2436,7 @@ onUnmounted(() => {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
   position: relative;
   z-index: 1001;
 }
@@ -2491,7 +2510,7 @@ onUnmounted(() => {
   border-radius: var(--radius-md);
   font-size: 1rem;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  background: white;
+  background: var(--color-bg-card);
 }
 
 .form-input:focus,
@@ -2703,7 +2722,7 @@ onUnmounted(() => {
   border: 2px solid var(--color-border);
   border-radius: var(--radius-md);
   font-size: 1rem;
-  background: white;
+  background: var(--color-bg-card);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -2751,10 +2770,10 @@ onUnmounted(() => {
   top: calc(100% + 4px);
   left: 0;
   right: 0;
-  background: white;
+  background: var(--color-bg-card);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-bold);
   max-height: 240px;
   overflow-y: auto;
   z-index: 9999;
@@ -2919,9 +2938,9 @@ onUnmounted(() => {
   background: rgba(255,255,255,0.5);
 }
 .section-tab.active {
-  background: white;
+  background: var(--color-bg-card);
   color: var(--color-primary);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  box-shadow: var(--shadow-md);
 }
 
 /* ═══ Count Section ═══ */
@@ -2959,11 +2978,12 @@ onUnmounted(() => {
   box-shadow: 0 4px 12px rgba(99,102,241,0.3);
 }
 .count-form-card {
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   overflow: hidden;
   margin-bottom: 24px;
+  box-shadow: var(--shadow-md);
 }
 .count-form-header {
   padding: 20px 24px 12px;
@@ -3117,16 +3137,19 @@ onUnmounted(() => {
 
 /* Count History */
 .count-history-card {
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: 20px 24px;
+  box-shadow: var(--shadow-md);
 }
 .count-history-title {
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
   color: #1f2937;
   margin: 0 0 16px;
+  padding-left: 0.6rem;
+  border-left: 5px solid var(--color-primary);
 }
 .count-loading {
   display: flex;
@@ -3147,11 +3170,11 @@ onUnmounted(() => {
   text-align: left;
   padding: 10px 12px;
   color: #6b7280;
-  font-weight: 500;
+  font-weight: 700;
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border-bottom: 2px solid #f3f4f6;
+  border-bottom: 2px solid var(--border-strong);
 }
 .count-history-table tbody td {
   padding: 10px 12px;

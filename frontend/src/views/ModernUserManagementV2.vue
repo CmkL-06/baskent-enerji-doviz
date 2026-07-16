@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import apiService from '@/services/apiservice'
 import AppKpiCard from '@/components/common/AppKpiCard.vue'
@@ -7,6 +8,7 @@ import AppPageHeader from '@/components/common/AppPageHeader.vue'
 import AppEmptyState from '@/components/common/AppEmptyState.vue'
 
 const authStore = useAuthStore()
+const route = useRoute()
 
 const users   = ref<any[]>([])
 const offices = ref<any[]>([])
@@ -179,7 +181,14 @@ async function toggleOffice(office: any) {
   } finally { officeSaving.value = false }
 }
 
-onMounted(load)
+onMounted(async () => {
+  await load()
+  const userId = route.query.userId as string | undefined
+  if (userId) {
+    const user = users.value.find(u => u.id === userId)
+    if (user) await selectUser(user)
+  }
+})
 </script>
 
 <template>
@@ -446,7 +455,7 @@ onMounted(load)
 .uy-search {
   width: 100%; box-sizing: border-box;
   padding: 12px 14px 12px 44px; border: 1px solid var(--color-border); border-radius: var(--radius-lg);
-  font-size: 14px; outline: none; background: #fff; transition: border-color .15s;
+  font-size: 14px; outline: none; background: var(--color-bg-card); transition: border-color .15s;
 }
 .uy-search:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(99,102,241,.1); }
 
@@ -464,10 +473,10 @@ onMounted(load)
   display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px;
 }
 .uy-card {
-  background: #fff; border: 1px solid var(--color-border); border-radius: var(--radius-lg);
-  padding: 20px; cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+  background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+  padding: 20px; cursor: pointer; box-shadow: var(--shadow-md); transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
 }
-.uy-card:hover { border-color: #a5b4fc; box-shadow: 0 4px 16px rgba(99,102,241,.1); transform: translateY(-2px); }
+.uy-card:hover { border-color: #a5b4fc; box-shadow: var(--shadow-glow-primary); transform: translateY(-2px); }
 .uy-card-top {
   display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;
 }
@@ -478,7 +487,8 @@ onMounted(load)
 }
 .uy-rank-badge {
   display: inline-block; padding: 4px 12px; border-radius: var(--radius-xl);
-  font-size: 11px; font-weight: 600; letter-spacing: .3px; flex-shrink: 0;
+  font-size: 11px; font-weight: 700; letter-spacing: .3px; flex-shrink: 0;
+  box-shadow: var(--shadow-sm);
 }
 .uy-card-name { font-size: 15px; font-weight: 700; color: #111; margin-bottom: 2px; }
 .uy-card-meta { font-size: 12px; color: var(--color-text-muted); margin-bottom: 4px; }
@@ -486,12 +496,12 @@ onMounted(load)
 
 /* Modal */
 .modal-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,.4);
+  position: fixed; inset: 0; background: rgba(0,0,0,.4); backdrop-filter: blur(2px);
   display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px;
 }
 .modal {
-  background: #fff; border-radius: var(--radius-lg); width: 100%; max-width: 540px;
-  box-shadow: 0 20px 60px rgba(0,0,0,.15); max-height: 90vh; display: flex; flex-direction: column;
+  background: var(--color-bg-card); border-radius: var(--radius-lg); width: 100%; max-width: 540px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.2); max-height: 90vh; display: flex; flex-direction: column;
 }
 .modal-header {
   display: flex; justify-content: space-between; align-items: center;
@@ -530,7 +540,7 @@ onMounted(load)
 .btn-warn:hover { background: var(--color-warning); }
 .btn-warn:disabled { opacity: .6; cursor: not-allowed; }
 .btn-cancel {
-  padding: 10px 18px; background: #fff; color: #374151;
+  padding: 10px 18px; background: var(--color-bg-card); color: #374151;
   border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: 13px; cursor: pointer;
 }
 .btn-cancel:hover { background: #f3f4f6; }
@@ -547,7 +557,7 @@ onMounted(load)
   border-bottom: 2px solid transparent; transition: background-color 0.2s, color 0.2s, border-color 0.2s;
 }
 .uy-tab .material-symbols-outlined { font-size: 16px; }
-.uy-tab.active { color: var(--color-primary); border-bottom-color: var(--color-primary); background: #fff; }
+.uy-tab.active { color: var(--color-primary); border-bottom-color: var(--color-primary); background: var(--color-bg-card); }
 .uy-tab:hover:not(.active) { color: #374151; background: #f3f4f6; }
 .uy-tab-count {
   font-size: 11px; font-weight: 700; background: var(--color-primary-light); color: var(--color-primary);
@@ -560,7 +570,7 @@ onMounted(load)
 .uy-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .uy-input {
   padding: 10px 12px; border: 1.5px solid var(--color-border); border-radius: var(--radius-md);
-  font-size: 14px; outline: none; transition: border-color .15s; background: #fff;
+  font-size: 14px; outline: none; transition: border-color .15s; background: var(--color-bg-card);
 }
 .uy-input:focus { border-color: var(--color-primary); }
 .uy-input:disabled { background: #f9fafb; color: var(--color-text-muted); cursor: not-allowed; }
@@ -574,7 +584,7 @@ onMounted(load)
   cursor: pointer; transition: border-color 0.2s, background-color 0.2s, color 0.2s;
 }
 .uy-rank-chip:hover { border-color: var(--color-text-muted); }
-.uy-rank-chip.selected { font-weight: 700; }
+.uy-rank-chip.selected { font-weight: 700; box-shadow: var(--shadow-sm); }
 
 /* Messages */
 .uy-msg { border-radius: var(--radius-md); padding: 10px 14px; font-size: 13px; }
@@ -594,7 +604,7 @@ onMounted(load)
 .uy-office-row {
   display: flex; align-items: center; justify-content: space-between;
   padding: 12px 14px; border: 1.5px solid var(--color-border); border-radius: var(--radius-lg);
-  transition: border-color 0.2s, background-color 0.2s;
+  box-shadow: var(--shadow-sm); transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s;
 }
 .uy-office-row.assigned { border-color: #a5b4fc; background: var(--color-primary-light); }
 .uy-office-info { display: flex; align-items: center; gap: 12px; }
@@ -613,8 +623,8 @@ onMounted(load)
 .uy-toggle:disabled { opacity: .5; cursor: not-allowed; }
 .uy-toggle-ball {
   position: absolute; top: 3px; left: 3px;
-  width: 18px; height: 18px; border-radius: 50%; background: #fff;
-  transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2);
+  width: 18px; height: 18px; border-radius: 50%; background: var(--color-bg-card);
+  transition: transform .2s; box-shadow: var(--shadow-sm);
 }
 .uy-toggle.on .uy-toggle-ball { transform: translateX(20px); }
 

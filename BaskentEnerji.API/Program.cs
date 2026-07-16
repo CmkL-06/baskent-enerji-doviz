@@ -21,6 +21,7 @@ using BaskentEnerji.Business.Infrastructure.ExchangeOffice.Party;
 using BaskentEnerji.Business.Infrastructure.ExchangeOffice.Blockchain;
 using BaskentEnerji.Business.Services.ExchangeOffice.AutoRate;
 using BaskentEnerji.API.HostedServices;
+using BaskentEnerji.API.Infrastructure;
 using BaskentEnerji.Business.Infrastructure.Site.General;
 using BaskentEnerji.Business.Infrastructure.Site.Language;
 using BaskentEnerji.Business.Infrastructure.Site.Menu;
@@ -29,6 +30,7 @@ using BaskentEnerji.Business.Infrastructure.Site.Slider;
 using BaskentEnerji.Business.Infrastructure.Site.Tag;
 using BaskentEnerji.Business.Infrastructure.Site.Theme;
 using BaskentEnerji.Business.Infrastructure.Site;
+using BaskentEnerji.Business.Infrastructure.Telegram;
 using BaskentEnerji.Business.Infrastructure.User;
 using BaskentEnerji.Business.Services.Blog;
 using BaskentEnerji.Business.Services.Blog.Article;
@@ -50,6 +52,7 @@ using BaskentEnerji.Business.Services.Site.Slider;
 using BaskentEnerji.Business.Services.Site.Tag;
 using BaskentEnerji.Business.Services.Site.Theme;
 using BaskentEnerji.Business.Services.Site;
+using BaskentEnerji.Business.Services.Telegram;
 using BaskentEnerji.Business.Services.User;
 using BaskentEnerji.Data.Contexts;
 using System.Text;
@@ -159,6 +162,9 @@ builder.Services.AddAuthentication(options =>
 
             if (userIdClaim != null && Guid.TryParse(userIdClaim.Value, out var userId))
             {
+                var activityTracker = context.HttpContext.RequestServices.GetRequiredService<UserActivityTracker>();
+                activityTracker.Touch(userId);
+
                 var user = await dbContext.Users.FindAsync(userId);
 
                 if (user != null && user.LastPasswordChangeDate.HasValue)
@@ -193,6 +199,9 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddHostedService<HostService>();
 builder.Services.AddHostedService<VaultCountingBackgroundService>();
 builder.Services.AddHostedService<AutoRateUpdateBackgroundService>();
+builder.Services.AddSingleton<UserActivityTracker>();
+builder.Services.AddHostedService<UserActivityFlushBackgroundService>();
+builder.Services.AddHostedService<DailyStaffAnomalyCheckBackgroundService>();
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ValidationService>();
@@ -242,6 +251,7 @@ builder.Services.AddScoped<IOfficeServiceCommand, OfficeServiceCommand>();
 builder.Services.AddScoped<IOfficeHierarchyService, OfficeHierarchyService>();
 builder.Services.AddScoped<IOfficeTransferService, OfficeTransferService>();
 builder.Services.AddScoped<IAlertService, AlertService>();
+builder.Services.AddScoped<ITelegramNotificationService, TelegramNotificationService>();
 
 // Party Account Services
 builder.Services.AddScoped<IPartyService, PartyService>();
@@ -333,26 +343,35 @@ builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-    options.AddFixedWindowLimiter("login", opt =>
-    {
-        opt.PermitLimit = 5;
-        opt.Window = TimeSpan.FromMinutes(1);
-        opt.QueueLimit = 0;
-    });
+    // Not: AddFixedWindowLimiter(policyName, ...) tek bir GLOBAL kova oluşturur — tüm istemciler
+    // arasında paylaşılır. Login/api/sensitive burada AddPolicy + RateLimitPartition ile IP bazında
+    // bölümleniyor, yoksa bir istemcinin limiti tüketmesi diğer tüm kullanıcıları da kilitler.
+    options.AddPolicy("login", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 5,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        }));
 
-    options.AddFixedWindowLimiter("api", opt =>
-    {
-        opt.PermitLimit = 60;
-        opt.Window = TimeSpan.FromMinutes(1);
-        opt.QueueLimit = 2;
-    });
+    options.AddPolicy("api", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 60,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 2
+        }));
 
-    options.AddFixedWindowLimiter("sensitive", opt =>
-    {
-        opt.PermitLimit = 10;
-        opt.Window = TimeSpan.FromMinutes(1);
-        opt.QueueLimit = 0;
-    });
+    options.AddPolicy("sensitive", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 10,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        }));
 
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
         RateLimitPartition.GetFixedWindowLimiter(

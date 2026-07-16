@@ -1,0 +1,179 @@
+{
+  "navbar": {
+    "dashboard": "Dashboard",
+    "zReport": "Z-Report",
+    "zReportV2": "Z-Report v2",
+    "exchange": "Exchange",
+    "parties": "Parties",
+    "ghostParty": "Ghost Party",
+    "expenses": "Expenses",
+    "vaults": "Vaults",
+    "users": "Users",
+    "settings": "Settings",
+    "logout": "Logout"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "search": "Search",
+    "loading": "Loading...",
+    "noData": "No data found",
+    "confirm": "Confirm",
+    "success": "Success",
+    "error": "Error",
+    "warning": "Warning",
+    "info": "Info",
+    "yes": "Yes",
+    "no": "No",
+    "date": "Date",
+    "amount": "Amount",
+    "currency": "Currency",
+    "rate": "Rate",
+    "notes": "Notes",
+    "status": "Status",
+    "actions": "Actions",
+    "close": "Close",
+    "refresh": "Refresh",
+    "allOffices": "All Offices",
+    "allStatuses": "All Statuses",
+    "active": "Active",
+    "inactive": "Inactive"
+  },
+  "auth": {
+    "username": "Username",
+    "password": "Password",
+    "login": "Login",
+    "loginError": "Invalid username or password",
+    "rememberMe": "Remember me"
+  },
+  "exchange": {
+    "buy": "Buy",
+    "sell": "Sell",
+    "amount": "Amount",
+    "rate": "Rate",
+    "total": "Total",
+    "newTransaction": "New Transaction",
+    "history": "Transaction History",
+    "from": "From",
+    "to": "To",
+    "vault": "Vault",
+    "transactionType": {
+      "selectTitle": "Select Transaction Type",
+      "buy": "Buy",
+      "buyDesc": "Purchase currency from customer",
+      "sell": "Sell",
+      "sellDesc": "Sell currency to customer"
+    },
+    "officeVault": {
+      "warningTitle": "Office & Vault Selection",
+      "warningOffice": "Please select an office",
+      "warningVault": "Please select a vault"
+    },
+    "quickSelect": {
+      "title": "Quick Select"
+    },
+    "operations": {
+      "title": "Operations",
+      "addButton": "Add Operation",
+      "transactionNumber": "Transaction No",
+      "receivedCurrency": "Received Currency",
+      "fromCustomer": "From Customer",
+      "toVault": "To Vault",
+      "selectCurrency": "Select Currency",
+      "givenCurrency": "Given Currency",
+      "fromVault": "From Vault",
+      "toCustomer": "To Customer",
+      "amount": "Amount",
+      "rate": "Rate",
+      "customRate": "Custom Rate"
+    },
+    "notes": {
+      "label": "Notes",
+      "placeholder": "Add transaction note (optional)"
+    },
+    "summary": {
+      "title": "Transaction Summary",
+      "vaultBalance": "Vault Balance",
+      "insufficient": "Insufficient Balance",
+      "available": "Available",
+      "required": "Required",
+      "details": "Details",
+      "receivedFromCustomer": "Received from Customer",
+      "exchangeRate": "Exchange Rate",
+      "givenFromVault": "Given from Vault",
+      "givenToCustomer": "Given to Customer",
+      "paymentAmount": "Payment Amount",
+      "noTransaction": "No transactions added yet",
+      "processing": "Processing...",
+      "submit": "Complete Transaction"
+    },
+    "messages": {
+      "transactionSuccess": "Transaction completed successfully",
+      "transactionFailed": "Transaction failed",
+      "unknownError": "Unknown error occurred",
+      "printWindowFailed": "Could not open print window",
+      "loadingData": "Loading data..."
+    },
+    "receipt": {
+      "buyTitle": "BUY RECEIPT",
+      "sellTitle": "SELL RECEIPT"
+    }
+  },
+  "sidebar": {
+    "expenses": "Expenses",
+    "exchangeRates": "Exchange Rates",
+    "usdtPayments": "USDT Payments",
+    "newPaymentMethod": "New Payment Method",
+    "expenseCategories": "Expense Categories",
+    "expenseReports": "Expense Reports"
+  },
+  "transactionHistory": {
+    "title": "Transaction History",
+    "type": "Type",
+    "date": "Date",
+    "vault": "Vault",
+    "rate": "Rate",
+    "status": "Status",
+    "actions": "Actions",
+    "viewDetails": "View Details",
+    "loadingTransactions": "Loading transactions...",
+    "buy": "Buy",
+    "sell": "Sell",
+    "pending": "Pending",
+    "completed": "Completed",
+    "cancelled": "Cancelled",
+    "notes": "Notes"
+  },
+  "vault": {
+    "balance": "Balance",
+    "deposit": "Deposit",
+    "withdraw": "Withdraw",
+    "transfer": "Transfer"
+  },
+  "vaults": {
+    "title": "Vaults",
+    "subtitle": "Vault management and balance tracking",
+    "addVault": "Add Vault",
+    "transfer": "Transfer",
+    "totalBalances": "Total Balances",
+    "vaultsCount": "Vault Count",
+    "totalTRYValue": "Total TRY Value",
+    "filterByOffice": "Filter by Office",
+    "searchPlaceholder": "Search vault..."
+  },
+  "usdt": {
+    "title": "USDT Payments"
+  },
+  "parties": {
+    "pleaseSelectOffice": "Please select an office"
+  },
+  "refresh": "Refresh",
+  "close": "Close",
+  "save": "Save",
+  "confirm": "Confirm",
+  "complete": "Complete",
+  "saved": "Saved"
+}

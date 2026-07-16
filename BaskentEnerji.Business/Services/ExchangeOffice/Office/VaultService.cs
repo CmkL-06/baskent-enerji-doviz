@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Caching.Memory;
 using BaskentEnerji.Entity;
+using BaskentEnerji.Business.Exceptions;
 using BaskentEnerji.Business.Infrastructure.ExchangeOffice.Office;
 using BaskentEnerji.Business.Services.Permission;
 using BaskentEnerji.Data.Contexts;
@@ -83,6 +84,18 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 return false;
 
             return balance.Balance >= requiredAmount;
+        }
+
+        public async Task<decimal> GetLockedBalanceAsync(Guid vaultId, Guid currencyId)
+        {
+            // CheckVaultBalanceAsync ile aynı UPDLOCK deseni — ama burada satış sonrası yeni miktarı
+            // hesaplamak için (WAC güncellemesi) gerçek bakiye değerine ihtiyaç duyan çağıranlar için.
+            // Önceden ExchangeTransactionService bu sorguyu UPDLOCK'suz, kendi içinde tekrar yazıyordu.
+            var balance = await _context.VaultBalances
+                .FromSqlRaw("SELECT * FROM VaultBalances WITH (UPDLOCK) WHERE VaultId = {0} AND CurrencyId = {1}", vaultId, currencyId)
+                .FirstOrDefaultAsync();
+
+            return balance?.Balance ?? 0m;
         }
 
         public async Task<vm_vaultsummary> GetVaultSummaryAsync(Guid vaultId)
@@ -688,6 +701,62 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             }
         }
 
+        // Bir kasa hareketi (VaultBalanceHistory) kaydını geri alınamaz şekilde
+        // silmek yerine "iptal" (soft-delete) eder ve o vault+para birimi için
+        // silinmemiş tüm geçmişi yeniden oynatarak (replay) güncel bakiyeyi
+        // yeniden hesaplar — kaydın sırası/tipi ne olursa olsun her zaman doğru sonucu garanti eder.
+        public async Task VoidVaultBalanceHistoryAsync(Guid historyId, string reason)
+        {
+            if (!await _validationService.IsOwnerAsync())
+                throw new ApiException(System.Net.HttpStatusCode.Forbidden, "Kasa hareketi iptali için Owner yetkisi gereklidir.");
+
+            var history = await _context.VaultBalanceHistories.FindAsync(historyId);
+            if (history == null)
+                throw new ApiException(System.Net.HttpStatusCode.NotFound, "Kasa hareketi bulunamadı.");
+            if (history.IsDeleted)
+                throw new ApiException(System.Net.HttpStatusCode.BadRequest, "Bu kasa hareketi zaten iptal edilmiş.");
+
+            var currentUserId = Guid.Parse(_validationService.GetUserID());
+
+            history.IsDeleted = true;
+            history.DeletedReason = reason;
+            history.DeletedByUserId = currentUserId;
+
+            var remainingHistory = await _context.VaultBalanceHistories
+                .Where(h => h.VaultId == history.VaultId && h.CurrencyId == history.CurrencyId && !h.IsDeleted && h.Id != historyId)
+                .OrderBy(h => h.CreatedDate)
+                .ToListAsync();
+
+            decimal replayedBalance = 0;
+            foreach (var row in remainingHistory)
+            {
+                if (row.TransactionType == TransactionType.Adjustment)
+                    replayedBalance = row.Balance;
+                else
+                    replayedBalance += row.Balance;
+            }
+
+            var balance = await _context.VaultBalances
+                .FirstOrDefaultAsync(vb => vb.VaultId == history.VaultId && vb.CurrencyId == history.CurrencyId);
+            if (balance != null)
+            {
+                balance.Balance = replayedBalance;
+                balance.LastUpdated = DateTime.UtcNow;
+            }
+
+            await _context.SaveChangesAsync();
+
+            ClearVaultCaches();
+
+            var vaultForCache = await _context.Vaults.FindAsync(history.VaultId);
+            if (vaultForCache != null)
+            {
+                InvalidateZReportCache(vaultForCache.OfficeId, DateTime.Today);
+                InvalidateZReportCache(vaultForCache.OfficeId, history.CreatedDate.Date);
+                InvalidateZReportCache(vaultForCache.OfficeId, DateTime.Now.Date);
+            }
+        }
+
         public async Task SaveVault(rm_savevault data)
         {
             await _validationService.EnsureNotViewerAsync(data.OfficeId);
@@ -1069,6 +1138,11 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
         {
             var cacheKey = $"ZReport_Daily_{officeId}_{date:yyyyMMdd}";
             _memoryCache.Remove(cacheKey);
+
+            // "Tüm Şubeler" (officeId=null) birleşik görünümü ayrı bir cache anahtarı kullanıyor —
+            // o da temizlenmezse, tek bir ofis için yapılan güncelleme/iptal birleşik raporda görünmez.
+            var allOfficesCacheKey = $"ZReport_Daily__{date:yyyyMMdd}";
+            _memoryCache.Remove(allOfficesCacheKey);
         }
 
         public async Task<bool> SubmitVaultCountAsync(rm_vaultcount data)
@@ -1107,7 +1181,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
                     var discrepancy = detail.ActualAmount - systemBalance;
 
-                    if (Math.Abs(discrepancy) > 0.01m)
+                    if (Math.Abs(discrepancy) > FinancialConstants.DiscrepancyThreshold)
                     {
                         vaultCount.HasDiscrepancy = true;
                         var currency = await _context.Currencies

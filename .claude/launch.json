@@ -1,0 +1,24 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Frontend (Vue/Vite :5173)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "frontend",
+      "port": 5173
+    },
+    {
+      "name": "Backend API (.NET 8 :5093)",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "BaskentEnerji.API"],
+      "port": 5093
+    },
+    {
+      "name": "Telegram Bot (Python polling)",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["main_bot.py"],
+      "cwd": "telegram-bot"
+    }
+  ]
+}

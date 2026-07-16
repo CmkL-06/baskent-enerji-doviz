@@ -62,12 +62,12 @@ export function isMetalCurrency(code: string): boolean {
   return METAL_CODES.has(code?.toUpperCase())
 }
 
-export function formatAmount(value: number | null | undefined, decimals = 4): string {
+export function formatAmount(value: number | null | undefined, decimals = 0): string {
   if (value === null || value === undefined) return '0'
   const num = Number(value)
   if (isNaN(num)) return '0'
   return num.toLocaleString('tr-TR', {
-    minimumFractionDigits: 2,
+    minimumFractionDigits: decimals,
     maximumFractionDigits: decimals
   })
 }

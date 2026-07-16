@@ -35,7 +35,5 @@ namespace BaskentEnerji.Entity.Entities.ExchangeOffice.Office
         // Navigation
         public ICollection<Vault> Vaults { get; set; }
         public ICollection<User.User> Employees { get; set; }
-        public ICollection<OfficeTransfer> OutgoingTransfers { get; set; }
-        public ICollection<OfficeTransfer> IncomingTransfers { get; set; }
     }
 }

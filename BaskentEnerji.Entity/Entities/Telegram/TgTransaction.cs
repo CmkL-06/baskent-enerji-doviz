@@ -32,6 +32,9 @@ namespace BaskentEnerji.Entity.Entities.Telegram
         [MaxLength(50)]
         public string? ReferralCode { get; set; }
 
+        // Şube (Vault'a bağlı) TgDealer için işlemin gittiği gerçek Kasa — dış bayilerde null kalır
+        public Guid? VaultId { get; set; }
+
         public long? AssignedOperatorId { get; set; }
 
         [MaxLength(20)]
@@ -49,6 +52,16 @@ namespace BaskentEnerji.Entity.Entities.Telegram
 
         [MaxLength(50)]
         public string? IdempotencyKey { get; set; }
+
+        // QR'sız (uzaktan) müşteri akışı — "Bayi" / "Banka" / "Kurye" seçimi
+        [MaxLength(20)]
+        public string? DeliveryMethod { get; set; }
+
+        [MaxLength(300)]
+        public string? CustomerAddress { get; set; }
+
+        [MaxLength(30)]
+        public string? CustomerPhone { get; set; }
 
         [ForeignKey("CustomerId")]
         public TgCustomer? Customer { get; set; }

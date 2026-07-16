@@ -160,6 +160,8 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         [HttpPost("rate")]
         public async Task<IActionResult> SaveRate([FromBody] rm_saveexchangerate data)
         {
+            if (!await _permissionService.IsAdminAsync())
+                return StatusCode(403, new { error = "Bu işlem için Admin yetkisi gereklidir." });
             await _command.SaveRate(data);
             return Ok(new { message = "Exchange rate saved successfully." });
         }
@@ -225,6 +227,19 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             try
             {
                 var vaults = await _vaultService.GetAllVaultSummariesAsync();
+
+                if (!await _permissionService.IsAdminAsync())
+                {
+                    var userId = _permissionService.GetUserID();
+                    var accessibleOfficeIds = Guid.TryParse(userId, out var parsedUserId)
+                        ? await _context.User_Offices.AsNoTracking()
+                            .Where(x => x.UserId == parsedUserId)
+                            .Select(x => x.OfficeId)
+                            .ToListAsync()
+                        : new List<Guid>();
+                    vaults = vaults.Where(v => accessibleOfficeIds.Contains(v.OfficeId)).ToList();
+                }
+
                 return Ok(vaults);
             }
             catch (Exception ex)
@@ -251,6 +266,12 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             if (!await _permissionService.IsAdminAsync())
                 throw new ApiException(HttpStatusCode.Forbidden, "Bu işlem için Admin yetkisi gereklidir.");
             await _vaultService.RemoveVault(id);
+        }
+
+        [HttpPost("vault-balance-history/{id}/void")]
+        public async Task VoidVaultBalanceHistory(Guid id, [FromBody] rm_void_vault_balance_history data)
+        {
+            await _vaultService.VoidVaultBalanceHistoryAsync(id, data?.Reason);
         }
 
         [HttpPost("office")]
@@ -311,7 +332,13 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
                 if (vault == null)
                     return NotFound(new { error = $"Vault with ID {vaultId} not found" });
 
+                await _permissionService.ValidateOfficeAccessAsync(vault.OfficeId);
+
                 return Ok(vault);
+            }
+            catch (ApiException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -586,7 +613,10 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
 
         public async Task<vm_transaction> GetTransaction(Guid id)
         {
-            return await _transactionService.GetTransaction(id);
+            var transaction = await _transactionService.GetTransaction(id);
+            if (transaction != null)
+                await _permissionService.ValidateOfficeAccessAsync(transaction.OfficeId);
+            return transaction;
 
         }
 
@@ -607,6 +637,9 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         {
             try
             {
+                if (vaultId.HasValue)
+                    await ValidateVaultAccessAsync(vaultId.Value);
+
                 var transactions = await _transactionService.GetTransactionHistoryAsync(
                     vaultId, startDate, endDate);
 
@@ -690,6 +723,10 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
                         totalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
                     }
                 });
+            }
+            catch (ApiException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -1665,9 +1702,22 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
 
         // ==================== WAC Endpoints ====================
 
+        // Vault ID'den ofisini bulup erişim kontrolü yapar — WAC endpoint'leri başka şubenin
+        // vault ID'siyle çağrılırsa (URL'den tahmin/deneme) yetkisiz erişim engellenir.
+        private async Task ValidateVaultAccessAsync(Guid vaultId)
+        {
+            var officeId = await _context.Vaults.AsNoTracking()
+                .Where(v => v.Id == vaultId)
+                .Select(v => (Guid?)v.OfficeId)
+                .FirstOrDefaultAsync();
+            if (officeId.HasValue)
+                await _permissionService.ValidateOfficeAccessAsync(officeId.Value);
+        }
+
         [HttpGet("wac/{vaultId}")]
         public async Task<ActionResult<Dictionary<Guid, decimal>>> GetAllWacs(Guid vaultId)
         {
+            await ValidateVaultAccessAsync(vaultId);
             var result = await _wacService.GetAllWacsForVaultAsync(vaultId);
             return Ok(result);
         }
@@ -1675,6 +1725,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         [HttpGet("wac/{vaultId}/{currencyId}")]
         public async Task<ActionResult<decimal>> GetWac(Guid vaultId, Guid currencyId)
         {
+            await ValidateVaultAccessAsync(vaultId);
             var result = await _wacService.GetWacAsync(vaultId, currencyId);
             return Ok(result);
         }
@@ -1682,6 +1733,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         [HttpGet("wac/{vaultId}/history")]
         public async Task<IActionResult> GetWacHistory(Guid vaultId, [FromQuery] Guid? currencyId = null, [FromQuery] int limit = 50)
         {
+            await ValidateVaultAccessAsync(vaultId);
             var query = _context.CurrencyWacHistories
                 .AsNoTracking()
                 .Include(h => h.Currency)
@@ -1726,6 +1778,7 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         [HttpPost("day-close")]
         public async Task<ActionResult<vm_dayclosure>> CloseDay([FromBody] rm_dayclosure request)
         {
+            await _permissionService.EnsureNotViewerAsync(request.OfficeId);
             var result = await _dayClosureService.CloseDayAsync(request);
             return Ok(result);
         }
@@ -1753,6 +1806,20 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             var businessDate = date ?? TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow,
                 TimeZoneInfo.FindSystemTimeZoneById("Turkey Standard Time")).Date;
             var result = await _dayClosureService.GetConsolidatedDayClosureAsync(businessDate);
+            return Ok(result);
+        }
+
+        [HttpGet("day-closure/pending-approvals")]
+        public async Task<ActionResult<List<vm_dayclosure>>> GetPendingApprovals()
+        {
+            var result = await _dayClosureService.GetPendingApprovalsAsync();
+            return Ok(result);
+        }
+
+        [HttpPost("day-closure/{closureId}/approve")]
+        public async Task<ActionResult<vm_dayclosure>> ApproveDayClosure(Guid closureId, [FromBody] rm_approvedayclosure request)
+        {
+            var result = await _dayClosureService.ApproveDayClosureAsync(closureId, request.Approve, request.RejectionNote);
             return Ok(result);
         }
 

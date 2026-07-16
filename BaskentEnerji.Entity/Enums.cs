@@ -79,6 +79,7 @@ namespace BaskentEnerji.Entity
         ThresholdBreach     = 3,
         TransferPending     = 4,
         DayClosureMissing   = 5,
+        BulkEntrySuspected  = 6,
     }
 
     public enum AlertSeverity

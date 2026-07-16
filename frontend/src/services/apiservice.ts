@@ -34,7 +34,7 @@ apiClient.interceptors.response.use(
           .then(m => m.default.push('/login').finally(() => { _redirecting = false }))
           .catch(() => { _redirecting = false })
       }
-    } else if (status !== 401) {
+    } else if (status !== 401 && !err.config?.skipErrorToast) {
       const msg = err.response?.data?.message
         || err.response?.data?.error
         || (status === 403 ? 'Bu işlem için yetkiniz yok'
@@ -67,6 +67,14 @@ const apiService = {
   getUser:            (params?: any)                     => get('/user/User', { params }),
   changeUserPassword: (userId: any, newPassword: string) => post('/user/change-password', { UserId: userId, NewPassword: newPassword }),
   logoutAllUsers:     ()                                 => post('/user/logout-all'),
+  getUserActivity:    ()                                 => get('/user/activity'),
+  getUserLoginHistory: (userId: any, year?: number, month?: number) => {
+    const params: any = {}
+    if (year) params.year = year
+    if (month) params.month = month
+    return get(`/user/${userId}/login-history`, { params })
+  },
+  getUserDailyDetail: (userId: any, date: string) => get(`/user/${userId}/daily-detail`, { params: { date } }),
 
   // ── Currencies  [ExchangeController → /api/v1/exchange/currency]
   getCurrencies:  ()           => get('/exchange/currency'),
@@ -79,6 +87,7 @@ const apiService = {
   getVaultsByOfficeId: (officeId: any)                        => get(`/exchange/office/${officeId}/vaults`),
   getVaultBalance:     (vaultId: any, currencyId: any)        => get(`/exchange/vaults/${vaultId}/balance/${currencyId}`),
   updateVaultBalance:  (data: any)                            => post('/exchange/vault/updatebalance', data),
+  voidVaultBalanceHistory: (id: any, reason: string)          => post(`/exchange/vault-balance-history/${id}/void`, { reason }),
   checkVaultBalance:   (vaultId: any, currencyId: any)        => get(`/exchange/vaults/${vaultId}/balance/${currencyId}`),
   saveVault:           (data: any)                            => post('/exchange/vault', data),
   deleteVault:         (id: any)                              => post(`/exchange/vault/delete/${id}`),
@@ -235,6 +244,9 @@ const apiService = {
   getDayClosure:     (officeId: any, date: string) => get(`/exchange/day-closure/${officeId}/${date}`),
   getClosureHistory: (officeId: any, params?: any) => get(`/exchange/day-closure/${officeId}/history`, { params }),
   getConsolidatedDayClosure: (date?: string) => get('/exchange/day-closure/consolidated', { params: date ? { date } : {} }),
+  getPendingDayClosureApprovals: () => get('/exchange/day-closure/pending-approvals'),
+  approveDayClosure: (closureId: any, approve: boolean, rejectionNote?: string) =>
+    post(`/exchange/day-closure/${closureId}/approve`, { approve, rejectionNote }),
 
   // ── Vault balance histories  [ExchangeController → /api/v1/exchange/vault/balance-histories]
   getVaultBalanceHistories: (officeId: any, date?: string) => {
@@ -283,7 +295,7 @@ const apiService = {
 
   // ── TG Bayi Cari Hesap  [TelegramDealerController → /api/v1/tg/dealer/...]
   getTgCariSummary:     ()                             => get('/tg/dealer/cari-summary'),
-  getTgCariEntries:     (code: string)                 => get(`/tg/dealer/${code}/cari-entries`),
+  getTgCariEntries:     (code: string)                 => get(`/tg/dealer/${code}/cari-entries`, { skipErrorToast: true }),
   recordTgPayment:      (data: any)                    => post('/tg/dealer/record-payment', data),
 
   // ── Generic

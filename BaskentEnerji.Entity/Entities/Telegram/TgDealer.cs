@@ -4,17 +4,34 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace BaskentEnerji.Entity.Entities.Telegram
 {
+    public enum TgDealerType
+    {
+        // Gerçek bir Office/Vault'a (Şube'ye) bağlı — Telegram işlemleri gerçek Kasa'ya işler
+        Branch = 1,
+        // Döviz programı olmayan, sadece cari hesap üzerinden takip edilen dış bayi
+        External = 2
+    }
+
     [Table("TgDealers")]
     public class TgDealer
     {
         [Key]
         public int DealerId { get; set; }
 
+        public TgDealerType DealerType { get; set; } = TgDealerType.External;
+
         [MaxLength(50)]
         public string DealerCode { get; set; } = "";
 
         [MaxLength(100)]
         public string DealerName { get; set; } = "";
+
+        // "En yakın bayi" eşlemesi için — basit metin eşleşmesi, coğrafi hesap yok
+        [MaxLength(100)]
+        public string? City { get; set; }
+
+        [MaxLength(300)]
+        public string? Address { get; set; }
 
         public bool IsActive { get; set; }
 

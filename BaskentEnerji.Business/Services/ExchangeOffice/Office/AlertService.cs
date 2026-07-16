@@ -1,4 +1,6 @@
 using BaskentEnerji.Business.Infrastructure.ExchangeOffice.Office;
+using BaskentEnerji.Business.Infrastructure.Telegram;
+using BaskentEnerji.Business.Services.User;
 using BaskentEnerji.Data.Contexts;
 using BaskentEnerji.Entity;
 using BaskentEnerji.Entity.Entities.ExchangeOffice.Office;
@@ -13,10 +15,12 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
     public class AlertService : IAlertService
     {
         private readonly BaskentEnerjiDbContext _db;
+        private readonly ITelegramNotificationService _telegramNotificationService;
 
-        public AlertService(BaskentEnerjiDbContext db)
+        public AlertService(BaskentEnerjiDbContext db, ITelegramNotificationService telegramNotificationService)
         {
             _db = db;
+            _telegramNotificationService = telegramNotificationService;
         }
 
         public async Task<List<vm_alert>> GetUnreadAlertsAsync()
@@ -97,6 +101,27 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             };
             _db.OfficeAlerts.Add(alert);
             await _db.SaveChangesAsync();
+
+            // Owner'lara Telegram bildirimi — sadece Warning/Critical (Info seviyesi paneldeki
+            // listede kalır, bildirim spam'i yaratmasın diye Telegram'a gitmez).
+            if (severity != AlertSeverity.Info)
+                await NotifyOwnersViaTelegramAsync(alert);
+        }
+
+        private async Task NotifyOwnersViaTelegramAsync(OfficeAlert alert)
+        {
+            var ownerChatIds = await _db.Users
+                .Where(u => u.Rank == Rank.Owner && u.TelegramOperatorId.HasValue)
+                .Select(u => u.TelegramOperatorId!.Value)
+                .ToListAsync();
+
+            if (ownerChatIds.Count == 0) return;
+
+            var severityLabel = alert.Severity == AlertSeverity.Critical ? "🚨 KRİTİK" : "⚠️ Uyarı";
+            var text = $"{severityLabel}: {alert.Title}\n\n{alert.Message}";
+
+            foreach (var chatId in ownerChatIds)
+                await _telegramNotificationService.SendMessageAsync(chatId, text);
         }
 
         public async Task CheckLowBalancesAsync(decimal threshold = 100)
@@ -125,6 +150,95 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     $"{vb.Vault.Name} kasasında {vb.Currency.CurrencyCode} bakiyesi {vb.Balance:N2} seviyesine düştü.",
                     vb.Id.ToString(),
                     "VaultBalance"
+                );
+            }
+        }
+
+        public async Task CheckStaffDailyAnomaliesAsync(DateTime businessDate)
+        {
+            var dayStartUtc = businessDate.Date.AddHours(-3);
+            var dayEndUtc = dayStartUtc.AddDays(1);
+            var dateKey = businessDate.Date.ToString("yyyy-MM-dd");
+
+            // 1. Gün sonu eksik: o gün işlemi olan ama kapanışı olmayan ofisler
+            var officesWithTransactions = await _db.Transactions
+                .Where(t => t.CreatedDate >= dayStartUtc && t.CreatedDate < dayEndUtc)
+                .Select(t => t.Vault.OfficeId)
+                .Distinct()
+                .ToListAsync();
+
+            foreach (var officeId in officesWithTransactions)
+            {
+                var hasClosure = await _db.DayClosures.AnyAsync(dc =>
+                    dc.OfficeId == officeId &&
+                    dc.BusinessDate.Date == businessDate.Date &&
+                    (dc.Status == DayClosureStatus.Closed || dc.Status == DayClosureStatus.AutoClosed));
+                if (hasClosure) continue;
+
+                var closureReferenceId = $"{officeId}:{dateKey}";
+                var closureAlertExists = await _db.OfficeAlerts.AnyAsync(a =>
+                    a.AlertType == AlertType.DayClosureMissing &&
+                    a.ReferenceId == closureReferenceId &&
+                    !a.IsResolved);
+                if (closureAlertExists) continue;
+
+                var office = await _db.Offices.FindAsync(officeId);
+                await CreateAlertAsync(
+                    officeId,
+                    AlertType.DayClosureMissing,
+                    AlertSeverity.Warning,
+                    "Gün sonu alınmadı",
+                    $"{office?.OfficeName ?? "Ofis"} için {businessDate:dd.MM.yyyy} tarihinde işlem yapıldı ancak gün sonu kapanışı alınmadı.",
+                    closureReferenceId,
+                    "DayClosureMissing"
+                );
+            }
+
+            // 2. Toplu/şüpheli giriş: personel + ofis bazında
+            var staffTransactions = await _db.Transactions
+                .Where(t => t.CreatedDate >= dayStartUtc && t.CreatedDate < dayEndUtc)
+                .Select(t => new { t.UserId, t.CreatedDate, t.TransactionDate, OfficeId = t.Vault.OfficeId })
+                .ToListAsync();
+
+            var historyStartUtc = dayStartUtc.AddDays(-14);
+
+            foreach (var group in staffTransactions.GroupBy(t => new { t.UserId, t.OfficeId }))
+            {
+                // Kişisel baseline: bu personelin son 14 günündeki (bugün hariç), en az 5 işlemli günlerinin dağılım oranları
+                var historicalTransactions = await _db.Transactions
+                    .Where(t => t.UserId == group.Key.UserId && t.CreatedDate >= historyStartUtc && t.CreatedDate < dayStartUtc)
+                    .Select(t => t.CreatedDate)
+                    .ToListAsync();
+
+                var historicalDailyRatios = historicalTransactions
+                    .GroupBy(d => d.AddHours(3).Date)
+                    .Where(g => g.Count() >= 5)
+                    .Select(g => BulkEntryHeuristic.ComputeSpreadRatio(g.ToList()).Value)
+                    .ToList();
+
+                var heuristic = BulkEntryHeuristic.Evaluate(
+                    group.Select(t => (t.CreatedDate, t.TransactionDate)).ToList(),
+                    historicalDailyRatios);
+                if (!heuristic.IsBulkEntrySuspected) continue;
+
+                var bulkReferenceId = $"{group.Key.UserId}:{dateKey}";
+                var bulkAlertExists = await _db.OfficeAlerts.AnyAsync(a =>
+                    a.AlertType == AlertType.BulkEntrySuspected &&
+                    a.ReferenceId == bulkReferenceId &&
+                    !a.IsResolved);
+                if (bulkAlertExists) continue;
+
+                var user = await _db.Users.FindAsync(group.Key.UserId);
+                var userName = user != null ? $"{user.Firstname} {user.Lastname}".Trim() : "Personel";
+
+                await CreateAlertAsync(
+                    group.Key.OfficeId,
+                    AlertType.BulkEntrySuspected,
+                    AlertSeverity.Warning,
+                    $"Toplu giriş şüphesi: {userName}",
+                    $"{userName}, {businessDate:dd.MM.yyyy} tarihinde {heuristic.TransactionCount} işlemi {heuristic.FirstTransactionAt:HH:mm}–{heuristic.LastTransactionAt:HH:mm} arasında dar bir zaman diliminde girmiş.",
+                    bulkReferenceId,
+                    "BulkEntrySuspected"
                 );
             }
         }

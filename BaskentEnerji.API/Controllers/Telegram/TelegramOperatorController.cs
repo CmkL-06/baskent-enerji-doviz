@@ -3,8 +3,12 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using BaskentEnerji.Business.Exceptions;
 using BaskentEnerji.Business.Services.Permission;
+using BaskentEnerji.Business.Services.Telegram;
+using BaskentEnerji.Business.Infrastructure.ExchangeOffice.Office;
+using BaskentEnerji.Business.Infrastructure.Telegram;
 using BaskentEnerji.Data.Contexts;
 using BaskentEnerji.Entity.Entities.Telegram;
+using BaskentEnerji.Entity.Modals.RequestModals.ExchangeService.Office;
 using System;
 using System.Linq;
 using System.Net;
@@ -13,6 +17,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace BaskentEnerji.API.Controllers.Telegram
 {
@@ -24,13 +29,26 @@ namespace BaskentEnerji.API.Controllers.Telegram
         private readonly BaskentEnerjiDbContext _db;
         private readonly ValidationService _validationService;
         private readonly IConfiguration _configuration;
+        private readonly IExchangeTransactionService _exchangeTransactionService;
+        private readonly ILogger<TelegramOperatorController> _logger;
+        private readonly ITelegramNotificationService _telegramNotificationService;
 
-        public TelegramOperatorController(BaskentEnerjiDbContext db, ValidationService validationService, IConfiguration configuration)
+        public TelegramOperatorController(
+            BaskentEnerjiDbContext db,
+            ValidationService validationService,
+            IConfiguration configuration,
+            IExchangeTransactionService exchangeTransactionService,
+            ILogger<TelegramOperatorController> logger,
+            ITelegramNotificationService telegramNotificationService)
         {
             _db = db;
             _validationService = validationService;
             _configuration = configuration;
+            _exchangeTransactionService = exchangeTransactionService;
+            _logger = logger;
+            _telegramNotificationService = telegramNotificationService;
         }
+
 
         private async Task RequireStaff()
         {
@@ -80,6 +98,9 @@ namespace BaskentEnerji.API.Controllers.Telegram
                     t.Txid,
                     t.CryptoVerified,
                     t.CryptoVerifiedAt,
+                    t.DeliveryMethod,
+                    t.CustomerAddress,
+                    t.CustomerPhone,
                     CustomerName = t.Customer != null ? t.Customer.FirstName : null,
                     CustomerUsername = t.Customer != null ? t.Customer.Username : null
                 })
@@ -174,7 +195,46 @@ namespace BaskentEnerji.API.Controllers.Telegram
             tx.AssignedOperatorId = tgOpId;
 
             if (txAction == "complete")
+            {
                 tx.CompletedAt = DateTime.Now;
+
+                // Şube'ye (gerçek Vault'a) bağlı bir TgDealer ise, işlemi gerçek döviz muhasebesine (Kasa) işle.
+                // Harici bayilerde (DealerType.External) mevcut cari hesap akışı (record-entry) hiç etkilenmez.
+                var dealer = await _db.TgDealers.FirstOrDefaultAsync(d => d.DealerCode == tx.ReferralCode);
+                if (dealer != null && dealer.DealerType == TgDealerType.Branch)
+                {
+                    if (!Guid.TryParse(dealer.VaultId, out var vaultId))
+                        throw new ApiException(HttpStatusCode.InternalServerError,
+                            $"Bayi '{dealer.DealerCode}' Şube (Branch) olarak işaretli ama geçerli bir VaultId'si yok.");
+
+                    var currencyCode = TgCurrencyMapper.ToSystemCurrencyCode(tx.Currency);
+                    var sourceCurrency = await _db.Set<BaskentEnerji.Entity.Entities.ExchangeOffice.Currency.Currency>()
+                        .FirstOrDefaultAsync(c => c.CurrencyCode == currencyCode);
+                    var tryCurrency = await _db.Set<BaskentEnerji.Entity.Entities.ExchangeOffice.Currency.Currency>()
+                        .FirstOrDefaultAsync(c => c.CurrencyCode == "TRY");
+
+                    if (sourceCurrency == null || tryCurrency == null)
+                        throw new ApiException(HttpStatusCode.InternalServerError, $"Para birimi bulunamadı: {currencyCode}");
+
+                    tx.VaultId = vaultId;
+
+                    await _exchangeTransactionService.ProcessExchangeAsync(new System.Collections.Generic.List<rm_exchangetransaction>
+                    {
+                        new rm_exchangetransaction
+                        {
+                            VaultId = vaultId,
+                            SourceCurrencyId = sourceCurrency.Id,
+                            TargetCurrencyId = tryCurrency.Id,
+                            SourceAmount = tx.Amount ?? 0,
+                            IsBuyingFromCustomer = tx.IsBuy == true,
+                            CustomRate = tx.ExchangeRate,
+                            Notes = $"Telegram işlemi #{tx.TransactionId} — bayi kodu {tx.ReferralCode}"
+                        }
+                    });
+
+                    _logger.LogInformation("TG işlemi #{TxId} şube kasasına işlendi (VaultId: {VaultId})", tx.TransactionId, vaultId);
+                }
+            }
 
             await _db.SaveChangesAsync();
 
@@ -190,6 +250,8 @@ namespace BaskentEnerji.API.Controllers.Telegram
                 if (message != null)
                     await SendTelegramMessage(tx.CustomerId.Value, message);
             }
+
+            TelegramEventsController.Broadcast("transaction_update", new { transactionId = tx.TransactionId, status = newStatus, referralCode = tx.ReferralCode });
 
             return Ok(new { success = true, status = newStatus });
         }
@@ -210,24 +272,17 @@ namespace BaskentEnerji.API.Controllers.Telegram
             tx.CryptoVerifiedAt = DateTime.Now;
             await _db.SaveChangesAsync();
 
+            if (tx.CustomerId.HasValue)
+                await SendTelegramMessage(tx.CustomerId.Value,
+                    $"✅ <b>Ödemeniz ulaştı!</b>\n\n💰 Tutar: {tx.Amount} {tx.Currency ?? "USDT"}\n\nİşleminiz onaylandı, operatör tarafından tamamlanması bekleniyor.");
+
+            TelegramEventsController.Broadcast("transaction_update", new { transactionId = tx.TransactionId, status = tx.Status, cryptoVerified = true });
+
             return Ok(new { success = true, cryptoVerified = true, cryptoVerifiedAt = tx.CryptoVerifiedAt });
         }
 
-        private async Task SendTelegramMessage(long chatId, string text)
-        {
-            var botToken = _configuration["Telegram:MainBotToken"];
-            if (string.IsNullOrEmpty(botToken)) return;
-
-            try
-            {
-                using var client = new HttpClient();
-                var payload = JsonSerializer.Serialize(new { chat_id = chatId, text, parse_mode = "HTML" });
-                await client.PostAsync(
-                    $"https://api.telegram.org/bot{botToken}/sendMessage",
-                    new StringContent(payload, Encoding.UTF8, "application/json"));
-            }
-            catch { }
-        }
+        private Task SendTelegramMessage(long chatId, string text)
+            => _telegramNotificationService.SendMessageAsync(chatId, text);
     }
 
     public class SendChatRequest

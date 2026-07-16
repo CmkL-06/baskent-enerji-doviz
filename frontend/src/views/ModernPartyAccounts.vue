@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useExchangeStore } from '@/stores/exchange'
 import apiService from '@/services/apiservice'
+import { formatAmount } from '@/utils/currency'
 import AppKpiCard from '@/components/common/AppKpiCard.vue'
 import { useNotification } from '@/composables/useNotification'
 
@@ -116,8 +117,7 @@ const totals = computed(() => {
   }
 })
 
-const formatCurrency = (amount: number): string =>
-  new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount)
+const formatCurrency = (amount: number): string => formatAmount(amount, 2)
 
 const formatDate = (d: string | null | undefined): string => {
   if (!d) return '-'
@@ -839,7 +839,7 @@ onUnmounted(() => {
 }
 .btn-back {
   background: none;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: 6px 8px;
   cursor: pointer;
@@ -870,7 +870,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  background: #fff;
+  background: var(--color-bg-card);
   color: #374151;
   border: 1px solid #d1d5db;
   border-radius: var(--radius-md);
@@ -882,7 +882,7 @@ onUnmounted(() => {
 
 .btn-cancel {
   padding: 8px 16px;
-  background: #fff;
+  background: var(--color-bg-card);
   color: #374151;
   border: 1px solid #d1d5db;
   border-radius: var(--radius-md);
@@ -910,7 +910,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #fff;
+  background: var(--color-bg-card);
   border: 1px solid #d1d5db;
   border-radius: var(--radius-md);
   padding: 6px 12px;
@@ -933,7 +933,7 @@ onUnmounted(() => {
   border: 1px solid #d1d5db;
   border-radius: var(--radius-md);
   font-size: 13px;
-  background: #fff;
+  background: var(--color-bg-card);
   color: #374151;
 }
 .filter-chips {
@@ -944,7 +944,7 @@ onUnmounted(() => {
   padding: 6px 14px;
   border-radius: var(--radius-xl);
   border: 1px solid #d1d5db;
-  background: #fff;
+  background: var(--color-bg-card);
   font-size: 12px;
   cursor: pointer;
   color: #374151;
@@ -969,9 +969,10 @@ onUnmounted(() => {
 
 /* Table */
 .party-table-wrap {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-bold);
   overflow-x: auto;
 }
 .party-table {
@@ -982,12 +983,12 @@ onUnmounted(() => {
 .party-table th {
   padding: 10px 14px;
   text-align: left;
-  font-weight: 600;
+  font-weight: 700;
   color: #6b7280;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: .5px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 2px solid var(--border-strong);
   background: #f9fafb;
   white-space: nowrap;
 }
@@ -1068,9 +1069,10 @@ onUnmounted(() => {
 
 /* Party Info Card */
 .party-info-card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-bold);
   padding: 20px;
   margin-bottom: 20px;
 }
@@ -1093,10 +1095,24 @@ onUnmounted(() => {
 
 /* Section title */
 .section-title {
+  position: relative;
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 700;
   color: #1a1a2e;
   margin: 20px 0 12px;
+  padding: 6px 12px 6px 14px;
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.08), transparent);
+  border-bottom: 3px solid var(--border-strong);
+}
+.section-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 5px;
+  border-radius: var(--radius-sm);
+  background: var(--color-secondary-hover);
 }
 
 /* Accounts Grid */
@@ -1107,14 +1123,15 @@ onUnmounted(() => {
   margin-bottom: 20px;
 }
 .account-card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
   padding: 16px;
   cursor: pointer;
   transition: border-color .15s, box-shadow .15s;
 }
-.account-card:hover { border-color: #93c5fd; }
+.account-card:hover { border-color: #93c5fd; box-shadow: var(--shadow-bold); }
 .account-selected { border-color: var(--color-secondary-hover); box-shadow: 0 0 0 2px rgba(37, 99, 235, .15); }
 .acc-header {
   display: flex;
@@ -1153,9 +1170,10 @@ onUnmounted(() => {
 
 /* Entries Section */
 .entries-section {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-bold);
   overflow-x: auto;
 }
 .entries-section .section-title {
@@ -1179,6 +1197,7 @@ onUnmounted(() => {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, .4);
+  backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1186,14 +1205,14 @@ onUnmounted(() => {
   padding: 20px;
 }
 .modal {
-  background: #fff;
+  background: var(--color-bg-card);
   border-radius: var(--radius-lg);
   width: 100%;
   max-width: 560px;
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, .15);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .2);
 }
 .modal-lg { max-width: 680px; }
 .modal-xl { max-width: 960px; }
@@ -1202,7 +1221,7 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 20px 24px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--color-border);
 }
 .modal-header h2 {
   font-size: 17px;
@@ -1224,7 +1243,7 @@ onUnmounted(() => {
 }
 .modal-footer {
   padding: 16px 24px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--color-border);
   display: flex;
   justify-content: flex-end;
   gap: 8px;
@@ -1285,8 +1304,9 @@ onUnmounted(() => {
 }
 .aging-card {
   background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
   padding: 12px;
   text-align: center;
 }

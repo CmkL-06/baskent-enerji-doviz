@@ -3,11 +3,15 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using BaskentEnerji.Business.Exceptions;
 using BaskentEnerji.Business.Services.Permission;
+using BaskentEnerji.Business.Infrastructure.ExchangeOffice.Party;
+using BaskentEnerji.Business.Infrastructure.ExchangeOffice.Office;
+using BaskentEnerji.Business.Services.Telegram;
 using BaskentEnerji.Data.Contexts;
 using BaskentEnerji.Entity.Entities.Telegram;
 using System;
 using System.Linq;
 using System.Net;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace BaskentEnerji.API.Controllers.Telegram
@@ -19,11 +23,16 @@ namespace BaskentEnerji.API.Controllers.Telegram
     {
         private readonly BaskentEnerjiDbContext _db;
         private readonly ValidationService _validationService;
+        private readonly IPartyAccountService _partyAccountService;
+        private readonly IExchangeRateService _exchangeRateService;
 
-        public TelegramAdminController(BaskentEnerjiDbContext db, ValidationService validationService)
+        public TelegramAdminController(BaskentEnerjiDbContext db, ValidationService validationService,
+            IPartyAccountService partyAccountService, IExchangeRateService exchangeRateService)
         {
             _db = db;
             _validationService = validationService;
+            _partyAccountService = partyAccountService;
+            _exchangeRateService = exchangeRateService;
         }
 
         private async Task RequireAdmin()
@@ -127,6 +136,7 @@ namespace BaskentEnerji.API.Controllers.Telegram
                     name = (u.Firstname + " " + u.Lastname).Trim(),
                     dealer_code = u.DealerReferralCode,
                     is_active = u.Rank != Entity.Rank.Banned,
+                    rank = (int)u.Rank,
                     created_at = u.CreatedDate
                 })
                 .ToListAsync();
@@ -138,10 +148,44 @@ namespace BaskentEnerji.API.Controllers.Telegram
                 .Select(g => new { Code = g.Key, Total = g.Count(), Completed = g.Count(t => t.Status == "completed") })
                 .ToListAsync();
 
+            // Kur bayatlama rozeti için: External bayilerde TgDealerRate, Branch bayilerde
+            // o ofisin USDT/KRUB ExchangeRate'i baz alınır — en eski güncelleme tarihi döner.
+            var dealerRateUpdates = await _db.TgDealerRates
+                .GroupBy(r => r.DealerId)
+                .Select(g => new { DealerId = g.Key, Oldest = g.Min(r => r.UpdatedAt) })
+                .ToListAsync();
+
+            var vaultOfficeMap = await _db.Vaults.Select(v => new { v.Id, v.OfficeId }).ToListAsync();
+            var trackedCurrencyIds = await _db.Set<BaskentEnerji.Entity.Entities.ExchangeOffice.Currency.Currency>()
+                .Where(c => c.CurrencyCode == "USDT" || c.CurrencyCode == "KRUB")
+                .Select(c => c.Id)
+                .ToListAsync();
+            var branchRateUpdates = await _db.Set<BaskentEnerji.Entity.Entities.ExchangeOffice.Currency.ExchangeRate>()
+                .Where(r => r.IsActive && trackedCurrencyIds.Contains(r.SourceCurrencyId))
+                .GroupBy(r => r.OfficeId)
+                .Select(g => new { OfficeId = g.Key, Oldest = g.Min(r => r.UpdatedAt) })
+                .ToListAsync();
+
             var dealers = dealerUsers.Select(u =>
             {
                 var tgd = tgDealers.FirstOrDefault(d => d.DealerCode == u.dealer_code);
                 var txc = txCounts.FirstOrDefault(t => t.Code == u.dealer_code);
+
+                DateTime? oldestRateUpdate = null;
+                if (tgd != null)
+                {
+                    if (tgd.DealerType == TgDealerType.Branch && Guid.TryParse(tgd.VaultId, out var vaultGuid))
+                    {
+                        var officeId = vaultOfficeMap.FirstOrDefault(v => v.Id == vaultGuid)?.OfficeId;
+                        if (officeId.HasValue)
+                            oldestRateUpdate = branchRateUpdates.FirstOrDefault(b => b.OfficeId == officeId.Value)?.Oldest;
+                    }
+                    else
+                    {
+                        oldestRateUpdate = dealerRateUpdates.FirstOrDefault(r => r.DealerId == tgd.DealerId)?.Oldest;
+                    }
+                }
+
                 return new
                 {
                     u.id,
@@ -149,15 +193,45 @@ namespace BaskentEnerji.API.Controllers.Telegram
                     u.name,
                     u.dealer_code,
                     dealer_name = tgd?.DealerName ?? u.name,
+                    city = tgd?.City,
+                    address = tgd?.Address,
                     u.is_active,
+                    u.rank,
                     balance = tgd?.Balance ?? 0,
+                    dealer_type = tgd?.DealerType.ToString() ?? "External",
+                    vault_id = tgd?.VaultId,
+                    commission_rate = tgd?.CommissionRate ?? 1.5m,
                     total_tx = txc?.Total ?? 0,
                     completed_tx = txc?.Completed ?? 0,
+                    oldest_rate_update = oldestRateUpdate,
                     u.created_at
                 };
             }).ToList();
 
             return Ok(new { dealers });
+        }
+
+        // DealerName'den okunaklı bir kod türetir (örn. "Ankara" -> "ANKARA01"), çakışırsa sayaç artırılır.
+        private async Task<string> GenerateReadableDealerCodeAsync(string dealerName)
+        {
+            var baseCode = new string((dealerName ?? "").ToUpperInvariant()
+                .Where(char.IsLetterOrDigit)
+                .Select(c => c switch
+                {
+                    'Ç' => 'C', 'Ğ' => 'G', 'İ' => 'I', 'Ö' => 'O', 'Ş' => 'S', 'Ü' => 'U',
+                    _ => c
+                })
+                .ToArray());
+            if (string.IsNullOrWhiteSpace(baseCode)) baseCode = "BAYI";
+
+            for (var i = 1; i <= 99; i++)
+            {
+                var candidate = $"{baseCode}{i:00}";
+                var taken = await _db.TgDealers.AnyAsync(d => d.DealerCode == candidate)
+                    || await _db.Users.AnyAsync(u => u.DealerReferralCode == candidate);
+                if (!taken) return candidate;
+            }
+            throw new ApiException(HttpStatusCode.Conflict, "Benzersiz bayi kodu üretilemedi, elle bir kod belirtin.");
         }
 
         [HttpPost("dealers")]
@@ -168,27 +242,91 @@ namespace BaskentEnerji.API.Controllers.Telegram
             if (string.IsNullOrWhiteSpace(req.Username) || string.IsNullOrWhiteSpace(req.Name))
                 throw new ApiException(HttpStatusCode.BadRequest, "Kullanıcı adı ve ad gerekli");
 
-            var rng = new Random();
-            var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-            var dealerCode = new string(Enumerable.Range(0, 6).Select(_ => chars[rng.Next(chars.Length)]).ToArray());
-
-            var existing = await _db.Users.AnyAsync(u => u.DealerReferralCode == dealerCode);
-            if (existing)
-                dealerCode = new string(Enumerable.Range(0, 6).Select(_ => chars[rng.Next(chars.Length)]).ToArray());
+            if (req.DealerType == TgDealerType.Branch && !req.VaultId.HasValue)
+                throw new ApiException(HttpStatusCode.BadRequest, "Şube tipi bayiler için Kasa (VaultId) seçilmelidir.");
+            if (req.DealerType == TgDealerType.External && req.VaultId.HasValue)
+                throw new ApiException(HttpStatusCode.BadRequest, "Harici bayilere Kasa bağlanamaz.");
 
             var user = await _db.Users.FirstOrDefaultAsync(u => u.Username == req.Username);
-            if (user != null)
+            if (user == null)
+                throw new ApiException(HttpStatusCode.BadRequest, "Kullanıcı bulunamadı. Önce sistem kullanıcısı oluşturun.");
+            if (!string.IsNullOrEmpty(user.DealerReferralCode))
+                throw new ApiException(HttpStatusCode.Conflict, "Bu kullanıcı zaten bir bayiye atanmış.");
+
+            var dealerCode = string.IsNullOrWhiteSpace(req.DealerCode)
+                ? await GenerateReadableDealerCodeAsync(req.Name)
+                : req.DealerCode.Trim().ToUpperInvariant();
+
+            if (await _db.TgDealers.AnyAsync(d => d.DealerCode == dealerCode))
+                throw new ApiException(HttpStatusCode.Conflict, $"Bayi kodu '{dealerCode}' zaten kullanılıyor.");
+
+            // Cari hesabın bağlanacağı Office: Şube ise kendi ofisi, Harici bayi ise Merkez.
+            Guid partyOfficeId;
+            string? vaultIdString = null;
+            if (req.DealerType == TgDealerType.Branch)
             {
-                user.DealerReferralCode = dealerCode;
-                _db.Users.Update(user);
+                var vault = await _db.Vaults.FirstOrDefaultAsync(v => v.Id == req.VaultId!.Value);
+                if (vault == null)
+                    throw new ApiException(HttpStatusCode.BadRequest, "Belirtilen Kasa bulunamadı.");
+                partyOfficeId = vault.OfficeId;
+                vaultIdString = vault.Id.ToString();
             }
             else
             {
-                throw new ApiException(HttpStatusCode.BadRequest, "Kullanıcı bulunamadı. Önce sistem kullanıcısı oluşturun.");
+                var merkez = await _db.Offices.FirstOrDefaultAsync(o => o.OfficeType == Entity.OfficeType.Merkez);
+                if (merkez == null)
+                    throw new ApiException(HttpStatusCode.InternalServerError, "Merkez ofis bulunamadı — harici bayi cari hesabı bağlanamıyor.");
+                partyOfficeId = merkez.Id;
             }
 
-            await _db.SaveChangesAsync();
-            return Ok(new { success = true, dealer_code = dealerCode });
+            var tryCurrency = await _db.Set<BaskentEnerji.Entity.Entities.ExchangeOffice.Currency.Currency>()
+                .FirstOrDefaultAsync(c => c.CurrencyCode == "TRY");
+            if (tryCurrency == null)
+                throw new ApiException(HttpStatusCode.InternalServerError, "TRY para birimi bulunamadı.");
+
+            using var tx = await _db.Database.BeginTransactionAsync();
+            try
+            {
+                var party = new BaskentEnerji.Entity.Entities.ExchangeOffice.Party.Party
+                {
+                    OfficeId = partyOfficeId,
+                    PartyCode = dealerCode,
+                    Name = req.Name,
+                    Type = BaskentEnerji.Entity.Entities.ExchangeOffice.Party.PartyType.Both,
+                    IsActive = true
+                };
+                _db.Set<BaskentEnerji.Entity.Entities.ExchangeOffice.Party.Party>().Add(party);
+                await _db.SaveChangesAsync();
+
+                await _partyAccountService.CreateAccountAsync(party.Id, tryCurrency.Id);
+
+                var dealer = new TgDealer
+                {
+                    DealerCode = dealerCode,
+                    DealerName = req.Name,
+                    DealerType = req.DealerType,
+                    Balance = 0,
+                    IsActive = true,
+                    CommissionRate = req.CommissionRate ?? 1.5m,
+                    PartyId = party.Id,
+                    VaultId = vaultIdString,
+                    CreatedAt = DateTime.UtcNow
+                };
+                _db.TgDealers.Add(dealer);
+
+                user.DealerReferralCode = dealerCode;
+                _db.Users.Update(user);
+
+                await _db.SaveChangesAsync();
+                await tx.CommitAsync();
+
+                return Ok(new { success = true, dealer_code = dealerCode, party_id = party.Id });
+            }
+            catch
+            {
+                await tx.RollbackAsync();
+                throw;
+            }
         }
 
         [HttpGet("operators")]
@@ -259,6 +397,301 @@ namespace BaskentEnerji.API.Controllers.Telegram
             }
 
             return Ok(new { success = true });
+        }
+
+        public class rm_updatedealerinfo
+        {
+            public string? DealerName { get; set; }
+            public string? City { get; set; }
+            public string? Address { get; set; }
+            public string? Firstname { get; set; }
+            public string? Lastname { get; set; }
+            public int? Rank { get; set; }
+        }
+
+        // Bayi/Şube kartının kendi bilgilerini (görünen ad, şehir, adres) ve atanmış
+        // kullanıcının ad/yetkisini TG Yönetim paneli içinden, ayrı sayfaya gitmeden düzenler.
+        [HttpPut("dealers/{code}")]
+        public async Task<IActionResult> UpdateDealerInfo(string code, [FromBody] rm_updatedealerinfo request)
+        {
+            await RequireAdmin();
+
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.DealerReferralCode == code);
+            if (user == null)
+                throw new ApiException(HttpStatusCode.NotFound, "Bayi bulunamadı.");
+
+            var tgd = await _db.TgDealers.FirstOrDefaultAsync(d => d.DealerCode == code);
+            if (tgd != null)
+            {
+                if (request.DealerName != null) tgd.DealerName = request.DealerName;
+                if (request.City != null) tgd.City = request.City;
+                if (request.Address != null) tgd.Address = request.Address;
+            }
+
+            if (request.Firstname != null) user.Firstname = request.Firstname;
+            if (request.Lastname != null) user.Lastname = request.Lastname;
+            if (request.Rank.HasValue) user.Rank = (Entity.Rank)request.Rank.Value;
+
+            await _db.SaveChangesAsync();
+            return Ok(new { success = true });
+        }
+
+        // ═══════════════════════════════════════════════
+        // BAYİ KUR YÖNETİMİ — bayiye özel alış/satış (settlement) kuru.
+        // Müşteriye gösterilen kur (TgExchangeRate) ile KASITLI olarak ayrı: kâr, aradaki
+        // farktan (spread) doğar, sabit bir komisyon yüzdesinden değil.
+        // ═══════════════════════════════════════════════
+
+        [HttpGet("dealers/{code}/rates")]
+        public async Task<IActionResult> GetDealerRates(string code)
+        {
+            await RequireAdmin();
+
+            var dealer = await _db.TgDealers.FirstOrDefaultAsync(d => d.DealerCode == code);
+            if (dealer == null)
+                throw new ApiException(HttpStatusCode.NotFound, "Bayi bulunamadı.");
+
+            var rates = await _db.TgDealerRates
+                .Where(r => r.DealerId == dealer.DealerId)
+                .Select(r => new { r.Currency, r.BuyRate, r.SellRate, r.UpdatedAt })
+                .ToListAsync();
+
+            return Ok(new { dealer_code = code, rates });
+        }
+
+        public class UpsertDealerRateRequest
+        {
+            public string Currency { get; set; } = "";
+            public decimal BuyRate { get; set; }
+            public decimal SellRate { get; set; }
+        }
+
+        [HttpPost("dealers/{code}/rates")]
+        public async Task<IActionResult> UpsertDealerRate(string code, [FromBody] UpsertDealerRateRequest req)
+        {
+            await RequireAdmin();
+
+            if (string.IsNullOrWhiteSpace(req.Currency))
+                throw new ApiException(HttpStatusCode.BadRequest, "Para birimi gerekli.");
+            if (req.BuyRate <= 0 || req.SellRate <= 0)
+                throw new ApiException(HttpStatusCode.BadRequest, "Kurlar sıfır veya negatif olamaz.");
+
+            var dealer = await _db.TgDealers.FirstOrDefaultAsync(d => d.DealerCode == code);
+            if (dealer == null)
+                throw new ApiException(HttpStatusCode.NotFound, "Bayi bulunamadı.");
+
+            var currencyCode = TgCurrencyMapper.ToSystemCurrencyCode(req.Currency);
+
+            var rate = await _db.TgDealerRates
+                .FirstOrDefaultAsync(r => r.DealerId == dealer.DealerId && r.Currency == currencyCode);
+            if (rate == null)
+            {
+                rate = new TgDealerRate { DealerId = dealer.DealerId, Currency = currencyCode };
+                _db.TgDealerRates.Add(rate);
+            }
+            else
+            {
+                // Geçmişe eski değeri kaydet (yeni kayıt ilk kez giriliyorsa geçmiş yok)
+                _db.TgDealerRateHistories.Add(new TgDealerRateHistory
+                {
+                    DealerId = dealer.DealerId,
+                    Currency = currencyCode,
+                    OldBuyRate = rate.BuyRate,
+                    OldSellRate = rate.SellRate,
+                    NewBuyRate = req.BuyRate,
+                    NewSellRate = req.SellRate,
+                    ChangedAt = DateTime.UtcNow
+                });
+            }
+            rate.BuyRate = req.BuyRate;
+            rate.SellRate = req.SellRate;
+            rate.UpdatedAt = DateTime.UtcNow;
+
+            await _db.SaveChangesAsync();
+
+            return Ok(new { success = true, currency = currencyCode, buyRate = rate.BuyRate, sellRate = rate.SellRate, updatedAt = rate.UpdatedAt });
+        }
+
+        [HttpGet("dealers/{code}/rates/{currency}/history")]
+        public async Task<IActionResult> GetDealerRateHistory(string code, string currency, [FromQuery] int limit = 10)
+        {
+            await RequireAdmin();
+
+            var dealer = await _db.TgDealers.FirstOrDefaultAsync(d => d.DealerCode == code);
+            if (dealer == null)
+                throw new ApiException(HttpStatusCode.NotFound, "Bayi bulunamadı.");
+
+            var currencyCode = TgCurrencyMapper.ToSystemCurrencyCode(currency);
+
+            var history = await _db.TgDealerRateHistories
+                .Where(h => h.DealerId == dealer.DealerId && h.Currency == currencyCode)
+                .OrderByDescending(h => h.ChangedAt)
+                .Take(limit)
+                .Select(h => new { h.OldBuyRate, h.OldSellRate, h.NewBuyRate, h.NewSellRate, h.ChangedAt })
+                .ToListAsync();
+
+            return Ok(new { history });
+        }
+
+        public class BulkUpdateDealerRateRequest
+        {
+            public string Currency { get; set; } = "";
+            public decimal BuyRate { get; set; }
+            public decimal SellRate { get; set; }
+        }
+
+        [HttpPost("dealers/rates/bulk")]
+        public async Task<IActionResult> BulkUpdateDealerRate([FromBody] BulkUpdateDealerRateRequest req)
+        {
+            await RequireAdmin();
+
+            if (string.IsNullOrWhiteSpace(req.Currency))
+                throw new ApiException(HttpStatusCode.BadRequest, "Para birimi gerekli.");
+            if (req.BuyRate <= 0 || req.SellRate <= 0)
+                throw new ApiException(HttpStatusCode.BadRequest, "Kurlar sıfır veya negatif olamaz.");
+
+            var currencyCode = TgCurrencyMapper.ToSystemCurrencyCode(req.Currency);
+
+            // Sadece Harici (External) bayiler — Şube tipi kendi ofis kurunu kullanır.
+            var externalDealers = await _db.TgDealers
+                .Where(d => d.IsActive && d.DealerType == TgDealerType.External)
+                .ToListAsync();
+
+            var now = DateTime.UtcNow;
+            var affected = 0;
+            foreach (var dealer in externalDealers)
+            {
+                var rate = await _db.TgDealerRates
+                    .FirstOrDefaultAsync(r => r.DealerId == dealer.DealerId && r.Currency == currencyCode);
+                if (rate == null)
+                {
+                    rate = new TgDealerRate { DealerId = dealer.DealerId, Currency = currencyCode };
+                    _db.TgDealerRates.Add(rate);
+                }
+                else
+                {
+                    _db.TgDealerRateHistories.Add(new TgDealerRateHistory
+                    {
+                        DealerId = dealer.DealerId,
+                        Currency = currencyCode,
+                        OldBuyRate = rate.BuyRate,
+                        OldSellRate = rate.SellRate,
+                        NewBuyRate = req.BuyRate,
+                        NewSellRate = req.SellRate,
+                        ChangedAt = now
+                    });
+                }
+                rate.BuyRate = req.BuyRate;
+                rate.SellRate = req.SellRate;
+                rate.UpdatedAt = now;
+                affected++;
+            }
+
+            await _db.SaveChangesAsync();
+
+            return Ok(new { success = true, currency = currencyCode, dealersUpdated = affected });
+        }
+
+        // ═══════════════════════════════════════════════
+        // ŞUBE (BRANCH) BAYİ KURU — o ofisin gerçek ExchangeRates'i (Kasa/WAC muhasebesini
+        // besleyen kur). Mevcut ExchangeController./rates altyapısını sarmalar; TG Yönetim →
+        // Bayiler ekranından Manuel Kur Yönetimi'ne gitmeden Şube kuru düzenlenebilsin diye.
+        // ═══════════════════════════════════════════════
+
+        private async Task<(Guid officeId, Guid tryCurrencyId)> ResolveBranchContextAsync(string dealerCode)
+        {
+            var dealer = await _db.TgDealers.FirstOrDefaultAsync(d => d.DealerCode == dealerCode);
+            if (dealer == null || dealer.DealerType != TgDealerType.Branch || !Guid.TryParse(dealer.VaultId, out var vaultId))
+                throw new ApiException(HttpStatusCode.BadRequest, "Bu bayi Şube tipinde değil veya Kasa'sı yok.");
+
+            var vault = await _db.Vaults.FirstOrDefaultAsync(v => v.Id == vaultId);
+            if (vault == null)
+                throw new ApiException(HttpStatusCode.NotFound, "Kasa bulunamadı.");
+
+            var tryCurrency = await _db.Set<BaskentEnerji.Entity.Entities.ExchangeOffice.Currency.Currency>()
+                .FirstOrDefaultAsync(c => c.CurrencyCode == "TRY");
+            if (tryCurrency == null)
+                throw new ApiException(HttpStatusCode.InternalServerError, "TRY para birimi bulunamadı.");
+
+            return (vault.OfficeId, tryCurrency.Id);
+        }
+
+        [HttpGet("dealers/{code}/branch-rates")]
+        public async Task<IActionResult> GetBranchRates(string code)
+        {
+            await RequireAdmin();
+            var (officeId, tryCurrencyId) = await ResolveBranchContextAsync(code);
+
+            var results = new System.Collections.Generic.List<object>();
+            foreach (var cur in new[] { "USDT", "KRUB" })
+            {
+                var currency = await _db.Set<BaskentEnerji.Entity.Entities.ExchangeOffice.Currency.Currency>()
+                    .FirstOrDefaultAsync(c => c.CurrencyCode == cur);
+                if (currency == null) continue;
+
+                var rate = await _exchangeRateService.GetCurrentRateAsync(officeId, currency.Id, tryCurrencyId);
+                results.Add(new
+                {
+                    currency = cur,
+                    buyRate = rate?.BuyRate ?? 0,
+                    sellRate = rate?.SellRate ?? 0,
+                    updatedAt = rate?.UpdatedAt,
+                    sourceCurrencyId = currency.Id,
+                    targetCurrencyId = tryCurrencyId
+                });
+            }
+
+            return Ok(new { dealer_code = code, rates = results });
+        }
+
+        public class UpsertBranchRateRequest
+        {
+            public string Currency { get; set; } = "";
+            public decimal BuyRate { get; set; }
+            public decimal SellRate { get; set; }
+        }
+
+        [HttpPost("dealers/{code}/branch-rates")]
+        public async Task<IActionResult> UpsertBranchRate(string code, [FromBody] UpsertBranchRateRequest req)
+        {
+            await RequireAdmin();
+
+            if (req.BuyRate <= 0 || req.SellRate <= 0)
+                throw new ApiException(HttpStatusCode.BadRequest, "Kurlar sıfır veya negatif olamaz.");
+
+            var (officeId, tryCurrencyId) = await ResolveBranchContextAsync(code);
+            var currencyCode = TgCurrencyMapper.ToSystemCurrencyCode(req.Currency);
+            var currency = await _db.Set<BaskentEnerji.Entity.Entities.ExchangeOffice.Currency.Currency>()
+                .FirstOrDefaultAsync(c => c.CurrencyCode == currencyCode);
+            if (currency == null)
+                throw new ApiException(HttpStatusCode.BadRequest, $"Para birimi bulunamadı: {currencyCode}");
+
+            var updated = await _exchangeRateService.CreateOrUpdateRateAsync(officeId, currency.Id, tryCurrencyId, req.BuyRate, req.SellRate);
+
+            return Ok(new { success = true, currency = currencyCode, buyRate = updated.BuyRate, sellRate = updated.SellRate, updatedAt = updated.UpdatedAt });
+        }
+
+        [HttpGet("dealers/{code}/branch-rates/{currency}/history")]
+        public async Task<IActionResult> GetBranchRateHistory(string code, string currency, [FromQuery] int limit = 10)
+        {
+            await RequireAdmin();
+            var (officeId, tryCurrencyId) = await ResolveBranchContextAsync(code);
+            var currencyCode = TgCurrencyMapper.ToSystemCurrencyCode(currency);
+            var cur = await _db.Set<BaskentEnerji.Entity.Entities.ExchangeOffice.Currency.Currency>()
+                .FirstOrDefaultAsync(c => c.CurrencyCode == currencyCode);
+            if (cur == null)
+                throw new ApiException(HttpStatusCode.BadRequest, $"Para birimi bulunamadı: {currencyCode}");
+
+            var rates = await _exchangeRateService.GetRateHistoryAsync(officeId, cur.Id, tryCurrencyId, limit);
+            var history = rates.Select((r, i) => new
+            {
+                changedAt = r.UpdatedAt,
+                newBuyRate = r.BuyRate,
+                newSellRate = r.SellRate,
+                oldBuyRate = i + 1 < rates.Count ? rates[i + 1].BuyRate : (decimal?)null,
+                oldSellRate = i + 1 < rates.Count ? rates[i + 1].SellRate : (decimal?)null,
+            });
+            return Ok(new { history });
         }
 
         [HttpGet("crypto-deposits")]
@@ -496,6 +929,11 @@ namespace BaskentEnerji.API.Controllers.Telegram
     {
         public string Username { get; set; } = "";
         public string Name { get; set; } = "";
+        [JsonConverter(typeof(JsonStringEnumConverter))]
+        public TgDealerType DealerType { get; set; } = TgDealerType.External;
+        public Guid? VaultId { get; set; }
+        public decimal? CommissionRate { get; set; }
+        public string? DealerCode { get; set; }
     }
 
     public class CreateOperatorRequest

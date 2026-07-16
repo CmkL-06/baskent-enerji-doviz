@@ -12,6 +12,9 @@ namespace BaskentEnerji.Business.Infrastructure.User
     {
         Task<vm_user> GetUser (rm_user_get FilterData);
         Task<List<vm_user>> GetUsers (rm_user_get? FilterData);
-      
+        Task<List<vm_user_activity>> GetUserActivityList();
+        Task<List<vm_user_login_history_entry>> GetUserLoginHistory(Guid userId, int? year, int? month);
+        Task<vm_user_daily_detail> GetUserDailyDetail(Guid userId, DateTime date);
+
     }
 }

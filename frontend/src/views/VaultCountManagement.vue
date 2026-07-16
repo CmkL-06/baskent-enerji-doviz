@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useExchangeStore } from '@/stores/exchange'
 import apiService from '@/services/apiservice'
+import { formatAmount } from '@/utils/currency'
 import AppKpiCard from '@/components/common/AppKpiCard.vue'
 import AppPageHeader from '@/components/common/AppPageHeader.vue'
 import AppEmptyState from '@/components/common/AppEmptyState.vue'
@@ -86,8 +87,7 @@ const timeline = computed(() => {
   return items
 })
 
-const formatCurrency = (amount: number): string =>
-  new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount)
+const formatCurrency = (amount: number): string => formatAmount(amount, 2)
 
 const formatDateTime = (d: string | null | undefined): string => {
   if (!d) return '-'

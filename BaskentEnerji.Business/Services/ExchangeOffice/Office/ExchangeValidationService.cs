@@ -68,6 +68,18 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 return result;
             }
 
+            // Arbitraj (çapraz kur): her iki taraf da TRY değil — tek bir SourceCurrencyId→TargetCurrencyId
+            // ExchangeRate çifti yok, kur/bakiye/WAC doğrulaması ProcessExchangeAsync içinde (iki bağımsız
+            // kur ve iki bağımsız bacak ile) yapılıyor; burada sadece manuel kurların girildiğini doğrula.
+            if (sourceCurrency.CurrencyCode != "TRY" && targetCurrency.CurrencyCode != "TRY")
+            {
+                if (!request.SourceCustomRate.HasValue || !request.TargetCustomRate.HasValue)
+                {
+                    result.AddError("Arbitraj işlemi için hem alınan hem verilen birimin kuru girilmelidir.");
+                }
+                return result;
+            }
+
             // Validate exchange rate exists
             var rate = await _context.ExchangeRates
                 .FirstOrDefaultAsync(r =>

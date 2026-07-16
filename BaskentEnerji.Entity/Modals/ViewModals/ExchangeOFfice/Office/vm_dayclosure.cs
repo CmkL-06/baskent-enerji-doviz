@@ -31,6 +31,7 @@ namespace BaskentEnerji.Entity.Modals.ViewModals.ExchangeOFfice.Office
     {
         public Guid Id { get; set; }
         public Guid OfficeId { get; set; }
+        public string OfficeName { get; set; }
         public DateTime BusinessDate { get; set; }
         public DateTime ClosedAt { get; set; }
         public string ClosedByUser { get; set; }

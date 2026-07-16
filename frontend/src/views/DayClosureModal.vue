@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import apiService from '@/services/apiservice'
 import { useNotification } from '@/composables/useNotification'
-import { getCurrencyFlagImg } from '@/utils/currency'
+import { getCurrencyFlagImg, formatAmount } from '@/utils/currency'
 
 const props = defineProps<{ officeId: string }>()
 const emit = defineEmits<{ (e: 'closed'): void; (e: 'done'): void }>()
@@ -14,6 +14,7 @@ const dayStatus = ref<any>(null)
 const physicalCounts = ref<Record<string, number>>({})
 const discrepancyNotes = ref<Record<string, string>>({})
 const closureNotes = ref('')
+const voluntaryMode = ref(false)
 
 onMounted(async () => {
   await loadDayStatus()
@@ -48,7 +49,7 @@ function hasAnyDiscrepancy(): boolean {
 }
 
 const canSubmit = computed(() => {
-  if (!dayStatus.value?.hasUnclosedDays && dayStatus.value?.canTransact) return false
+  if (!voluntaryMode.value && !dayStatus.value?.hasUnclosedDays && dayStatus.value?.canTransact) return false
   return balances.value.every((b: any) => {
     const disc = getDiscrepancy(b.currencyId, b.systemBalance)
     if (Math.abs(disc) > 0.0001) {
@@ -69,7 +70,7 @@ async function submitClosure() {
     }))
     const result = await apiService.closeDay({
       officeId: props.officeId,
-      businessDate: dayStatus.value.firstUnclosedDate || new Date().toISOString(),
+      businessDate: dayStatus.value.firstUnclosedDate || dayStatus.value.currentBusinessDate || new Date().toISOString(),
       notes: closureNotes.value,
       details
     })
@@ -83,8 +84,7 @@ async function submitClosure() {
 }
 
 function formatNumber(val: number): string {
-  if (val === 0) return '0'
-  return val.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 6 })
+  return formatAmount(val, 0)
 }
 
 function formatDate(d: string): string {
@@ -115,18 +115,26 @@ function formatDate(d: string): string {
       </div>
 
       <template v-else-if="dayStatus">
-        <!-- Already open, no action needed -->
-        <div v-if="dayStatus.canTransact && !dayStatus.hasUnclosedDays" class="dc-status-ok">
+        <!-- Already open, voluntary close offered -->
+        <div v-if="dayStatus.canTransact && !dayStatus.hasUnclosedDays && !voluntaryMode" class="dc-status-ok">
           <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
           <p>Gün açık — tüm kapanışlar tamamlanmış, işlem yapabilirsiniz.</p>
           <p v-if="dayStatus.lastClosedDate" class="dc-meta">Son kapanış: {{ formatDate(dayStatus.lastClosedDate) }}</p>
+          <button class="dc-btn dc-btn-submit" @click="voluntaryMode = true">
+            <span class="material-symbols-outlined" aria-hidden="true">lock_clock</span>
+            Bugünü Kapat
+          </button>
         </div>
 
-        <!-- Closure required -->
+        <!-- Closure required or voluntary -->
         <template v-else>
-          <div class="dc-warning-bar">
+          <div v-if="dayStatus.blockReason" class="dc-warning-bar">
             <span class="material-symbols-outlined" aria-hidden="true">warning</span>
             <span>{{ dayStatus.blockReason }}</span>
+          </div>
+          <div v-else class="dc-info-bar">
+            <span class="material-symbols-outlined" aria-hidden="true">info</span>
+            <span>Bugünün ({{ formatDate(dayStatus.currentBusinessDate) }}) gün sonu kapanışını yapıyorsunuz.</span>
           </div>
 
           <div v-if="dayStatus.unclosedDayCount > 1" class="dc-info-bar">

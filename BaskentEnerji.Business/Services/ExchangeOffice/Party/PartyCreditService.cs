@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using BaskentEnerji.Business.Infrastructure.ExchangeOffice.Party;
+using BaskentEnerji.Business.Services.Permission;
 using BaskentEnerji.Data.Contexts;
 using BaskentEnerji.Entity.Entities.ExchangeOffice.Party;
 using BaskentEnerji.Entity.Modals.RequestModals.ExchangeService.Party;
@@ -8,6 +9,8 @@ using BaskentEnerji.Entity.Modals.ViewModals.ExchangeOffice.Party;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
+using BaskentEnerji.Business.Exceptions;
 using System.Threading.Tasks;
 
 namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
@@ -16,15 +19,25 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
     {
         private readonly BaskentEnerjiDbContext _context;
         private readonly ILogger<PartyCreditService> _logger;
+        private readonly ValidationService _validationService;
 
-        public PartyCreditService(BaskentEnerjiDbContext context, ILogger<PartyCreditService> logger)
+        public PartyCreditService(BaskentEnerjiDbContext context, ILogger<PartyCreditService> logger, ValidationService validationService)
         {
             _context = context;
             _logger = logger;
+            _validationService = validationService;
         }
 
         public async Task<vm_partycreditlimit> SetCreditLimitAsync(rm_partycreditlimit request)
         {
+            var partyOfficeId = await _context.Parties
+                .Where(p => p.Id == request.PartyId)
+                .Select(p => p.OfficeId)
+                .FirstOrDefaultAsync();
+            if (partyOfficeId == default)
+                throw new ApiException(HttpStatusCode.NotFound, "Party not found.");
+            await _validationService.EnsureNotViewerAsync(partyOfficeId);
+
             var creditLimit = new PartyCreditLimit
             {
                 PartyId = request.PartyId,

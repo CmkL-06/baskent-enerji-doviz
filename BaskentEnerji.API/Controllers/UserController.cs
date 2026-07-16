@@ -107,6 +107,27 @@ namespace BaskentEnerji.API.Controllers
             return await _userServiceQuery.GetUser(FilterData);
         }
 
+        [HttpGet("activity")]
+        [Authorize]
+        public async Task<List<vm_user_activity>> GetUserActivity()
+        {
+            return await _userServiceQuery.GetUserActivityList();
+        }
+
+        [HttpGet("{id}/login-history")]
+        [Authorize]
+        public async Task<List<vm_user_login_history_entry>> GetUserLoginHistory(Guid id, [FromQuery] int? year, [FromQuery] int? month)
+        {
+            return await _userServiceQuery.GetUserLoginHistory(id, year, month);
+        }
+
+        [HttpGet("{id}/daily-detail")]
+        [Authorize]
+        public async Task<vm_user_daily_detail> GetUserDailyDetail(Guid id, [FromQuery] DateTime date)
+        {
+            return await _userServiceQuery.GetUserDailyDetail(id, date);
+        }
+
         [HttpPost("change-password")]
         [Authorize]
         [EnableRateLimiting("sensitive")]

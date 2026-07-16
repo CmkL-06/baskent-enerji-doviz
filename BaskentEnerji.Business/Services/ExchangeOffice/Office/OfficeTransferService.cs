@@ -56,15 +56,17 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     throw new ApiException(HttpStatusCode.BadRequest,
                         $"Kaynak kasada yeterli bakiye yok. Mevcut: {balance?.Balance ?? 0}");
 
-                // Günlük işlem limiti kontrolü (aynı para birimi bazında)
+                // Günlük işlem limiti kontrolü (aynı para birimi bazında). Sertleştirme: bu sorgu da
+                // UPDLOCK ile okunuyor — az önceki bakiye UPDLOCK'u aynı transaction içinde zaten
+                // eşzamanlı transferleri serileştiriyor (test ile doğrulandı), ancak bu ek kilit,
+                // ileride bakiye kontrolünün kaldırılması/değişmesi durumunda dahi bu kontrolün
+                // kendi başına race'e açık kalmamasını garantiler.
                 if (sourceVault.Office.DailyTransactionLimit.HasValue)
                 {
                     var todayStart = DateTime.UtcNow.Date;
                     var dailyTotal = await _db.OfficeTransfers
-                        .Where(t => t.SourceVaultId == model.SourceVaultId
-                            && t.CurrencyId == model.CurrencyId
-                            && t.Status == TransferStatus.Completed
-                            && t.CreatedDate >= todayStart)
+                        .FromSqlRaw("SELECT * FROM OfficeTransfers WITH (UPDLOCK) WHERE SourceVaultId = {0} AND CurrencyId = {1} AND Status = {2} AND CreatedDate >= {3}",
+                            model.SourceVaultId, model.CurrencyId, (int)TransferStatus.Completed, todayStart)
                         .SumAsync(t => t.Amount);
 
                     if (dailyTotal + model.Amount > sourceVault.Office.DailyTransactionLimit.Value)
@@ -77,10 +79,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 {
                     var monthStart = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
                     var monthlyTotal = await _db.OfficeTransfers
-                        .Where(t => t.SourceVaultId == model.SourceVaultId
-                            && t.CurrencyId == model.CurrencyId
-                            && t.Status == TransferStatus.Completed
-                            && t.CreatedDate >= monthStart)
+                        .FromSqlRaw("SELECT * FROM OfficeTransfers WITH (UPDLOCK) WHERE SourceVaultId = {0} AND CurrencyId = {1} AND Status = {2} AND CreatedDate >= {3}",
+                            model.SourceVaultId, model.CurrencyId, (int)TransferStatus.Completed, monthStart)
                         .SumAsync(t => t.Amount);
 
                     if (monthlyTotal + model.Amount > sourceVault.Office.MonthlyTransactionLimit.Value)
@@ -171,6 +171,37 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
                     if (sourceBalance == null || sourceBalance.Balance < transfer.Amount)
                         throw new ApiException(HttpStatusCode.BadRequest, "Kaynak kasada yeterli bakiye kalmadı.");
+
+                    // Sertleştirme: talep oluşturulduğunda (eşik üstü olduğu için onaya düştüğünde)
+                    // günlük/aylık limit kontrol edilmişti, ama onay anına kadar geçen sürede aynı
+                    // kasadan başka otomatik transferler gerçekleşmiş olabilir. Onay anında limitler
+                    // tekrar kontrol edilmezse eşik atlatılabilirdi.
+                    var office = transfer.SourceVault.Office;
+                    if (office.DailyTransactionLimit.HasValue)
+                    {
+                        var todayStart = DateTime.UtcNow.Date;
+                        var dailyTotal = await _db.OfficeTransfers
+                            .FromSqlRaw("SELECT * FROM OfficeTransfers WITH (UPDLOCK) WHERE SourceVaultId = {0} AND CurrencyId = {1} AND Status = {2} AND CreatedDate >= {3}",
+                                transfer.SourceVaultId, transfer.CurrencyId, (int)TransferStatus.Completed, todayStart)
+                            .SumAsync(t => t.Amount);
+
+                        if (dailyTotal + transfer.Amount > office.DailyTransactionLimit.Value)
+                            throw new ApiException(HttpStatusCode.BadRequest,
+                                $"Günlük işlem limiti onay anında aşıldı. Limit: {office.DailyTransactionLimit.Value:N0}, Bugünkü toplam: {dailyTotal:N0}");
+                    }
+
+                    if (office.MonthlyTransactionLimit.HasValue)
+                    {
+                        var monthStart = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+                        var monthlyTotal = await _db.OfficeTransfers
+                            .FromSqlRaw("SELECT * FROM OfficeTransfers WITH (UPDLOCK) WHERE SourceVaultId = {0} AND CurrencyId = {1} AND Status = {2} AND CreatedDate >= {3}",
+                                transfer.SourceVaultId, transfer.CurrencyId, (int)TransferStatus.Completed, monthStart)
+                            .SumAsync(t => t.Amount);
+
+                        if (monthlyTotal + transfer.Amount > office.MonthlyTransactionLimit.Value)
+                            throw new ApiException(HttpStatusCode.BadRequest,
+                                $"Aylık işlem limiti onay anında aşıldı. Limit: {office.MonthlyTransactionLimit.Value:N0}, Bu ayki toplam: {monthlyTotal:N0}");
+                    }
 
                     sourceBalance.Balance -= transfer.Amount;
 

@@ -1106,7 +1106,8 @@ namespace BaskentEnerji.Data.Migrations
 
                     b.HasIndex("CurrencyId");
 
-                    b.HasIndex("VaultId");
+                    b.HasIndex("VaultId", "CurrencyId")
+                        .IsUnique();
 
                     b.ToTable("CurrencyWacs");
                 });
@@ -1228,6 +1229,12 @@ namespace BaskentEnerji.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("ApprovedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime>("BusinessDate")
                         .HasColumnType("datetime2");
 
@@ -1249,6 +1256,10 @@ namespace BaskentEnerji.Data.Migrations
 
                     b.Property<Guid>("OfficeId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("RejectionNote")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
@@ -1467,12 +1478,6 @@ namespace BaskentEnerji.Data.Migrations
                     b.Property<string>("Notes")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<Guid?>("OfficeId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid?>("OfficeId1")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<DateTime?>("ProcessedAt")
                         .HasColumnType("datetime2");
 
@@ -1496,10 +1501,6 @@ namespace BaskentEnerji.Data.Migrations
                     b.HasIndex("ApprovedByUserId");
 
                     b.HasIndex("CurrencyId");
-
-                    b.HasIndex("OfficeId");
-
-                    b.HasIndex("OfficeId1");
 
                     b.HasIndex("RequestedByUserId");
 
@@ -1764,6 +1765,12 @@ namespace BaskentEnerji.Data.Migrations
 
                     b.Property<Guid>("CurrencyId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("DeletedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("DeletedReason")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Description")
                         .HasColumnType("nvarchar(max)");
@@ -3611,6 +3618,10 @@ namespace BaskentEnerji.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("DealerId"));
 
+                    b.Property<string>("Address")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
                     b.Property<string>("ApiKey")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
@@ -3622,6 +3633,10 @@ namespace BaskentEnerji.Data.Migrations
                     b.Property<decimal>("Balance")
                         .HasPrecision(18, 4)
                         .HasColumnType("decimal(18,4)");
+
+                    b.Property<string>("City")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<decimal>("CommissionRate")
                         .HasPrecision(18, 6)
@@ -3648,6 +3663,9 @@ namespace BaskentEnerji.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<int>("DealerType")
+                        .HasColumnType("int");
+
                     b.Property<string>("ExchangeName")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
@@ -3665,6 +3683,83 @@ namespace BaskentEnerji.Data.Migrations
                     b.HasKey("DealerId");
 
                     b.ToTable("TgDealers");
+                });
+
+            modelBuilder.Entity("BaskentEnerji.Entity.Entities.Telegram.TgDealerRate", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("BuyRate")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<int>("DealerId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("SellRate")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DealerId", "Currency")
+                        .IsUnique();
+
+                    b.ToTable("TgDealerRates");
+                });
+
+            modelBuilder.Entity("BaskentEnerji.Entity.Entities.Telegram.TgDealerRateHistory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("ChangedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<int>("DealerId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("NewBuyRate")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<decimal>("NewSellRate")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<decimal>("OldBuyRate")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<decimal>("OldSellRate")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DealerId", "Currency", "ChangedAt");
+
+                    b.ToTable("TgDealerRateHistories");
                 });
 
             modelBuilder.Entity("BaskentEnerji.Entity.Entities.Telegram.TgExchangeRate", b =>
@@ -3828,8 +3923,20 @@ namespace BaskentEnerji.Data.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
 
+                    b.Property<string>("CustomerAddress")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
                     b.Property<long?>("CustomerId")
                         .HasColumnType("bigint");
+
+                    b.Property<string>("CustomerPhone")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("DeliveryMethod")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<decimal?>("ExchangeRate")
                         .HasPrecision(18, 6)
@@ -3860,6 +3967,9 @@ namespace BaskentEnerji.Data.Migrations
                     b.Property<string>("Txid")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("VaultId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.HasKey("TransactionId");
 
@@ -3896,8 +4006,14 @@ namespace BaskentEnerji.Data.Migrations
                     b.Property<string>("LanguageCode")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<DateTime?>("LastActivityDate")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("LastIp")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("LastLoginDate")
+                        .HasColumnType("datetime2");
 
                     b.Property<DateTime?>("LastPasswordChangeDate")
                         .HasColumnType("datetime2");
@@ -3932,6 +4048,52 @@ namespace BaskentEnerji.Data.Migrations
                     b.HasIndex("OfficeId");
 
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("BaskentEnerji.Entity.Entities.User.UserActivityHistory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("PingDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("UserActivityHistories");
+                });
+
+            modelBuilder.Entity("BaskentEnerji.Entity.Entities.User.UserLoginHistory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("LoginDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("UserLoginHistories");
                 });
 
             modelBuilder.Entity("BaskentEnerji.Entity.Entities.Blog.Blog_Article", b =>
@@ -4471,14 +4633,6 @@ namespace BaskentEnerji.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("BaskentEnerji.Entity.Entities.ExchangeOffice.Office.Office", null)
-                        .WithMany("IncomingTransfers")
-                        .HasForeignKey("OfficeId");
-
-                    b.HasOne("BaskentEnerji.Entity.Entities.ExchangeOffice.Office.Office", null)
-                        .WithMany("OutgoingTransfers")
-                        .HasForeignKey("OfficeId1");
-
                     b.HasOne("BaskentEnerji.Entity.Entities.User.User", "RequestedBy")
                         .WithMany()
                         .HasForeignKey("RequestedByUserId")
@@ -4517,13 +4671,13 @@ namespace BaskentEnerji.Data.Migrations
                     b.HasOne("BaskentEnerji.Entity.Entities.User.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("BaskentEnerji.Entity.Entities.ExchangeOffice.Office.Vault", "Vault")
                         .WithMany("Transactions")
                         .HasForeignKey("VaultId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Party");
@@ -4538,7 +4692,7 @@ namespace BaskentEnerji.Data.Migrations
                     b.HasOne("BaskentEnerji.Entity.Entities.ExchangeOffice.Currency.Currency", "Currency")
                         .WithMany()
                         .HasForeignKey("CurrencyId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("BaskentEnerji.Entity.Entities.ExchangeOffice.Office.Transaction", "Transaction")
@@ -5058,6 +5212,28 @@ namespace BaskentEnerji.Data.Migrations
                     b.Navigation("Transaction");
                 });
 
+            modelBuilder.Entity("BaskentEnerji.Entity.Entities.Telegram.TgDealerRate", b =>
+                {
+                    b.HasOne("BaskentEnerji.Entity.Entities.Telegram.TgDealer", "Dealer")
+                        .WithMany()
+                        .HasForeignKey("DealerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Dealer");
+                });
+
+            modelBuilder.Entity("BaskentEnerji.Entity.Entities.Telegram.TgDealerRateHistory", b =>
+                {
+                    b.HasOne("BaskentEnerji.Entity.Entities.Telegram.TgDealer", "Dealer")
+                        .WithMany()
+                        .HasForeignKey("DealerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Dealer");
+                });
+
             modelBuilder.Entity("BaskentEnerji.Entity.Entities.Telegram.TgMessage", b =>
                 {
                     b.HasOne("BaskentEnerji.Entity.Entities.Telegram.TgTransaction", "Transaction")
@@ -5133,10 +5309,6 @@ namespace BaskentEnerji.Data.Migrations
                     b.Navigation("ChildOffices");
 
                     b.Navigation("Employees");
-
-                    b.Navigation("IncomingTransfers");
-
-                    b.Navigation("OutgoingTransfers");
 
                     b.Navigation("Vaults");
                 });

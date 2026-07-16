@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using BaskentEnerji.Business.Exceptions;
 using BaskentEnerji.Business.Infrastructure.ExchangeOffice.Office;
+using BaskentEnerji.Business.Services.Permission;
 using BaskentEnerji.Entity.Modals.RequestModals.ExchangeService.Office;
 using BaskentEnerji.Entity.Modals.ViewModals.ExchangeOFfice.Office;
 using System;
@@ -21,13 +23,16 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
     {
         private readonly IVaultSnapshotService _snapshotService;
         private readonly ILogger<VaultSnapshotController> _logger;
+        private readonly ValidationService _permissionService;
 
         public VaultSnapshotController(
             IVaultSnapshotService snapshotService,
-            ILogger<VaultSnapshotController> logger)
+            ILogger<VaultSnapshotController> logger,
+            ValidationService permissionService)
         {
             _snapshotService = snapshotService;
             _logger = logger;
+            _permissionService = permissionService;
         }
 
         /// <summary>
@@ -45,11 +50,17 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
                     return Unauthorized(new { error = "Invalid or missing user identity" });
                 }
 
+                await _permissionService.EnsureNotViewerAsync(request.OfficeId);
+
                 var result = await _snapshotService.CreateSnapshotAsync(request, userId);
                 _logger.LogInformation("Snapshot created successfully for office {OfficeId} by user {UserId}",
                     request.OfficeId, userId);
 
                 return Ok(result);
+            }
+            catch (ApiException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -70,8 +81,14 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         {
             try
             {
+                await _permissionService.ValidateOfficeAccessAsync(officeId);
+
                 var result = await _snapshotService.GetSnapshotsByOfficeAsync(officeId, startDate, endDate);
                 return Ok(result);
+            }
+            catch (ApiException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -91,8 +108,14 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         {
             try
             {
+                await _permissionService.ValidateOfficeAccessAsync(officeId);
+
                 var result = await _snapshotService.GetSnapshotsByDateAsync(officeId, date);
                 return Ok(result);
+            }
+            catch (ApiException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -112,7 +135,12 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             try
             {
                 var result = await _snapshotService.GetSnapshotByIdAsync(snapshotId);
+                await _permissionService.ValidateOfficeAccessAsync(result.OfficeId);
                 return Ok(result);
+            }
+            catch (ApiException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -130,6 +158,9 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         {
             try
             {
+                var snapshot = await _snapshotService.GetSnapshotByIdAsync(snapshotId);
+                await _permissionService.EnsureNotViewerAsync(snapshot.OfficeId);
+
                 var result = await _snapshotService.DeleteSnapshotAsync(snapshotId);
                 if (!result)
                 {
@@ -138,6 +169,10 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
 
                 _logger.LogInformation("Snapshot {SnapshotId} deleted successfully", snapshotId);
                 return Ok(new { message = "Snapshot deleted successfully" });
+            }
+            catch (ApiException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -157,8 +192,15 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         {
             try
             {
+                var snapshot1 = await _snapshotService.GetSnapshotByIdAsync(snapshotId1);
+                await _permissionService.ValidateOfficeAccessAsync(snapshot1.OfficeId);
+
                 var result = await _snapshotService.CompareSnapshotsAsync(snapshotId1, snapshotId2);
                 return Ok(result);
+            }
+            catch (ApiException)
+            {
+                throw;
             }
             catch (Exception ex)
             {

@@ -159,6 +159,31 @@ namespace BaskentEnerji.Data.Contexts
                 .HasForeignKey(a => a.OfficeId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            // Denetim raporu sertleştirmesi: Transaction.User ve TransactionDetail.Currency FK'ları
+            // convention gereği Cascade'e düşüyordu — bir kullanıcı veya para birimi silinirse tüm
+            // işlem geçmişi (finansal kayıtlar) da silinirdi. Restrict'e çekildi.
+            modelBuilder.Entity<Transaction>()
+                .HasOne(t => t.User)
+                .WithMany()
+                .HasForeignKey(t => t.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TransactionDetail>()
+                .HasOne(d => d.Currency)
+                .WithMany()
+                .HasForeignKey(d => d.CurrencyId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Transaction.Vault: canlı veritabanında zaten NO_ACTION olarak duruyordu (migration
+            // geçmişi Cascade diyordu — model/canlı sapması). Model burada canlı gerçeğe eşitleniyor.
+            // WithMany(v => v.Transactions) — Vault.Transactions mevcut ters navigasyonla eşleşmeli,
+            // aksi halde EF bunu ayrı bir ilişki sanıp gölge VaultId1 kolonu oluşturur.
+            modelBuilder.Entity<Transaction>()
+                .HasOne(t => t.Vault)
+                .WithMany(v => v.Transactions)
+                .HasForeignKey(t => t.VaultId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             // Telegram MTT FK'lar
             modelBuilder.Entity<TgTransaction>()
                 .HasOne(t => t.Customer)
@@ -274,6 +299,12 @@ namespace BaskentEnerji.Data.Contexts
             {
                 entity.Property(e => e.Wac).HasPrecision(18, 6);
                 entity.Property(e => e.Quantity).HasPrecision(18, 4);
+                // Denetim raporu düzeltmesi: (VaultId, CurrencyId) üzerinde unique kısıt olmadığı için
+                // eşzamanlı ilk-alış işlemleri iki ayrı satır oluşturabiliyordu (WacService.
+                // GetOrCreateWacAsync'teki UPDLOCK, henüz var olmayan bir satırı koruyamaz). Bu kısıt,
+                // veritabanı seviyesinde ikinci eşzamanlı INSERT'i reddederek WacService'teki retry
+                // mantığının devreye girmesini sağlar.
+                entity.HasIndex(e => new { e.VaultId, e.CurrencyId }).IsUnique();
             });
 
             // --- CurrencyWacHistory ---
@@ -314,6 +345,7 @@ namespace BaskentEnerji.Data.Contexts
                 entity.Property(e => e.Balance).HasPrecision(18, 4);
                 entity.Property(e => e.ReservedAmount).HasPrecision(18, 4);
             });
+
 
             // --- VaultBalanceHistory ---
             modelBuilder.Entity<VaultBalanceHistory>(entity =>
@@ -474,6 +506,24 @@ namespace BaskentEnerji.Data.Contexts
                 entity.Property(e => e.CommissionRate).HasPrecision(18, 6);
             });
 
+            // --- TgDealerRate ---
+            modelBuilder.Entity<TgDealerRate>(entity =>
+            {
+                entity.Property(e => e.BuyRate).HasPrecision(18, 6);
+                entity.Property(e => e.SellRate).HasPrecision(18, 6);
+                entity.HasIndex(e => new { e.DealerId, e.Currency }).IsUnique();
+            });
+
+            // --- TgDealerRateHistory ---
+            modelBuilder.Entity<TgDealerRateHistory>(entity =>
+            {
+                entity.Property(e => e.OldBuyRate).HasPrecision(18, 6);
+                entity.Property(e => e.OldSellRate).HasPrecision(18, 6);
+                entity.Property(e => e.NewBuyRate).HasPrecision(18, 6);
+                entity.Property(e => e.NewSellRate).HasPrecision(18, 6);
+                entity.HasIndex(e => new { e.DealerId, e.Currency, e.ChangedAt });
+            });
+
             // --- TgCryptoDeposit ---
             modelBuilder.Entity<TgCryptoDeposit>(entity =>
             {
@@ -513,6 +563,8 @@ namespace BaskentEnerji.Data.Contexts
 
         // User
         public DbSet<User> Users { get; set; } = null!;
+        public DbSet<UserLoginHistory> UserLoginHistories { get; set; } = null!;
+        public DbSet<UserActivityHistory> UserActivityHistories { get; set; } = null!;
 
         // Blog
         public DbSet<Blog_Article> Blog_Articles { get; set; } = null!;
@@ -617,5 +669,7 @@ namespace BaskentEnerji.Data.Contexts
         public DbSet<TgLoginLog> TgLoginLogs { get; set; } = null!;
         public DbSet<TgExchangeRate> TgExchangeRates { get; set; } = null!;
         public DbSet<TgDealer> TgDealers { get; set; } = null!;
+        public DbSet<TgDealerRate> TgDealerRates { get; set; } = null!;
+        public DbSet<TgDealerRateHistory> TgDealerRateHistories { get; set; } = null!;
     }
 }

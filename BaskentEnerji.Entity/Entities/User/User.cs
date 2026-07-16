@@ -24,6 +24,8 @@ namespace BaskentEnerji.Entity.Entities.User
         public string? FirstIp { get; set; }
         public string? LastIp { get; set; }
         public DateTime? LastPasswordChangeDate { get; set; }
+        public DateTime? LastLoginDate { get; set; }
+        public DateTime? LastActivityDate { get; set; }
 
         // Telegram MTT entegrasyonu
         public long? TelegramOperatorId { get; set; }

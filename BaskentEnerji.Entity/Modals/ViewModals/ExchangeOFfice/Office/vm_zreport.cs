@@ -47,7 +47,11 @@ namespace BaskentEnerji.Entity.Modals.ViewModals.ExchangeOFfice.Office
         public Dictionary<string, decimal> TotalVolumesByCurrency { get; set; } // Raw amounts per currency
         public decimal AverageTransactionSize { get; set; }
         public decimal ProfitMargin { get; set; } // Percentage
-        
+
+        // Arbitraj (çapraz kur, iki yabancı bacaklı) işlemlerin kârı — tek bir para birimine
+        // atanamayacağından (her iki bacak da yabancı para) burada ayrıca toplanır.
+        public decimal TotalArbitrageProfit { get; set; }
+
         // Vault Operations Summary
         public decimal VaultDeposits { get; set; } // Total deposits to vault in TRY
         public decimal VaultWithdrawals { get; set; } // Total withdrawals from vault in TRY

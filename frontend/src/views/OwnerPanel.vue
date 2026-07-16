@@ -10,6 +10,8 @@ import OwnerBalances from './owner/OwnerBalances.vue'
 import OwnerReports from './owner/OwnerReports.vue'
 import OwnerQr from './owner/OwnerQr.vue'
 import OwnerVaultInspect from './owner/OwnerVaultInspect.vue'
+import OwnerStaffActivity from './owner/OwnerStaffActivity.vue'
+import OwnerApprovals from './owner/OwnerApprovals.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -23,7 +25,7 @@ onMounted(() => {
   loadAlerts()
 })
 
-type Tab = 'dashboard' | 'branches' | 'transfers' | 'balances' | 'inspect' | 'reports' | 'qr'
+type Tab = 'dashboard' | 'branches' | 'transfers' | 'balances' | 'inspect' | 'reports' | 'qr' | 'staffActivity' | 'approvals'
 const activeTab = ref<Tab>('dashboard')
 const refreshKey = ref(0)
 
@@ -35,6 +37,8 @@ const tabs: { id: Tab; icon: string; label: string }[] = [
   { id: 'inspect',    icon: 'manage_search',     label: 'Kasa İnceleme' },
   { id: 'reports',    icon: 'insert_chart',      label: 'Raporlar' },
   { id: 'qr',         icon: 'qr_code_2',        label: 'QR Oluştur' },
+  { id: 'staffActivity', icon: 'badge',         label: 'Personel Takibi' },
+  { id: 'approvals',  icon: 'fact_check',       label: 'Kapanış Onayları' },
 ]
 
 const alerts = ref<any[]>([])
@@ -60,6 +64,18 @@ async function markAllRead() {
     alerts.value = []
     showAlertPanel.value = false
   } catch {}
+}
+
+function openAlertTarget(a: any) {
+  showAlertPanel.value = false
+  if (a.referenceType === 'BulkEntrySuspected' && a.referenceId) {
+    const [userId, date] = String(a.referenceId).split(':')
+    router.push({ path: '/ihtiyar/owner-panel', query: { tab: 'staffActivity', userId, date } })
+    activeTab.value = 'staffActivity'
+  } else if (a.referenceType === 'DayClosureMissing') {
+    router.push({ path: '/ihtiyar/owner-panel', query: { tab: 'branches' } })
+    activeTab.value = 'branches'
+  }
 }
 
 function severityColor(s: string) {
@@ -105,7 +121,7 @@ function refresh() {
               <span class="material-symbols-outlined" aria-hidden="true">check_circle</span> Okunmamış uyarı yok
             </div>
             <div v-else class="op-alert-list">
-              <div v-for="a in alerts" :key="a.id" class="op-alert-item">
+              <div v-for="a in alerts" :key="a.id" class="op-alert-item" @click="openAlertTarget(a)">
                 <span class="material-symbols-outlined op-alert-icon" :style="{ color: severityColor(a.severity) }">
                   {{ severityIcon(a.severity) }}
                 </span>
@@ -114,7 +130,7 @@ function refresh() {
                   <div class="op-alert-msg">{{ a.message }}</div>
                   <div class="op-alert-meta">{{ a.officeName }}</div>
                 </div>
-                <button class="op-alert-dismiss" @click="markRead(a.id)" title="Okundu">
+                <button class="op-alert-dismiss" @click.stop="markRead(a.id)" title="Okundu">
                   <span class="material-symbols-outlined" aria-hidden="true">close</span>
                 </button>
               </div>
@@ -148,6 +164,8 @@ function refresh() {
     <OwnerVaultInspect v-if="activeTab === 'inspect'"   :key="'vi-' + refreshKey" />
     <OwnerReports     v-if="activeTab === 'reports'"    :key="'r-' + refreshKey" />
     <OwnerQr          v-if="activeTab === 'qr'" />
+    <OwnerStaffActivity v-if="activeTab === 'staffActivity'" :key="'sa-' + refreshKey" />
+    <OwnerApprovals   v-if="activeTab === 'approvals'"  :key="'ap-' + refreshKey" />
   </div>
 </template>
 
@@ -159,7 +177,14 @@ function refresh() {
   margin-bottom: 1.5rem;
 }
 .op-header-left { display: flex; align-items: center; gap: 1rem; }
-.op-crown { font-size: 2.5rem; color: var(--color-secondary); }
+.op-crown {
+  font-size: 1.6rem; color: #fff;
+  width: 52px; height: 52px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, var(--color-secondary), var(--color-primary));
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-glow-primary);
+}
 .op-title { font-size: 1.5rem; font-weight: 800; color: var(--color-text); margin: 0; }
 .op-sub   { font-size: 0.875rem; color: var(--color-text-secondary); margin: 0; }
 .op-refresh-btn {
@@ -183,7 +208,12 @@ function refresh() {
   transition: color .2s, border-bottom-color .2s; white-space: nowrap;
 }
 .op-tab:hover  { color: var(--color-secondary); }
-.op-tab.active { color: var(--color-secondary); border-bottom-color: var(--color-secondary); font-weight: 600; }
+.op-tab.active {
+  color: var(--color-secondary); border-bottom-color: var(--color-secondary); font-weight: 700;
+  border-bottom-width: 3px; margin-bottom: -3px;
+  background: linear-gradient(180deg, var(--color-secondary-light), transparent);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
 .op-tab .material-symbols-outlined { font-size: 1.1rem; }
 
 .op-header-actions { display: flex; align-items: center; gap: 0.75rem; }
@@ -205,7 +235,7 @@ function refresh() {
 
 .op-alert-panel {
   position: absolute; top: 48px; right: 0; width: min(360px, calc(100vw - 2rem)); max-height: 420px;
-  background: white; border-radius: var(--radius-lg); box-shadow: 0 8px 32px rgba(0,0,0,.15);
+  background: white; border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-bold);
   z-index: 100; overflow: hidden;
 }
 .op-alert-header {
@@ -224,6 +254,7 @@ function refresh() {
 }
 .op-alert-list { max-height: 360px; overflow-y: auto; }
 .op-alert-item {
+  cursor: pointer;
   display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--color-bg-page); transition: background .15s;
 }

@@ -23,11 +23,13 @@ export const useExchangeStore = defineStore('exchange', () => {
   }
 
   async function fetchCurrencies() {
-    try { currencies.value = await apiService.getCurrencies() } catch {}
+    try { currencies.value = await apiService.getCurrencies() }
+    catch (e) { console.error('Para birimleri yüklenemedi:', e) }
   }
 
   async function fetchVaults() {
-    try { vaults.value = await apiService.getVaults() } catch {}
+    try { vaults.value = await apiService.getVaults() }
+    catch (e) { console.error('Kasalar yüklenemedi:', e) }
   }
 
   // Load vaults for a specific office (used by ExchangeV2)
@@ -35,7 +37,8 @@ export const useExchangeStore = defineStore('exchange', () => {
     try {
       const data = await apiService.getVaultsByOfficeId(officeId)
       vaults.value = Array.isArray(data) ? data : (data?.items ?? data?.data ?? [])
-    } catch {
+    } catch (e) {
+      console.error('Ofis kasaları yüklenemedi, tüm kasalara geri dönülüyor:', e)
       // fallback: load all vaults
       await fetchVaults()
     }
@@ -50,7 +53,7 @@ export const useExchangeStore = defineStore('exchange', () => {
         const match = savedId ? offices.value.find((o: any) => o.officeId === savedId || o.id === savedId) : null
         selectedOffice.value = match ?? offices.value[0]
       }
-    } catch {}
+    } catch (e) { console.error('Ofisler yüklenemedi:', e) }
   }
 
   // Alias used by ModernLayout.vue
@@ -61,7 +64,7 @@ export const useExchangeStore = defineStore('exchange', () => {
       const id = officeId ?? selectedOffice.value?.officeId ?? currentOfficeId.value
       const data = await apiService.getExchangeRates(id ?? undefined)
       exchangeRates.value = Array.isArray(data) ? data : (data?.items ?? data?.data ?? [])
-    } catch {}
+    } catch (e) { console.error('Döviz kurları yüklenemedi:', e) }
   }
 
   function getExchangeRate(sourceCurrencyId: string, targetCurrencyId: string, transactionType: string): number | null {

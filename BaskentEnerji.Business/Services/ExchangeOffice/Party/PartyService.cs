@@ -34,6 +34,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
             //_cacheClearService.ClearAllCaches();
             try
             {
+                await _validationService.EnsureNotViewerAsync(request.OfficeId);
+
                 // Validate party code uniqueness
                // var exists = await _context.Parties
                   //  .AnyAsync(p => p.PartyCode == request.PartyCode && p.OfficeId == request.OfficeId);
@@ -134,6 +136,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
                 {
                     throw new InvalidOperationException("Party not found.");
                 }
+
+                await _validationService.EnsureNotViewerAsync(party.OfficeId);
 
                 // Validate party code uniqueness if changed
                 if (party.PartyCode != request.PartyCode)
@@ -443,6 +447,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
                 {
                     throw new InvalidOperationException("Party not found.");
                 }
+
+                await _validationService.EnsureNotViewerAsync(party.OfficeId);
 
                 // Remove all account entries first
                 if (party.Accounts != null)

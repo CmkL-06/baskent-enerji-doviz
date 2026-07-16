@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useExchangeStore } from '@/stores/exchange'
 import apiService from '@/services/apiservice'
-import { getCurrencyFlagImg } from '@/utils/currency'
+import { getCurrencyFlagImg, formatAmount } from '@/utils/currency'
 import AppKpiCard from '@/components/common/AppKpiCard.vue'
 import AppPageHeader from '@/components/common/AppPageHeader.vue'
 import AppEmptyState from '@/components/common/AppEmptyState.vue'
@@ -67,8 +67,7 @@ const officeId = computed(() =>
   exchangeStore.selectedOffice?.officeId ?? exchangeStore.offices[0]?.officeId
 )
 
-const formatCurrency = (amount: number): string =>
-  new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 4, maximumFractionDigits: 4 }).format(amount)
+const formatCurrency = (amount: number): string => formatAmount(amount, 4)
 
 const formatDateTime = (d: string | null | undefined): string => {
   if (!d) return '-'
@@ -555,7 +554,7 @@ onMounted(async () => {
 .btn-primary:disabled { opacity: .6; cursor: not-allowed; }
 .btn-secondary {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 8px 16px; background: #fff; color: var(--color-text);
+  padding: 8px 16px; background: var(--color-bg-card); color: var(--color-text);
   border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: 13px; font-weight: 500; cursor: pointer;
 }
 .btn-secondary:hover { background: var(--color-bg-page); }
@@ -600,12 +599,13 @@ onMounted(async () => {
 /* Settings */
 .settings-panel { max-width: 800px; }
 .settings-section {
-  background: #fff; border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+  background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-bold);
   padding: 20px; margin-bottom: 16px;
 }
 .settings-section h3 {
-  font-size: 14px; font-weight: 600; color: var(--color-text); margin: 0 0 14px;
-  padding-bottom: 8px; border-bottom: 1px solid var(--color-bg-page);
+  font-size: 14px; font-weight: 700; color: var(--color-text); margin: 0 0 14px;
+  padding-bottom: 8px; border-bottom: 2px solid var(--border-strong);
 }
 .settings-footer { padding: 16px 0; }
 
@@ -630,22 +630,23 @@ onMounted(async () => {
 .day-chips { display: flex; gap: 6px; }
 .chip {
   padding: 6px 14px; border-radius: var(--radius-xl); border: 1px solid var(--color-border);
-  background: #fff; font-size: 12px; cursor: pointer; color: var(--color-text);
+  background: var(--color-bg-card); font-size: 12px; cursor: pointer; color: var(--color-text);
 }
 .chip:hover { background: var(--color-bg-page); }
 .chip-active { background: var(--color-secondary-hover); color: #fff; border-color: var(--color-secondary-hover); }
 
 /* Table */
 .table-wrap {
-  background: #fff; border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow-x: auto;
+  background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow-x: auto;
+  box-shadow: var(--shadow-md);
 }
 .ar-table {
   width: 100%; border-collapse: collapse; font-size: 13px;
 }
 .ar-table th {
-  padding: 10px 14px; text-align: left; font-weight: 600; color: var(--color-text-secondary);
+  padding: 10px 14px; text-align: left; font-weight: 700; color: var(--color-text-secondary);
   font-size: 11px; text-transform: uppercase; letter-spacing: .5px;
-  border-bottom: 1px solid var(--color-border); background: var(--color-bg-page); white-space: nowrap;
+  border-bottom: 2px solid var(--border-strong); background: var(--color-bg-page); white-space: nowrap;
 }
 .ar-table td {
   padding: 10px 14px; border-bottom: 1px solid var(--color-bg-page); color: var(--color-text);
@@ -673,7 +674,7 @@ onMounted(async () => {
 .source-chip {
   display: flex; align-items: center; gap: 4px;
   padding: 6px 12px; border-radius: var(--radius-md); border: 1px solid var(--color-border);
-  background: #fff; font-size: 12px; font-weight: 500; cursor: pointer;
+  background: var(--color-bg-card); font-size: 12px; font-weight: 500; cursor: pointer;
   transition: border-color 0.2s, background-color 0.2s, color 0.2s;
 }
 .source-chip:hover { border-color: var(--color-secondary-hover); background: var(--color-secondary-light); }
@@ -684,7 +685,7 @@ onMounted(async () => {
 .source-dimmed { opacity: .45; }
 .source-group { margin-bottom: 20px; }
 .source-group h4 { font-size: 14px; font-weight: 600; color: var(--color-text); margin: 0 0 8px; }
-.source-group .ar-table { border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; }
+.source-group .ar-table { border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--shadow-md); }
 .status-ok { color: var(--color-success); font-size: 12px; font-weight: 500; }
 .status-err { color: var(--color-danger); font-size: 12px; font-weight: 500; cursor: help; }
 

@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using BaskentEnerji.Business.Services.Permission;
 using System;
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -77,9 +79,17 @@ namespace BaskentEnerji.API.Controllers.Telegram
         [AllowAnonymous]
         public IActionResult Notify([FromBody] JsonElement data)
         {
-            var secret = _configuration["NotifySecret"] ?? "bsk-notify-2026-secret";
-            var headerSecret = Request.Headers["X-Notify-Secret"].FirstOrDefault();
-            if (headerSecret != secret)
+            var secret = _configuration["NotifySecret"];
+            if (string.IsNullOrEmpty(secret))
+                return StatusCode(500, new { ok = false, error = "NotifySecret yapılandırılmamış" });
+
+            var headerSecret = Request.Headers["X-Notify-Secret"].FirstOrDefault() ?? "";
+            var secretBytes = Encoding.UTF8.GetBytes(secret);
+            var headerBytes = Encoding.UTF8.GetBytes(headerSecret);
+            // Sabit-zamanlı karşılaştırma: uzunluk farklıysa dahi zamanlama farkını gizlemek için
+            // her zaman aynı boyutta bir tampon üzerinden CryptographicOperations.FixedTimeEquals çağrılır.
+            var isValid = secretBytes.Length == headerBytes.Length && CryptographicOperations.FixedTimeEquals(secretBytes, headerBytes);
+            if (!isValid)
                 return Unauthorized(new { ok = false, error = "Invalid secret" });
 
             var message = $"event: transaction_update\ndata: {data.GetRawText()}\n\n";

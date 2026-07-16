@@ -2,8 +2,112 @@
 import { ref, computed, onMounted } from 'vue'
 import apiService from '@/services/apiservice'
 import { useNotification } from '@/composables/useNotification'
+import { getCurrencyFlagImg } from '@/utils/currency'
 
 const notification = useNotification()
+
+const USER_RANKS = [
+  { value: 0,  label: 'Yasaklı' },
+  { value: 1,  label: 'Kullanıcı' },
+  { value: 2,  label: 'Müşteri' },
+  { value: 50, label: 'Personel' },
+  { value: 99, label: 'Admin' },
+  { value: 100, label: 'Sahip' },
+]
+
+// --- Personel düzenleme (Owner Panel içinde, ayrı sayfaya gitmeden) ---
+const showUserModal = ref(false)
+const userSaving = ref(false)
+const editUserForm = ref({ id: '', firstname: '', lastname: '', username: '', mail: '', rank: 50 })
+const editUserOfficeId = ref('')
+
+function openUserEdit(u: any, officeId: string) {
+  editUserForm.value = {
+    id: u.id || u.userId || u.user?.id || '',
+    firstname: u.firstname || u.userName || u.user?.firstname || '',
+    lastname: u.lastname || u.user?.lastname || '',
+    username: u.username || u.user?.username || '',
+    mail: u.mail || u.email || u.user?.mail || '',
+    rank: typeof u.rank === 'number' ? u.rank : (typeof u.role === 'number' ? u.role : 50)
+  }
+  editUserOfficeId.value = officeId
+  showUserModal.value = true
+}
+
+async function saveUserEdit() {
+  if (!editUserForm.value.id) return
+  userSaving.value = true
+  try {
+    await apiService.updateUser({
+      Id: editUserForm.value.id,
+      username: editUserForm.value.username,
+      mail: editUserForm.value.mail,
+      firstname: editUserForm.value.firstname,
+      lastname: editUserForm.value.lastname,
+      rank: editUserForm.value.rank
+    })
+    notification.success('Personel bilgileri güncellendi')
+    showUserModal.value = false
+    if (editUserOfficeId.value) await toggleExpand(editUserOfficeId.value, true)
+  } catch (e: any) {
+    notification.error(e.response?.data?.message || 'Güncelleme başarısız')
+  } finally {
+    userSaving.value = false
+  }
+}
+
+async function removeUserFromCurrentOffice() {
+  if (!editUserForm.value.id || !editUserOfficeId.value) return
+  if (!confirm('Bu personeli şubeden kaldırmak istediğinize emin misiniz?')) return
+  userSaving.value = true
+  try {
+    await apiService.removeOfficeFromUser(editUserForm.value.id, editUserOfficeId.value)
+    notification.success('Personel şubeden kaldırıldı')
+    showUserModal.value = false
+    await toggleExpand(editUserOfficeId.value, true)
+  } catch (e: any) {
+    notification.error(e.response?.data?.message || 'İşlem başarısız')
+  } finally {
+    userSaving.value = false
+  }
+}
+
+// --- Kasa bakiyesi düzenleme (Owner Panel içinde) ---
+const showVaultModal = ref(false)
+const vaultSaving = ref(false)
+const editVault = ref<any>(null)
+const vaultBalanceEdits = ref<Record<string, number>>({})
+
+function openVaultEdit(v: any) {
+  editVault.value = v
+  const edits: Record<string, number> = {}
+  for (const b of (v.balances || [])) edits[b.currencyId] = b.balance
+  vaultBalanceEdits.value = edits
+  showVaultModal.value = true
+}
+
+async function saveVaultBalance(currencyId: string) {
+  if (!editVault.value) return
+  const vaultId = editVault.value.id || editVault.value.vaultId
+  vaultSaving.value = true
+  try {
+    await apiService.updateVaultBalance({
+      vaultId,
+      currencyId,
+      amount: vaultBalanceEdits.value[currencyId],
+      isEntireBalance: true,
+      description: 'Owner Panel üzerinden manuel düzeltme'
+    })
+    notification.success('Bakiye güncellendi')
+    if (expandedId.value) await toggleExpand(expandedId.value, true)
+    const refreshed = expandedVaults.value.find((x: any) => (x.id || x.vaultId) === vaultId)
+    if (refreshed) editVault.value = refreshed
+  } catch (e: any) {
+    notification.error(e.response?.data?.message || 'Bakiye güncellenemedi')
+  } finally {
+    vaultSaving.value = false
+  }
+}
 
 const offices = ref<any[]>([])
 const loading = ref(true)
@@ -64,8 +168,8 @@ async function loadData() {
   }
 }
 
-async function toggleExpand(officeId: string) {
-  if (expandedId.value === officeId) { expandedId.value = null; return }
+async function toggleExpand(officeId: string, force = false) {
+  if (!force && expandedId.value === officeId) { expandedId.value = null; return }
   expandedId.value = officeId
   expandedLoading.value = true
   expandedVaults.value = []
@@ -196,7 +300,7 @@ function assetPercent(o: any) {
     <!-- Summary Stats -->
     <div class="ob-stats-row">
       <div class="ob-stat-card">
-        <div class="ob-stat-icon" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6;">
+        <div class="ob-stat-icon" style="background: #3b82f6;">
           <span class="material-symbols-outlined" aria-hidden="true">domain</span>
         </div>
         <div class="ob-stat-info">
@@ -205,7 +309,7 @@ function assetPercent(o: any) {
         </div>
       </div>
       <div class="ob-stat-card">
-        <div class="ob-stat-icon" style="background: rgba(168, 85, 247, 0.1); color: #a855f7;">
+        <div class="ob-stat-icon" style="background: #a855f7;">
           <span class="material-symbols-outlined" aria-hidden="true">account_balance_wallet</span>
         </div>
         <div class="ob-stat-info">
@@ -214,7 +318,7 @@ function assetPercent(o: any) {
         </div>
       </div>
       <div class="ob-stat-card">
-        <div class="ob-stat-icon" style="background: rgba(34, 197, 94, 0.1); color: #22c55e;">
+        <div class="ob-stat-icon" style="background: #22c55e;">
           <span class="material-symbols-outlined" aria-hidden="true">groups</span>
         </div>
         <div class="ob-stat-info">
@@ -223,7 +327,7 @@ function assetPercent(o: any) {
         </div>
       </div>
       <div class="ob-stat-card">
-        <div class="ob-stat-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">
+        <div class="ob-stat-icon" style="background: #f59e0b;">
           <span class="material-symbols-outlined" aria-hidden="true">account_balance</span>
         </div>
         <div class="ob-stat-info">
@@ -395,8 +499,15 @@ function assetPercent(o: any) {
                   <div v-else class="ob-vault-list">
                     <div v-for="v in expandedVaults" :key="v.id || v.vaultId" class="ob-vault-item">
                       <div class="ob-vault-name">
-                        <span class="material-symbols-outlined" aria-hidden="true">lock</span>
-                        {{ v.name || v.vaultName }}
+                        <span class="ob-vault-icon"><span class="material-symbols-outlined" aria-hidden="true">lock</span></span>
+                        <span class="ob-vault-name-text">{{ v.name || v.vaultName }}</span>
+                        <button
+                          class="ob-row-edit-btn"
+                          title="Kasayı düzenle / say"
+                          @click="openVaultEdit(v)"
+                        >
+                          <span class="material-symbols-outlined" aria-hidden="true">edit</span>
+                        </button>
                       </div>
                       <div class="ob-vault-balances">
                         <div
@@ -404,7 +515,12 @@ function assetPercent(o: any) {
                           :key="b.currencyCode"
                           class="ob-bal-row"
                         >
-                          <span class="ob-bal-code">{{ b.currencyCode }}</span>
+                          <span class="ob-bal-currency">
+                            <span v-if="b.currencyCode === 'USDT'" class="ob-bal-badge ob-bal-badge--usdt">₮</span>
+                            <img v-else-if="getCurrencyFlagImg(b.currencyCode)" :src="getCurrencyFlagImg(b.currencyCode)" :alt="b.currencyCode" class="ob-bal-flag" />
+                            <span v-else class="ob-bal-badge">{{ b.currencyCode.slice(0, 1) }}</span>
+                            <span class="ob-bal-code">{{ b.currencyCode }}</span>
+                          </span>
                           <span class="ob-bal-amount ob-mono">{{ fmtMoney(b.balance) }}</span>
                           <span
                             v-if="expandedWacs[v.id || v.vaultId]?.[b.currencyId] > 0"
@@ -418,6 +534,7 @@ function assetPercent(o: any) {
                           v-if="!(v.balances || []).some((x: any) => x.balance > 0)"
                           class="ob-bal-empty"
                         >
+                          <span class="material-symbols-outlined" aria-hidden="true">inbox</span>
                           Bakiye bulunmuyor
                         </div>
                       </div>
@@ -438,7 +555,7 @@ function assetPercent(o: any) {
                   </div>
                   <div v-else class="ob-user-list">
                     <div v-for="u in expandedUsers" :key="u.id || u.userId" class="ob-user-item">
-                      <div class="ob-user-avatar">
+                      <div :class="['ob-user-avatar', roleBadgeClass(u.rank ?? u.role ?? u.officeRole ?? '')]">
                         {{ (u.firstname || u.userName || u.user?.firstname || '?')[0].toUpperCase() }}
                       </div>
                       <div class="ob-user-info">
@@ -448,6 +565,13 @@ function assetPercent(o: any) {
                       <span :class="['ob-role-badge', roleBadgeClass(u.rank ?? u.role ?? u.officeRole ?? '')]">
                         {{ roleLabel(u.rank ?? u.role ?? u.officeRole ?? '') }}
                       </span>
+                      <button
+                        class="ob-row-edit-btn"
+                        title="Personeli düzenle"
+                        @click="openUserEdit(u, o.officeId)"
+                      >
+                        <span class="material-symbols-outlined" aria-hidden="true">edit</span>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -549,6 +673,108 @@ function assetPercent(o: any) {
         </div>
       </Transition>
     </Teleport>
+
+    <!-- Personel Düzenleme Modalı -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="showUserModal" class="ob-overlay" @click.self="showUserModal = false">
+          <div class="ob-modal ob-modal--sm">
+            <div class="ob-modal-header">
+              <div class="ob-modal-title-block">
+                <span class="material-symbols-outlined" aria-hidden="true">edit</span>
+                <h3>Personeli Düzenle</h3>
+              </div>
+              <button class="ob-modal-close" @click="showUserModal = false">
+                <span class="material-symbols-outlined" aria-hidden="true">close</span>
+              </button>
+            </div>
+            <div class="ob-modal-body">
+              <div class="ob-field-row">
+                <div class="ob-field">
+                  <label>Ad</label>
+                  <input v-model="editUserForm.firstname" type="text" class="ob-input" />
+                </div>
+                <div class="ob-field">
+                  <label>Soyad</label>
+                  <input v-model="editUserForm.lastname" type="text" class="ob-input" />
+                </div>
+              </div>
+              <div class="ob-field">
+                <label>Kullanıcı Adı</label>
+                <input v-model="editUserForm.username" type="text" class="ob-input" />
+              </div>
+              <div class="ob-field">
+                <label>E-posta</label>
+                <input v-model="editUserForm.mail" type="email" class="ob-input" />
+              </div>
+              <div class="ob-field">
+                <label>Yetki Seviyesi</label>
+                <div class="ob-rank-chips">
+                  <button
+                    v-for="r in USER_RANKS" :key="r.value"
+                    type="button"
+                    :class="['ob-rank-chip', { active: editUserForm.rank === r.value }]"
+                    @click="editUserForm.rank = r.value"
+                  >{{ r.label }}</button>
+                </div>
+              </div>
+            </div>
+            <div class="ob-modal-footer">
+              <button class="ob-btn ob-btn-ghost ob-btn-danger" :disabled="userSaving" @click="removeUserFromCurrentOffice">
+                <span class="material-symbols-outlined" aria-hidden="true">person_remove</span>
+                Şubeden Kaldır
+              </button>
+              <button class="ob-btn ob-btn-primary" :disabled="userSaving" @click="saveUserEdit">
+                <span v-if="userSaving" class="material-symbols-outlined spin">progress_activity</span>
+                <span class="material-symbols-outlined" aria-hidden="true" v-else>save</span>
+                {{ userSaving ? 'Kaydediliyor...' : 'Kaydet' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- Kasa Bakiyesi Düzenleme Modalı -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="showVaultModal" class="ob-overlay" @click.self="showVaultModal = false">
+          <div class="ob-modal ob-modal--sm">
+            <div class="ob-modal-header">
+              <div class="ob-modal-title-block">
+                <span class="material-symbols-outlined" aria-hidden="true">lock</span>
+                <h3>{{ editVault?.name || editVault?.vaultName }}</h3>
+              </div>
+              <button class="ob-modal-close" @click="showVaultModal = false">
+                <span class="material-symbols-outlined" aria-hidden="true">close</span>
+              </button>
+            </div>
+            <div class="ob-modal-body">
+              <p class="ob-modal-hint">Bakiyeyi doğrudan düzenlemek, sistemdeki değeri kalıcı olarak değiştirir. Her para birimi ayrı kaydedilir.</p>
+              <div v-for="b in (editVault?.balances || [])" :key="b.currencyId" class="ob-vault-edit-row">
+                <span class="ob-bal-currency">
+                  <span v-if="b.currencyCode === 'USDT'" class="ob-bal-badge ob-bal-badge--usdt">₮</span>
+                  <img v-else-if="getCurrencyFlagImg(b.currencyCode)" :src="getCurrencyFlagImg(b.currencyCode)" :alt="b.currencyCode" class="ob-bal-flag" />
+                  <span v-else class="ob-bal-badge">{{ b.currencyCode.slice(0, 1) }}</span>
+                  <span class="ob-bal-code">{{ b.currencyCode }}</span>
+                </span>
+                <input
+                  v-model.number="vaultBalanceEdits[b.currencyId]"
+                  type="number" step="any" class="ob-input ob-vault-edit-input"
+                />
+                <button class="ob-btn ob-btn-outline ob-btn-sm" :disabled="vaultSaving" @click="saveVaultBalance(b.currencyId)">
+                  <span class="material-symbols-outlined" aria-hidden="true">save</span>
+                </button>
+              </div>
+              <div v-if="!(editVault?.balances || []).length" class="ob-detail-empty">
+                <span class="material-symbols-outlined" aria-hidden="true">inbox</span>
+                Bu kasada tanımlı bakiye yok
+              </div>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -569,13 +795,15 @@ function assetPercent(o: any) {
   display: flex; align-items: center; gap: 0.75rem;
   background: #fff; border-radius: var(--radius-lg); padding: 1rem 1.25rem;
   border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
   transition: box-shadow .2s;
 }
-.ob-stat-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+.ob-stat-card:hover { box-shadow: var(--shadow-bold); }
 .ob-stat-icon {
   width: 44px; height: 44px; border-radius: var(--radius-md);
   display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
+  flex-shrink: 0; color: #fff;
+  box-shadow: 0 3px 8px -2px rgba(0,0,0,.28);
 }
 .ob-stat-icon .material-symbols-outlined { font-size: 22px; }
 .ob-stat-info { display: flex; flex-direction: column; min-width: 0; }
@@ -592,6 +820,15 @@ function assetPercent(o: any) {
 .ob-section-title {
   display: flex; align-items: center; gap: 0.4rem;
   font-size: 1.05rem; font-weight: 700; color: var(--color-text); margin: 0;
+  position: relative; padding: 0.5rem 0.8rem 0.5rem 1rem;
+  background: linear-gradient(90deg, var(--color-secondary-light), transparent);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  border-bottom: 3px solid var(--color-secondary);
+}
+.ob-section-title::before {
+  content: '';
+  position: absolute; left: 0; top: 0; bottom: 0; width: 5px;
+  background: var(--color-secondary); border-radius: 3px;
 }
 .ob-section-title .material-symbols-outlined { font-size: 20px; color: var(--color-secondary); }
 .ob-subtitle { font-size: 0.8rem; color: var(--color-text-muted); }
@@ -649,13 +886,15 @@ function assetPercent(o: any) {
 .ob-office-card {
   background: #fff;
   border: 1px solid var(--color-border);
+  border-left: 6px solid var(--color-secondary);
   border-radius: var(--radius-lg);
   overflow: hidden;
+  box-shadow: var(--shadow-sm);
   transition: box-shadow .2s, border-color .2s;
 }
-.ob-office-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,.05); }
-.ob-office-card.expanded { border-color: #bfdbfe; box-shadow: 0 2px 12px rgba(59,130,246,.08); }
-.ob-office-card.merkez { border-left: 3px solid var(--color-warning); }
+.ob-office-card:hover { box-shadow: var(--shadow-md); }
+.ob-office-card.expanded { border-color: #bfdbfe; box-shadow: var(--shadow-bold); }
+.ob-office-card.merkez { border-left: 6px solid var(--color-warning); }
 
 .ob-office-main {
   display: flex; align-items: center; gap: 1rem;
@@ -775,67 +1014,110 @@ function assetPercent(o: any) {
 }
 @media (max-width: 768px) { .ob-detail-grid { grid-template-columns: 1fr; } }
 
-.ob-detail-section { background: #f9fafb; padding: 1.25rem; }
+.ob-detail-section { background: #f9fafb; padding: 1.25rem 1.25rem 1.5rem; }
 .ob-detail-header {
-  display: flex; align-items: center; gap: 0.4rem;
-  margin-bottom: 0.75rem;
+  display: flex; align-items: center; gap: 0.5rem;
+  margin-bottom: 0.9rem;
 }
-.ob-detail-header .material-symbols-outlined { font-size: 18px; color: var(--color-text-secondary); }
-.ob-detail-header h4 { margin: 0; font-size: 0.85rem; font-weight: 700; color: var(--color-text-secondary); }
+.ob-detail-header .material-symbols-outlined {
+  font-size: 15px; color: var(--color-secondary);
+  width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
+  background: var(--color-secondary-light); border-radius: var(--radius-md);
+}
+.ob-detail-header h4 { margin: 0; font-size: 0.85rem; font-weight: 700; color: var(--color-text); }
 .ob-detail-count {
   margin-left: auto; font-size: 0.65rem; font-weight: 700;
-  background: var(--color-border); color: var(--color-text-secondary); padding: 1px 6px; border-radius: var(--radius-md);
+  background: var(--color-border); color: var(--color-text-secondary); padding: 1px 7px; border-radius: 999px;
 }
 .ob-detail-empty {
-  display: flex; align-items: center; gap: 0.5rem;
-  font-size: 0.8rem; color: var(--color-text-muted); padding: 1rem 0;
+  display: flex; flex-direction: column; align-items: center; gap: 0.4rem;
+  font-size: 0.8rem; color: var(--color-text-muted); padding: 1.75rem 0;
+  background: #fff; border-radius: var(--radius-md); border: 1px dashed var(--color-border);
 }
-.ob-detail-empty .material-symbols-outlined { font-size: 18px; }
+.ob-detail-empty .material-symbols-outlined { font-size: 22px; color: var(--color-border); background: none; width: auto; height: auto; }
 
 /* Vault Items */
-.ob-vault-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.ob-vault-list { display: flex; flex-direction: column; gap: 0.6rem; }
 .ob-vault-item {
-  background: #fff; border-radius: var(--radius-md); padding: 0.75rem;
-  border: 1px solid var(--color-border);
+  background: #fff; border-radius: var(--radius-lg); padding: 0.9rem 1rem;
+  border: 1px solid var(--color-border); box-shadow: 0 1px 2px rgba(15,23,42,.04);
 }
 .ob-vault-name {
-  display: flex; align-items: center; gap: 0.35rem;
-  font-weight: 600; font-size: 0.82rem; color: var(--color-text); margin-bottom: 0.5rem;
-}
-.ob-vault-name .material-symbols-outlined { font-size: 16px; color: var(--color-text-secondary); }
-.ob-vault-balances { display: flex; flex-direction: column; gap: 3px; }
-.ob-bal-row {
   display: flex; align-items: center; gap: 0.5rem;
-  font-size: 0.78rem; padding: 2px 0;
+  font-weight: 700; font-size: 0.85rem; color: var(--color-text); margin-bottom: 0.65rem;
+  padding-bottom: 0.6rem; border-bottom: 1px solid var(--color-border);
 }
-.ob-bal-code { font-weight: 700; color: var(--color-secondary); min-width: 40px; }
-.ob-bal-amount { color: var(--color-text); }
+.ob-vault-name-text { flex: 1; }
+.ob-row-edit-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: var(--radius-md);
+  background: transparent; border: none; color: var(--color-text-muted);
+  cursor: pointer; flex-shrink: 0; transition: background-color 0.15s, color 0.15s;
+}
+.ob-row-edit-btn:hover { background: var(--color-secondary-light); color: var(--color-secondary); }
+.ob-row-edit-btn .material-symbols-outlined { font-size: 15px; }
+.ob-vault-icon {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--color-bg-page); color: var(--color-text-secondary);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.ob-vault-icon .material-symbols-outlined { font-size: 13px; }
+.ob-vault-balances { display: flex; flex-direction: column; gap: 2px; }
+.ob-bal-row {
+  display: flex; align-items: center; gap: 0.6rem;
+  font-size: 0.8rem; padding: 5px 2px; border-radius: var(--radius-sm);
+  transition: background-color 0.15s;
+}
+.ob-bal-row:hover { background: var(--color-bg-page); }
+.ob-bal-currency { display: flex; align-items: center; gap: 6px; min-width: 66px; }
+.ob-bal-flag { width: 18px; height: 13px; object-fit: cover; border-radius: 2px; box-shadow: 0 0 0 1px rgba(0,0,0,.06); }
+.ob-bal-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 13px; border-radius: 2px;
+  background: var(--color-border); color: var(--color-text-secondary);
+  font-size: 0.55rem; font-weight: 700; flex-shrink: 0;
+}
+.ob-bal-badge--usdt { background: #26A17B; color: #fff; font-size: 0.65rem; }
+.ob-bal-code { font-weight: 700; color: var(--color-text); }
+.ob-bal-amount { color: var(--color-text); margin-left: auto; font-weight: 600; }
 .ob-wac-chip {
-  font-size: 0.6rem; color: #7c3aed; background: #f5f3ff;
-  padding: 1px 5px; border-radius: 3px; white-space: nowrap;
+  font-size: 0.62rem; color: #7c3aed; background: #f5f3ff;
+  padding: 2px 7px; border-radius: 999px; white-space: nowrap; font-weight: 600;
 }
-.ob-bal-empty { font-size: 0.75rem; color: var(--color-border); font-style: italic; }
+.ob-bal-empty {
+  display: flex; align-items: center; gap: 0.4rem;
+  font-size: 0.78rem; color: var(--color-text-muted); font-style: italic; padding: 0.4rem 0;
+}
+.ob-bal-empty .material-symbols-outlined { font-size: 16px; }
 
 /* User Items */
-.ob-user-list { display: flex; flex-direction: column; gap: 0.35rem; }
+.ob-user-list { display: flex; flex-direction: column; gap: 0.5rem; }
 .ob-user-item {
-  display: flex; align-items: center; gap: 0.6rem;
-  padding: 0.5rem 0.6rem; background: #fff; border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
+  display: flex; align-items: center; gap: 0.7rem;
+  padding: 0.65rem 0.8rem; background: #fff; border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border); box-shadow: 0 1px 2px rgba(15,23,42,.04);
+  transition: box-shadow 0.15s, transform 0.15s;
 }
+.ob-user-item:hover { box-shadow: 0 4px 10px rgba(15,23,42,.08); transform: translateY(-1px); }
 .ob-user-avatar {
-  width: 32px; height: 32px; border-radius: 50%;
+  width: 36px; height: 36px; border-radius: 50%;
   background: linear-gradient(135deg, #6366f1, #3b82f6);
-  color: #fff; font-size: 0.75rem; font-weight: 700;
+  color: #fff; font-size: 0.8rem; font-weight: 700;
   display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
+  flex-shrink: 0; box-shadow: 0 0 0 3px #fff, 0 0 0 4px var(--color-border);
 }
-.ob-user-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.ob-user-name { font-size: 0.82rem; font-weight: 600; color: var(--color-text); }
-.ob-user-mail { font-size: 0.7rem; color: var(--color-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ob-user-avatar.role-owner { background: linear-gradient(135deg, #ec4899, #be185d); }
+.ob-user-avatar.role-manager { background: linear-gradient(135deg, #fbbf24, #b45309); }
+.ob-user-avatar.role-cashier { background: linear-gradient(135deg, var(--color-secondary), var(--color-secondary-hover)); }
+.ob-user-avatar.role-banned { background: linear-gradient(135deg, #f87171, var(--color-danger)); }
+.ob-user-avatar.role-user { background: linear-gradient(135deg, #4ade80, #15803d); }
+.ob-user-avatar.role-viewer { background: linear-gradient(135deg, #9ca3af, #6b7280); }
+.ob-user-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.ob-user-name { font-size: 0.84rem; font-weight: 700; color: var(--color-text); }
+.ob-user-mail { font-size: 0.72rem; color: var(--color-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ob-role-badge {
-  font-size: 0.65rem; font-weight: 700; padding: 2px 8px;
-  border-radius: var(--radius-sm); white-space: nowrap;
+  font-size: 0.65rem; font-weight: 700; padding: 3px 9px;
+  border-radius: 999px; white-space: nowrap; flex-shrink: 0;
 }
 .role-owner { background: #fce7f3; color: #be185d; }
 .role-manager { background: #fef3c7; color: #b45309; }
@@ -854,8 +1136,28 @@ function assetPercent(o: any) {
   background: #fff; border-radius: var(--radius-lg);
   width: 95%; max-width: 580px; max-height: 90vh;
   overflow: hidden; display: flex; flex-direction: column;
-  box-shadow: 0 20px 60px rgba(0,0,0,.15);
+  box-shadow: 0 20px 60px rgba(0,0,0,.2);
 }
+.ob-modal--sm { max-width: 420px; }
+.ob-modal-hint { font-size: 0.78rem; color: var(--color-text-muted); margin: 0 0 1rem; }
+.ob-rank-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.ob-rank-chip {
+  padding: 0.4rem 0.8rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600;
+  border: 1.5px solid var(--color-border); background: #fff; color: var(--color-text-secondary);
+  cursor: pointer; transition: all 0.15s;
+}
+.ob-rank-chip:hover { border-color: var(--color-secondary); }
+.ob-rank-chip.active { background: var(--color-secondary); border-color: var(--color-secondary); color: #fff; }
+.ob-btn-sm { padding: 0.4rem 0.55rem; }
+.ob-btn-danger { color: var(--color-danger); }
+.ob-btn-danger:hover { background: #fef2f2; }
+.ob-vault-edit-row {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.5rem 0; border-bottom: 1px solid var(--color-bg-page);
+}
+.ob-vault-edit-row:last-child { border-bottom: none; }
+.ob-vault-edit-row .ob-bal-currency { min-width: 66px; }
+.ob-vault-edit-input { flex: 1; text-align: right; }
 .ob-modal-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--color-border);
