@@ -16,6 +16,14 @@ namespace BaskentEnerji.Entity.Modals.ViewModals.ExchangeOFfice.Office
         public bool CanTransact { get; set; }
         public string BlockReason { get; set; }
         public List<vm_dayclosurebalance> SystemBalances { get; set; }
+
+        // Yazdırma raporu geliştirmesi: gün içi özet bilgileri.
+        // OpenedByUserName: o iş gününün ilk işlemini yapan personel (kasa açılışı için ayrı bir DB
+        // kaydı yok, bu yüzden ilk işlemden türetiliyor) — hiç işlem yoksa null.
+        public string? OpenedByUserName { get; set; }
+        public string? LastClosedByUserName { get; set; }
+        public int TotalTransactionCount { get; set; }
+        public decimal TotalTransactionVolumeInTRY { get; set; }
     }
 
     public class vm_dayclosurebalance

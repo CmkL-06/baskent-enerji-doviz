@@ -98,6 +98,97 @@ namespace BaskentEnerji.Business.Tests
             await ctx.SaveChangesAsync();
         }
 
+        private async Task<Guid> CreateUserAsync(string suffix)
+        {
+            using var ctx = TestDbContextFactory.Create();
+            var user = new User { Id = Guid.NewGuid(), Username = "emp_" + suffix + "_" + Guid.NewGuid().ToString("N").Substring(0, 6), Password = "", Mail = "", Firstname = "Emp", Lastname = suffix };
+            ctx.Users.Add(user);
+            await ctx.SaveChangesAsync();
+            return user.Id;
+        }
+
+        // AddExchangeTransactionAsync'in aynısı, ama kendi rastgele kullanıcısını oluşturmak yerine
+        // verilen (bilinen) UserId'yi kullanır — personel bazlı kırılımı birden fazla işlemde aynı
+        // personele atfetmek için gerekli.
+        private async Task AddExchangeTransactionAsUserAsync(Guid vaultId, Guid userId, DateTime date,
+            Guid foreignCurrencyId, Guid tryCurrencyId, TransactionSide foreignSide, decimal foreignAmount, decimal rate, decimal profit)
+        {
+            using var ctx = TestDbContextFactory.Create();
+
+            var trySide = foreignSide == TransactionSide.Credit ? TransactionSide.Debit : TransactionSide.Credit;
+            var tryAmount = foreignAmount * rate;
+
+            var tx = new Transaction
+            {
+                Id = Guid.NewGuid(),
+                TransactionNumber = "TX-" + Guid.NewGuid().ToString("N").Substring(0, 8),
+                VaultId = vaultId,
+                UserId = userId,
+                Type = TransactionType.Exchange,
+                TransactionDate = date,
+                Status = TransactionStatus.Completed,
+                Profit = profit,
+                IsDeleted = false,
+                Details = new List<TransactionDetail>
+                {
+                    new TransactionDetail { CurrencyId = foreignCurrencyId, Side = foreignSide, Amount = foreignAmount, Rate = rate },
+                    new TransactionDetail { CurrencyId = tryCurrencyId, Side = trySide, Amount = tryAmount, Rate = 1m }
+                }
+            };
+
+            ctx.Transactions.Add(tx);
+            await ctx.SaveChangesAsync();
+        }
+
+        [Fact]
+        public async Task GetDailyZReport_IkiFarkliPersonel_DogruKirilimVeKarHesaplar()
+        {
+            var tryId = await CreateCurrencyAsync("TRY");
+            var usdId = await CreateCurrencyAsync("TST");
+            var (officeId, vaultId) = await CreateOfficeAndVaultAsync("EMP1");
+            var alice = await CreateUserAsync("Alice");
+            var bob = await CreateUserAsync("Bob");
+            var today = DateTime.UtcNow.Date.AddHours(10);
+
+            await AddExchangeTransactionAsUserAsync(vaultId, alice, today, usdId, tryId, TransactionSide.Credit, 100m, 40m, profit: 50m);
+            await AddExchangeTransactionAsUserAsync(vaultId, alice, today, usdId, tryId, TransactionSide.Debit, 50m, 42m, profit: 30m);
+            await AddExchangeTransactionAsUserAsync(vaultId, bob, today, usdId, tryId, TransactionSide.Credit, 20m, 41m, profit: 10m);
+
+            using var reportCtx = TestDbContextFactory.Create();
+            var service = CreateService(reportCtx);
+            var report = await service.GetDailyZReport(officeId, today);
+
+            Assert.Equal(2, report.EmployeeBreakdown.Count);
+
+            var aliceRow = report.EmployeeBreakdown.Single(e => e.UserId == alice);
+            Assert.Equal(2, aliceRow.TransactionCount);
+            Assert.Equal(80m, aliceRow.TotalProfit); // 50 + 30
+            Assert.Equal("Emp Alice", aliceRow.EmployeeName);
+
+            var bobRow = report.EmployeeBreakdown.Single(e => e.UserId == bob);
+            Assert.Equal(1, bobRow.TransactionCount);
+            Assert.Equal(10m, bobRow.TotalProfit);
+        }
+
+        [Fact]
+        public async Task GetDailyZReport_TumSubelerGorunumu_PersonelKirilimiBosDoner()
+        {
+            var tryId = await CreateCurrencyAsync("TRY");
+            var usdId = await CreateCurrencyAsync("TST");
+            var (officeId, vaultId) = await CreateOfficeAndVaultAsync("EMP2");
+            var alice = await CreateUserAsync("AliceMulti");
+            var today = DateTime.UtcNow.Date.AddHours(10);
+
+            await AddExchangeTransactionAsUserAsync(vaultId, alice, today, usdId, tryId, TransactionSide.Credit, 10m, 40m, profit: 5m);
+
+            using var reportCtx = TestDbContextFactory.Create();
+            var service = CreateService(reportCtx);
+            var report = await service.GetDailyZReport(null, today); // Tüm Şubeler
+
+            Assert.NotNull(report.EmployeeBreakdown);
+            Assert.Empty(report.EmployeeBreakdown);
+        }
+
         [Fact]
         public async Task GetDailyZReport_AlisVeSatisIslemi_DogruKarVeMarjHesaplar()
         {

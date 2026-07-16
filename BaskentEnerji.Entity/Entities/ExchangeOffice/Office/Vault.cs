@@ -20,7 +20,6 @@ namespace BaskentEnerji.Entity.Entities.ExchangeOffice.Office
         public bool ShouldCount { get; set; } = false;
         public DateTime? LastCountDate { get; set; }
 
-       
         public Office Office { get; set; }
         public ICollection<VaultBalance> Balances { get; set; }
         public ICollection<Transaction> Transactions { get; set; }

@@ -299,5 +299,62 @@ namespace BaskentEnerji.Business.Tests
             });
             Assert.Equal(DayClosureStatus.Closed, retryResult.Status);
         }
+
+        [Fact]
+        public async Task GetDayStatusAsync_GununIlkIslemi_AcanKisiVeToplamlarDogruDoner()
+        {
+            var s = await SeedAsync();
+
+            using (var ctx = TestDbContextFactory.Create())
+            {
+                var earlierTransaction = new Transaction
+                {
+                    Id = Guid.NewGuid(),
+                    TransactionNumber = "T-" + Guid.NewGuid().ToString("N").Substring(0, 8),
+                    VaultId = s.VaultId,
+                    UserId = s.StaffUserId,
+                    Type = TransactionType.Exchange,
+                    TransactionDate = DateTime.UtcNow.Date.AddHours(9),
+                    Status = TransactionStatus.Completed,
+                    Profit = 0,
+                    Details = new List<TransactionDetail>
+                    {
+                        new TransactionDetail { Id = Guid.NewGuid(), CurrencyId = s.UsdCurrencyId, Side = TransactionSide.Debit, Amount = 10m, Rate = 40m, Commission = 0, NetAmount = 10m },
+                        new TransactionDetail { Id = Guid.NewGuid(), CurrencyId = s.TryCurrencyId, Side = TransactionSide.Credit, Amount = 400m, Rate = 1m, Commission = 0, NetAmount = 400m }
+                    }
+                };
+
+                var laterTransaction = new Transaction
+                {
+                    Id = Guid.NewGuid(),
+                    TransactionNumber = "T-" + Guid.NewGuid().ToString("N").Substring(0, 8),
+                    VaultId = s.VaultId,
+                    UserId = s.OwnerUserId,
+                    Type = TransactionType.Exchange,
+                    TransactionDate = DateTime.UtcNow.Date.AddHours(15),
+                    Status = TransactionStatus.Completed,
+                    Profit = 0,
+                    Details = new List<TransactionDetail>
+                    {
+                        new TransactionDetail { Id = Guid.NewGuid(), CurrencyId = s.UsdCurrencyId, Side = TransactionSide.Debit, Amount = 5m, Rate = 40m, Commission = 0, NetAmount = 5m },
+                        new TransactionDetail { Id = Guid.NewGuid(), CurrencyId = s.TryCurrencyId, Side = TransactionSide.Credit, Amount = 200m, Rate = 1m, Commission = 0, NetAmount = 200m }
+                    }
+                };
+
+                ctx.Transactions.AddRange(earlierTransaction, laterTransaction);
+                await ctx.SaveChangesAsync();
+            }
+
+            using var verifyCtx = TestDbContextFactory.Create();
+            var service = CreateService(verifyCtx, s.StaffUserId);
+            var status = await service.GetDayStatusAsync(s.OfficeId);
+
+            // Günün ilk işlemini yapan (saat 09) personel Staff — Owner'ın daha geç (saat 15) yaptığı
+            // işlem "açan kişi" olarak sayılmamalı.
+            Assert.Equal("Test Staff", status.OpenedByUserName);
+            Assert.Equal(2, status.TotalTransactionCount);
+            // Her işlemde tek yabancı bacak (USD) var: 10*40 + 5*40 = 600 TL toplam hacim.
+            Assert.Equal(600m, status.TotalTransactionVolumeInTRY);
+        }
     }
 }

@@ -35,6 +35,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
         private async Task<(DayClosure? lastClosure, DayClosure? pendingApproval)> GetLastClosureStateAsync(Guid officeId)
         {
             var lastClosure = await _context.DayClosures
+                .Include(d => d.ClosedByUser)
                 .Where(d => d.OfficeId == officeId && (d.Status == DayClosureStatus.Closed || d.Status == DayClosureStatus.AutoClosed))
                 .OrderByDescending(d => d.BusinessDate)
                 .FirstOrDefaultAsync();
@@ -67,6 +68,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 status.HasUnclosedDays = false;
                 status.UnclosedDayCount = 0;
                 await PopulateSystemBalances(status, officeId);
+                await PopulateActivitySummaryAsync(status, officeId, today, lastClosure);
                 return status;
             }
 
@@ -100,6 +102,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             }
 
             await PopulateSystemBalances(status, officeId);
+            await PopulateActivitySummaryAsync(status, officeId, today, lastClosure);
             return status;
         }
 
@@ -510,6 +513,46 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     CurrentWac = wac
                 });
             }
+        }
+
+        // Yazdırma özeti: "kasayı açan kişi" için ayrı bir DB kaydı yok (Vault kalıcı, günlük yeniden
+        // açılmıyor) — bu yüzden o iş gününün ilk işlemini yapan personel "açan kişi" olarak kabul edilir.
+        private async Task PopulateActivitySummaryAsync(vm_daystatus status, Guid officeId, DateTime today, DayClosure? lastClosure)
+        {
+            status.LastClosedByUserName = lastClosure?.ClosedByUser != null
+                ? $"{lastClosure.ClosedByUser.Firstname} {lastClosure.ClosedByUser.Lastname}"
+                : null;
+
+            var todaysTransactions = await _context.Transactions
+                .AsNoTracking()
+                .Include(t => t.Details).ThenInclude(d => d.Currency)
+                .Include(t => t.User)
+                .Where(t => t.Vault.OfficeId == officeId &&
+                            t.TransactionDate.Date == today &&
+                            t.Status == TransactionStatus.Completed &&
+                            !t.IsDeleted)
+                .OrderBy(t => t.TransactionDate)
+                .ToListAsync();
+
+            status.TotalTransactionCount = todaysTransactions.Count;
+
+            var firstTransaction = todaysTransactions.FirstOrDefault();
+            status.OpenedByUserName = firstTransaction?.User != null
+                ? $"{firstTransaction.User.Firstname} {firstTransaction.User.Lastname}"
+                : null;
+
+            decimal totalVolume = 0;
+            foreach (var transaction in todaysTransactions)
+            {
+                if (transaction.Type != TransactionType.Exchange && transaction.Type != TransactionType.Buy)
+                    continue;
+
+                foreach (var detail in transaction.Details.Where(d => d.Currency.CurrencyCode != "TRY"))
+                {
+                    totalVolume += Math.Abs(detail.Amount) * detail.Rate;
+                }
+            }
+            status.TotalTransactionVolumeInTRY = totalVolume;
         }
 
         public async Task<List<vm_dayclosure>> GetPendingApprovalsAsync()

@@ -33,6 +33,10 @@ namespace BaskentEnerji.Entity.Modals.ViewModals.ExchangeOFfice.Office
         
         // Multi-office aggregated data (when no specific office is selected)
         public List<vm_zreport_office_summary> OfficeBreakdown { get; set; }
+
+        // Section 6: Per-employee transaction breakdown (single-office view only —
+        // boş liste döner "Tüm Şubeler" modunda, bkz. GenerateMultiOfficeReport)
+        public List<vm_zreport_employee_summary> EmployeeBreakdown { get; set; }
     }
     
     public class vm_zreport_summary
@@ -134,6 +138,17 @@ namespace BaskentEnerji.Entity.Modals.ViewModals.ExchangeOFfice.Office
         public decimal TotalVaultValueInTRY { get; set; }
     }
     
+    public class vm_zreport_employee_summary
+    {
+        public Guid UserId { get; set; }
+        public string EmployeeName { get; set; } // Firstname + " " + Lastname
+        public int TransactionCount { get; set; }
+        public int ExchangeTransactionCount { get; set; }
+        public decimal TotalProfit { get; set; }
+        public decimal TotalVolumeInTRY { get; set; }
+        public decimal AverageTransactionSize { get; set; }
+    }
+
     public class vm_zreport_office_summary
     {
         public Guid OfficeId { get; set; }

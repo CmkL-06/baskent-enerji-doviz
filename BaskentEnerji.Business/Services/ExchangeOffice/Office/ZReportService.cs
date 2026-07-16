@@ -604,6 +604,39 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             if (summary.TotalForeignCurrencyProcessed > 0)
                 summary.ProfitMargin = (summary.TotalProfit / summary.TotalForeignCurrencyProcessed) * 100;
 
+            // Personel bazlı kırılım: kimin ne kadar işlem yapıp ne kadar kâr getirdiği. Sadece tek-şube
+            // görünümünde anlamlıdır (bkz. GenerateMultiOfficeReport — orada boş liste döner, çünkü personel
+            // tek şubeye özgüdür ve şubeler arası toplamak yanıltıcı bir "şirket geneli liderlik tablosu"
+            // izlenimi verir).
+            var employeeUserIds = transactions.Select(t => t.UserId).Distinct().ToList();
+            var employeeUsers = await _context.Users
+                .AsNoTracking()
+                .Where(u => employeeUserIds.Contains(u.Id))
+                .ToDictionaryAsync(u => u.Id, u => u.Firstname + " " + u.Lastname);
+
+            report.EmployeeBreakdown = transactions
+                .GroupBy(t => t.UserId)
+                .Select(g =>
+                {
+                    var exchangeTxs = g.Where(t => t.Type == TransactionType.Exchange || t.Type == TransactionType.Buy).ToList();
+                    var volumeInTRY = exchangeTxs
+                        .SelectMany(t => t.Details)
+                        .Where(d => d.Currency.CurrencyCode != "TRY")
+                        .Sum(d => Math.Abs(d.Amount) * d.Rate);
+                    return new vm_zreport_employee_summary
+                    {
+                        UserId = g.Key,
+                        EmployeeName = employeeUsers.GetValueOrDefault(g.Key, "Bilinmeyen"),
+                        TransactionCount = g.Count(),
+                        ExchangeTransactionCount = exchangeTxs.Count,
+                        TotalProfit = exchangeTxs.Sum(t => t.Profit),
+                        TotalVolumeInTRY = volumeInTRY,
+                        AverageTransactionSize = exchangeTxs.Count > 0 ? volumeInTRY / exchangeTxs.Count : 0
+                    };
+                })
+                .OrderByDescending(e => e.TotalProfit)
+                .ToList();
+
             // Assign to report
             report.Summary = summary;
             report.CurrencyDetails = currencyDetailsMap.Values.OrderByDescending(cd => cd.Profit).ToList();
@@ -799,6 +832,10 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             report.PartyAccountsSummary = totalPartySummary;
             report.CashOnlySummary = totalCashSummary;
             report.VaultBalanceHistories = aggregatedBalanceHistories.OrderByDescending(h => h.CreatedDate).ToList();
+
+            // Personel bazlı kırılım "Tüm Şubeler" görünümünde gösterilmez — personel tek şubeye özgüdür,
+            // şubeler arası toplamak yanıltıcı olur (bkz. GenerateSingleOfficeReport'taki açıklama).
+            report.EmployeeBreakdown = new List<vm_zreport_employee_summary>();
         }
 
         private async Task<decimal> GetExchangeRateToTRY(Guid officeId, Guid currencyId)
