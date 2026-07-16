@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useExchangeStore } from '@/stores/exchange'
 import { useAuthStore } from '@/stores/auth'
@@ -17,6 +17,7 @@ import { getCurrencyCountryCode, getCurrencyName } from '@/utils/currency'
 const { t } = useI18n()
 
 const route = useRoute()
+const router = useRouter()
 const exchangeStore = useExchangeStore()
 const authStore = useAuthStore()
 const notification = useNotification()
@@ -1725,18 +1726,29 @@ watch(() => exchangeItems.value.map(item => ({
         </div>
       </div>
       <div class="ex-topbar-right">
-        <button @click="refreshRates" :disabled="!selectedOfficeId || loadingExternalRates" class="ex-topbar-btn" :class="{ 'ex-topbar-btn--syncing': loadingExternalRates }" title="Kurları Yenile">
-          <span class="material-symbols-outlined" aria-hidden="true" :class="{ 'animate-spin': loadingExternalRates }">sync</span>
-          <span v-if="refreshCountdown < 60" class="ex-countdown">{{ refreshCountdown }}s</span>
+        <button @click="router.push('/ihtiyar/exchange-rates')" class="ex-topbar-btn ex-topbar-btn--sky" title="Manuel Kur Yönetimi'ne git">
+          <span class="ex-topbar-btn-icon">
+            <span class="material-symbols-outlined" aria-hidden="true">tune</span>
+          </span>
+          <span class="ex-topbar-btn-label">Kur Yönetimi</span>
         </button>
-        <button @click="openManualVaultCounting" :disabled="!selectedVaultId" class="ex-topbar-btn" title="Kasa Sayımı">
-          <span class="material-symbols-outlined" aria-hidden="true">calculate</span>
+        <button @click="openManualVaultCounting" :disabled="!selectedVaultId" class="ex-topbar-btn ex-topbar-btn--violet" title="Kasa Sayımı">
+          <span class="ex-topbar-btn-icon">
+            <span class="material-symbols-outlined" aria-hidden="true">calculate</span>
+          </span>
+          <span class="ex-topbar-btn-label">Kasa Sayımı</span>
         </button>
-        <button @click="openDayClosureModal" :disabled="!selectedOfficeId" class="ex-topbar-btn" title="Gün Sonu Yap">
-          <span class="material-symbols-outlined" aria-hidden="true">lock_clock</span>
+        <button @click="openDayClosureModal" :disabled="!selectedOfficeId" class="ex-topbar-btn ex-topbar-btn--dayclose" title="Gün Sonu Yap">
+          <span class="ex-topbar-btn-icon">
+            <span class="material-symbols-outlined ex-icon-filled" aria-hidden="true">lock_clock</span>
+          </span>
+          <span class="ex-topbar-btn-label">Gün Sonu Al</span>
         </button>
-        <button @click="transactionHistoryRef?.printAllTransactions?.()" :disabled="!selectedOfficeId" class="ex-topbar-btn" title="Yazdır">
-          <span class="material-symbols-outlined" aria-hidden="true">print</span>
+        <button @click="transactionHistoryRef?.printAllTransactions?.()" :disabled="!selectedOfficeId" class="ex-topbar-btn ex-topbar-btn--indigo" title="Yazdır">
+          <span class="ex-topbar-btn-icon">
+            <span class="material-symbols-outlined" aria-hidden="true">print</span>
+          </span>
+          <span class="ex-topbar-btn-label">Yazdır</span>
         </button>
       </div>
     </div>
@@ -2257,7 +2269,7 @@ watch(() => exchangeItems.value.map(item => ({
       <div class="ex-card">
         <div class="ex-card-header">
           <h3 class="ex-card-title">
-            <span class="material-symbols-outlined ex-icon-filled" style="font-size:18px;color:#6366f1">grid_view</span>
+            <span class="material-symbols-outlined ex-icon-filled" style="font-size:18px;color:var(--color-primary)">grid_view</span>
             Çapraz Kur Matrisi
           </h3>
         </div>
@@ -2330,11 +2342,11 @@ watch(() => exchangeItems.value.map(item => ({
 :root {
   --ex-radius: 16px;
   --ex-border: #e2e8f0;
-  --ex-indigo: #6366f1;
+  --ex-indigo: var(--color-primary);
   --ex-purple: #7c3aed;
   --ex-green: #16a34a;
-  --ex-red: #dc2626;
-  --ex-amber: #d97706;
+  --ex-red: var(--color-danger);
+  --ex-amber: var(--color-warning);
   --ex-shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
   --ex-shadow-md: 0 4px 16px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
   --ex-shadow-lg: 0 8px 32px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
@@ -2371,8 +2383,8 @@ watch(() => exchangeItems.value.map(item => ({
   justify-content: center;
   color: white;
 }
-.ex-overlay-icon--red { background: linear-gradient(135deg, #ef4444, #dc2626); }
-.ex-overlay-icon--amber { background: linear-gradient(135deg, #f59e0b, #d97706); }
+.ex-overlay-icon--red { background: linear-gradient(135deg, #ef4444, var(--color-danger)); }
+.ex-overlay-icon--amber { background: linear-gradient(135deg, #f59e0b, var(--color-warning)); }
 .ex-overlay-title { font-size: 26px; font-weight: 700; color: var(--color-text); }
 .ex-overlay-desc { font-size: 16px; color: #6b7280; max-width: 400px; }
 .ex-overlay-hint { font-size: 14px; color: var(--color-warning); }
@@ -2405,7 +2417,7 @@ watch(() => exchangeItems.value.map(item => ({
   height: 44px;
   border-radius: var(--radius-lg);
   background: rgba(255,255,255,0.12);
-  backdrop-filter: blur(8px);
+  backdrop-filter: var(--glass-blur-light);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2462,35 +2474,75 @@ watch(() => exchangeItems.value.map(item => ({
 .ex-select:focus { border-color: var(--ex-indigo); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); outline: none; }
 .ex-select:disabled { opacity: 0.5; cursor: not-allowed; background-color: #f9fafb; }
 
+/* Topbar aksiyon butonları — genel sistemdeki KPI kartı ikon rozeti deseniyle (AppKpiCard.vue:
+   beyaz yuvarlak kutu içinde canlı renkli dolu ikon) tutarlı hale getirildi. Önceki soluk/cam
+   ikonlar koyu zeminde kayboluyordu; artık her ikon kendi vurgu rengiyle beyaz bir rozette,
+   dolu (FILL) stilde — uygulamanın geri kalanındaki panel/kart ikonlarıyla aynı dil. */
 .ex-topbar-btn {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
-  width: 40px;
-  height: 40px;
-  padding: 0;
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: var(--radius-lg);
-  background: rgba(255,255,255,0.1);
-  backdrop-filter: blur(8px);
-  color: #c7d2fe;
-  font-size: 14px;
+  gap: 10px;
+  height: 48px;
+  padding: 0 18px 0 8px;
+  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.09);
+  backdrop-filter: var(--glass-blur-light);
+  color: #e0e7ff;
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   cursor: pointer;
-  transition: background-color 0.25s, color 0.25s, transform 0.25s, box-shadow 0.25s;
+  transition: background-color 0.2s, color 0.2s, transform 0.2s, box-shadow 0.2s, border-color 0.2s;
   position: relative;
 }
+.ex-topbar-btn-icon {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.22);
+  transition: transform 0.2s;
+}
+.ex-topbar-btn-icon .material-symbols-outlined {
+  font-size: 19px;
+  color: var(--ex-btn-color, var(--color-primary));
+  font-variation-settings: 'FILL' 1, 'wght' 600, 'GRAD' 0, 'opsz' 24;
+}
+.ex-topbar-btn--sky { --ex-btn-color: #0ea5e9; }
+.ex-topbar-btn--violet { --ex-btn-color: #8b5cf6; }
+.ex-topbar-btn--indigo { --ex-btn-color: var(--color-primary); }
 .ex-topbar-btn:hover:not(:disabled) {
-  background: rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.19);
+  border-color: rgba(255,255,255,0.32);
   color: #fff;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.28);
 }
-.ex-topbar-btn--syncing {
-  background: rgba(99,102,241,0.3);
-  color: #a5b4fc;
+.ex-topbar-btn:hover:not(:disabled) .ex-topbar-btn-icon { transform: scale(1.08); }
+.ex-topbar-btn:active:not(:disabled) { transform: translateY(0); }
+.ex-topbar-btn--syncing .ex-topbar-btn-icon { background: #e0e7ff; }
+.ex-topbar-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+/* Gün Sonu Al — dükkan kapanışı seyrek ama yüksek etkili bir işlem olduğu için ikon rengi (amber)
+   yanında dış kapsül de hafif amber tonlu, diğerlerinden en belirgin olan bu olmalı. */
+.ex-topbar-btn--dayclose {
+  --ex-btn-color: var(--color-warning);
+  background: rgba(245,158,11,0.22);
+  border-color: rgba(245,158,11,0.55);
+  color: #fef3c7;
 }
-.ex-topbar-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.ex-topbar-btn--dayclose:hover:not(:disabled) {
+  background: rgba(245,158,11,0.34);
+  border-color: rgba(245,158,11,0.7);
+  color: #fff;
+  box-shadow: 0 8px 22px rgba(245,158,11,0.35);
+}
+.ex-topbar-btn-label { font-size: 13.5px; white-space: nowrap; }
+@media (max-width: 900px) { .ex-topbar-btn-label { display: none; } .ex-topbar-btn { padding: 0 7px; width: 48px; justify-content: center; } }
 .ex-countdown {
   font-size: 9px;
   color: #1e1b4b;
@@ -2572,7 +2624,7 @@ watch(() => exchangeItems.value.map(item => ({
   font-size: 28px;
 }
 .ex-type-btn--sell-active {
-  background: linear-gradient(145deg, #fee2e2, #fecaca);
+  background: linear-gradient(145deg, var(--color-danger-bg), #fecaca);
   border-color: var(--color-danger);
   color: #b91c1c;
   box-shadow: 0 6px 24px rgba(239,68,68,0.25), inset 0 1px 0 rgba(255,255,255,0.6);
@@ -2648,9 +2700,9 @@ watch(() => exchangeItems.value.map(item => ({
 .ex-chip--usd { border-color: rgba(34,197,94,0.3); }
 .ex-chip--usd:hover { border-color: #22c55e; color: #15803d; background: linear-gradient(135deg, #f0fdf4, #dcfce7); box-shadow: 0 6px 20px rgba(34,197,94,0.2); }
 .ex-chip--eur { border-color: rgba(59,130,246,0.3); }
-.ex-chip--eur:hover { border-color: var(--color-secondary); color: #1d4ed8; background: linear-gradient(135deg, #eff6ff, #dbeafe); box-shadow: 0 6px 20px rgba(59,130,246,0.2); }
+.ex-chip--eur:hover { border-color: var(--color-secondary); color: #1d4ed8; background: linear-gradient(135deg, var(--color-secondary-light), #dbeafe); box-shadow: 0 6px 20px rgba(59,130,246,0.2); }
 .ex-chip--rub { border-color: rgba(239,68,68,0.3); }
-.ex-chip--rub:hover { border-color: var(--color-danger); color: #b91c1c; background: linear-gradient(135deg, #fef2f2, #fee2e2); box-shadow: 0 6px 20px rgba(239,68,68,0.2); }
+.ex-chip--rub:hover { border-color: var(--color-danger); color: #b91c1c; background: linear-gradient(135deg, #fef2f2, var(--color-danger-bg)); box-shadow: 0 6px 20px rgba(239,68,68,0.2); }
 .ex-chip--krub { border-color: rgba(139,92,246,0.3); }
 .ex-chip--krub:hover { border-color: #8b5cf6; color: #6b46c1; background: linear-gradient(135deg, #f5f3ff, #ede9fe); box-shadow: 0 6px 20px rgba(139,92,246,0.2); }
 .ex-chip--usdt { border-color: rgba(20,184,166,0.3); }
@@ -2658,13 +2710,13 @@ watch(() => exchangeItems.value.map(item => ({
 .ex-chip--active {
   box-shadow: 0 0 0 2px var(--color-primary), 0 4px 16px rgba(99,102,241,0.25);
   border-color: var(--color-primary);
-  background: linear-gradient(135deg, #eef2ff, #e0e7ff);
+  background: linear-gradient(135deg, var(--color-primary-light), #e0e7ff);
   color: #4338ca;
   transform: translateY(-2px);
 }
 .ex-chip--active.ex-chip--usd { box-shadow: 0 0 0 2px #22c55e, 0 4px 16px rgba(34,197,94,0.25); border-color: #22c55e; background: linear-gradient(135deg, #f0fdf4, #dcfce7); color: #15803d; }
-.ex-chip--active.ex-chip--eur { box-shadow: 0 0 0 2px var(--color-secondary), 0 4px 16px rgba(59,130,246,0.25); border-color: var(--color-secondary); background: linear-gradient(135deg, #eff6ff, #dbeafe); color: #1d4ed8; }
-.ex-chip--active.ex-chip--rub { box-shadow: 0 0 0 2px var(--color-danger), 0 4px 16px rgba(239,68,68,0.25); border-color: var(--color-danger); background: linear-gradient(135deg, #fef2f2, #fee2e2); color: #b91c1c; }
+.ex-chip--active.ex-chip--eur { box-shadow: 0 0 0 2px var(--color-secondary), 0 4px 16px rgba(59,130,246,0.25); border-color: var(--color-secondary); background: linear-gradient(135deg, var(--color-secondary-light), #dbeafe); color: #1d4ed8; }
+.ex-chip--active.ex-chip--rub { box-shadow: 0 0 0 2px var(--color-danger), 0 4px 16px rgba(239,68,68,0.25); border-color: var(--color-danger); background: linear-gradient(135deg, #fef2f2, var(--color-danger-bg)); color: #b91c1c; }
 .ex-chip--active.ex-chip--krub { box-shadow: 0 0 0 2px #8b5cf6, 0 4px 16px rgba(139,92,246,0.25); border-color: #8b5cf6; background: linear-gradient(135deg, #f5f3ff, #ede9fe); color: #6b46c1; }
 .ex-chip--active.ex-chip--usdt { box-shadow: 0 0 0 2px #14b8a6, 0 4px 16px rgba(20,184,166,0.25); border-color: #14b8a6; background: linear-gradient(135deg, #f0fdfa, #ccfbf1); color: #0f766e; }
 .ex-chip-flag { font-size: 20px; }
@@ -2755,7 +2807,7 @@ watch(() => exchangeItems.value.map(item => ({
   box-shadow: 0 1px 4px rgba(22,163,74,0.12);
 }
 .ex-item-badge--sell {
-  background: linear-gradient(135deg, #fee2e2, #fecaca);
+  background: linear-gradient(135deg, var(--color-danger-bg), #fecaca);
   color: #b91c1c;
   box-shadow: 0 1px 4px rgba(220,38,38,0.12);
 }
@@ -2792,7 +2844,7 @@ watch(() => exchangeItems.value.map(item => ({
   color: white;
   width: 38px;
   height: 38px;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: linear-gradient(135deg, var(--color-primary), #8b5cf6);
   border-radius: 50%;
   box-shadow: 0 3px 10px rgba(99,102,241,0.3);
   align-self: end;
@@ -2850,7 +2902,7 @@ watch(() => exchangeItems.value.map(item => ({
 
 .ex-result-value {
   padding: 11px 14px;
-  background: linear-gradient(135deg, #eef2ff, #e0e7ff);
+  background: linear-gradient(135deg, var(--color-primary-light), #e0e7ff);
   border: 1.5px solid #c7d2fe;
   border-radius: var(--radius-lg);
   font-family: 'JetBrains Mono', ui-monospace, monospace;
@@ -3003,7 +3055,7 @@ watch(() => exchangeItems.value.map(item => ({
   align-items: center;
   gap: 10px;
   padding: 18px 22px;
-  background: linear-gradient(135deg, #4338ca 0%, #6366f1 40%, #7c3aed 100%);
+  background: linear-gradient(135deg, #4338ca 0%, var(--color-primary) 40%, #7c3aed 100%);
   color: white;
   font-size: 16px;
   font-weight: 800;
@@ -3061,7 +3113,7 @@ watch(() => exchangeItems.value.map(item => ({
 .ex-summary-num {
   font-size: 10px;
   color: white;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: linear-gradient(135deg, var(--color-primary), #8b5cf6);
   width: 22px;
   height: 22px;
   display: flex;
@@ -3080,7 +3132,7 @@ watch(() => exchangeItems.value.map(item => ({
 
 /* Grand Total */
 .ex-grand-total {
-  background: linear-gradient(145deg, #f5f3ff, #eef2ff, #faf5ff);
+  background: linear-gradient(145deg, #f5f3ff, var(--color-primary-light), #faf5ff);
   border: 1px solid rgba(99,102,241,0.15);
   border-radius: var(--radius-lg);
   padding: 16px;
@@ -3170,12 +3222,12 @@ watch(() => exchangeItems.value.map(item => ({
   background: linear-gradient(135deg, #16a34a, #15803d);
 }
 .ex-submit-btn--sell {
-  background: linear-gradient(135deg, #ef4444, #dc2626);
+  background: linear-gradient(135deg, #ef4444, var(--color-danger));
   box-shadow: 0 4px 16px rgba(220,38,38,0.35);
 }
 .ex-submit-btn--sell:hover:not(:disabled) {
   box-shadow: 0 8px 32px rgba(220,38,38,0.45);
-  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  background: linear-gradient(135deg, var(--color-danger), #b91c1c);
 }
 
 /* ═══ Buttons ═══ */
@@ -3196,16 +3248,16 @@ watch(() => exchangeItems.value.map(item => ({
 .ex-btn:hover { transform: translateY(-1px); }
 .ex-btn:active { transform: translateY(0); }
 .ex-btn--sm { padding: 8px 16px; font-size: 13px; border-radius: var(--radius-md); }
-.ex-btn--red { background: linear-gradient(135deg, #ef4444, #dc2626); box-shadow: 0 3px 10px rgba(220,38,38,0.25); }
-.ex-btn--red:hover { background: linear-gradient(135deg, #dc2626, #b91c1c); box-shadow: 0 6px 16px rgba(220,38,38,0.3); }
-.ex-btn--amber { background: linear-gradient(135deg, #f59e0b, #d97706); box-shadow: 0 3px 10px rgba(217,119,6,0.25); }
-.ex-btn--amber:hover { background: linear-gradient(135deg, #d97706, #b45309); box-shadow: 0 6px 16px rgba(217,119,6,0.3); }
-.ex-btn--indigo { background: linear-gradient(135deg, #6366f1, #4f46e5); box-shadow: 0 3px 10px rgba(79,70,229,0.25); }
-.ex-btn--indigo:hover { background: linear-gradient(135deg, #4f46e5, #4338ca); box-shadow: 0 6px 16px rgba(79,70,229,0.3); }
+.ex-btn--red { background: linear-gradient(135deg, #ef4444, var(--color-danger)); box-shadow: 0 3px 10px rgba(220,38,38,0.25); }
+.ex-btn--red:hover { background: linear-gradient(135deg, var(--color-danger), #b91c1c); box-shadow: 0 6px 16px rgba(220,38,38,0.3); }
+.ex-btn--amber { background: linear-gradient(135deg, #f59e0b, var(--color-warning)); box-shadow: 0 3px 10px rgba(217,119,6,0.25); }
+.ex-btn--amber:hover { background: linear-gradient(135deg, var(--color-warning), #b45309); box-shadow: 0 6px 16px rgba(217,119,6,0.3); }
+.ex-btn--indigo { background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover)); box-shadow: 0 3px 10px rgba(79,70,229,0.25); }
+.ex-btn--indigo:hover { background: linear-gradient(135deg, var(--color-primary-hover), #4338ca); box-shadow: 0 6px 16px rgba(79,70,229,0.3); }
 
 /* ═══ Today Stats ═══ */
 .ex-today-stats {
-  background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 50%, #d1fae5 100%);
+  background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 50%, var(--color-success-bg) 100%);
   border: 1px solid rgba(22,163,74,0.2);
   border-radius: var(--radius-lg);
   padding: 14px 18px;
@@ -3475,7 +3527,7 @@ watch(() => exchangeItems.value.map(item => ({
   font-weight: 700;
 }
 .ex-tab--active-batch {
-  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  background: linear-gradient(135deg, var(--color-secondary-light), #dbeafe);
   color: #1e40af;
   box-shadow: 0 2px 12px rgba(59,130,246,0.2), 0 1px 3px rgba(0,0,0,0.06);
   font-weight: 700;
@@ -3528,7 +3580,7 @@ watch(() => exchangeItems.value.map(item => ({
   text-align: center;
 }
 .ex-btn--amber {
-  background: linear-gradient(135deg, #f59e0b, #d97706);
+  background: linear-gradient(135deg, #f59e0b, var(--color-warning));
   color: white;
   border: none;
   border-radius: var(--radius-md);
@@ -3539,7 +3591,7 @@ watch(() => exchangeItems.value.map(item => ({
   font-weight: 600;
   transition: background 0.2s, opacity 0.2s;
 }
-.ex-btn--amber:hover { background: linear-gradient(135deg, #d97706, #b45309); }
+.ex-btn--amber:hover { background: linear-gradient(135deg, var(--color-warning), #b45309); }
 .ex-btn--amber:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ═══ Batch Mode ═══ */
@@ -3649,7 +3701,7 @@ watch(() => exchangeItems.value.map(item => ({
   font-size: 11px;
   font-weight: 800;
   color: #fff;
-  background: linear-gradient(135deg, #4338ca, #6366f1);
+  background: linear-gradient(135deg, #4338ca, var(--color-primary));
   border-radius: var(--radius-md);
   letter-spacing: 0.5px;
 }

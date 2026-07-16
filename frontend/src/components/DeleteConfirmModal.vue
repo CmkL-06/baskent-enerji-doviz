@@ -76,7 +76,7 @@ const confirmDelete = () => {
 
 .modal-container {
   background: rgba(30, 20, 50, 0.95);
-  backdrop-filter: blur(20px);
+  backdrop-filter: var(--glass-blur-strong);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: var(--radius-xl);
   padding: 30px;

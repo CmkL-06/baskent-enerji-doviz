@@ -144,9 +144,9 @@ onMounted(async () => {
 
     <!-- KPI -->
     <div class="kpi-grid">
-      <AppKpiCard icon="account_balance_wallet" label="Toplam Kasa" :value="vaults.length" color="#3b82f6" bg="#eff6ff" />
-      <AppKpiCard icon="check_circle" label="Aktif" :value="vaults.filter(v => v.isActive !== false).length" color="#059669" bg="#ecfdf5" />
-      <AppKpiCard icon="fact_check" label="Sayım Gerektiren" :value="vaults.filter(v => v.shouldCount).length" color="#d97706" bg="#fffbeb" />
+      <AppKpiCard icon="account_balance_wallet" label="Toplam Kasa" :value="vaults.length" color="var(--color-secondary)" bg="var(--color-secondary-light)" />
+      <AppKpiCard icon="check_circle" label="Aktif" :value="vaults.filter(v => v.isActive !== false).length" color="var(--color-success)" bg="#ecfdf5" />
+      <AppKpiCard icon="fact_check" label="Sayım Gerektiren" :value="vaults.filter(v => v.shouldCount).length" color="var(--color-warning)" bg="#fffbeb" />
     </div>
 
     <div v-if="loading" class="loading-state">

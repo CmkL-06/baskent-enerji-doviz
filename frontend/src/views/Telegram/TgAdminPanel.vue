@@ -453,7 +453,7 @@ function formatMoney(n: number | null) {
 }
 function statusColor(status: string) {
   const map: Record<string, string> = {
-    completed: '#10b981', approved: '#3b82f6', pending: '#f59e0b',
+    completed: '#10b981', approved: 'var(--color-secondary)', pending: '#f59e0b',
     processing: '#8b5cf6', cancelled: '#ef4444', rejected: '#ef4444',
     online: '#10b981', offline: '#ef4444', unknown: '#6b7280'
   }
@@ -759,7 +759,7 @@ onUnmounted(() => {
               <div class="dealer-card-code"><code>{{ d.dealer_code }}</code></div>
             </div>
             <div class="dealer-card-badges">
-              <span class="status-badge sm" :style="{ background: d.dealer_type === 'Branch' ? '#f59e0b' : '#6366f1' }">{{ d.dealer_type === 'Branch' ? 'Şube' : 'Bayi' }}</span>
+              <span class="status-badge sm" :style="{ background: d.dealer_type === 'Branch' ? '#f59e0b' : 'var(--color-primary)' }">{{ d.dealer_type === 'Branch' ? 'Şube' : 'Bayi' }}</span>
               <span class="status-badge sm" :style="{ background: d.is_active ? '#10b981' : '#ef4444' }">{{ d.is_active ? 'Aktif' : 'Pasif' }}</span>
               <span v-if="rateStalenessDays(d.oldest_rate_update) !== null && rateStalenessDays(d.oldest_rate_update)! >= 3"
                     class="status-badge sm rate-stale-badge" title="Kur bir süredir güncellenmedi">
@@ -932,7 +932,7 @@ onUnmounted(() => {
     <!-- ═══════ CRYPTO ═══════ -->
     <div v-else-if="activeTab === 'crypto'" class="tg-content">
       <div class="stat-grid four" style="margin-bottom:16px">
-        <div class="stat-card mini"><div class="mini-val" style="color:#3b82f6">{{ cryptoSummary.total_usdt_transactions }}</div><div class="mini-label">USDT İşlem</div></div>
+        <div class="stat-card mini"><div class="mini-val" style="color:var(--color-secondary)">{{ cryptoSummary.total_usdt_transactions }}</div><div class="mini-label">USDT İşlem</div></div>
         <div class="stat-card mini"><div class="mini-val" style="color:#10b981">{{ cryptoSummary.verified_transactions }}</div><div class="mini-label">Doğrulanmış</div></div>
         <div class="stat-card mini"><div class="mini-val warn">{{ cryptoSummary.unverified_transactions }}</div><div class="mini-label">Doğrulanmamış</div></div>
         <div class="stat-card mini"><div class="mini-val" style="color:#8b5cf6">{{ cryptoSummary.confirmed_count }}</div><div class="mini-label">Onaylı Deposit</div></div>
@@ -1218,7 +1218,7 @@ onUnmounted(() => {
 }
 .tg-tab .material-symbols-outlined { font-size: 18px; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
 .tg-tab:hover { background: var(--color-hover, #f3f4f6); color: var(--color-text, #1f2937); }
-.tg-tab.active { background: var(--color-primary, #2563eb); color: #fff; box-shadow: var(--shadow-glow-primary); border-bottom: 3px solid var(--color-primary, #2563eb); }
+.tg-tab.active { background: var(--color-primary, var(--color-secondary-hover)); color: #fff; box-shadow: var(--shadow-glow-primary); border-bottom: 3px solid var(--color-primary, var(--color-secondary-hover)); }
 
 .tg-content { padding: 16px; }
 .tg-loading { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 60px; color: var(--color-text-secondary, #6b7280); }
@@ -1271,7 +1271,7 @@ onUnmounted(() => {
 }
 .section-title::before {
   content: ''; position: absolute; left: 0; top: 6px; bottom: 6px; width: 5px;
-  background: var(--color-primary, #2563eb); border-radius: var(--radius-sm);
+  background: var(--color-primary, var(--color-secondary-hover)); border-radius: var(--radius-sm);
 }
 .section-title .material-symbols-outlined { font-size: 20px; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
 
@@ -1312,8 +1312,8 @@ onUnmounted(() => {
 .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .filter-bar { display: flex; gap: 6px; flex-wrap: wrap; }
 .filter-btn { padding: 6px 12px; border: 1px solid var(--color-border, var(--color-border)); background: var(--color-bg-card, #fff); border-radius: var(--radius-sm); font-size: 12px; cursor: pointer; color: var(--color-text-secondary, var(--color-text-secondary)); transition: background-color 0.15s, color 0.15s, border-color 0.15s; }
-.filter-btn:hover { border-color: var(--color-primary, #2563eb); }
-.filter-btn.active { background: var(--color-primary, #2563eb); color: #fff; border-color: var(--color-primary, #2563eb); }
+.filter-btn:hover { border-color: var(--color-primary, var(--color-secondary-hover)); }
+.filter-btn.active { background: var(--color-primary, var(--color-secondary-hover)); color: #fff; border-color: var(--color-primary, var(--color-secondary-hover)); }
 
 .search-box { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--color-border, var(--color-border)); border-radius: var(--radius-sm); background: var(--color-bg-card, #fff); }
 .search-input { border: none; outline: none; font-size: 12px; background: transparent; color: var(--color-text, #1f2937); width: 200px; }
@@ -1321,7 +1321,7 @@ onUnmounted(() => {
 
 /* Add Button */
 .add-btn { display: flex; align-items: center; gap: 4px; padding: 6px 14px; border: 1px solid var(--color-primary, var(--color-secondary-hover)); background: transparent; color: var(--color-primary, var(--color-secondary-hover)); border-radius: var(--radius-sm); font-size: 12px; font-weight: 600; cursor: pointer; transition: background-color 0.15s, color 0.15s, border-color 0.15s; }
-.add-btn:hover { background: var(--color-primary, #2563eb); color: #fff; }
+.add-btn:hover { background: var(--color-primary, var(--color-secondary-hover)); color: #fff; }
 .add-btn .material-symbols-outlined { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
 
 /* Create Forms */
@@ -1330,7 +1330,7 @@ onUnmounted(() => {
 .form-group { flex: 1; min-width: 160px; }
 .form-group label { display: block; font-size: 11px; font-weight: 600; color: var(--color-text-secondary, #6b7280); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
 .form-input { width: 100%; padding: 7px 10px; border: 1px solid var(--color-border, var(--color-border)); border-radius: var(--radius-sm); font-size: 13px; background: var(--color-bg-card, #fff); color: var(--color-text, var(--color-text)); }
-.form-input:focus { outline: none; border-color: var(--color-primary, #2563eb); }
+.form-input:focus { outline: none; border-color: var(--color-primary, var(--color-secondary-hover)); }
 .form-hint { font-size: 11px; color: var(--color-text-secondary, #9ca3af); margin-top: 8px; }
 
 /* Dealer Onboarding Result */
@@ -1370,7 +1370,7 @@ onUnmounted(() => {
 .dealer-rate-row .action-sm.save { flex-shrink: 0; }
 .dealer-rate-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-left: 50px; }
 .dealer-rate-margin { font-size: 11px; color: var(--color-text-secondary, #6b7280); }
-.dealer-rate-link { background: none; border: none; padding: 0; font-size: 11px; color: var(--color-primary, #2563eb); cursor: pointer; text-decoration: underline; }
+.dealer-rate-link { background: none; border: none; padding: 0; font-size: 11px; color: var(--color-primary, var(--color-secondary-hover)); cursor: pointer; text-decoration: underline; }
 .dealer-rate-link:disabled { opacity: 0.5; cursor: not-allowed; }
 .dealer-rate-history { padding-left: 50px; display: flex; flex-direction: column; gap: 3px; }
 .dealer-rate-history-empty { font-size: 11px; color: var(--color-text-secondary, #9ca3af); font-style: italic; }
@@ -1408,14 +1408,14 @@ onUnmounted(() => {
   border: 1.5px solid var(--color-border, #e5e7eb); background: var(--color-bg-card, #fff); color: var(--color-text-secondary, #6b7280);
   cursor: pointer; transition: all 0.15s;
 }
-.dealer-rank-chip:hover { border-color: var(--color-primary, #2563eb); }
-.dealer-rank-chip.active { background: var(--color-primary, #2563eb); border-color: var(--color-primary, #2563eb); color: #fff; }
+.dealer-rank-chip:hover { border-color: var(--color-primary, var(--color-secondary-hover)); }
+.dealer-rank-chip.active { background: var(--color-primary, var(--color-secondary-hover)); border-color: var(--color-primary, var(--color-secondary-hover)); color: #fff; }
 .dealer-info-actions { display: flex; justify-content: flex-end; }
 
 .rate-form { display: flex; gap: 8px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
 .rate-input { padding: 6px 10px; border: 1px solid var(--color-border, var(--color-border)); border-radius: var(--radius-sm); font-size: 13px; background: var(--color-bg-card, #fff); color: var(--color-text, var(--color-text)); width: 140px; }
 .rate-input.sm { width: 100px; }
-.rate-input:focus { outline: none; border-color: var(--color-primary, #2563eb); }
+.rate-input:focus { outline: none; border-color: var(--color-primary, var(--color-secondary-hover)); }
 
 .rate-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 12px; }
 .rate-card { padding: 14px; background: var(--color-hover, #f9fafb); border: 1px solid var(--color-border, var(--color-border)); border-radius: var(--radius-md); box-shadow: var(--shadow-md); }

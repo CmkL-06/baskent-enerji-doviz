@@ -9,7 +9,7 @@ const props = defineProps<{
   items: { code: string; amount: number }[]
 }>()
 
-const palette = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#ef4444', '#14b8a6']
+const palette = ['var(--color-primary)', '#0ea5e9', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#ef4444', '#14b8a6']
 
 const chartData = computed(() => ({
   labels: props.items.map(i => i.code),

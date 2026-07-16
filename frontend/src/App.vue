@@ -82,26 +82,26 @@ body {
 
 /* Global positive/negative amount styles */
 .amount-positive {
-  color: #059669 !important;
+  color: var(--color-success) !important;
 }
 
 .amount-negative {
-  color: #dc2626 !important;
+  color: var(--color-danger) !important;
 }
 
 .amount-badge-positive {
-  background-color: #d1fae5 !important;
+  background-color: var(--color-success-bg) !important;
   border: 1px solid #6ee7b7 !important;
-  color: #059669 !important;
+  color: var(--color-success) !important;
   padding: 0.3rem 0.6rem;
   border-radius: 6px;
   font-weight: 500;
 }
 
 .amount-badge-negative {
-  background-color: #fee2e2 !important;
+  background-color: var(--color-danger-bg) !important;
   border: 1px solid #fca5a5 !important;
-  color: #dc2626 !important;
+  color: var(--color-danger) !important;
   padding: 0.3rem 0.6rem;
   border-radius: 6px;
   font-weight: 500;

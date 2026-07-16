@@ -69,7 +69,7 @@ async function toggleOffice(office: any) {
 }
 
 function avatarColor(name: string) {
-  const colors = ['#6366f1','#8b5cf6','#ec4899','#f97316','#14b8a6','#0ea5e9','#84cc16','#ef4444']
+  const colors = ['var(--color-primary)','#8b5cf6','#ec4899','#f97316','#14b8a6','#0ea5e9','#84cc16','#ef4444']
   return colors[(name?.charCodeAt(0) ?? 0) % colors.length]
 }
 </script>

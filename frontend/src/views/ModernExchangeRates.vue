@@ -234,7 +234,7 @@ onMounted(async () => {
     <div class="mr-topbar">
       <div class="mr-topbar-left">
         <div class="mr-topbar-icon">
-          <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 22px; color: #6366f1">tune</span>
+          <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 22px; color: var(--color-primary)">tune</span>
         </div>
         <h1 class="mr-topbar-title">Manuel Kur Yönetimi</h1>
       </div>
@@ -278,7 +278,7 @@ onMounted(async () => {
 
     <!-- Loading -->
     <div v-if="loading && activeTab === 'rates'" class="mr-loading">
-      <span class="material-symbols-outlined mr-spin" style="font-size: 32px; color: #6366f1">progress_activity</span>
+      <span class="material-symbols-outlined mr-spin" style="font-size: 32px; color: var(--color-primary)">progress_activity</span>
       <span>Kurlar yükleniyor...</span>
     </div>
 
@@ -353,7 +353,7 @@ onMounted(async () => {
     <div v-else-if="activeTab === 'add'" class="mr-form-wrap">
       <div class="mr-form-card">
         <div class="mr-form-header">
-          <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 22px; color: #6366f1">{{ editMode ? 'edit_note' : 'add_circle' }}</span>
+          <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 22px; color: var(--color-primary)">{{ editMode ? 'edit_note' : 'add_circle' }}</span>
           <h2>{{ editMode ? 'Kur Düzenle' : 'Yeni Kur Ekle' }}</h2>
         </div>
 
@@ -370,7 +370,7 @@ onMounted(async () => {
               </select>
             </div>
             <div class="mr-form-arrow">
-              <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 24px; color: #6366f1">swap_horiz</span>
+              <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 24px; color: var(--color-primary)">swap_horiz</span>
             </div>
             <div class="mr-form-group">
               <label class="mr-label">Hedef Para Birimi</label>

@@ -37,8 +37,8 @@ const RANKS = [
   { value: 1,   label: 'Kullanıcı', key: 'User',     color: '#6b7280', bg: '#f9fafb', ring: '#d1d5db' },
   { value: 2,   label: 'Müşteri',   key: 'Customer', color: '#0ea5e9', bg: '#f0f9ff', ring: '#7dd3fc' },
   { value: 50,  label: 'Personel',  key: 'Staff',    color: '#8b5cf6', bg: '#f5f3ff', ring: '#c4b5fd' },
-  { value: 99,  label: 'Admin',     key: 'Admin',    color: '#dc2626', bg: '#fef2f2', ring: '#fca5a5' },
-  { value: 100, label: 'Owner',     key: 'Owner',    color: '#d97706', bg: '#fffbeb', ring: '#fcd34d' },
+  { value: 99,  label: 'Admin',     key: 'Admin',    color: 'var(--color-danger)', bg: '#fef2f2', ring: '#fca5a5' },
+  { value: 100, label: 'Owner',     key: 'Owner',    color: 'var(--color-warning)', bg: '#fffbeb', ring: '#fcd34d' },
 ]
 
 function rankInfo(rank: any) {
@@ -50,7 +50,7 @@ function rankValue(rank: any) {
 }
 
 function avatarColor(name: string) {
-  const colors = ['#6366f1','#8b5cf6','#ec4899','#f97316','#14b8a6','#0ea5e9','#84cc16','#ef4444']
+  const colors = ['var(--color-primary)','#8b5cf6','#ec4899','#f97316','#14b8a6','#0ea5e9','#84cc16','#ef4444']
   return colors[(name?.charCodeAt(0) ?? 0) % colors.length]
 }
 
@@ -201,10 +201,10 @@ onMounted(async () => {
 
     <!-- KPIs -->
     <div class="kpi-grid">
-      <AppKpiCard icon="group" label="Toplam Kullanıcı" :value="users.length" color="#6366f1" bg="#eef2ff" />
-      <AppKpiCard icon="admin_panel_settings" label="Admin / Owner" :value="adminCount" color="#dc2626" bg="#fef2f2" />
+      <AppKpiCard icon="group" label="Toplam Kullanıcı" :value="users.length" color="var(--color-primary)" bg="var(--color-primary-light)" />
+      <AppKpiCard icon="admin_panel_settings" label="Admin / Owner" :value="adminCount" color="var(--color-danger)" bg="#fef2f2" />
       <AppKpiCard icon="badge" label="Personel" :value="staffCount" color="#8b5cf6" bg="#f5f3ff" />
-      <AppKpiCard icon="apartment" label="Ofis Sayısı" :value="offices.length" color="#059669" bg="#ecfdf5" />
+      <AppKpiCard icon="apartment" label="Ofis Sayısı" :value="offices.length" color="var(--color-success)" bg="#ecfdf5" />
     </div>
 
     <!-- Search -->
@@ -251,7 +251,7 @@ onMounted(async () => {
         <div class="modal-header">
           <div class="modal-header-left">
             <template v-if="createMode">
-              <div class="uy-detail-avatar" style="background:#6366f1">
+              <div class="uy-detail-avatar" style="background:var(--color-primary)">
                 <span class="material-symbols-outlined" aria-hidden="true" style="font-size:20px">person_add</span>
               </div>
               <div>
@@ -496,7 +496,7 @@ onMounted(async () => {
 
 /* Modal */
 .modal-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,.4); backdrop-filter: blur(2px);
+  position: fixed; inset: 0; background: rgba(0,0,0,.4); backdrop-filter: var(--glass-blur-strong);
   display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px;
 }
 .modal {

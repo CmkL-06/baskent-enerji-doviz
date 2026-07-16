@@ -1749,17 +1749,17 @@ onUnmounted(() => {
 }
 
 .action-button.deposit .action-icon {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: linear-gradient(135deg, #10b981 0%, var(--color-success) 100%);
   color: white;
 }
 
 .action-button.withdraw .action-icon {
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  background: linear-gradient(135deg, #f59e0b 0%, var(--color-warning) 100%);
   color: white;
 }
 
 .action-button.transfer .action-icon {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  background: linear-gradient(135deg, var(--color-secondary) 0%, var(--color-secondary-hover) 100%);
   color: white;
 }
 
@@ -1774,7 +1774,7 @@ onUnmounted(() => {
 }
 
 .action-button.delete .action-icon {
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  background: linear-gradient(135deg, #ef4444 0%, var(--color-danger) 100%);
   color: white;
 }
 
@@ -2419,7 +2419,7 @@ onUnmounted(() => {
   right: 0;
   bottom: 0;
   background: rgba(15, 23, 42, 0.5);
-  backdrop-filter: blur(2px);
+  backdrop-filter: var(--glass-blur-strong);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2964,7 +2964,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 6px;
   padding: 10px 20px;
-  background: linear-gradient(135deg, #6366f1, #818cf8);
+  background: linear-gradient(135deg, var(--color-primary), #818cf8);
   color: white;
   border: none;
   border-radius: var(--radius-md);

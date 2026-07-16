@@ -345,7 +345,7 @@ const vaultLabel = (id: string) => {
 .st-cancelled { background: var(--color-bg-page); color: var(--color-text-secondary); }
 
 /* Modal */
-.ot-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(2px); }
+.ot-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: var(--glass-blur-strong); }
 .ot-modal { background: white; border-radius: var(--radius-lg); width: 95%; max-width: 520px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
 .ot-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--color-border); }
 .ot-modal-header h3 { margin: 0; font-size: 1.1rem; }

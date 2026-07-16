@@ -166,6 +166,17 @@ const getCategoryItems = (category: string) => {
   return topNavItems.value.filter(item => item.category === category)
 }
 
+// Menü ikon rozetlerinin rengi — AppKpiCard/topbar-btn ailesindeki "canlı ikon rozeti" dilini
+// menüye taşımak için her kategoriye kendi vurgu rengi atanır.
+const categoryColors: Record<string, string> = {
+  GENEL: 'var(--color-primary)',
+  'İŞLEMLER': 'var(--color-secondary)',
+  RAPORLAR: '#8b5cf6',
+  YÖNETİM: 'var(--color-warning)',
+  TELEGRAM: 'var(--color-success)',
+}
+const categoryColor = (category: string) => categoryColors[category] || 'var(--color-primary)'
+
 
 // New computed: nav groups for sidebar
 const navGroups = computed(() => {
@@ -329,7 +340,9 @@ const toggleTicker = () => {
             active-class="is-active"
             @click="isMobileMenuOpen = false"
           >
-            <span class="material-symbols-outlined nav-link-icon">{{ item.icon }}</span>
+            <span class="nav-link-icon-badge" :style="{ '--nav-badge-color': categoryColor(group.cat) }">
+              <span class="material-symbols-outlined nav-link-icon">{{ item.icon }}</span>
+            </span>
             <span class="nav-link-text">{{ item.label }}</span>
             <span v-if="(item as any).isNew" class="nav-badge">YENİ</span>
           </router-link>
@@ -456,8 +469,9 @@ const toggleTicker = () => {
 /* ═══ Nav Sidebar ════════════════════════════════════ */
 .nav-sidebar {
   width: 230px;
-  background: var(--color-bg-card);
-  border-right: 1px solid var(--color-border);
+  background: linear-gradient(180deg, rgba(238,242,255,0.55), var(--glass-bg));
+  backdrop-filter: var(--glass-blur-light); -webkit-backdrop-filter: var(--glass-blur-light);
+  border-right: var(--border-crisp);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -477,7 +491,7 @@ const toggleTicker = () => {
 }
 .brand-icon {
   width: 34px; height: 34px;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: linear-gradient(135deg, var(--color-primary), #8b5cf6);
   border-radius: var(--radius-md);
   display: flex; align-items: center; justify-content: center;
   box-shadow: var(--shadow-glow-primary);
@@ -507,28 +521,52 @@ const toggleTicker = () => {
 
 .nav-link {
   display: flex; align-items: center; gap: 10px;
-  padding: 8px 10px;
+  padding: 10px 12px;
   border-radius: var(--radius-md);
-  font-size: 13px; font-weight: 500; color: var(--color-text-secondary);
+  border: var(--border-crisp);
+  background: var(--color-bg-card);
+  font-size: 13.5px; font-weight: 700; color: var(--color-text-secondary);
   text-decoration: none;
-  transition: background .12s, color .12s;
+  transition: background-color .14s, color .14s, border-color .14s, box-shadow .14s, transform .14s;
   position: relative;
-  margin-bottom: 1px;
+  margin-bottom: 6px;
+  box-shadow: var(--shadow-md);
 }
-.nav-link:hover { background: var(--color-bg-page); color: var(--color-text); }
+.nav-link:hover {
+  background: var(--color-bg-page); color: var(--color-text);
+  border-color: var(--color-primary);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
 .nav-link.is-active {
-  background: var(--color-primary-light); color: var(--color-primary-hover); font-weight: 600;
+  background: linear-gradient(135deg, var(--color-primary), #8b5cf6); color: #fff;
+  border-color: var(--color-primary);
   box-shadow: var(--shadow-glow-primary);
-  position: relative;
 }
-.nav-link.is-active::before {
-  content: '';
-  position: absolute; left: -10px; top: 4px; bottom: 4px; width: 3px;
-  background: var(--color-primary); border-radius: 0 3px 3px 0;
-}
-.nav-link.is-active .nav-link-icon { color: var(--color-primary-hover); }
-.nav-link-icon { font-size: 18px; color: var(--color-text-muted); flex-shrink: 0; transition: color .12s; }
+.nav-link-icon { font-size: 15px; flex-shrink: 0; }
 .nav-link-text { flex: 1; }
+
+/* İkon rozetleri — AppKpiCard/topbar-btn ailesindeki "canlı ikon rozeti" dili */
+.nav-link-icon-badge {
+  width: 26px; height: 26px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-page);
+  transition: background-color .12s, transform .12s;
+}
+.nav-link-icon-badge .nav-link-icon {
+  color: var(--nav-badge-color, var(--color-text-muted));
+  font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+}
+.nav-link:hover .nav-link-icon-badge { transform: scale(1.06); }
+.nav-link.is-active .nav-link-icon-badge {
+  background: rgba(255,255,255,0.22);
+  box-shadow: 0 2px 8px -1px rgba(0,0,0,0.2);
+}
+.nav-link.is-active .nav-link-icon-badge .nav-link-icon {
+  color: #fff;
+  font-variation-settings: 'FILL' 1, 'wght' 600, 'GRAD' 0, 'opsz' 24;
+}
 .nav-badge {
   font-size: 9px; font-weight: 700; background: var(--color-danger); color: #fff;
   padding: 1px 5px; border-radius: var(--radius-sm); letter-spacing: .3px;
@@ -553,7 +591,7 @@ const toggleTicker = () => {
 .nav-user-btn:hover { background: var(--color-bg-page); }
 .nav-avatar {
   width: 30px; height: 30px; border-radius: 50%;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: linear-gradient(135deg, var(--color-primary), #8b5cf6);
   color: #fff; font-size: 13px; font-weight: 700;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
@@ -570,7 +608,7 @@ const toggleTicker = () => {
 }
 .ud-header {
   display: flex; align-items: center; gap: 12px;
-  padding: 16px; background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  padding: 16px; background: linear-gradient(135deg, var(--color-primary), #8b5cf6);
 }
 .ud-avatar {
   width: 42px; height: 42px; border-radius: 50%;
@@ -648,7 +686,7 @@ const toggleTicker = () => {
 .header-user-btn:hover { background: var(--color-bg-page); }
 .header-avatar {
   width: 26px; height: 26px; border-radius: 50%;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: linear-gradient(135deg, var(--color-primary), #8b5cf6);
   color: #fff; font-size: 11px; font-weight: 700;
   display: flex; align-items: center; justify-content: center;
 }
@@ -664,7 +702,7 @@ const toggleTicker = () => {
   animation: ticker 60s linear infinite;
   will-change: transform;
 }
-.ticker-office { background: #d97706; color: #fff; padding: 2px 8px; border-radius: 4px; font-weight: 700; font-size: 11px; }
+.ticker-office { background: var(--color-warning); color: #fff; padding: 2px 8px; border-radius: 4px; font-weight: 700; font-size: 11px; }
 .ticker-item { display: inline-flex; align-items: center; gap: 4px; }
 .ticker-buy { color: #4ade80; }
 .ticker-sell { color: #f87171; }

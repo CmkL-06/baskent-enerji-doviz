@@ -40,7 +40,7 @@ function go() {
   margin: 0 0 12px;
 }
 .app-empty-btn {
-  background: #6366f1;
+  background: var(--color-primary);
   color: #fff;
   border: none;
   border-radius: 8px;
@@ -51,6 +51,6 @@ function go() {
   transition: background .2s;
 }
 .app-empty-btn:hover {
-  background: #4f46e5;
+  background: var(--color-primary-hover);
 }
 </style>

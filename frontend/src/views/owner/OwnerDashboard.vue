@@ -249,7 +249,7 @@ const topCurrencies = (obj: Record<string, number> | null | undefined) => {
                 </td>
                 <td>
                   <div class="od-perf-name">
-                    <span class="material-symbols-outlined" aria-hidden="true" style="font-size:1rem" :style="{ color: row.officeType === 1 ? '#f59e0b' : '#3b82f6' }">{{ officeTypeIcon(row.officeType) }}</span>
+                    <span class="material-symbols-outlined" aria-hidden="true" style="font-size:1rem" :style="{ color: row.officeType === 1 ? '#f59e0b' : 'var(--color-secondary)' }">{{ officeTypeIcon(row.officeType) }}</span>
                     {{ row.officeName }}
                   </div>
                 </td>

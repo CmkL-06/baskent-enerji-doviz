@@ -159,7 +159,7 @@ onMounted(() => {
 .animated-bg {
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, #7c3aed 100%);
   overflow: hidden;
 }
 
@@ -216,7 +216,7 @@ onMounted(() => {
 
 .login-card {
   background: rgba(255, 255, 255, 0.98);
-  backdrop-filter: blur(20px);
+  backdrop-filter: var(--glass-blur-strong);
   border-radius: var(--radius-xl);
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.3);
   width: 100%;
@@ -248,7 +248,7 @@ onMounted(() => {
   justify-content: center;
   width: 80px;
   height: 80px;
-  background: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, #7c3aed 100%);
   border-radius: var(--radius-xl);
   margin-bottom: 1.5rem;
   box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
@@ -381,7 +381,7 @@ onMounted(() => {
 .submit-btn {
   width: 100%;
   padding: 1rem;
-  background: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, #7c3aed 100%);
   border: none;
   border-radius: var(--radius-lg);
   color: white;

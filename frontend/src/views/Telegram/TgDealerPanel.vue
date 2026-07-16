@@ -116,7 +116,7 @@ function formatDate(d: string | null) {
 
 function statusColor(status: string) {
   const map: Record<string, string> = {
-    completed: '#10b981', approved: '#3b82f6', pending: '#f59e0b',
+    completed: '#10b981', approved: 'var(--color-secondary)', pending: '#f59e0b',
     cancelled: '#ef4444', rejected: '#ef4444'
   }
   return map[status] || '#6b7280'
@@ -184,7 +184,7 @@ onUnmounted(() => {
           <div class="summary-label">Verilen Toplam TL</div>
         </div>
         <div class="summary-card">
-          <div class="summary-icon" style="color: #3b82f6">
+          <div class="summary-icon" style="color: var(--color-secondary)">
             <span class="material-symbols-outlined" aria-hidden="true">token</span>
           </div>
           <div class="summary-value">${{ formatMoney(dashboard.usdt) }}</div>
@@ -374,26 +374,26 @@ onUnmounted(() => {
 .qr-section { margin-top: 16px; padding: 16px; background: var(--color-bg-card, #fff); border: 1px solid var(--color-border); border-radius: var(--radius-md); box-shadow: var(--shadow-md); }
 .qr-section-header { display: flex; justify-content: space-between; align-items: center; }
 .qr-download-btn { display: flex; align-items: center; gap: 4px; padding: 6px 12px; border: 1px solid var(--color-primary, var(--color-secondary-hover)); background: transparent; color: var(--color-primary, var(--color-secondary-hover)); border-radius: var(--radius-sm); font-size: 12px; font-weight: 600; cursor: pointer; transition: background-color 0.15s, color 0.15s, border-color 0.15s; }
-.qr-download-btn:hover { background: var(--color-primary, #2563eb); color: #fff; }
+.qr-download-btn:hover { background: var(--color-primary, var(--color-secondary-hover)); color: #fff; }
 .qr-body { display: flex; gap: 20px; margin-top: 14px; align-items: flex-start; }
 .qr-image-wrap { flex-shrink: 0; padding: 8px; background: var(--color-bg-card, #fff); border: 1px solid var(--color-border); border-radius: var(--radius-md); box-shadow: var(--shadow-md); }
 .qr-image { width: 160px; height: 160px; display: block; }
 .qr-details { flex: 1; min-width: 0; }
 .qr-link-label { font-size: 11px; font-weight: 600; color: var(--color-text-secondary, #6b7280); text-transform: uppercase; letter-spacing: 0.05em; }
 .qr-link-value { font-size: 13px; color: var(--color-text, #1f2937); margin-top: 2px; word-break: break-all; }
-.qr-link-value a { color: var(--color-primary, #2563eb); text-decoration: none; }
+.qr-link-value a { color: var(--color-primary, var(--color-secondary-hover)); text-decoration: none; }
 .qr-link-value a:hover { text-decoration: underline; }
 .qr-link-value code { background: var(--color-hover, #f3f4f6); padding: 2px 8px; border-radius: var(--radius-sm); font-weight: 600; font-size: 14px; }
 .qr-hint { margin-top: 12px; font-size: 12px; color: var(--color-text-secondary, #6b7280); line-height: 1.5; }
 
 .section-title { display: flex; align-items: center; gap: 8px; margin: 16px 0 10px; padding: 6px 10px 6px 12px; font-size: 14px; font-weight: 600; color: var(--color-text, #1f2937); position: relative; background: linear-gradient(90deg, var(--color-hover, #f3f4f6), transparent); border-bottom: 3px solid var(--border-strong); border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
-.section-title::before { content: ''; position: absolute; left: 0; top: 4px; bottom: 4px; width: 5px; border-radius: var(--radius-sm); background: var(--color-primary, #2563eb); }
+.section-title::before { content: ''; position: absolute; left: 0; top: 4px; bottom: 4px; width: 5px; border-radius: var(--radius-sm); background: var(--color-primary, var(--color-secondary-hover)); }
 .section-title .material-symbols-outlined { font-size: 20px; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
 
 .filter-bar { display: flex; gap: 6px; margin-bottom: 12px; }
 .filter-btn { padding: 6px 12px; border: 1px solid var(--color-border); background: var(--color-bg-card, #fff); border-radius: var(--radius-sm); font-size: 12px; cursor: pointer; color: var(--color-text-secondary, var(--color-text-secondary)); transition: background-color 0.15s, color 0.15s, border-color 0.15s; }
-.filter-btn:hover { border-color: var(--color-primary, #2563eb); }
-.filter-btn.active { background: var(--color-primary, #2563eb); color: #fff; border-color: var(--color-primary, #2563eb); }
+.filter-btn:hover { border-color: var(--color-primary, var(--color-secondary-hover)); }
+.filter-btn.active { background: var(--color-primary, var(--color-secondary-hover)); color: #fff; border-color: var(--color-primary, var(--color-secondary-hover)); }
 
 .tg-table-wrap { overflow-x: auto; border-radius: var(--radius-md); border: 1px solid var(--color-border); box-shadow: var(--shadow-md); }
 .tg-table { width: 100%; border-collapse: collapse; font-size: 13px; }

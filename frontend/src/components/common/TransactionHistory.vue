@@ -4,6 +4,7 @@ import apiService from '@/services/apiservice'
 import { useNotification } from '@/composables/useNotification'
 import { useAuthStore } from '@/stores/auth'
 import { getCurrencyCountryCode } from '@/utils/currency'
+import { useExpandable } from '@/composables/useExpandable'
 
 const props = withDefaults(defineProps<{
   officeId: string
@@ -29,7 +30,7 @@ const totalCount = ref(0)
 const filterType = ref<string>('')
 const deleteConfirmId = ref<string | null>(null)
 const isDeleting = ref(false)
-const selectedTx = ref<any>(null)
+const { expandedId: expandedTxId, toggle: toggleTxRow, isExpanded: isTxExpanded, close: closeTxRow } = useExpandable<string>()
 
 const formatNumber = (value: number, decimals = 2) => {
   return new Intl.NumberFormat('tr-TR', {
@@ -104,21 +105,13 @@ async function deleteTransaction(id: string) {
     await apiService.removeTransaction(id)
     notification.success('İşlem başarıyla silindi')
     deleteConfirmId.value = null
-    selectedTx.value = null
+    closeTxRow()
     await loadTransactions()
   } catch (err: any) {
     notification.error(`Silme hatası: ${err.response?.data?.message || err.message}`)
   } finally {
     isDeleting.value = false
   }
-}
-
-function openDetail(tx: any) {
-  selectedTx.value = tx
-}
-
-function closeDetail() {
-  selectedTx.value = null
 }
 
 function printReceipt(tx: any) {
@@ -183,11 +176,19 @@ ${tx.notes ? `<div class="divider"></div><div class="row"><span class="label">No
   setTimeout(() => { printWindow.print(); printWindow.close() }, 400)
 }
 
-function printAllTransactions() {
+async function printAllTransactions() {
   if (transactions.value.length === 0) {
     notification.warning('Yazdırılacak işlem bulunamadı')
     return
   }
+
+  let dayStatus: any = null
+  try {
+    dayStatus = await apiService.getDayStatus(props.officeId)
+  } catch (err) {
+    console.error('Failed to load day status for print summary:', err)
+  }
+
   const printWindow = window.open('', '_blank', 'width=900,height=700')
   if (!printWindow) return
 
@@ -204,11 +205,56 @@ function printAllTransactions() {
     </tr>`
   })
 
-  printWindow.document.write(`<!DOCTYPE html><html><head><title>İşlem Geçmişi</title>
-    <style>body{font-family:'Segoe UI',sans-serif;padding:30px}h2{text-align:center;margin-bottom:20px}
-    table{width:100%;border-collapse:collapse}th{text-align:left;padding:10px 8px;border-bottom:2px solid #333;font-size:13px}
-    @media print{body{padding:10px}}</style></head><body>
-    <h2>İşlem Geçmişi — ${props.selectedDate || new Date().toLocaleDateString('tr-TR')}</h2>
+  const isDayOpen = dayStatus?.isDayOpen ?? true
+  const statusBadge = isDayOpen
+    ? `<span style="padding:3px 10px;border-radius:5px;font-size:11px;font-weight:700;background:#dcfce7;color:#15803d">AÇIK</span>`
+    : `<span style="padding:3px 10px;border-radius:5px;font-size:11px;font-weight:700;background:#fee2e2;color:#b91c1c">KAPALI</span>`
+
+  const totalCount = dayStatus?.totalTransactionCount ?? transactions.value.length
+  const totalVolume = dayStatus?.totalTransactionVolumeInTRY ?? 0
+  const openedBy = dayStatus?.openedByUserName || 'Bilinmiyor (geçmiş kayıt)'
+  const closedBy = dayStatus?.lastClosedByUserName || '—'
+  const printedBy = [authStore.user?.firstname, authStore.user?.lastname].filter(Boolean).join(' ') || authStore.user?.username || '-'
+  const printedAt = new Date().toLocaleString('tr-TR')
+
+  const balancesRows = (dayStatus?.systemBalances || [])
+    .map((b: any) => `<div class="summary-balance-row"><span>${b.currencyCode}</span><span>${formatNumber(b.systemBalance)}</span></div>`)
+    .join('')
+
+  printWindow.document.write(`<!DOCTYPE html><html><head><title>İşlem Geçmişi — ${props.selectedDate || new Date().toLocaleDateString('tr-TR')}</title>
+    <style>
+      *{box-sizing:border-box}
+      body{font-family:'Segoe UI',sans-serif;padding:30px;color:#111827}
+      h2{text-align:center;margin-bottom:4px}
+      .print-subtitle{text-align:center;color:#6b7280;font-size:12px;margin-bottom:20px}
+      .summary-card{border:1px solid #e5e7eb;border-radius:10px;padding:16px 20px;margin-bottom:24px;background:#fafafa}
+      .summary-title{font-size:12px;font-weight:700;letter-spacing:0.5px;color:#9ca3af;text-transform:uppercase;margin-bottom:12px}
+      .summary-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px 24px}
+      .summary-item{display:flex;flex-direction:column;gap:2px}
+      .summary-label{font-size:11px;color:#6b7280}
+      .summary-value{font-size:14px;font-weight:600;color:#111827}
+      .summary-balances{margin-top:14px;border-top:1px dashed #d1d5db;padding-top:12px}
+      .summary-balance-row{display:flex;justify-content:space-between;font-size:12px;font-family:monospace;padding:2px 0}
+      table{width:100%;border-collapse:collapse}
+      th{text-align:left;padding:10px 8px;border-bottom:2px solid #333;font-size:13px}
+      @media print{body{padding:10px}}
+    </style></head><body>
+    <h2>İşlem Geçmişi</h2>
+    <div class="print-subtitle">${props.selectedDate || new Date().toLocaleDateString('tr-TR')}</div>
+
+    <div class="summary-card">
+      <div class="summary-title">Gün Özeti</div>
+      <div class="summary-grid">
+        <div class="summary-item"><span class="summary-label">Toplam İşlem</span><span class="summary-value">${totalCount} işlem · ${formatNumber(totalVolume)} ₺</span></div>
+        <div class="summary-item"><span class="summary-label">Mevcut Durum</span><span class="summary-value">${statusBadge}</span></div>
+        <div class="summary-item"><span class="summary-label">Kasayı Açan</span><span class="summary-value">${openedBy}</span></div>
+        <div class="summary-item"><span class="summary-label">Kasayı Kapatan</span><span class="summary-value">${closedBy}</span></div>
+        <div class="summary-item"><span class="summary-label">Yazdıran</span><span class="summary-value">${printedBy}</span></div>
+        <div class="summary-item"><span class="summary-label">Tarih / Saat</span><span class="summary-value">${printedAt}</span></div>
+      </div>
+      ${balancesRows ? `<div class="summary-balances"><div class="summary-title">Kasa Bakiyeleri</div>${balancesRows}</div>` : ''}
+    </div>
+
     <table><thead><tr><th>Saat</th><th>Tür</th><th>Kaynak</th><th>Kur</th><th>Hedef</th><th>Personel</th><th>Kar</th></tr></thead>
     <tbody>${rows}</tbody></table></body></html>`)
   printWindow.document.close()
@@ -241,7 +287,7 @@ defineExpose({ loadTransactions, printAllTransactions })
     <!-- Header -->
     <div class="th-header">
       <div class="th-header-left">
-        <span class="material-symbols-outlined th-icon-filled" style="font-size:20px;color:#6366f1">history</span>
+        <span class="material-symbols-outlined th-icon-filled" style="font-size:20px;color:var(--color-primary)">history</span>
         <h3 class="th-title">İşlem Geçmişi</h3>
         <span v-if="totalCount > 0" class="th-count">{{ totalCount }}</span>
       </div>
@@ -259,7 +305,7 @@ defineExpose({ loadTransactions, printAllTransactions })
 
     <!-- Loading -->
     <div v-if="isLoading && transactions.length === 0" class="th-loading">
-      <span class="material-symbols-outlined th-spin" style="font-size:24px;color:#6366f1">refresh</span>
+      <span class="material-symbols-outlined th-spin" style="font-size:24px;color:var(--color-primary)">refresh</span>
       <span>Yükleniyor...</span>
     </div>
 
@@ -284,41 +330,135 @@ defineExpose({ loadTransactions, printAllTransactions })
           </tr>
         </thead>
         <tbody>
-          <tr v-for="tx in transactions" :key="tx.id" class="th-row" :class="{ 'th-row--deleting': deleteConfirmId === tx.id }" @click="openDetail(tx)">
-            <td class="th-cell-time">{{ formatDate(tx.transactionDate) }} {{ formatTime(tx.transactionDate) }}</td>
-            <td>
-              <span class="th-type-badge" :class="isBuy(tx) ? 'th-type-badge--buy' : 'th-type-badge--sell'">
-                {{ txTypeLabel(tx) }}
-              </span>
-            </td>
-            <td>
-              <div class="th-currency-cell">
-                <i v-if="getFlagClass(tx.sourceCurrencyCode)" :class="getFlagClass(tx.sourceCurrencyCode)" class="th-flag"></i>
-                <span class="th-amount">{{ formatNumber(tx.sourceAmount) }}</span>
-                <span class="th-code">{{ tx.sourceCurrencyCode }}</span>
-              </div>
-            </td>
-            <td class="th-cell-rate">
-              <span class="th-rate">{{ tx.exchangeRate ? formatNumber(tx.exchangeRate, 4) : '-' }}</span>
-              <span v-if="tx.isCustomRate" class="th-custom-badge">Ö</span>
-            </td>
-            <td>
-              <div class="th-currency-cell">
-                <i v-if="getFlagClass(tx.targetCurrencyCode)" :class="getFlagClass(tx.targetCurrencyCode)" class="th-flag"></i>
-                <span class="th-amount">{{ formatNumber(tx.targetAmount) }}</span>
-                <span class="th-code">{{ tx.targetCurrencyCode }}</span>
-              </div>
-            </td>
-            <td class="th-cell-user">
-              <span class="th-username">{{ tx.username || '-' }}</span>
-            </td>
-            <td class="th-cell-profit">
-              <span v-if="tx.profit" :class="tx.profit > 0 ? 'th-profit--pos' : 'th-profit--neg'">
-                {{ tx.profit > 0 ? '+' : '' }}{{ formatNumber(tx.profit) }}
-              </span>
-              <span v-else class="th-profit--zero">-</span>
-            </td>
-          </tr>
+          <template v-for="tx in transactions" :key="tx.id">
+            <tr class="th-row expandable-row" :class="{ 'th-row--deleting': deleteConfirmId === tx.id, expanded: isTxExpanded(tx.id) }" @click="toggleTxRow(tx.id)">
+              <td class="th-cell-time">
+                <span class="material-symbols-outlined th-chevron" aria-hidden="true">chevron_right</span>
+                {{ formatDate(tx.transactionDate) }} {{ formatTime(tx.transactionDate) }}
+              </td>
+              <td>
+                <span class="th-type-badge" :class="isBuy(tx) ? 'th-type-badge--buy' : 'th-type-badge--sell'">
+                  {{ txTypeLabel(tx) }}
+                </span>
+              </td>
+              <td>
+                <div class="th-currency-cell">
+                  <i v-if="getFlagClass(tx.sourceCurrencyCode)" :class="getFlagClass(tx.sourceCurrencyCode)" class="th-flag"></i>
+                  <span class="th-amount">{{ formatNumber(tx.sourceAmount) }}</span>
+                  <span class="th-code">{{ tx.sourceCurrencyCode }}</span>
+                </div>
+              </td>
+              <td class="th-cell-rate">
+                <span class="th-rate">{{ tx.exchangeRate ? formatNumber(tx.exchangeRate, 4) : '-' }}</span>
+                <span v-if="tx.isCustomRate" class="th-custom-badge">Ö</span>
+              </td>
+              <td>
+                <div class="th-currency-cell">
+                  <i v-if="getFlagClass(tx.targetCurrencyCode)" :class="getFlagClass(tx.targetCurrencyCode)" class="th-flag"></i>
+                  <span class="th-amount">{{ formatNumber(tx.targetAmount) }}</span>
+                  <span class="th-code">{{ tx.targetCurrencyCode }}</span>
+                </div>
+              </td>
+              <td class="th-cell-user">
+                <span class="th-username">{{ tx.username || '-' }}</span>
+              </td>
+              <td class="th-cell-profit">
+                <span v-if="tx.profit" :class="tx.profit > 0 ? 'th-profit--pos' : 'th-profit--neg'">
+                  {{ tx.profit > 0 ? '+' : '' }}{{ formatNumber(tx.profit) }}
+                </span>
+                <span v-else class="th-profit--zero">-</span>
+              </td>
+            </tr>
+
+            <tr class="detail-row" v-if="isTxExpanded(tx.id)">
+              <td colspan="7">
+                <div class="th-detail-body">
+                  <div class="th-detail-type-row">
+                    <span class="th-type-badge th-type-badge--lg" :class="isBuy(tx) ? 'th-type-badge--buy' : 'th-type-badge--sell'">
+                      {{ txTypeLabel(tx) }}
+                    </span>
+                    <span class="th-detail-date">{{ formatFullDate(tx.transactionDate) }}</span>
+                    <span class="th-detail-ref">{{ tx.transactionReferenceNo }}</span>
+                    <button @click.stop="printReceipt(tx)" class="th-print-btn" title="Fiş Yazdır">
+                      <span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px">receipt_long</span>
+                      Fiş Yazdır
+                    </button>
+                  </div>
+
+                  <div class="th-detail-amounts">
+                    <div class="th-detail-amount-box">
+                      <div class="th-detail-amount-label">Kaynak</div>
+                      <div class="th-detail-amount-value">
+                        <i v-if="getFlagClass(tx.sourceCurrencyCode)" :class="getFlagClass(tx.sourceCurrencyCode)" class="th-flag"></i>
+                        {{ formatNumber(tx.sourceAmount) }} {{ tx.sourceCurrencyCode }}
+                      </div>
+                    </div>
+                    <div class="th-detail-arrow">
+                      <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
+                    </div>
+                    <div class="th-detail-amount-box">
+                      <div class="th-detail-amount-label">Hedef</div>
+                      <div class="th-detail-amount-value">
+                        <i v-if="getFlagClass(tx.targetCurrencyCode)" :class="getFlagClass(tx.targetCurrencyCode)" class="th-flag"></i>
+                        {{ formatNumber(tx.targetAmount) }} {{ tx.targetCurrencyCode }}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="th-detail-info-grid">
+                    <div class="th-detail-info-item">
+                      <span class="th-detail-info-label">Kur</span>
+                      <span class="th-detail-info-value">{{ tx.exchangeRate ? formatNumber(tx.exchangeRate, 4) : '-' }}</span>
+                    </div>
+                    <div v-if="tx.customRate" class="th-detail-info-item">
+                      <span class="th-detail-info-label">Özel Kur</span>
+                      <span class="th-detail-info-value th-detail-custom">{{ formatNumber(tx.customRate, 4) }}</span>
+                    </div>
+                    <div class="th-detail-info-item">
+                      <span class="th-detail-info-label">Personel</span>
+                      <span class="th-detail-info-value">{{ tx.username || '-' }}</span>
+                    </div>
+                    <div class="th-detail-info-item">
+                      <span class="th-detail-info-label">Şube</span>
+                      <span class="th-detail-info-value">{{ tx.officeName || '-' }}</span>
+                    </div>
+                    <div v-if="tx.profit" class="th-detail-info-item">
+                      <span class="th-detail-info-label">Kar</span>
+                      <span class="th-detail-info-value" :class="tx.profit > 0 ? 'th-profit--pos' : 'th-profit--neg'">
+                        {{ tx.profit > 0 ? '+' : '' }}{{ formatNumber(tx.profit) }} ₺
+                      </span>
+                    </div>
+                    <div v-if="tx.notes" class="th-detail-info-item th-detail-info-full">
+                      <span class="th-detail-info-label">Not</span>
+                      <span class="th-detail-info-value">{{ tx.notes }}</span>
+                    </div>
+                  </div>
+
+                  <div v-if="tx.isDeleted" class="th-detail-deleted-banner">
+                    <span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px">delete</span>
+                    Silinmiş — {{ tx.deletedBy || '' }} {{ tx.deletedReason ? `(${tx.deletedReason})` : '' }}
+                  </div>
+
+                  <div v-if="showActions && !tx.isDeleted && (authStore.isAdmin || authStore.isOwner)" class="th-detail-footer">
+                    <template v-if="deleteConfirmId === tx.id">
+                      <span class="th-detail-confirm-text">Bu işlemi silmek istediğinize emin misiniz?</span>
+                      <div class="th-detail-confirm-actions">
+                        <button @click.stop="deleteTransaction(tx.id)" :disabled="isDeleting" class="th-detail-del-confirm">
+                          <span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px">{{ isDeleting ? 'refresh' : 'check' }}</span>
+                          Evet, Sil
+                        </button>
+                        <button @click.stop="deleteConfirmId = null" class="th-detail-del-cancel">İptal</button>
+                      </div>
+                    </template>
+                    <button v-else @click.stop="deleteConfirmId = tx.id" class="th-detail-del-btn">
+                      <span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px">delete</span>
+                      İşlemi Sil
+                    </button>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </template>
         </tbody>
       </table>
     </div>
@@ -333,109 +473,6 @@ defineExpose({ loadTransactions, printAllTransactions })
         <span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px">chevron_right</span>
       </button>
     </div>
-
-    <!-- Detail Modal -->
-    <Teleport to="body">
-      <div v-if="selectedTx" class="th-overlay" @click.self="closeDetail">
-        <div class="th-detail-card">
-          <div class="th-detail-header">
-            <div>
-              <h3 class="th-detail-title">İşlem Detayı</h3>
-              <span class="th-detail-ref">{{ selectedTx.transactionReferenceNo }}</span>
-            </div>
-            <div class="th-detail-header-right">
-              <button @click="printReceipt(selectedTx)" class="th-print-btn" title="Fiş Yazdır">
-                <span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px">receipt_long</span>
-                Fiş Yazdır
-              </button>
-              <button @click="closeDetail" class="th-close-btn">
-                <span class="material-symbols-outlined" aria-hidden="true" style="font-size:20px">close</span>
-              </button>
-            </div>
-          </div>
-
-          <div class="th-detail-body">
-            <div class="th-detail-type-row">
-              <span class="th-type-badge th-type-badge--lg" :class="isBuy(selectedTx) ? 'th-type-badge--buy' : 'th-type-badge--sell'">
-                {{ txTypeLabel(selectedTx) }}
-              </span>
-              <span class="th-detail-date">{{ formatFullDate(selectedTx.transactionDate) }}</span>
-            </div>
-
-            <div class="th-detail-amounts">
-              <div class="th-detail-amount-box">
-                <div class="th-detail-amount-label">Kaynak</div>
-                <div class="th-detail-amount-value">
-                  <i v-if="getFlagClass(selectedTx.sourceCurrencyCode)" :class="getFlagClass(selectedTx.sourceCurrencyCode)" class="th-flag"></i>
-                  {{ formatNumber(selectedTx.sourceAmount) }} {{ selectedTx.sourceCurrencyCode }}
-                </div>
-              </div>
-              <div class="th-detail-arrow">
-                <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
-              </div>
-              <div class="th-detail-amount-box">
-                <div class="th-detail-amount-label">Hedef</div>
-                <div class="th-detail-amount-value">
-                  <i v-if="getFlagClass(selectedTx.targetCurrencyCode)" :class="getFlagClass(selectedTx.targetCurrencyCode)" class="th-flag"></i>
-                  {{ formatNumber(selectedTx.targetAmount) }} {{ selectedTx.targetCurrencyCode }}
-                </div>
-              </div>
-            </div>
-
-            <div class="th-detail-info-grid">
-              <div class="th-detail-info-item">
-                <span class="th-detail-info-label">Kur</span>
-                <span class="th-detail-info-value">{{ selectedTx.exchangeRate ? formatNumber(selectedTx.exchangeRate, 4) : '-' }}</span>
-              </div>
-              <div v-if="selectedTx.customRate" class="th-detail-info-item">
-                <span class="th-detail-info-label">Özel Kur</span>
-                <span class="th-detail-info-value th-detail-custom">{{ formatNumber(selectedTx.customRate, 4) }}</span>
-              </div>
-              <div class="th-detail-info-item">
-                <span class="th-detail-info-label">Personel</span>
-                <span class="th-detail-info-value">{{ selectedTx.username || '-' }}</span>
-              </div>
-              <div class="th-detail-info-item">
-                <span class="th-detail-info-label">Şube</span>
-                <span class="th-detail-info-value">{{ selectedTx.officeName || '-' }}</span>
-              </div>
-              <div v-if="selectedTx.profit" class="th-detail-info-item">
-                <span class="th-detail-info-label">Kar</span>
-                <span class="th-detail-info-value" :class="selectedTx.profit > 0 ? 'th-profit--pos' : 'th-profit--neg'">
-                  {{ selectedTx.profit > 0 ? '+' : '' }}{{ formatNumber(selectedTx.profit) }} ₺
-                </span>
-              </div>
-              <div v-if="selectedTx.notes" class="th-detail-info-item th-detail-info-full">
-                <span class="th-detail-info-label">Not</span>
-                <span class="th-detail-info-value">{{ selectedTx.notes }}</span>
-              </div>
-            </div>
-
-            <div v-if="selectedTx.isDeleted" class="th-detail-deleted-banner">
-              <span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px">delete</span>
-              Silinmiş — {{ selectedTx.deletedBy || '' }} {{ selectedTx.deletedReason ? `(${selectedTx.deletedReason})` : '' }}
-            </div>
-          </div>
-
-          <div v-if="showActions && !selectedTx.isDeleted && (authStore.isAdmin || authStore.isOwner)" class="th-detail-footer">
-            <template v-if="deleteConfirmId === selectedTx.id">
-              <span style="font-size:13px;color:#6b7280">Bu işlemi silmek istediğinize emin misiniz?</span>
-              <div style="display:flex;gap:8px">
-                <button @click="deleteTransaction(selectedTx.id)" :disabled="isDeleting" class="th-detail-del-confirm">
-                  <span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px">{{ isDeleting ? 'refresh' : 'check' }}</span>
-                  Evet, Sil
-                </button>
-                <button @click="deleteConfirmId = null" class="th-detail-del-cancel">İptal</button>
-              </div>
-            </template>
-            <button v-else @click="deleteConfirmId = selectedTx.id" class="th-detail-del-btn">
-              <span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px">delete</span>
-              İşlemi Sil
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
   </div>
 </template>
 
@@ -672,48 +709,20 @@ defineExpose({ loadTransactions, printAllTransactions })
   font-weight: 500;
 }
 
-/* Detail Modal */
-.th-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  padding: 20px;
-}
-.th-detail-card {
-  background: white;
-  border-radius: var(--radius-lg);
-  width: 100%;
-  max-width: 520px;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
-  overflow: hidden;
-}
-
-.th-detail-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 18px 24px;
-  border-bottom: 1px solid #f3f4f6;
-}
-.th-detail-title {
+/* Açılır satır detayı (accordion) */
+.expandable-row { cursor: pointer; }
+.th-chevron {
   font-size: 16px;
-  font-weight: 700;
-  color: #111827;
-}
-.th-detail-ref {
-  font-size: 12px;
   color: #9ca3af;
-  font-family: 'JetBrains Mono', monospace;
+  vertical-align: middle;
+  margin-right: 2px;
+  transition: transform 0.15s;
+  display: inline-block;
 }
-.th-detail-header-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
+.expandable-row.expanded .th-chevron { transform: rotate(90deg); color: var(--color-primary); }
+.expandable-row.expanded td { background: #f5f3ff; }
+.detail-row td { padding: 0; border-bottom: 1px solid #f3f4f6; }
+
 .th-print-btn {
   display: inline-flex;
   align-items: center;
@@ -727,36 +736,32 @@ defineExpose({ loadTransactions, printAllTransactions })
   font-weight: 600;
   cursor: pointer;
   transition: background-color 0.2s, color 0.2s;
+  margin-left: auto;
 }
 .th-print-btn:hover { background: var(--color-primary); color: white; }
-.th-close-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: none;
-  border-radius: var(--radius-md);
-  background: #f3f4f6;
-  color: #6b7280;
-  cursor: pointer;
-  transition: background-color 0.2s, color 0.2s;
-}
-.th-close-btn:hover { background: #e5e7eb; color: #111827; }
 
 .th-detail-body {
-  padding: 20px 24px;
+  padding: 16px 20px;
+  background: #faf5ff;
+  border-top: 2px solid var(--border-strong);
 }
 .th-detail-type-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 .th-detail-date {
   font-size: 13px;
   color: #6b7280;
 }
+.th-detail-ref {
+  font-size: 12px;
+  color: #9ca3af;
+  font-family: 'JetBrains Mono', monospace;
+}
+.th-detail-confirm-text { font-size: 13px; color: #6b7280; }
+.th-detail-confirm-actions { display: flex; gap: 8px; }
 
 .th-detail-amounts {
   display: flex;
@@ -899,7 +904,6 @@ defineExpose({ loadTransactions, printAllTransactions })
   .th-cell-user { display: none; }
   .th-col-profit { display: none; }
   .th-cell-profit { display: none; }
-  .th-detail-card { max-width: 100%; }
   .th-detail-amounts { flex-direction: column; }
   .th-detail-arrow { transform: rotate(90deg); }
 }

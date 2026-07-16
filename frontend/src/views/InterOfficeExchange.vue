@@ -163,8 +163,8 @@ onMounted(async () => {
 
     <!-- KPI -->
     <div class="kpi-grid">
-      <AppKpiCard v-if="authStore.isAdmin" icon="pending_actions" label="Bekleyen" :value="pendingTransfers.length" color="#d97706" bg="#fffbeb" />
-      <AppKpiCard icon="sync_alt" label="Toplam Transfer" :value="officeTransfers.length" color="#6366f1" bg="#eef2ff" />
+      <AppKpiCard v-if="authStore.isAdmin" icon="pending_actions" label="Bekleyen" :value="pendingTransfers.length" color="var(--color-warning)" bg="#fffbeb" />
+      <AppKpiCard icon="sync_alt" label="Toplam Transfer" :value="officeTransfers.length" color="var(--color-primary)" bg="var(--color-primary-light)" />
     </div>
 
     <!-- Tabs -->

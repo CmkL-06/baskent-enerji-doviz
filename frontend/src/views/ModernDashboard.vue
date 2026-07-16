@@ -168,9 +168,9 @@ const ownerKpi = computed(() => {
     { icon: 'account_balance', label: 'Toplam Varlık', value: fmtNum(totalAssets), unit: '₺', color: '#7c3aed', bg: '#f3f0ff', spark: null, change: null },
     { icon: 'trending_up', label: 'Günlük K/Z', value: plSign(tp) + fmtNum(tp), unit: '₺', color: plColor(tp), bg: tp >= 0 ? '#f0fdf4' : '#fef2f2', spark: profitSpark.value, change: ch.profit },
     { icon: 'calendar_month', label: 'Aylık K/Z', value: plSign(mp) + fmtNum(mp), unit: '₺', color: plColor(mp), bg: mp >= 0 ? '#f0fdf4' : '#fef2f2', spark: null, change: null },
-    { icon: 'swap_horiz', label: 'İşlem Sayısı', value: String(txCount), unit: 'adet', color: '#6366f1', bg: '#eef2ff', spark: txSpark.value, change: ch.txCount },
-    { icon: 'currency_exchange', label: 'Döviz Varlık', value: fmtNum(fxValue), unit: '₺', color: '#2563eb', bg: '#eff6ff', spark: null, change: null },
-    { icon: 'people', label: 'Cari Net', value: fmtNum(cariNet), unit: '₺', color: '#d97706', bg: '#fffbeb', spark: null, change: null },
+    { icon: 'swap_horiz', label: 'İşlem Sayısı', value: String(txCount), unit: 'adet', color: 'var(--color-primary)', bg: 'var(--color-primary-light)', spark: txSpark.value, change: ch.txCount },
+    { icon: 'currency_exchange', label: 'Döviz Varlık', value: fmtNum(fxValue), unit: '₺', color: 'var(--color-secondary-hover)', bg: 'var(--color-secondary-light)', spark: null, change: null },
+    { icon: 'people', label: 'Cari Net', value: fmtNum(cariNet), unit: '₺', color: 'var(--color-warning)', bg: '#fffbeb', spark: null, change: null },
   ]
 })
 
@@ -315,7 +315,7 @@ const staffZKpi = computed(() => {
   return [
     { icon: 'account_balance_wallet', label: 'Kasa Değeri', value: fmtNum(vaultValue), unit: '₺', color: '#7c3aed', bg: '#f3f0ff' },
     { icon: 'trending_up', label: 'Günlük Kar', value: plSign(profit) + fmtNum(profit), unit: '₺', color: plColor(profit), bg: profit >= 0 ? '#f0fdf4' : '#fef2f2' },
-    { icon: 'swap_horiz', label: 'İşlem Sayısı', value: String(txCount), unit: 'adet', color: '#6366f1', bg: '#eef2ff' },
+    { icon: 'swap_horiz', label: 'İşlem Sayısı', value: String(txCount), unit: 'adet', color: 'var(--color-primary)', bg: 'var(--color-primary-light)' },
     { icon: 'monitoring', label: 'İşlem Hacmi', value: fmtNum(volume), unit: '₺', color: '#0ea5e9', bg: 'rgba(14,165,233,0.10)' },
     { icon: 'percent', label: 'Kar Marjı', value: fmtNum(margin, 1), unit: '%', color: '#f59e0b', bg: 'rgba(245,158,11,0.10)' },
     { icon: 'receipt_long', label: 'Giderler', value: fmtNum(expenseTotals.value.total), unit: '₺', color: '#ef4444', bg: '#fef2f2' },
@@ -573,14 +573,14 @@ onUnmounted(() => {
 
         <div class="sf-info-card">
           <div class="sf-info-head">
-            <span class="material-symbols-outlined" aria-hidden="true" style="color:#6366f1">contacts</span>
+            <span class="material-symbols-outlined" aria-hidden="true" style="color:var(--color-primary)">contacts</span>
             <span class="sf-info-title">Cari Hesaplar</span>
             <button class="sf-link-btn" @click="router.push('/ihtiyar/parties')">Detay <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></button>
           </div>
           <div v-if="partyTotals" class="sf-info-body sf-info-inline">
             <div class="sf-info-row"><span>Toplam Cari</span><strong>{{ partyTotals.count }}</strong></div>
             <div class="sf-info-row"><span>Alacak</span><strong style="color:#16a34a">{{ fmtMoney(partyTotals.receivables) }} ₺</strong></div>
-            <div class="sf-info-row"><span>Borç</span><strong style="color:#dc2626">{{ fmtMoney(partyTotals.payables) }} ₺</strong></div>
+            <div class="sf-info-row"><span>Borç</span><strong style="color:var(--color-danger)">{{ fmtMoney(partyTotals.payables) }} ₺</strong></div>
             <div class="sf-info-row sf-info-highlight"><span>Net Bakiye</span><strong :style="{ color: plColor(partyTotals.net) }">{{ plSign(partyTotals.net) }}{{ fmtMoney(partyTotals.net) }} ₺</strong></div>
           </div>
           <div v-else class="state-msg"><span class="material-symbols-outlined" aria-hidden="true">info</span> Veri yüklenemedi</div>
@@ -647,7 +647,7 @@ onUnmounted(() => {
           <div class="qa-grid">
             <button class="qa-btn" @click="openModal('addUser')"><span class="material-symbols-outlined" aria-hidden="true" style="color:#22c55e">person_add</span><span>Kullanıcı Ekle</span></button>
             <button class="qa-btn" @click="openModal('removeUser')"><span class="material-symbols-outlined" aria-hidden="true" style="color:#ef4444">person_remove</span><span>Kullanıcı Çıkar</span></button>
-            <button class="qa-btn" @click="openModal('addVault')"><span class="material-symbols-outlined" aria-hidden="true" style="color:#6366f1">add_card</span><span>Kasa Ekle</span></button>
+            <button class="qa-btn" @click="openModal('addVault')"><span class="material-symbols-outlined" aria-hidden="true" style="color:var(--color-primary)">add_card</span><span>Kasa Ekle</span></button>
             <button class="qa-btn" @click="openModal('removeVault')"><span class="material-symbols-outlined" aria-hidden="true" style="color:#f59e0b">credit_card_off</span><span>Kasa Çıkar</span></button>
             <button class="qa-btn" @click="openModal('loadBalance')"><span class="material-symbols-outlined" aria-hidden="true" style="color:#0ea5e9">account_balance_wallet</span><span>Bakiye Yükle</span></button>
             <button class="qa-btn" @click="openModal('transfer')"><span class="material-symbols-outlined" aria-hidden="true" style="color:#8b5cf6">swap_horiz</span><span>Transfer Yap</span></button>
@@ -1097,7 +1097,7 @@ onUnmounted(() => {
 /* ═══ Quick-Action Modal ═══ */
 .qm-overlay {
   position: fixed; inset: 0; z-index: 9999;
-  background: rgba(15,23,42,0.5); backdrop-filter: blur(4px);
+  background: rgba(15,23,42,0.5); backdrop-filter: var(--glass-blur-strong);
   display: flex; align-items: center; justify-content: center;
 }
 .qm-box {
@@ -1150,7 +1150,7 @@ onUnmounted(() => {
 .qm-cancel:hover { background: var(--color-border); }
 .qm-submit {
   display: flex; align-items: center; gap: 6px;
-  padding: 9px 24px; background: linear-gradient(135deg, #6366f1, #4f46e5);
+  padding: 9px 24px; background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
   border: none; border-radius: var(--radius-md); cursor: pointer;
   font-size: 13px; font-weight: 700; color: #fff; transition: box-shadow .15s, opacity .15s;
 }
@@ -1212,7 +1212,7 @@ onUnmounted(() => {
 .pos-bar-wrap { height: 22px; background: var(--color-bg-page); border-radius: var(--radius-sm); overflow: hidden; position: relative; }
 .pos-bar {
   height: 100%; border-radius: var(--radius-sm);
-  background: linear-gradient(90deg, #6366f1, #818cf8);
+  background: linear-gradient(90deg, var(--color-primary), #818cf8);
   display: flex; align-items: center; justify-content: flex-end;
   padding-right: 6px; min-width: 32px;
   transition: width .6s cubic-bezier(.4,0,.2,1);
@@ -1295,9 +1295,9 @@ onUnmounted(() => {
 .msb-debt--credit { background: #f0fdf4; color: #15803d; }
 
 .msb-card--merkez {
-  --msb-accent: #d97706;
+  --msb-accent: var(--color-warning);
   border-top-color: var(--msb-accent); border-color: #fde68a;
-  background: linear-gradient(135deg, #fffbeb, #fefce8);
+  background: linear-gradient(135deg, #fffbeb, var(--color-warning-bg));
 }
 .msb-card--merkez .msb-card-head { color: #92400e; }
 
@@ -1335,8 +1335,8 @@ onUnmounted(() => {
   padding: 3px 10px; border-radius: var(--radius-sm);
   font-size: 11px; font-weight: 700; text-align: center; letter-spacing: 0.3px;
 }
-.tx-buy { background: linear-gradient(135deg, #ecfdf5, #d1fae5); color: var(--color-success); }
-.tx-sell { background: linear-gradient(135deg, #fef2f2, #fee2e2); color: var(--color-danger); }
+.tx-buy { background: linear-gradient(135deg, #ecfdf5, var(--color-success-bg)); color: var(--color-success); }
+.tx-sell { background: linear-gradient(135deg, #fef2f2, var(--color-danger-bg)); color: var(--color-danger); }
 .tx-detail { display: flex; align-items: baseline; gap: 6px; }
 .tx-cur { font-weight: 800; color: #1e1b4b; letter-spacing: 0.3px; }
 .tx-amt { font-weight: 600; color: #374151; font-variant-numeric: tabular-nums; }
@@ -1375,7 +1375,7 @@ onUnmounted(() => {
 .staff-item:hover { background: #fafbfe; }
 .staff-avatar {
   width: 36px; height: 36px; border-radius: var(--radius-md);
-  background: linear-gradient(135deg, #6366f1, #818cf8);
+  background: linear-gradient(135deg, var(--color-primary), #818cf8);
   color: #fff; font-size: 14px; font-weight: 800;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }

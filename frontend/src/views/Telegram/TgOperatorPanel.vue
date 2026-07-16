@@ -175,7 +175,7 @@ function formatMoney(n: number | null) {
 
 function statusColor(status: string) {
   const map: Record<string, string> = {
-    completed: '#10b981', approved: '#3b82f6', pending: '#f59e0b',
+    completed: '#10b981', approved: 'var(--color-secondary)', pending: '#f59e0b',
     processing: '#8b5cf6', cancelled: '#ef4444', rejected: '#ef4444'
   }
   return map[status] || '#6b7280'
@@ -358,7 +358,7 @@ onUnmounted(() => {
 .tx-sidebar { background: var(--color-bg-card); border-right: 1px solid var(--color-border); display: flex; flex-direction: column; overflow: hidden; }
 .sidebar-tabs { display: flex; border-bottom: 1px solid var(--color-border); }
 .stab { flex: 1; padding: 10px; border: none; background: transparent; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--color-text-secondary, #6b7280); }
-.stab.active { color: var(--color-primary, #2563eb); border-bottom: 2px solid var(--color-primary, #2563eb); }
+.stab.active { color: var(--color-primary, var(--color-secondary-hover)); border-bottom: 2px solid var(--color-primary, var(--color-secondary-hover)); }
 
 .search-box { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--color-border); color: var(--color-text-secondary, #9ca3af); }
 .search-box input { flex: 1; border: none; outline: none; font-size: 12px; background: transparent; color: var(--color-text, #1f2937); }
@@ -366,7 +366,7 @@ onUnmounted(() => {
 .tx-list { flex: 1; overflow-y: auto; }
 .tx-item { padding: 10px 12px; border-bottom: 1px solid var(--color-border); cursor: pointer; transition: background 0.1s; }
 .tx-item:hover { background: var(--color-hover, #f9fafb); }
-.tx-item.selected { background: var(--color-primary-light, #eff6ff); border-left: 6px solid var(--color-primary, #2563eb); box-shadow: var(--shadow-md); }
+.tx-item.selected { background: var(--color-primary-light, var(--color-secondary-light)); border-left: 6px solid var(--color-primary, var(--color-secondary-hover)); box-shadow: var(--shadow-md); }
 .tx-item-header { display: flex; justify-content: space-between; align-items: center; }
 .tx-id { font-size: 12px; font-weight: 600; color: var(--color-text, #1f2937); }
 .status-dot { width: 8px; height: 8px; border-radius: 50%; }
@@ -390,8 +390,8 @@ onUnmounted(() => {
 
 .chat-input { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--color-border); }
 .chat-input input { flex: 1; padding: 8px 14px; border: 1px solid var(--color-border); border-radius: var(--radius-xl); outline: none; font-size: 13px; background: var(--color-bg-card); color: var(--color-text, var(--color-text)); }
-.chat-input input:focus { border-color: var(--color-primary, #2563eb); }
-.send-btn { width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--color-primary, #2563eb); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-glow-primary); }
+.chat-input input:focus { border-color: var(--color-primary, var(--color-secondary-hover)); }
+.send-btn { width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--color-primary, var(--color-secondary-hover)); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-glow-primary); }
 .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .send-btn .material-symbols-outlined { font-size: 18px; }
 

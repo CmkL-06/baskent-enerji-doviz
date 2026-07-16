@@ -202,7 +202,7 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside, true))
   text-align: left;
 }
 .cs-trigger:hover:not(:disabled) {
-  border-color: #6366f1;
+  border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.08);
 }
 .cs-trigger:disabled {
@@ -211,7 +211,7 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside, true))
   background: #f9fafb;
 }
 .cs-open {
-  border-color: #6366f1;
+  border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
 }
 
@@ -365,13 +365,13 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside, true))
 .cs-balance {
   font-family: 'JetBrains Mono', ui-monospace, monospace;
   font-size: 12px;
-  color: #6366f1;
+  color: var(--color-primary);
   font-weight: 500;
 }
 
 .cs-check {
   font-size: 18px;
-  color: #6366f1;
+  color: var(--color-primary);
   font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20;
 }
 

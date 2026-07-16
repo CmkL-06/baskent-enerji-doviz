@@ -12,7 +12,7 @@ defineProps<{
 </script>
 
 <template>
-  <div class="app-kpi" :style="{ '--kc': color ?? '#6366f1', '--kb': bg ?? '#eef2ff' }">
+  <div class="app-kpi" :style="{ '--kc': color ?? 'var(--color-primary)', '--kb': bg ?? 'var(--color-primary-light)' }">
     <div class="app-kpi-icon">
       <span class="material-symbols-outlined" aria-hidden="true">{{ icon }}</span>
     </div>
@@ -88,8 +88,8 @@ defineProps<{
 .app-kpi-delta .material-symbols-outlined {
   font-size: 13px;
 }
-.app-kpi-delta.pos { color: var(--color-success, #059669); }
-.app-kpi-delta.neg { color: var(--color-danger, #dc2626); }
+.app-kpi-delta.pos { color: var(--color-success, var(--color-success)); }
+.app-kpi-delta.neg { color: var(--color-danger, var(--color-danger)); }
 .app-kpi-delta-label {
   font-weight: 400;
   color: var(--color-text-muted, #94a3b8);

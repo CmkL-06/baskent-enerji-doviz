@@ -382,10 +382,10 @@ onUnmounted(() => {
 
     <!-- KPI Cards -->
     <div v-if="activeTab === 'list'" class="kpi-grid">
-      <AppKpiCard icon="people" label="Toplam Cari" :value="totals.count" color="#6366f1" bg="#eef2ff" />
-      <AppKpiCard icon="arrow_downward" label="Toplam Alacak" :value="formatCurrency(totals.totalReceivables) + ' ₺'" color="#059669" bg="#ecfdf5" />
+      <AppKpiCard icon="people" label="Toplam Cari" :value="totals.count" color="var(--color-primary)" bg="var(--color-primary-light)" />
+      <AppKpiCard icon="arrow_downward" label="Toplam Alacak" :value="formatCurrency(totals.totalReceivables) + ' ₺'" color="var(--color-success)" bg="#ecfdf5" />
       <AppKpiCard icon="arrow_upward" label="Toplam Borç" :value="formatCurrency(totals.totalDebts) + ' ₺'" color="#ef4444" bg="#fef2f2" />
-      <AppKpiCard icon="account_balance" label="Net Bakiye" :value="formatCurrency(totals.netBalance) + ' ₺'" :color="totals.netBalance >= 0 ? '#059669' : '#ef4444'" :bg="totals.netBalance >= 0 ? '#ecfdf5' : '#fef2f2'" />
+      <AppKpiCard icon="account_balance" label="Net Bakiye" :value="formatCurrency(totals.netBalance) + ' ₺'" :color="totals.netBalance >= 0 ? 'var(--color-success)' : '#ef4444'" :bg="totals.netBalance >= 0 ? '#ecfdf5' : '#fef2f2'" />
     </div>
 
     <!-- Filters -->
@@ -1197,7 +1197,7 @@ onUnmounted(() => {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, .4);
-  backdrop-filter: blur(2px);
+  backdrop-filter: var(--glass-blur-strong);
   display: flex;
   align-items: center;
   justify-content: center;

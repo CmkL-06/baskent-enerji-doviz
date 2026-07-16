@@ -45,13 +45,19 @@ const { expandedId: expandedCurrency, toggle: toggleCurrency } = useExpandable<s
 const { expandedId: expandedOfficeRow, toggle: toggleOfficeRow } = useExpandable<string>()
 const { expandedId: expandedVaultRow, toggle: toggleVaultRow } = useExpandable<number>()
 const { expandedId: expandedTxRow, toggle: toggleTxRow } = useExpandable<number>()
+const { expandedId: expandedEmployeeRow, toggle: toggleEmployeeRow } = useExpandable<string>()
 
 const showVolumeChart = ref(false)
 const showOfficeChart = ref(false)
 const showPartyChart = ref(false)
+const showEmployeeChart = ref(false)
 
 const officeChartLabels = computed(() => officeRows.value.map((o: any) => o.officeName))
 const officeChartProfit = computed(() => officeRows.value.map((o: any) => o.profit ?? 0))
+
+const employeeRows = computed(() => reportData.value?.employeeBreakdown ?? [])
+const employeeChartLabels = computed(() => employeeRows.value.map((e: any) => e.employeeName))
+const employeeChartProfit = computed(() => employeeRows.value.map((e: any) => e.totalProfit ?? 0))
 
 const partyChartCurrencies = computed(() => {
   const debts = partyData.value?.totalDebtsByCurrency ?? {}
@@ -66,13 +72,22 @@ const showProfitTrend = ref(false)
 const trendLoading = ref(false)
 const trendHistory = ref<any[]>([])
 
+// Rapor modu (günlük/haftalık/aylık) trend penceresinin de dönemini belirler — aylık modda
+// "son 14 gün" değil "son 12 ay" (yıl bazlı ay karşılaştırması) anlamlı olur.
+const trendPeriodConfig = computed(() => {
+  if (reportMode.value === 'weekly') return { period: 2, count: 8, label: 'Son 8 Hafta' }
+  if (reportMode.value === 'monthly') return { period: 3, count: 12, label: 'Son 12 Ay' }
+  return { period: 1, count: 14, label: 'Son 14 Gün' }
+})
+
 async function toggleProfitTrend() {
   showProfitTrend.value = !showProfitTrend.value
   if (showProfitTrend.value && !trendHistory.value.length) {
     trendLoading.value = true
     try {
       const oid = selectedOfficeId.value || undefined
-      const data = await apiService.getZReportHistory({ officeId: oid, period: 0, count: 14 })
+      const { period, count } = trendPeriodConfig.value
+      const data = await apiService.getZReportHistory({ officeId: oid, period, count })
       trendHistory.value = (data ?? []).slice().reverse()
     } catch {
       trendHistory.value = []
@@ -82,7 +97,40 @@ async function toggleProfitTrend() {
   }
 }
 
-const trendLabels = computed(() => trendHistory.value.map((r: any) => fmtDate(r.reportDate ?? r.periodStart)))
+// Saatlik dağılım: günlük/haftalık modda ve ≤7 günlük özel aralıkta anlamlı (aylık modda
+// bir ayın tüm işlemlerini saate göre kırmak aşırı kalabalık ve az bilgilendirici olur).
+const showHourlyChart = ref(false)
+const hourlyEnabled = computed(() => {
+  if (reportMode.value === 'daily' || reportMode.value === 'weekly') return true
+  if (reportMode.value === 'custom') {
+    const days = (new Date(customEnd.value).getTime() - new Date(customStart.value).getTime()) / 86400000
+    return days >= 0 && days <= 7
+  }
+  return false
+})
+const hourlyLabels = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`)
+const hourlyCounts = computed(() => {
+  const buckets = new Array(24).fill(0)
+  transactions.value.forEach((tx: any) => {
+    if (!tx.transactionDate) return
+    buckets[new Date(tx.transactionDate).getHours()]++
+  })
+  return buckets
+})
+function toggleHourlyChart() {
+  if (!hourlyEnabled.value) return
+  showHourlyChart.value = !showHourlyChart.value
+}
+
+const trendLabels = computed(() => trendHistory.value.map((r: any) => {
+  const iso = r.reportDate ?? r.periodStart
+  if (!iso) return '-'
+  if (reportMode.value === 'monthly') {
+    const d = new Date(iso)
+    return `${months[d.getMonth()].slice(0, 3)} ${d.getFullYear()}`
+  }
+  return fmtDate(iso)
+}))
 const trendProfit = computed(() => trendHistory.value.map((r: any) => r.summary?.totalProfit ?? 0))
 const trendVolume = computed(() => trendHistory.value.map((r: any) => r.summary?.totalForeignCurrencyProcessed ?? 0))
 
@@ -95,7 +143,7 @@ const previousReport = ref<any>(null)
 async function fetchPreviousPeriod() {
   previousReport.value = null
   if (reportMode.value === 'custom') return
-  const periodMap: Record<string, number> = { daily: 0, weekly: 1, monthly: 2 }
+  const periodMap: Record<string, number> = { daily: 1, weekly: 2, monthly: 3 }
   const period = periodMap[reportMode.value]
   if (period === undefined) return
   try {
@@ -161,11 +209,11 @@ const txTypeLabels: Record<number, string> = {
 }
 
 const txTypeColors: Record<number, string> = {
-  0: '#6366f1',
+  0: 'var(--color-primary)',
   1: '#8b5cf6',
   2: '#10b981',
   3: '#ef4444',
-  4: '#3b82f6',
+  4: 'var(--color-secondary)',
   5: '#f59e0b',
   6: '#ec4899',
 }
@@ -178,11 +226,11 @@ const kpis = computed(() => {
   if (!s.value) return []
   const items = [
     { icon: 'trending_up', label: 'Toplam Kar', value: fmt(s.value.totalProfit ?? s.value.totalProfitInTRY ?? 0), unit: '₺', color: '#10b981', bg: 'rgba(16,185,129,0.10)', deltaKey: 'totalProfit' },
-    { icon: 'swap_horiz', label: 'İşlem Sayısı', value: fmt(s.value.totalTransactions ?? 0, 0), unit: 'adet', color: '#6366f1', bg: 'rgba(99,102,241,0.10)', deltaKey: 'totalTransactions' },
+    { icon: 'swap_horiz', label: 'İşlem Sayısı', value: fmt(s.value.totalTransactions ?? 0, 0), unit: 'adet', color: 'var(--color-primary)', bg: 'rgba(99,102,241,0.10)', deltaKey: 'totalTransactions' },
     { icon: 'monitoring', label: 'İşlem Hacmi', value: fmt(s.value.totalForeignCurrencyProcessed ?? 0), unit: '₺', color: '#0ea5e9', bg: 'rgba(14,165,233,0.10)', deltaKey: 'totalForeignCurrencyProcessed' },
     { icon: 'percent', label: 'Kar Marjı', value: fmt(s.value.profitMargin ?? 0, 1), unit: '%', color: '#f59e0b', bg: 'rgba(245,158,11,0.10)', deltaKey: 'profitMargin' },
     { icon: 'straighten', label: 'Ort. İşlem', value: fmt(s.value.averageTransactionSize ?? 0), unit: '₺', color: '#8b5cf6', bg: 'rgba(139,92,246,0.10)', deltaKey: 'averageTransactionSize' },
-    { icon: 'account_balance', label: 'Kasa Değeri', value: fmt(s.value.totalValueInBaseCurrency ?? 0), unit: '₺', color: '#3b82f6', bg: 'rgba(59,130,246,0.10)', deltaKey: 'totalValueInBaseCurrency' },
+    { icon: 'account_balance', label: 'Kasa Değeri', value: fmt(s.value.totalValueInBaseCurrency ?? 0), unit: '₺', color: 'var(--color-secondary)', bg: 'rgba(59,130,246,0.10)', deltaKey: 'totalValueInBaseCurrency' },
   ]
   return items
 })
@@ -191,7 +239,7 @@ const txBreakdown = computed(() => {
   const st = s.value
   if (!st) return []
   return [
-    { label: 'Döviz İşlemi', count: st.totalExchangeTransactions ?? 0, icon: 'currency_exchange', color: '#6366f1' },
+    { label: 'Döviz İşlemi', count: st.totalExchangeTransactions ?? 0, icon: 'currency_exchange', color: 'var(--color-primary)' },
     { label: 'Kasa Giriş', count: st.totalDepositTransactions ?? 0, icon: 'arrow_downward', color: '#10b981' },
     { label: 'Kasa Çıkış', count: st.totalWithdrawalTransactions ?? 0, icon: 'arrow_upward', color: '#ef4444' },
   ]
@@ -262,6 +310,7 @@ async function fetchReport() {
   reportData.value = null
   showProfitTrend.value = false
   trendHistory.value = []
+  showHourlyChart.value = false
   try {
     const oid = selectedOfficeId.value || undefined
     let data: any
@@ -284,6 +333,48 @@ async function fetchReport() {
 }
 
 function printReport() { window.print() }
+
+// CSV dışa aktarma: işlem geçmişi tablosundaki aynı kolonlar, Excel'de Türkçe karakterlerin
+// bozulmaması için UTF-8 BOM ile ve noktalı virgülle ayrılmış (tr-TR Excel'in varsayılan ayıracı).
+function csvEscape(value: any): string {
+  const str = String(value ?? '')
+  return /[";\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str
+}
+
+function exportCsv() {
+  if (!transactions.value.length) {
+    notification.warning('Dışa aktarılacak işlem bulunamadı')
+    return
+  }
+  const headers = ['İşlem No', 'Kasa', 'Tür', 'Tarih', 'Döviz', 'Miktar', 'Kur', 'TRY Karşılığı', 'Kar (₺)', 'Durum']
+  const rows = transactions.value.map((tx: any) => [
+    tx.transactionNumber,
+    tx.vaultName ?? '-',
+    getTxTypeLabel(tx),
+    fmtDateTime(tx.transactionDate),
+    tx.currencyCode ?? '-',
+    fmt(tx.amount),
+    fmt(tx.rate ?? tx.exchangeRate, 4),
+    fmt(tx.tryAmount ?? tx.totalTry),
+    fmt(tx.profit ?? 0),
+    tx.statusName ?? (tx.status === 2 ? 'Tamamlandı' : 'Bekliyor'),
+  ])
+
+  const csvContent = [headers, ...rows].map(r => r.map(csvEscape).join(';')).join('\r\n')
+  const blob = new Blob(['﻿' + csvContent], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  const dateSuffix = reportMode.value === 'daily' ? selectedDate.value
+    : reportMode.value === 'weekly' ? weekStart.value
+    : reportMode.value === 'monthly' ? `${selectedYear.value}-${String(selectedMonth.value).padStart(2, '0')}`
+    : `${customStart.value}_${customEnd.value}`
+  link.href = url
+  link.download = `z-raporu_${dateSuffix}.csv`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
 
 function getTxTypeChipClass(tx: any): string {
   const t = tx.type ?? tx.transactionType
@@ -379,6 +470,9 @@ onMounted(async () => {
             <button class="btn btn--ghost" @click="printReport" v-if="hasData" title="Yazdır">
               <span class="material-symbols-outlined" aria-hidden="true">print</span>
             </button>
+            <button class="btn btn--ghost" @click="exportCsv" v-if="hasData && transactions.length" title="CSV Olarak İndir">
+              <span class="material-symbols-outlined" aria-hidden="true">download</span>
+            </button>
           </div>
         </div>
       </div>
@@ -424,8 +518,8 @@ onMounted(async () => {
       <!-- ── KPI Kartları ── -->
       <div class="kpi-grid">
         <div v-for="k in kpis" :key="k.label"
-             class="kpi-slot" :class="{ clickable: k.label === 'Toplam Kar' }"
-             @click="k.label === 'Toplam Kar' && toggleProfitTrend()">
+             class="kpi-slot" :class="{ clickable: k.label === 'Toplam Kar' || (k.label === 'İşlem Sayısı' && hourlyEnabled) }"
+             @click="k.label === 'Toplam Kar' ? toggleProfitTrend() : (k.label === 'İşlem Sayısı' && toggleHourlyChart())">
           <AppKpiCard :icon="k.icon" :label="k.label" :value="k.value" :unit="k.unit" :color="k.color" :bg="k.bg"
                       :delta="kpiDeltas[k.deltaKey]" delta-label="önceki döneme göre" />
         </div>
@@ -435,12 +529,23 @@ onMounted(async () => {
       <div class="panel trend-panel" v-if="showProfitTrend">
         <div class="panel-hd">
           <span class="material-symbols-outlined" aria-hidden="true">show_chart</span>
-          <h3>Kâr &amp; Hacim Trendi — Son 14 Gün</h3>
+          <h3>Kâr &amp; Hacim Trendi — {{ trendPeriodConfig.label }}</h3>
         </div>
         <div class="trend-body">
           <div class="trend-loading" v-if="trendLoading">Yükleniyor...</div>
           <TrendLineChart v-else-if="trendHistory.length" :labels="trendLabels" :profit-series="trendProfit" :volume-series="trendVolume" />
           <div class="trend-empty" v-else>Geçmiş veri bulunamadı.</div>
+        </div>
+      </div>
+
+      <!-- ── Saatlik Dağılım (akıllı kart — "İşlem Sayısı" tıklanınca açılır) ── -->
+      <div class="panel trend-panel" v-if="showHourlyChart && hourlyEnabled">
+        <div class="panel-hd">
+          <span class="material-symbols-outlined" aria-hidden="true">schedule</span>
+          <h3>Saatlik İşlem Dağılımı</h3>
+        </div>
+        <div class="trend-body">
+          <ComparisonBarChart :labels="hourlyLabels" :datasets="[{ label: 'İşlem Sayısı', data: hourlyCounts, color: 'var(--color-primary)' }]" />
         </div>
       </div>
 
@@ -682,7 +787,7 @@ onMounted(async () => {
         </div>
         <div class="vo-divider"></div>
         <div class="vo-item">
-          <span class="material-symbols-outlined" aria-hidden="true" style="color: #3b82f6">sync_alt</span>
+          <span class="material-symbols-outlined" aria-hidden="true" style="color: var(--color-secondary)">sync_alt</span>
           <div>
             <p class="vo-label">Net Hareket</p>
             <p class="vo-val" :class="(s.netVaultChange ?? 0) >= 0 ? 'pos' : 'neg'">{{ (s.netVaultChange ?? 0) >= 0 ? '+' : '' }}{{ fmt(s.netVaultChange) }} ₺</p>
@@ -690,7 +795,7 @@ onMounted(async () => {
         </div>
         <div class="vo-divider"></div>
         <div class="vo-item">
-          <span class="material-symbols-outlined" aria-hidden="true" style="color: #6366f1">balance</span>
+          <span class="material-symbols-outlined" aria-hidden="true" style="color: var(--color-primary)">balance</span>
           <div>
             <p class="vo-label">Kasa Sonrası Kar</p>
             <p class="vo-val" :class="(s.profitAfterVaultOperations ?? 0) >= 0 ? 'pos' : 'neg'">{{ fmt(s.profitAfterVaultOperations) }} ₺</p>
@@ -903,6 +1008,59 @@ onMounted(async () => {
           <span class="material-symbols-outlined" aria-hidden="true">receipt_long</span>
           <span>İşlem Geçmişi</span>
         </div>
+
+      <!-- ── Personel Bazlı Kırılım — sadece tek şube görünümünde (Tüm Şubeler'de tamamen gizli) ── -->
+      <div class="panel" v-if="selectedOfficeId && employeeRows.length">
+        <div class="panel-hd">
+          <span class="material-symbols-outlined" aria-hidden="true">badge</span>
+          <h3>Personel Bazlı Kırılım</h3>
+          <span class="badge">{{ employeeRows.length }} personel</span>
+          <button class="chart-toggle-btn" @click="showEmployeeChart = !showEmployeeChart" title="Grafik göster/gizle">
+            <span class="material-symbols-outlined" aria-hidden="true">bar_chart</span>
+          </button>
+        </div>
+        <div class="chart-panel-inline" v-if="showEmployeeChart">
+          <ComparisonBarChart :labels="employeeChartLabels" :datasets="[{ label: 'Kâr (₺)', data: employeeChartProfit, color: 'var(--color-warning)' }]" horizontal />
+        </div>
+        <div class="table-wrap">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>Personel</th>
+                <th>İşlem Sayısı</th>
+                <th>Hacim (₺)</th>
+                <th>Kâr (₺)</th>
+                <th>Ort. İşlem (₺)</th>
+                <th class="cur-chevron-col"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="e in employeeRows" :key="e.userId"
+                  class="expandable-row" :class="{ expanded: expandedEmployeeRow === e.userId }"
+                  @click="toggleEmployeeRow(e.userId)">
+                <td class="fw-600">{{ e.employeeName }}</td>
+                <td>{{ fmt(e.transactionCount, 0) }}</td>
+                <td>{{ fmt(e.totalVolumeInTRY) }}</td>
+                <td :class="(e.totalProfit ?? 0) >= 0 ? 'pos' : 'neg'" class="fw-600">{{ (e.totalProfit ?? 0) >= 0 ? '+' : '' }}{{ fmt(e.totalProfit) }}</td>
+                <td>{{ fmt(e.averageTransactionSize) }}</td>
+                <td class="cur-chevron-col">
+                  <span class="material-symbols-outlined cur-chevron" aria-hidden="true">{{ expandedEmployeeRow === e.userId ? 'expand_less' : 'expand_more' }}</span>
+                </td>
+              </tr>
+              <tr class="detail-row" v-for="e in employeeRows.filter(x => expandedEmployeeRow === x.userId)" :key="'det-' + e.userId">
+                <td colspan="6">
+                  <div class="row-detail">
+                    <div class="cd-item">
+                      <span class="cd-label">Döviz İşlemi Sayısı</span>
+                      <span class="cd-val">{{ e.exchangeTransactionCount ?? 0 }} adet</span>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       <!-- ── İşlem Detayları ── -->
       <div class="panel" v-if="transactions.length">

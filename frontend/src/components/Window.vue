@@ -229,7 +229,7 @@ const stopResize = () => {
   padding: 0 12px;
   cursor: move;
   user-select: none;
-  backdrop-filter: blur(10px);
+  backdrop-filter: var(--glass-blur-light);
 }
 
 .window.maximized .window-titlebar {
@@ -307,12 +307,12 @@ const stopResize = () => {
 }
 
 .control-button.maximize {
-  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  background: linear-gradient(135deg, var(--color-success-bg) 0%, #a7f3d0 100%);
   color: #065f46;
 }
 
 .control-button.close {
-  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  background: linear-gradient(135deg, var(--color-danger-bg) 0%, #fecaca 100%);
   color: #991b1b;
 }
 

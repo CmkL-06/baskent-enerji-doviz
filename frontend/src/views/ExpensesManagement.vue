@@ -226,10 +226,10 @@ const activeTab = ref<'payments' | 'definitions'>('payments')
 
     <!-- KPIs -->
     <div class="kpi-grid">
-      <AppKpiCard icon="payments" label="Toplam Gider" :value="'₺' + fmt(totalExpense)" color="#6366f1" bg="#eef2ff" />
+      <AppKpiCard icon="payments" label="Toplam Gider" :value="'₺' + fmt(totalExpense)" color="var(--color-primary)" bg="var(--color-primary-light)" />
       <AppKpiCard icon="receipt_long" label="Ödeme Sayısı" :value="filteredPayments.length" color="#8b5cf6" bg="#f5f3ff" />
-      <AppKpiCard icon="category" label="Tanım Sayısı" :value="definitions.length" color="#059669" bg="#ecfdf5" />
-      <AppKpiCard icon="trending_up" label="En Yüksek Kategori" :value="categoryBreakdown[0]?.[0] || '-'" color="#d97706" bg="#fffbeb" />
+      <AppKpiCard icon="category" label="Tanım Sayısı" :value="definitions.length" color="var(--color-success)" bg="#ecfdf5" />
+      <AppKpiCard icon="trending_up" label="En Yüksek Kategori" :value="categoryBreakdown[0]?.[0] || '-'" color="var(--color-warning)" bg="#fffbeb" />
     </div>
 
     <!-- Filters -->
@@ -588,7 +588,7 @@ const activeTab = ref<'payments' | 'definitions'>('payments')
 .breakdown-row { display: flex; align-items: center; gap: 10px; }
 .breakdown-label { font-size: 12px; color: #374151; min-width: 100px; font-weight: 500; }
 .breakdown-bar-wrap { flex: 1; height: 8px; background: #f3f4f6; border-radius: var(--radius-sm); overflow: hidden; }
-.breakdown-bar { height: 100%; background: linear-gradient(90deg, #6366f1, #8b5cf6); border-radius: var(--radius-sm); transition: width .3s; }
+.breakdown-bar { height: 100%; background: linear-gradient(90deg, var(--color-primary), #8b5cf6); border-radius: var(--radius-sm); transition: width .3s; }
 .breakdown-val { font-size: 12px; font-weight: 700; color: #111; min-width: 90px; text-align: right; }
 
 /* Loading / Error */
@@ -602,7 +602,7 @@ const activeTab = ref<'payments' | 'definitions'>('payments')
 .modal-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 200;
   display: flex; align-items: center; justify-content: center;
-  backdrop-filter: blur(2px);
+  backdrop-filter: var(--glass-blur-strong);
 }
 .modal {
   background: var(--color-bg-card); border-radius: var(--radius-lg); width: 520px; max-width: 95vw;

@@ -300,7 +300,7 @@ const toggleTicker = () => {
 }
 
 input:checked + .toggle-slider {
-  background: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, #7c3aed 100%);
 }
 
 input:focus + .toggle-slider {

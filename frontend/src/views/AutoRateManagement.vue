@@ -239,10 +239,10 @@ onMounted(async () => {
 
     <!-- KPI -->
     <div class="kpi-grid">
-      <AppKpiCard icon="toggle_on" label="Otomatik Güncelleme" :value="settingsForm.isAutoUpdateEnabled ? 'Açık' : 'Kapalı'" :color="settingsForm.isAutoUpdateEnabled ? '#059669' : '#ef4444'" :bg="settingsForm.isAutoUpdateEnabled ? '#ecfdf5' : '#fef2f2'" />
-      <AppKpiCard icon="pending_actions" label="Onay Bekleyen" :value="pendingApprovals.length" color="#d97706" bg="#fffbeb" />
-      <AppKpiCard icon="public" label="Dış Kaynak" :value="externalRates.length + ' kur'" color="#6366f1" bg="#eef2ff" />
-      <AppKpiCard icon="schedule" label="Güncelleme Aralığı" :value="settingsForm.updateIntervalMinutes + ' dk'" color="#6366f1" bg="#eef2ff" />
+      <AppKpiCard icon="toggle_on" label="Otomatik Güncelleme" :value="settingsForm.isAutoUpdateEnabled ? 'Açık' : 'Kapalı'" :color="settingsForm.isAutoUpdateEnabled ? 'var(--color-success)' : '#ef4444'" :bg="settingsForm.isAutoUpdateEnabled ? '#ecfdf5' : '#fef2f2'" />
+      <AppKpiCard icon="pending_actions" label="Onay Bekleyen" :value="pendingApprovals.length" color="var(--color-warning)" bg="#fffbeb" />
+      <AppKpiCard icon="public" label="Dış Kaynak" :value="externalRates.length + ' kur'" color="var(--color-primary)" bg="var(--color-primary-light)" />
+      <AppKpiCard icon="schedule" label="Güncelleme Aralığı" :value="settingsForm.updateIntervalMinutes + ' dk'" color="var(--color-primary)" bg="var(--color-primary-light)" />
     </div>
 
     <!-- Tabs -->

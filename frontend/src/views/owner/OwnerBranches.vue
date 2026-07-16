@@ -300,7 +300,7 @@ function assetPercent(o: any) {
     <!-- Summary Stats -->
     <div class="ob-stats-row">
       <div class="ob-stat-card">
-        <div class="ob-stat-icon" style="background: #3b82f6;">
+        <div class="ob-stat-icon" style="background: var(--color-secondary);">
           <span class="material-symbols-outlined" aria-hidden="true">domain</span>
         </div>
         <div class="ob-stat-info">
@@ -975,7 +975,7 @@ function assetPercent(o: any) {
 }
 .ob-asset-fill {
   height: 100%; border-radius: 2px;
-  background: linear-gradient(90deg, #3b82f6, #6366f1);
+  background: linear-gradient(90deg, var(--color-secondary), var(--color-primary));
   transition: width .5s ease;
 }
 .ob-asset-pct { font-size: 0.65rem; color: var(--color-text-muted); font-weight: 600; min-width: 28px; text-align: right; }
@@ -1101,7 +1101,7 @@ function assetPercent(o: any) {
 .ob-user-item:hover { box-shadow: 0 4px 10px rgba(15,23,42,.08); transform: translateY(-1px); }
 .ob-user-avatar {
   width: 36px; height: 36px; border-radius: 50%;
-  background: linear-gradient(135deg, #6366f1, #3b82f6);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
   color: #fff; font-size: 0.8rem; font-weight: 700;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0; box-shadow: 0 0 0 3px #fff, 0 0 0 4px var(--color-border);
@@ -1130,7 +1130,7 @@ function assetPercent(o: any) {
 .ob-overlay {
   position: fixed; inset: 0; background: rgba(15,23,42,.5);
   display: flex; align-items: center; justify-content: center;
-  z-index: 1000; backdrop-filter: blur(2px);
+  z-index: 1000; backdrop-filter: var(--glass-blur-strong);
 }
 .ob-modal {
   background: #fff; border-radius: var(--radius-lg);

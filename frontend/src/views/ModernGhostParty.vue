@@ -259,8 +259,8 @@ onMounted(() => {
 
     <!-- Summary -->
     <div v-if="activeTab === 'accounts' && ghostSummary" class="kpi-grid">
-      <AppKpiCard icon="account_circle" label="Hesap Sayısı" :value="ghostAccounts.length" color="#6366f1" bg="#eef2ff" />
-      <AppKpiCard icon="arrow_downward" label="Toplam Alacak" :value="formatCurrency(ghostSummary.totalReceivables ?? ghostSummary.totalCredits ?? 0)" color="#059669" bg="#ecfdf5" />
+      <AppKpiCard icon="account_circle" label="Hesap Sayısı" :value="ghostAccounts.length" color="var(--color-primary)" bg="var(--color-primary-light)" />
+      <AppKpiCard icon="arrow_downward" label="Toplam Alacak" :value="formatCurrency(ghostSummary.totalReceivables ?? ghostSummary.totalCredits ?? 0)" color="var(--color-success)" bg="#ecfdf5" />
       <AppKpiCard icon="arrow_upward" label="Toplam Borç" :value="formatCurrency(ghostSummary.totalPayables ?? ghostSummary.totalDebits ?? 0)" color="#ef4444" bg="#fef2f2" />
     </div>
 

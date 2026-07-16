@@ -359,7 +359,7 @@ function plClass(n: number) {
 .at-exchange { background: var(--color-secondary-light); color: var(--color-secondary-hover); }
 .at-deposit { background: #f0fdf4; color: #16a34a; }
 .at-withdrawal { background: #fef2f2; color: var(--color-danger); }
-.at-adjustment { background: #fefce8; color: #ca8a04; }
+.at-adjustment { background: var(--color-warning-bg); color: #ca8a04; }
 .at-transfer { background: #f5f3ff; color: #7c3aed; }
 .at-desc { font-size: 0.8rem; color: var(--color-text-secondary); max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>

@@ -331,9 +331,9 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
 
     <!-- KPI Cards -->
     <div class="kpi-grid">
-      <AppKpiCard icon="account_balance_wallet" label="Toplam Kasa" :value="vaults.length" color="#3b82f6" bg="#eff6ff" />
-      <AppKpiCard icon="priority_high" label="Sayım Bekleyen" :value="pendingCount" color="#d97706" bg="#fffbeb" />
-      <AppKpiCard icon="task_alt" label="Bugün Sayılan" :value="countedToday" color="#059669" bg="#ecfdf5" />
+      <AppKpiCard icon="account_balance_wallet" label="Toplam Kasa" :value="vaults.length" color="var(--color-secondary)" bg="var(--color-secondary-light)" />
+      <AppKpiCard icon="priority_high" label="Sayım Bekleyen" :value="pendingCount" color="var(--color-warning)" bg="#fffbeb" />
+      <AppKpiCard icon="task_alt" label="Bugün Sayılan" :value="countedToday" color="var(--color-success)" bg="#ecfdf5" />
       <AppKpiCard icon="photo_camera" label="Snapshot" :value="snapshots.length" color="#8b5cf6" bg="#f5f3ff" />
     </div>
 
@@ -803,7 +803,7 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
 /* Buttons */
 .btn-primary {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 9px 18px; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff;
+  padding: 9px 18px; background: linear-gradient(135deg, var(--color-secondary-hover), #1d4ed8); color: #fff;
   border: none; border-radius: var(--radius-md); font-size: 13px; font-weight: 600; cursor: pointer;
   box-shadow: 0 2px 8px rgba(37,99,235,.25); transition: background-color 0.2s, box-shadow 0.2s, transform 0.2s;
 }
@@ -855,7 +855,7 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
   transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
 }
 .chip:hover { background: var(--color-bg-page); border-color: var(--color-border); }
-.chip-active { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; border-color: transparent; box-shadow: 0 2px 8px rgba(37,99,235,.3); }
+.chip-active { background: linear-gradient(135deg, var(--color-secondary-hover), #1d4ed8); color: #fff; border-color: transparent; box-shadow: 0 2px 8px rgba(37,99,235,.3); }
 
 /* Loading */
 .loading-state, .error-state { text-align: center; padding: 60px 20px; color: var(--color-text-muted); font-size: 14px; }
@@ -1004,7 +1004,7 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
 
 /* Modal */
 .modal-overlay {
-  position: fixed; inset: 0; background: rgba(15,23,42,.5); backdrop-filter: blur(4px);
+  position: fixed; inset: 0; background: rgba(15,23,42,.5); backdrop-filter: var(--glass-blur-strong);
   display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px;
 }
 .modal {

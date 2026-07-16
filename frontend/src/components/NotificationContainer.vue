@@ -154,7 +154,7 @@ const groupedNotifications = computed(() => {
   padding: 16px;
   min-width: 300px;
   max-width: 400px;
-  backdrop-filter: blur(10px);
+  backdrop-filter: var(--glass-blur-light);
 }
 
 /* Type-specific styles */
@@ -171,13 +171,13 @@ const groupedNotifications = computed(() => {
 }
 
 .notification-warning {
-  background-color: #fefce8;
+  background-color: var(--color-warning-bg);
   border-color: #fef08a;
   color: #854d0e;
 }
 
 .notification-info {
-  background-color: #eff6ff;
+  background-color: var(--color-secondary-light);
   border-color: #bfdbfe;
   color: #1e40af;
 }
@@ -197,11 +197,11 @@ const groupedNotifications = computed(() => {
 }
 
 .notification-success .notification-icon .material-symbols-outlined {
-  color: #059669;
+  color: var(--color-success);
 }
 
 .notification-error .notification-icon .material-symbols-outlined {
-  color: #dc2626;
+  color: var(--color-danger);
 }
 
 .notification-warning .notification-icon .material-symbols-outlined {
@@ -209,7 +209,7 @@ const groupedNotifications = computed(() => {
 }
 
 .notification-info .notification-icon .material-symbols-outlined {
-  color: #2563eb;
+  color: var(--color-secondary-hover);
 }
 
 .notification-text {

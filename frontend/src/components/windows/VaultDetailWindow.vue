@@ -533,7 +533,7 @@ onMounted(() => {
   width: 60px;
   height: 60px;
   background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
+  backdrop-filter: var(--glass-blur-light);
   border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
@@ -617,7 +617,7 @@ onMounted(() => {
   gap: 0.5rem;
   padding: 0.75rem 1.25rem;
   background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
+  backdrop-filter: var(--glass-blur-light);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: var(--radius-lg);
   color: white;
@@ -1234,17 +1234,17 @@ onMounted(() => {
 }
 
 .action-card.transfer .action-icon {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  background: linear-gradient(135deg, var(--color-secondary) 0%, var(--color-secondary-hover) 100%);
   color: white;
 }
 
 .action-card.deposit .action-icon {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: linear-gradient(135deg, #10b981 0%, var(--color-success) 100%);
   color: white;
 }
 
 .action-card.withdraw .action-icon {
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  background: linear-gradient(135deg, #f59e0b 0%, var(--color-warning) 100%);
   color: white;
 }
 
@@ -1366,7 +1366,7 @@ onMounted(() => {
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
+  backdrop-filter: var(--glass-blur-strong);
   display: flex;
   align-items: center;
   justify-content: center;

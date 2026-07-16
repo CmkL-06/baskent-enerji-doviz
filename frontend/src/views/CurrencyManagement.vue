@@ -189,8 +189,8 @@ onMounted(loadCurrencies)
 
     <!-- KPI Cards -->
     <div class="kpi-grid">
-      <AppKpiCard icon="payments" label="Toplam Para Birimi" :value="currencies.length" color="#3b82f6" bg="#eff6ff" />
-      <AppKpiCard icon="check_circle" label="Tedavüldeki" :value="activeCount" color="#059669" bg="#ecfdf5" />
+      <AppKpiCard icon="payments" label="Toplam Para Birimi" :value="currencies.length" color="var(--color-secondary)" bg="var(--color-secondary-light)" />
+      <AppKpiCard icon="check_circle" label="Tedavüldeki" :value="activeCount" color="var(--color-success)" bg="#ecfdf5" />
       <AppKpiCard icon="history" label="Tedavülden Kalkan" :value="discontinuedCount" color="#ef4444" bg="#fef2f2" />
       <AppKpiCard icon="public" label="Bölge" :value="regionCount" color="#8b5cf6" bg="#f5f3ff" />
     </div>
@@ -484,7 +484,7 @@ onMounted(loadCurrencies)
 .cm-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,.4);
   display: flex; align-items: center; justify-content: center; z-index: 1000;
-  backdrop-filter: blur(2px);
+  backdrop-filter: var(--glass-blur-strong);
 }
 .cm-modal {
   background: var(--color-bg-card); border-radius: var(--radius-lg); padding: 0; width: 440px; max-width: 95vw;

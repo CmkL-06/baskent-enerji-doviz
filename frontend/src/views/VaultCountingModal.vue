@@ -330,7 +330,7 @@ defineExpose({ open, close, getRemainingTime })
 <style scoped>
 .vcm-backdrop {
   position: fixed; inset: 0; z-index: 9999;
-  background: rgba(0,0,0,.5); backdrop-filter: blur(6px);
+  background: rgba(0,0,0,.5); backdrop-filter: var(--glass-blur-strong);
   display: flex; align-items: center; justify-content: center;
   padding: 16px;
 }
@@ -350,7 +350,7 @@ defineExpose({ open, close, getRemainingTime })
 .vcm-header-left { display: flex; align-items: center; gap: 12px; }
 .vcm-header-icon {
   width: 44px; height: 44px; border-radius: var(--radius-lg);
-  background: linear-gradient(135deg, #fee2e2, #fecaca); color: var(--color-danger);
+  background: linear-gradient(135deg, var(--color-danger-bg), #fecaca); color: var(--color-danger);
   display: flex; align-items: center; justify-content: center;
   font-size: 24px;
 }

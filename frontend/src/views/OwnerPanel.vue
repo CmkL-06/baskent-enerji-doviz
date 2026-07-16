@@ -81,7 +81,7 @@ function openAlertTarget(a: any) {
 function severityColor(s: string) {
   if (s === 'Critical') return '#ef4444'
   if (s === 'Warning') return '#f59e0b'
-  return '#3b82f6'
+  return 'var(--color-secondary)'
 }
 
 function severityIcon(s: string) {

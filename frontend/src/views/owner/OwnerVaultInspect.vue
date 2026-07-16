@@ -470,7 +470,7 @@ function txTypeClass(t: string | number) {
 
 /* Overview */
 .vi-total-bar {
-  background: linear-gradient(135deg, #1e40af, #3b82f6); color: white;
+  background: linear-gradient(135deg, #1e40af, var(--color-secondary)); color: white;
   border-radius: var(--radius-lg); padding: 1.25rem 1.5rem; display: flex;
   align-items: center; justify-content: space-between; margin-bottom: 1.25rem;
   box-shadow: var(--shadow-glow-primary);
@@ -562,7 +562,7 @@ function txTypeClass(t: string | number) {
 .vi-empty { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; padding: 3rem; color: var(--color-text-muted); }
 
 /* Modal */
-.vi-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(2px); }
+.vi-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: var(--glass-blur-strong); }
 .vi-modal { background: white; border-radius: var(--radius-lg); width: 95%; max-width: 600px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
 .vi-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--color-border); }
 .vi-modal-header h3 { margin: 0; font-size: 1.1rem; }
