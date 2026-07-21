@@ -4,6 +4,7 @@ Döviz işlemlerini muhasebe sistemine kaydeder.
 """
 import requests
 import logging
+import time
 from config import Config
 
 logger = logging.getLogger(__name__)
@@ -95,8 +96,16 @@ def send_exchange(transaction_id, dealer_vault_id, currency, amount,
 
 
 def record_dealer_entry(dealer_code, currency, amount, amount_try,
-                        exchange_rate, is_buy, transaction_id=None):
-    """Cari hesaba kayıt düşür (Exchange API'den AYRI, vault'a dokunmaz)"""
+                        exchange_rate, is_buy, transaction_id=None, max_attempts=3):
+    """
+    Cari hesaba kayıt düşür (Exchange API'den AYRI, vault'a dokunmaz).
+
+    send_exchange_for_transaction (vault güncellemesi) başarısız olduğunda TgApiQueue'ya
+    düşüp arka planda tekrar denenirken, bu çağrı için böyle bir kuyruk yoktu — tek bir ağ
+    hatası, vault düşülmüş ama bayinin cari hesabına hiç yansımamış bir işlem bırakabiliyordu.
+    Kalıcı bir kuyruk mekanizması eklemek yerine (şema değişikliği gerektirir), en sık görülen
+    geçici ağ hatalarını burada kısa aralıklarla birkaç kez deneyerek gideriyoruz.
+    """
     global _token
     url = f"{Config.BASKENT_API_URL}/tg/dealer/record-entry"
     payload = {
@@ -108,22 +117,31 @@ def record_dealer_entry(dealer_code, currency, amount, amount_try,
         "exchangeRate": float(exchange_rate),
         "isBuy": bool(is_buy)
     }
-    headers = {
-        "Authorization": f"Bearer {_token}",
-        "Content-Type": "application/json"
-    }
-    try:
-        resp = requests.post(url, json=payload, headers=headers, timeout=10)
-        if resp.status_code == 401:
-            if login():
-                headers["Authorization"] = f"Bearer {_token}"
-                resp = requests.post(url, json=payload, headers=headers, timeout=10)
-        if resp.status_code in (200, 201):
-            logger.info(f"[CariHesap] {dealer_code} kayıt başarılı — {currency} {'Alış' if is_buy else 'Satış'}")
-            return True
-        logger.error(f"[CariHesap] Başarısız: {resp.status_code} — {resp.text[:200]}")
-    except Exception as e:
-        logger.error(f"[CariHesap] Hata: {e}")
+
+    for attempt in range(1, max_attempts + 1):
+        headers = {
+            "Authorization": f"Bearer {_token}",
+            "Content-Type": "application/json"
+        }
+        try:
+            resp = requests.post(url, json=payload, headers=headers, timeout=10)
+            if resp.status_code == 401:
+                if login():
+                    headers["Authorization"] = f"Bearer {_token}"
+                    resp = requests.post(url, json=payload, headers=headers, timeout=10)
+            if resp.status_code in (200, 201):
+                logger.info(f"[CariHesap] {dealer_code} kayıt başarılı — {currency} {'Alış' if is_buy else 'Satış'}"
+                            + (f" ({attempt}. deneme)" if attempt > 1 else ""))
+                return True
+            logger.error(f"[CariHesap] Deneme {attempt}/{max_attempts} başarısız: {resp.status_code} — {resp.text[:200]}")
+        except Exception as e:
+            logger.error(f"[CariHesap] Deneme {attempt}/{max_attempts} hatası: {e}")
+
+        if attempt < max_attempts:
+            time.sleep(2 * attempt)
+
+    logger.error(f"[CariHesap] İşlem #{transaction_id}: {max_attempts} denemenin tamamı başarısız — "
+                 f"vault güncellendi ama cari hesap kaydı düşmedi, manuel kontrol gerekir.")
     return False
 
 

@@ -36,6 +36,21 @@ logger = logging.getLogger(__name__)
 
 _state_cache: dict = {}  # {customer_id: {'state': '...', 'data': {...}, 'transaction_id': N}}
 
+# _complete_usdt her transaction_id için birden fazla tetikleyiciden (kullanıcının TXID mesajı VE
+# arka plandaki otomatik onay takip görevi) çağrılabilir. Fonksiyon içinde şu an hiç "await" yok,
+# bu yüzden tek işlemli asyncio modelinde zaten atomik çalışıyor — ama ileride bir await eklenirse
+# (örn. db katmanı async'e taşınırsa) sessizce çifte tamamlama riski doğar. Bu kilit, o riski
+# şimdiden bertaraf eden ucuz bir güvence.
+_completion_locks: dict[int, asyncio.Lock] = {}
+
+
+def _get_completion_lock(transaction_id: int) -> asyncio.Lock:
+    lock = _completion_locks.get(transaction_id)
+    if lock is None:
+        lock = asyncio.Lock()
+        _completion_locks[transaction_id] = lock
+    return lock
+
 
 def get_state(customer_id: int) -> dict | None:
     if customer_id in _state_cache:
@@ -955,53 +970,54 @@ def _get_dealer_from_transaction(transaction_id: int) -> dict | None:
 
 async def _complete_usdt(context, user_id, transaction_id, txid, confirmations,
                          completion_code, lang):
-    # Zaten tamamlanmış mı kontrol et (çift tamamlama koruması)
-    trans = db.get_transaction(transaction_id)
-    if trans and trans.get('status') == 'completed':
-        logger.warning(f"İşlem #{transaction_id} zaten tamamlanmış, tekrar tamamlanmayacak")
-        set_state(user_id, 'completed', transaction_id)
-        return
+    async with _get_completion_lock(transaction_id):
+        # Zaten tamamlanmış mı kontrol et (çift tamamlama koruması)
+        trans = db.get_transaction(transaction_id)
+        if trans and trans.get('status') == 'completed':
+            logger.warning(f"İşlem #{transaction_id} zaten tamamlanmış, tekrar tamamlanmayacak")
+            set_state(user_id, 'completed', transaction_id)
+            return
 
-    # CryptoDeposit güncelle
-    db.update_crypto_deposit(txid=txid, confirmations=confirmations, status='confirmed')
+        # CryptoDeposit güncelle
+        db.update_crypto_deposit(txid=txid, confirmations=confirmations, status='confirmed')
 
-    # Transaction güncelle
-    db.update_transaction(transaction_id,
-                          txid=txid, crypto_verified=1,
-                          status='completed', completed_at=datetime.now())
+        # Transaction güncelle
+        db.update_transaction(transaction_id,
+                              txid=txid, crypto_verified=1,
+                              status='completed', completed_at=datetime.now())
 
-    # Dealer bakiye düş
-    trans = db.get_transaction(transaction_id)
-    if trans and trans.get('referral_code'):
-        rate = float(trans.get('exchange_rate') or 0)
-        if rate <= 0:
-            rates = get_rates()
-            rate = rates.get('USDT', Config.DEFAULT_USDT_RATE)
-        amount_try = float(trans['amount']) * rate
-        db.reduce_dealer_balance(trans['referral_code'], amount_try)
+        # Dealer bakiye düş
+        trans = db.get_transaction(transaction_id)
+        if trans and trans.get('referral_code'):
+            rate = float(trans.get('exchange_rate') or 0)
+            if rate <= 0:
+                rates = get_rates()
+                rate = rates.get('USDT', Config.DEFAULT_USDT_RATE)
+            amount_try = float(trans['amount']) * rate
+            db.reduce_dealer_balance(trans['referral_code'], amount_try)
 
-    # BaşkentEnerji API
-    try:
-        send_exchange_for_transaction(transaction_id)
-    except Exception as e:
-        logger.error(f"BaşkentEnerji API hatası: {e}")
-
-    # Cari hesap kaydı
-    if trans and trans.get('referral_code'):
+        # BaşkentEnerji API
         try:
-            record_dealer_entry(
-                dealer_code=trans['referral_code'],
-                currency='USDT',
-                amount=float(trans['amount']),
-                amount_try=amount_try,
-                exchange_rate=rate,
-                is_buy=True,
-                transaction_id=transaction_id
-            )
+            send_exchange_for_transaction(transaction_id)
         except Exception as e:
-            logger.error(f"Cari hesap kayıt hatası: {e}")
+            logger.error(f"BaşkentEnerji API hatası: {e}")
 
-    set_state(user_id, 'completed', transaction_id)
+        # Cari hesap kaydı
+        if trans and trans.get('referral_code'):
+            try:
+                record_dealer_entry(
+                    dealer_code=trans['referral_code'],
+                    currency='USDT',
+                    amount=float(trans['amount']),
+                    amount_try=amount_try,
+                    exchange_rate=rate,
+                    is_buy=True,
+                    transaction_id=transaction_id
+                )
+            except Exception as e:
+                logger.error(f"Cari hesap kayıt hatası: {e}")
+
+        set_state(user_id, 'completed', transaction_id)
 
 
 # ═══════════════════════════════════════════════
