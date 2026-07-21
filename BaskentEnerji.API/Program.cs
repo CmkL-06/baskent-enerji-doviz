@@ -262,8 +262,11 @@ builder.Services.AddScoped<IPartyReportingService, PartyReportingService>();
 builder.Services.AddScoped<PartyTransactionIntegration>();
 builder.Services.AddScoped<ICacheClearService, CacheClearService>();
 // Expense Services
+builder.Services.AddScoped<IExpenseReminderService, ExpenseReminderService>();
 builder.Services.AddScoped<IExpenseDefinitionService, ExpenseDefinitionService>();
 builder.Services.AddScoped<IExpensePaymentService, ExpensePaymentService>();
+builder.Services.AddScoped<IExpenseBudgetService, ExpenseBudgetService>();
+builder.Services.AddScoped<IExpenseCategoryService, ExpenseCategoryService>();
 
 // Binance API Services
 builder.Services.AddHttpClient();

@@ -135,6 +135,15 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
             try
             {
+                // (OfficeId, BusinessDate) üzerinde bir unique constraint yok — iki kullanıcı aynı
+                // ofis için aynı anda "gün kapat" çağırırsa, ikisi de aynı lastClosure/pendingForDate
+                // durumunu okuyup ikisi de kontrolü geçebilir ve aynı gün için iki DayClosure kaydı
+                // (çift WAC/bakiye ayarlaması) oluşabilirdi. sp_getapplock ile aynı ofis için kapanış
+                // işlemleri serileştiriliyor — kilit transaction ile birlikte otomatik serbest kalır.
+                await _context.Database.ExecuteSqlRawAsync(
+                    "EXEC sp_getapplock @Resource = {0}, @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 15000",
+                    $"DayClosure_{request.OfficeId}");
+
                 var today = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TurkeyTz).Date;
                 var businessDate = request.BusinessDate.Date;
 
@@ -176,9 +185,12 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     }
                 }
 
-                // Get transaction stats for the day
-                var dayStart = businessDate;
-                var dayEnd = businessDate.AddDays(1);
+                // Get transaction stats for the day — businessDate Türkiye yerel takvim günüdür,
+                // TransactionDate ise UTC olarak kaydediliyor (bkz. ZReportService.GetDailyZReport'taki
+                // aynı düzeltme notu) — sınırlar UTC'ye çevrilmeden karşılaştırılırsa TRT 00:00-03:00
+                // arası işlemler yanlış güne düşer ve kapanışın kâr/işlem sayısı hatalı hesaplanır.
+                var dayStart = TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(businessDate, DateTimeKind.Unspecified), TurkeyTz);
+                var dayEnd = dayStart.AddDays(1);
                 var dayTransactions = await _context.Transactions
                     .Where(t => t.VaultId == vault.Id
                         && t.TransactionDate >= dayStart && t.TransactionDate < dayEnd

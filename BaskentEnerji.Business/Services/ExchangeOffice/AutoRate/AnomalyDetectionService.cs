@@ -27,11 +27,15 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.AutoRate
                 Reason = null
             };
 
-            // Buy rate değişimi
-            var buyChange = Math.Abs(newBuyRate - currentBuyRate) / currentBuyRate * 100;
+            // Mevcut kur DB'de 0 olarak kayıtlıysa (hiç set edilmemiş / silinmiş bir rate satırı)
+            // bölme işlemi decimal'de DivideByZeroException fırlatır ve o kur çifti için otomatik
+            // güncelleme tamamen patlardı (PerformAllChecks sadece .HasValue kontrolü yapıyor, .Value
+            // sıfır olabilir). Karşılaştırılacak anlamlı bir önceki kur yoksa (0 veya negatif), bu
+            // taraf için değişim kontrolü atlanır — PerformAllChecks'teki !HasValue durumuyla tutarlı.
+            var buyChange = currentBuyRate > 0 ? Math.Abs(newBuyRate - currentBuyRate) / currentBuyRate * 100 : 0m;
 
             // Sell rate değişimi
-            var sellChange = Math.Abs(newSellRate - currentSellRate) / currentSellRate * 100;
+            var sellChange = currentSellRate > 0 ? Math.Abs(newSellRate - currentSellRate) / currentSellRate * 100 : 0m;
 
             // En yüksek değişimi al
             var maxChange = Math.Max(buyChange, sellChange);

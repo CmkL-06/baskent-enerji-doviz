@@ -196,8 +196,10 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.AutoRate
             var crossBuyRate = sourceToBaseBuy / targetToBaseSell;
             var crossSellRate = sourceToBaseSell / targetToBaseBuy;
 
-            // Kar marjı ekle
-            result.CalculatedBuyRate = crossBuyRate;
+            // Kar marjı HEM alış HEM satış kuruna uygulanır (CalculateDirectRate ile aynı desen) —
+            // önceden sadece satışa uygulanıyordu, büro çapraz kur alımlarında marjsız (piyasa
+            // fiyatından) alım yapıp beklenen kârın yarısını kaybediyordu.
+            result.CalculatedBuyRate = crossBuyRate * (1 - profitMarginPercent / 100);
             result.CalculatedSellRate = crossSellRate * (1 + profitMarginPercent / 100);
 
             result.Calculation = $"Strategy: {strategy} (Cross-Rate)\n\n" +
@@ -207,7 +209,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.AutoRate
                                $"{sourceCurrency}/{targetCurrency} Buy = {sourceToBaseBuy:F4} ÷ {targetToBaseSell:F4} = {crossBuyRate:F6}\n" +
                                $"{sourceCurrency}/{targetCurrency} Sell = {sourceToBaseSell:F4} ÷ {targetToBaseBuy:F4} = {crossSellRate:F6}\n\n" +
                                $"Profit Margin: {profitMarginPercent}%\n" +
-                               $"Final Buy: {result.CalculatedBuyRate:F6}\n" +
+                               $"Final Buy: {crossBuyRate:F6} * {(1 - profitMarginPercent / 100):F4} = {result.CalculatedBuyRate:F6}\n" +
                                $"Final Sell: {crossSellRate:F6} * {(1 + profitMarginPercent / 100):F4} = {result.CalculatedSellRate:F6}";
         }
     }
