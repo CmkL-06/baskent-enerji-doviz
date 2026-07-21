@@ -128,6 +128,9 @@ watch(() => officeId.value, () => {
 })
 
 onMounted(async () => {
+  // Owner/admin kullanıcılarda ModernLayout ofis listesini önceden yüklemez — bu garanti
+  // olmadan officeId undefined kalıp sayfa sessizce boş görünebilir (Giderler'deki hatayla aynı desen).
+  if (!exchangeStore.offices?.length) await exchangeStore.loadOffices()
   if (officeId.value) await loadVaults()
   if (route.query.create === 'true') openCreateModal()
 })

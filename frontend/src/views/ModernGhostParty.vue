@@ -158,6 +158,7 @@ function openCollection() {
 }
 
 async function submitPayment() {
+  if (saving.value) return
   if (!paymentForm.value.amount || paymentForm.value.amount <= 0) { notification.warning('Tutar giriniz'); return }
   saving.value = true
   try {
@@ -176,6 +177,7 @@ async function submitPayment() {
 }
 
 async function submitCollection() {
+  if (saving.value) return
   if (!paymentForm.value.amount || paymentForm.value.amount <= 0) { notification.warning('Tutar giriniz'); return }
   saving.value = true
   try {
@@ -206,7 +208,7 @@ async function reverseEntry(entry: any) {
 
 async function toggleAccountBlock(account: any) {
   try {
-    if (account.isBlocked || account.status === 'Blocked') {
+    if (!account.isActive) {
       await apiService.unblockGhostAccount(account.id)
     } else {
       await apiService.blockGhostAccount(account.id)
@@ -226,7 +228,10 @@ function backToList() {
   ghostSummary.value = null
 }
 
-onMounted(() => {
+onMounted(async () => {
+  // Owner/admin kullanıcılarda ModernLayout ofis listesini önceden yüklemez — bu garanti
+  // olmadan officeId undefined kalıp sayfa sessizce boş görünebilir (Giderler'deki hatayla aynı desen).
+  if (!exchangeStore.offices?.length) await exchangeStore.loadOffices()
   if (officeId.value) loadParties()
 })
 </script>
@@ -242,13 +247,13 @@ onMounted(() => {
         <h1 v-else>{{ selectedParty?.name }} <span class="party-code">{{ selectedParty?.partyCode }}</span></h1>
       </div>
       <div class="header-actions" v-if="activeTab === 'accounts' && selectedParty">
-        <button class="btn-primary" @click="openPayment">
+        <button v-if="!authStore.isViewerForOffice(officeId)" class="btn-primary" @click="openPayment">
           <span class="material-symbols-outlined" aria-hidden="true">arrow_upward</span> Ödeme
         </button>
-        <button class="btn-secondary" @click="openCollection">
+        <button v-if="!authStore.isViewerForOffice(officeId)" class="btn-secondary" @click="openCollection">
           <span class="material-symbols-outlined" aria-hidden="true">arrow_downward</span> Tahsilat
         </button>
-        <button class="btn-secondary" @click="openCreateAccount">
+        <button v-if="!authStore.isViewerForOffice(officeId)" class="btn-secondary" @click="openCreateAccount">
           <span class="material-symbols-outlined" aria-hidden="true">add</span> Hesap Ekle
         </button>
         <button class="btn-secondary" @click="loadStatement(selectedParty)">
@@ -307,19 +312,19 @@ onMounted(() => {
     <div v-else-if="activeTab === 'accounts'">
       <div class="accounts-grid">
         <div v-for="acc in ghostAccounts" :key="acc.id"
-             class="account-card" :class="{ 'account-selected': selectedAccount?.id === acc.id, 'account-blocked': acc.isBlocked }"
+             class="account-card" :class="{ 'account-selected': selectedAccount?.id === acc.id, 'account-blocked': !acc.isActive }"
              @click="loadEntries(acc)">
           <div class="acc-top">
             <span class="acc-currency">{{ acc.currencyCode }}</span>
             <button v-if="authStore.isAdmin" class="icon-btn-sm" @click.stop="toggleAccountBlock(acc)"
-                    :title="acc.isBlocked ? 'Blok Kaldır' : 'Blokla'">
-              <span class="material-symbols-outlined" aria-hidden="true">{{ acc.isBlocked ? 'lock_open' : 'lock' }}</span>
+                    :title="!acc.isActive ? 'Blok Kaldır' : 'Blokla'">
+              <span class="material-symbols-outlined" aria-hidden="true">{{ !acc.isActive ? 'lock_open' : 'lock' }}</span>
             </button>
           </div>
           <div class="acc-balance" :class="(acc.balance ?? 0) >= 0 ? 'balance-pos' : 'balance-neg'">
             {{ formatCurrency(acc.balance ?? 0) }}
           </div>
-          <div v-if="acc.isBlocked" class="blocked-badge">Blokeli</div>
+          <div v-if="!acc.isActive" class="blocked-badge">Blokeli</div>
         </div>
         <div v-if="ghostAccounts.length === 0" class="empty-accounts">Ghost hesap bulunamadı</div>
       </div>
@@ -344,16 +349,16 @@ onMounted(() => {
               <td colspan="7" class="empty-row">Hareket bulunamadı</td>
             </tr>
             <tr v-for="e in accountEntries" :key="e.id" :class="{ 'reversed-row': e.isReversed }">
-              <td>{{ formatDateTime(e.entryDate) }}</td>
+              <td>{{ formatDateTime(e.transactionDate) }}</td>
               <td>{{ e.description || '-' }}</td>
               <td class="code-cell">{{ e.referenceNumber || '-' }}</td>
-              <td class="text-right balance-neg">{{ e.debitAmount ? formatCurrency(e.debitAmount) : '' }}</td>
-              <td class="text-right balance-pos">{{ e.creditAmount ? formatCurrency(e.creditAmount) : '' }}</td>
+              <td class="text-right balance-neg">{{ e.entryType === 'Debit' ? formatCurrency(e.amount) : '' }}</td>
+              <td class="text-right balance-pos">{{ e.entryType === 'Credit' ? formatCurrency(e.amount) : '' }}</td>
               <td class="text-right" :class="(e.runningBalance ?? 0) >= 0 ? 'balance-pos' : 'balance-neg'">
                 {{ formatCurrency(e.runningBalance ?? 0) }}
               </td>
               <td class="text-center">
-                <button v-if="!e.isReversed" class="icon-btn-sm danger" title="İptal (ters kayıt)" @click="reverseEntry(e)">
+                <button v-if="!e.isReversed && !authStore.isViewerForOffice(officeId)" class="icon-btn-sm danger" title="İptal (ters kayıt)" @click="reverseEntry(e)">
                   <span class="material-symbols-outlined" aria-hidden="true">undo</span>
                 </button>
                 <span v-else class="reversed-label">İptal</span>
@@ -376,7 +381,7 @@ onMounted(() => {
             <div class="form-group">
               <label>Para Birimi</label>
               <select v-model="paymentForm.currencyId">
-                <option v-for="c in exchangeStore.currencies" :key="c.id" :value="c.id">{{ c.code }}</option>
+                <option v-for="c in exchangeStore.currencies" :key="c.id" :value="c.id">{{ c.currencyCode }}</option>
               </select>
             </div>
             <div class="form-group">
@@ -414,7 +419,7 @@ onMounted(() => {
             <div class="form-group">
               <label>Para Birimi</label>
               <select v-model="paymentForm.currencyId">
-                <option v-for="c in exchangeStore.currencies" :key="c.id" :value="c.id">{{ c.code }}</option>
+                <option v-for="c in exchangeStore.currencies" :key="c.id" :value="c.id">{{ c.currencyCode }}</option>
               </select>
             </div>
             <div class="form-group">
@@ -452,7 +457,7 @@ onMounted(() => {
             <div class="form-group">
               <label>Para Birimi</label>
               <select v-model="createAccountForm.currencyId">
-                <option v-for="c in exchangeStore.currencies" :key="c.id" :value="c.id">{{ c.code }} - {{ c.name }}</option>
+                <option v-for="c in exchangeStore.currencies" :key="c.id" :value="c.id">{{ c.currencyCode }} - {{ c.currencyName }}</option>
               </select>
             </div>
             <div class="form-group">

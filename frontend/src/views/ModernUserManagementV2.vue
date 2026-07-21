@@ -122,6 +122,12 @@ function switchTab(tab: 'info' | 'password' | 'offices') {
 }
 
 async function saveInfo() {
+  if (saving.value) return
+  if (
+    authStore.user?.id === selected.value?.id &&
+    editForm.value.rank !== selected.value.rank &&
+    !confirm('Kendi rütbenizi değiştirmek üzeresiniz. Bu, yönetici yetkilerinizi kaybetmenize neden olabilir. Devam edilsin mi?')
+  ) return
   saveError.value = ''; saveOk.value = false; saving.value = true
   try {
     await apiService.updateUser({ Id: selected.value.id, ...editForm.value })
@@ -135,9 +141,11 @@ async function saveInfo() {
 }
 
 async function createUser() {
+  if (saving.value) return
   saveError.value = ''; saveOk.value = false
   const f = createForm.value
   if (!f.username || !f.mail || !f.password) { saveError.value = 'Kullanıcı adı, e-posta ve şifre zorunludur.'; return }
+  if (f.password.length < 8) { saveError.value = 'Şifre en az 8 karakter olmalıdır.'; return }
   saving.value = true
   try {
     await apiService.registerUser(f)
@@ -150,8 +158,9 @@ async function createUser() {
 }
 
 async function savePassword() {
+  if (saving.value) return
   saveError.value = ''; saveOk.value = false
-  if (!pwForm.value.newPassword) { saveError.value = 'Şifre boş olamaz'; return }
+  if (!pwForm.value.newPassword || pwForm.value.newPassword.length < 8) { saveError.value = 'Şifre en az 8 karakter olmalıdır'; return }
   if (pwForm.value.newPassword !== pwForm.value.confirm) { saveError.value = 'Şifreler eşleşmiyor'; return }
   saving.value = true
   try {
@@ -164,7 +173,7 @@ async function savePassword() {
 }
 
 async function toggleOffice(office: any) {
-  if (!selected.value || !authStore.isAdmin) return
+  if (!selected.value || !authStore.isAdmin || officeSaving.value) return
   const officeId = office.officeId ?? office.id
   officeSaving.value = true
   try {

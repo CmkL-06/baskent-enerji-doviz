@@ -222,6 +222,7 @@ function openEditModal(party: any) {
 }
 
 async function saveParty() {
+  if (saving.value) return
   if (!partyForm.value.partyCode || !partyForm.value.name) {
     notification.warning('Cari kodu ve adı zorunludur')
     return
@@ -281,8 +282,13 @@ function openPaymentModal(party?: any) {
 }
 
 async function savePayment() {
+  if (saving.value) return
   if (!paymentForm.value.amount || paymentForm.value.amount <= 0) {
     notification.warning('Tutar giriniz')
+    return
+  }
+  if (!paymentForm.value.currencyId) {
+    notification.warning('Para birimi seçiniz')
     return
   }
   saving.value = true
@@ -365,11 +371,11 @@ onUnmounted(() => {
         </h1>
       </div>
       <div class="header-actions">
-        <button v-if="activeTab === 'list'" class="btn-primary" @click="openCreateModal">
+        <button v-if="activeTab === 'list' && !authStore.isViewerForOffice(officeId)" class="btn-primary" @click="openCreateModal">
           <span class="material-symbols-outlined" aria-hidden="true">person_add</span>
           Yeni Cari
         </button>
-        <button v-if="activeTab === 'accounts' && selectedParty" class="btn-primary" @click="openPaymentModal()">
+        <button v-if="activeTab === 'accounts' && selectedParty && !authStore.isViewerForOffice(officeId)" class="btn-primary" @click="openPaymentModal()">
           <span class="material-symbols-outlined" aria-hidden="true">payments</span>
           Ödeme Ekle
         </button>
@@ -454,16 +460,16 @@ onUnmounted(() => {
             </td>
             <td>{{ formatDate(party.lastTransactionDate) }}</td>
             <td class="text-center actions-cell" @click.stop>
-              <button class="icon-btn" title="Düzenle" @click="openEditModal(party)">
+              <button v-if="!authStore.isViewerForOffice(officeId)" class="icon-btn" title="Düzenle" @click="openEditModal(party)">
                 <span class="material-symbols-outlined" aria-hidden="true">edit</span>
               </button>
-              <button class="icon-btn" title="Ödeme" @click="openPaymentModal(party)">
+              <button v-if="!authStore.isViewerForOffice(officeId)" class="icon-btn" title="Ödeme" @click="openPaymentModal(party)">
                 <span class="material-symbols-outlined" aria-hidden="true">payments</span>
               </button>
               <button class="icon-btn" title="Ekstre" @click="loadStatement(party)">
                 <span class="material-symbols-outlined" aria-hidden="true">receipt_long</span>
               </button>
-              <button class="icon-btn danger" title="Sil" @click="deleteParty(party)">
+              <button v-if="!authStore.isViewerForOffice(officeId)" class="icon-btn danger" title="Sil" @click="deleteParty(party)">
                 <span class="material-symbols-outlined" aria-hidden="true">delete</span>
               </button>
             </td>
@@ -666,7 +672,7 @@ onUnmounted(() => {
             <div class="form-group">
               <label>Para Birimi</label>
               <select v-model="paymentForm.currencyId">
-                <option v-for="c in currencies" :key="c.id" :value="c.id">{{ c.code }} - {{ c.name }}</option>
+                <option v-for="c in currencies" :key="c.id" :value="c.id">{{ c.currencyCode }} - {{ c.currencyName }}</option>
               </select>
             </div>
             <div class="form-group">

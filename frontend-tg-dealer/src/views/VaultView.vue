@@ -548,8 +548,8 @@
                 <input v-model.number="depositForm.amount" type="number" min="0.01" step="0.01" class="form-input" placeholder="0.00">
               </div>
               <div class="form-group">
-                <label class="form-label">Notlar</label>
-                <textarea v-model="depositForm.notes" rows="3" class="form-textarea" placeholder="İsteğe bağlı notlar"></textarea>
+                <label class="form-label">Açıklama <span class="required">*</span></label>
+                <textarea v-model="depositForm.notes" rows="3" class="form-textarea" placeholder="Bu para yatırma işleminin nedeni (zorunlu)" required></textarea>
               </div>
               <div class="form-actions">
                 <button type="button" @click="showDepositDialog = false" class="btn-cancel">İptal</button>
@@ -616,8 +616,8 @@
                 <input v-model.number="withdrawForm.amount" type="number" min="0.01" step="0.01" class="form-input" placeholder="0.00">
               </div>
               <div class="form-group">
-                <label class="form-label">Notlar</label>
-                <textarea v-model="withdrawForm.notes" rows="3" class="form-textarea" placeholder="İsteğe bağlı notlar"></textarea>
+                <label class="form-label">Açıklama <span class="required">*</span></label>
+                <textarea v-model="withdrawForm.notes" rows="3" class="form-textarea" placeholder="Bu para çekme işleminin nedeni (zorunlu)" required></textarea>
               </div>
               <div class="form-actions">
                 <button type="button" @click="showWithdrawDialog = false" class="btn-cancel">İptal</button>
@@ -1324,6 +1324,11 @@ const processDeposit = async () => {
     return
   }
 
+  if (!depositForm.value.notes || !depositForm.value.notes.trim()) {
+    notification.error('Lütfen bu para yatırma işlemi için bir açıklama girin')
+    return
+  }
+
   isProcessing.value = true
   try {
     // API endpoint for deposit would be implemented here
@@ -1333,7 +1338,7 @@ const processDeposit = async () => {
       currencyId: depositForm.value.currencyId,
       amount: depositForm.value.amount,
       isEntireBalance: false,
-      description: depositForm.value.notes || 'Para Yatırma'
+      description: depositForm.value.notes.trim()
     })
     
     showDepositDialog.value = false
@@ -1361,6 +1366,11 @@ const processWithdraw = async () => {
     return
   }
 
+  if (!withdrawForm.value.notes || !withdrawForm.value.notes.trim()) {
+    notification.error('Lütfen bu para çekme işlemi için bir açıklama girin')
+    return
+  }
+
   isProcessing.value = true
   try {
     // API endpoint for withdrawal would be implemented here
@@ -1370,7 +1380,7 @@ const processWithdraw = async () => {
       currencyId: withdrawForm.value.currencyId,
       amount: -withdrawForm.value.amount,
       isEntireBalance: false,
-      description: withdrawForm.value.notes || 'Para Çekme'
+      description: withdrawForm.value.notes.trim()
     })
     
     showWithdrawDialog.value = false

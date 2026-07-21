@@ -133,6 +133,7 @@ function getLastDiff(row: any): number | null {
 }
 
 async function submit() {
+  if (submitting.value) return
   if (!allFilled.value) {
     error.value = 'Tüm döviz miktarlarını giriniz'
     return
