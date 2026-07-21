@@ -145,6 +145,9 @@ watch(() => officeId.value, () => {
 })
 
 onMounted(async () => {
+  // Owner/admin kullanıcılarda ModernLayout ofis listesini önceden yüklemez — bu garanti
+  // olmadan officeId undefined kalıp sayfa sessizce boş görünebilir (Giderler'deki hatayla aynı desen).
+  if (!exchangeStore.offices?.length) await exchangeStore.loadOffices()
   loading.value = true
   try {
     await Promise.all([loadPending(), loadHistory()])
@@ -292,7 +295,7 @@ onMounted(async () => {
             <div class="form-group">
               <label>Para Birimi</label>
               <select v-model="transferForm.currencyId">
-                <option v-for="c in exchangeStore.currencies" :key="c.id" :value="c.id">{{ c.code }} - {{ c.name }}</option>
+                <option v-for="c in exchangeStore.currencies" :key="c.id" :value="c.id">{{ c.currencyCode }} - {{ c.currencyName }}</option>
               </select>
             </div>
             <div class="form-group">

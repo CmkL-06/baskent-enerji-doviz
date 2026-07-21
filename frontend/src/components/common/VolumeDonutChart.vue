@@ -9,7 +9,10 @@ const props = defineProps<{
   items: { code: string; amount: number }[]
 }>()
 
-const palette = ['var(--color-primary)', '#0ea5e9', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#ef4444', '#14b8a6']
+// Canvas 2D context CSS custom property'lerini ("var(--x)") çözemez — burada geçirilirse
+// tarayıcı geçersiz fillStyle'ı siyaha düşürür. Bu yüzden --color-primary'nin ham hex
+// karşılığı kullanılıyor (design-tokens.css'teki değerle birebir aynı).
+const palette = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#ef4444', '#14b8a6']
 
 const chartData = computed(() => ({
   labels: props.items.map(i => i.code),

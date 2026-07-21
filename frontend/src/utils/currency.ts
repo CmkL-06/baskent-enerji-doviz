@@ -82,6 +82,27 @@ export function formatExchangeRate(value: number | null | undefined, decimals = 
   })
 }
 
+// Türkçe klavye/numpad girişini güvenli parse eder.
+// "1.234,56" -> 1234.56 ("." binlik, "," ondalık)
+// "38,75" -> 38.75 (yalnızca "," varsa ondalık ayraç)
+// "1.234" -> 1234 (yalnızca "." varsa VE tam binlik gruplama deseniyle eşleşiyorsa binlik ayraç sayılır)
+// "12.5" / "0.5" -> 12.5 / 0.5 (yalnızca "." varsa ve binlik deseniyle eşleşmiyorsa ondalık nokta sayılır)
+// Önceden bazı sayfalar tek-ayraçlı "." girişini her zaman ondalık nokta sayıyordu, bazıları ise
+// her zaman binlik ayraç — aynı "1.234" girişi sayfaya göre 1.234 ya da 1234 olarak parse ediliyordu.
+export function parseDecimalInput(value: unknown): number {
+  if (value === null || value === undefined || value === '') return 0
+  let s = String(value).trim()
+  if (s.includes(',') && s.includes('.')) {
+    s = s.replace(/\./g, '').replace(',', '.')
+  } else if (s.includes(',')) {
+    s = s.replace(',', '.')
+  } else if (/^\d{1,3}(\.\d{3})+$/.test(s)) {
+    s = s.replace(/\./g, '')
+  }
+  const n = parseFloat(s)
+  return isNaN(n) ? 0 : n
+}
+
 export function formatCurrency(value: number | null | undefined, currencyCode = 'TRY'): string {
   if (value === null || value === undefined) return '0'
   const num = Number(value)

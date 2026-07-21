@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useExchangeStore } from '@/stores/exchange'
 import apiService from '@/services/apiservice'
-import { getCurrencyFlagImg, formatExchangeRate } from '@/utils/currency'
+import { getCurrencyFlagImg, formatExchangeRate, parseDecimalInput } from '@/utils/currency'
 
 const exchangeStore = useExchangeStore()
 
@@ -154,15 +154,7 @@ function formatDecimal(val: number): string {
 }
 
 function parseNum(val: string): number {
-  if (!val) return 0
-  let s = String(val).trim()
-  if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) {
-    s = s.replace(/\./g, '').replace(',', '.')
-  } else {
-    s = s.replace(',', '.')
-  }
-  const n = parseFloat(s)
-  return isNaN(n) ? 0 : n
+  return parseDecimalInput(val)
 }
 
 async function saveRate() {

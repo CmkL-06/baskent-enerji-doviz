@@ -25,8 +25,10 @@ const authStore = useAuthStore()
 const transactions = ref<any[]>([])
 const isLoading = ref(false)
 const currentPage = ref(1)
-const totalPages = ref(1)
 const totalCount = ref(0)
+const isOpen = ref(false)
+const RECENT_LIMIT = 15
+const recentTransactions = computed(() => transactions.value.slice(0, RECENT_LIMIT))
 const filterType = ref<string>('')
 const deleteConfirmId = ref<string | null>(null)
 const isDeleting = ref(false)
@@ -86,7 +88,6 @@ async function loadTransactions() {
     const result = await apiService.getTransactionHistory(params)
     if (result && result.data) {
       transactions.value = result.data
-      totalPages.value = result.pagination?.totalPages || 1
       totalCount.value = result.pagination?.totalCount || 0
     } else {
       transactions.value = []
@@ -261,12 +262,6 @@ async function printAllTransactions() {
   setTimeout(() => { printWindow.print(); printWindow.close() }, 300)
 }
 
-function changePage(page: number) {
-  if (page < 1 || page > totalPages.value) return
-  currentPage.value = page
-  loadTransactions()
-}
-
 watch(() => props.officeId, () => {
   currentPage.value = 1
   loadTransactions()
@@ -285,13 +280,15 @@ defineExpose({ loadTransactions, printAllTransactions })
 <template>
   <div class="th-root">
     <!-- Header -->
-    <div class="th-header">
+    <div class="th-header" @click="isOpen = !isOpen">
       <div class="th-header-left">
+        <span class="material-symbols-outlined th-panel-chevron" :class="{ 'th-panel-chevron--open': isOpen }" aria-hidden="true">chevron_right</span>
         <span class="material-symbols-outlined th-icon-filled" style="font-size:20px;color:var(--color-primary)">history</span>
         <h3 class="th-title">İşlem Geçmişi</h3>
         <span v-if="totalCount > 0" class="th-count">{{ totalCount }}</span>
+        <span v-if="!isOpen" class="th-hint">Son {{ Math.min(RECENT_LIMIT, transactions.length) }} işlemi görmek için tıklayın</span>
       </div>
-      <div class="th-header-right">
+      <div class="th-header-right" @click.stop>
         <div class="th-filter-group">
           <button @click="filterType = ''" class="th-filter-btn" :class="{ 'th-filter-btn--active': filterType === '' }">Tümü</button>
           <button @click="filterType = 'buy'" class="th-filter-btn" :class="{ 'th-filter-btn--active': filterType === 'buy' }">Alış</button>
@@ -303,6 +300,7 @@ defineExpose({ loadTransactions, printAllTransactions })
       </div>
     </div>
 
+    <template v-if="isOpen">
     <!-- Loading -->
     <div v-if="isLoading && transactions.length === 0" class="th-loading">
       <span class="material-symbols-outlined th-spin" style="font-size:24px;color:var(--color-primary)">refresh</span>
@@ -315,7 +313,7 @@ defineExpose({ loadTransactions, printAllTransactions })
       <p>Bugün henüz işlem yapılmamış</p>
     </div>
 
-    <!-- Table -->
+    <!-- Son 15 işlem -->
     <div v-else class="th-table-wrap">
       <table class="th-table">
         <thead>
@@ -330,7 +328,7 @@ defineExpose({ loadTransactions, printAllTransactions })
           </tr>
         </thead>
         <tbody>
-          <template v-for="tx in transactions" :key="tx.id">
+          <template v-for="tx in recentTransactions" :key="tx.id">
             <tr class="th-row expandable-row" :class="{ 'th-row--deleting': deleteConfirmId === tx.id, expanded: isTxExpanded(tx.id) }" @click="toggleTxRow(tx.id)">
               <td class="th-cell-time">
                 <span class="material-symbols-outlined th-chevron" aria-hidden="true">chevron_right</span>
@@ -462,17 +460,7 @@ defineExpose({ loadTransactions, printAllTransactions })
         </tbody>
       </table>
     </div>
-
-    <!-- Pagination -->
-    <div v-if="totalPages > 1" class="th-pagination">
-      <button @click="changePage(currentPage - 1)" :disabled="currentPage <= 1" class="th-page-btn">
-        <span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px">chevron_left</span>
-      </button>
-      <span class="th-page-info">{{ currentPage }} / {{ totalPages }}</span>
-      <button @click="changePage(currentPage + 1)" :disabled="currentPage >= totalPages" class="th-page-btn">
-        <span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px">chevron_right</span>
-      </button>
-    </div>
+    </template>
   </div>
 </template>
 
@@ -492,6 +480,7 @@ defineExpose({ loadTransactions, printAllTransactions })
   border-bottom: 1px solid #f3f4f6;
   flex-wrap: wrap;
   gap: 10px;
+  cursor: pointer;
 }
 .th-header-left {
   display: flex;
@@ -680,32 +669,15 @@ defineExpose({ loadTransactions, printAllTransactions })
 }
 .th-profit--zero { color: #d1d5db; }
 
-.th-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 12px;
-  border-top: 1px solid #f3f4f6;
+.th-panel-chevron {
+  font-size: 20px;
+  color: #9ca3af;
+  transition: transform 0.15s;
 }
-.th-page-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid #e5e7eb;
-  border-radius: var(--radius-md);
-  background: white;
-  color: #374151;
-  cursor: pointer;
-  transition: border-color 0.2s, color 0.2s;
-}
-.th-page-btn:hover:not(:disabled) { border-color: var(--color-primary); color: var(--color-primary); }
-.th-page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-.th-page-info {
-  font-size: 13px;
-  color: #6b7280;
+.th-panel-chevron--open { transform: rotate(90deg); color: var(--color-primary); }
+.th-hint {
+  font-size: 12px;
+  color: #9ca3af;
   font-weight: 500;
 }
 

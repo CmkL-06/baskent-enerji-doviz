@@ -387,16 +387,16 @@ const getExchangeRate = (transaction: any) => {
   if (!fromAmount) return '-'
 
   const rate = toAmount / fromAmount
-  return (rate ?? 0).toFixed(2)
+  return formatAmount(rate, 2)
 }
 
 const getRateTooltip = (transaction: any) => {
   if (!transaction.details || transaction.details.length < 2) return ''
-  
+
   const detail1 = transaction.details[0]
   const detail2 = transaction.details[1]
-  
-  return `Alış Kuru: ${detail1.rate?.toFixed(4) || '-'}\nSatış Kuru: ${detail2.rate?.toFixed(4) || '-'}`
+
+  return `Alış Kuru: ${detail1.rate != null ? formatExchangeRate(detail1.rate) : '-'}\nSatış Kuru: ${detail2.rate != null ? formatExchangeRate(detail2.rate) : '-'}`
 }
 
 const getTransactionTypeClass = (type: number) => {

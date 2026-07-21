@@ -5,6 +5,7 @@ import type { Transaction, TransactionType, TransactionStatus } from '@/types/ap
 import EditTransactionModal from '@/components/EditTransactionModal.vue'
 import DeleteConfirmModal from '@/components/DeleteConfirmModal.vue'
 import apiService from '@/services/apiservice'
+import { formatAmount, formatExchangeRate } from '@/utils/currency'
 
 const exchangeStore = useExchangeStore()
 
@@ -28,9 +29,9 @@ const transactions = computed(() => {
   return exchangeStore.transactions.map(t => ({
     ...t,
     formattedDate: t.transactionDate ? new Date(t.transactionDate).toLocaleString('tr-TR') : '-',
-    formattedAmount: `${t.sourceCurrencyCode ?? ''} ${(t.sourceAmount ?? 0).toFixed(2)}`,
-    formattedRate: `₺${(t.exchangeRate ?? 0).toFixed(4)}`,
-    formattedTotal: `₺${(t.targetAmount ?? 0).toFixed(2)}`,
+    formattedAmount: `${t.sourceCurrencyCode ?? ''} ${formatAmount(t.sourceAmount, 2)}`,
+    formattedRate: `₺${formatExchangeRate(t.exchangeRate)}`,
+    formattedTotal: `₺${formatAmount(t.targetAmount, 2)}`,
     hasSpecialRate: t.customRate != null
   }))
 })

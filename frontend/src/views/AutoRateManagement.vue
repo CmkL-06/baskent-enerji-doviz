@@ -415,7 +415,7 @@ onMounted(async () => {
             <td class="text-right font-mono proposed">{{ formatCurrency(item.proposedBuyRate ?? 0) }}</td>
             <td class="text-right font-mono proposed">{{ formatCurrency(item.proposedSellRate ?? 0) }}</td>
             <td class="text-right" :class="Math.abs(item.changePercent ?? 0) > 3 ? 'change-high' : 'change-normal'">
-              {{ (item.changePercent ?? 0).toFixed(2) }}%
+              {{ formatAmount(item.changePercent, 2) }}%
             </td>
             <td>{{ item.reason || '-' }}</td>
             <td>{{ formatDateTime(item.createdAt) }}</td>
@@ -475,7 +475,7 @@ onMounted(async () => {
               </td>
               <td class="col-rate font-mono">{{ formatCurrency(r.buyRate ?? 0) }}</td>
               <td class="col-rate font-mono">{{ formatCurrency(r.sellRate ?? 0) }}</td>
-              <td class="text-right">{{ (r.spreadPercent ?? 0).toFixed(2) }}%</td>
+              <td class="text-right">{{ formatAmount(r.spreadPercent, 2) }}%</td>
               <td>{{ formatDateTime(r.fetchedAt) }}</td>
               <td>
                 <span v-if="r.isValid" class="status-ok">Geçerli</span>
@@ -522,7 +522,7 @@ onMounted(async () => {
             <td class="text-right font-mono">{{ formatCurrency(h.oldSellRate ?? 0) }}</td>
             <td class="text-right font-mono">{{ formatCurrency(h.newSellRate ?? 0) }}</td>
             <td class="text-right" :class="Math.abs(h.changePercent ?? 0) > 3 ? 'change-high' : 'change-normal'">
-              {{ (h.changePercent ?? 0).toFixed(2) }}%
+              {{ formatAmount(h.changePercent, 2) }}%
             </td>
             <td>
               <span class="source-tag">{{ h.updateSource || '-' }}</span>

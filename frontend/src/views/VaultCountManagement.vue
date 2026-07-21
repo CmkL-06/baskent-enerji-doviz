@@ -566,7 +566,7 @@ function switchTab(tab: 'vaults' | 'timeline' | 'compare') {
                   <td class="text-right font-mono" :class="(row.difference ?? row.change ?? 0) >= 0 ? 'balance-pos' : 'balance-neg'">
                     {{ (row.difference ?? row.change ?? 0) > 0 ? '+' : '' }}{{ formatCurrency(row.difference ?? row.change ?? 0) }}
                   </td>
-                  <td class="text-right">{{ row.changePercentage != null ? row.changePercentage.toFixed(1) + '%' : '-' }}</td>
+                  <td class="text-right">{{ row.changePercentage != null ? formatAmount(row.changePercentage, 1) + '%' : '-' }}</td>
                 </tr>
               </tbody>
             </table>

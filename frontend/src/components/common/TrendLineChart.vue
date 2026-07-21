@@ -8,17 +8,22 @@ import {
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler)
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   labels: string[]
   profitSeries: number[]
   volumeSeries: number[]
-}>()
+  profitLabel?: string
+  volumeLabel?: string
+}>(), {
+  profitLabel: 'Kâr (₺)',
+  volumeLabel: 'İşlem Hacmi (₺)',
+})
 
 const chartData = computed(() => ({
   labels: props.labels,
   datasets: [
     {
-      label: 'Kâr (₺)',
+      label: props.profitLabel,
       data: props.profitSeries,
       borderColor: '#10b981',
       backgroundColor: 'rgba(16,185,129,0.12)',
@@ -28,7 +33,7 @@ const chartData = computed(() => ({
       yAxisID: 'y',
     },
     {
-      label: 'İşlem Hacmi (₺)',
+      label: props.volumeLabel,
       data: props.volumeSeries,
       borderColor: '#0ea5e9',
       backgroundColor: 'rgba(14,165,233,0.08)',

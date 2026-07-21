@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useExchangeStore } from '@/stores/exchange'
 import { useAuthStore } from '@/stores/auth'
 import apiService from '@/services/apiservice'
-import { formatAmount } from '@/utils/currency'
+import { formatAmount, parseDecimalInput } from '@/utils/currency'
 import CurrencySelector from '@/components/common/CurrencySelector.vue'
 import TransactionHistory from '@/components/common/TransactionHistory.vue'
 import USDTPaymentsModal from './USDTPaymentsModal.vue'
@@ -68,6 +68,12 @@ interface ExchangeItem {
   customRate: string | number | null
   targetCustomRate?: string | number | null // Arbitraj modu: verilen birimin satış kuru
   rateManuallySet?: boolean
+  // Kullanıcının MİKTAR alanına o an yazdığı ham metin. sourceAmount'tan türetilip her
+  // tuş vuruşunda geri render edilseydi (örn. ".".replace(',')), kullanıcının yazdığı "."
+  // canlı DOM'da "," olarak görünür, bir sonraki tuş bu virgülü GERÇEK bir ondalık virgül
+  // sanıp tutarı bozardı (örn. "1.234" binlik ayraçlı yazılmak istenirken 1.234 ondalık
+  // sayısına dönüşürdü). Bu alan yazarken input'un kendi tuttuğu metni korur.
+  amountText?: string
 }
 
 interface Currency {
@@ -236,20 +242,8 @@ const isBalanceSufficient = computed(() => {
 // Helper to format numbers with thousand separators
 const formatNumber = (value: number, decimals: number = 2): string => formatAmount(value, decimals)
 
-// Türkçe sayı girişini güvenli parse et.
-// "1.234,56" → 1234.56 (binlik ayraçlı), "38,75" → 38.75, "38.75" → 38.75 (sayı toString).
-// Yalnızca hem '.' hem ',' varsa '.' binlik sayılır — mevcut tek-ayraçlı davranış korunur.
-const parseNum = (value: any): number => {
-  if (value === null || value === undefined || value === '') return 0
-  let s = String(value).trim()
-  if (s.includes(',') && s.includes('.')) {
-    s = s.replace(/\./g, '').replace(',', '.')
-  } else {
-    s = s.replace(',', '.')
-  }
-  const n = parseFloat(s)
-  return isNaN(n) ? 0 : n
-}
+// Türkçe sayı girişini güvenli parse et (bkz. utils/currency.ts — tüm sayfalarda tek/ortak mantık).
+const parseNum = (value: any): number => parseDecimalInput(value)
 
 // Get currency info by code
 const getCurrencyByCode = (code: string) => {
@@ -644,6 +638,7 @@ const removeExchangeItem = (index: number) => {
 }
 
 const updateAmount = (item: ExchangeItem, value: string) => {
+  item.amountText = value
   const amount = Math.max(0, parseNum(value))
   item.sourceAmount = amount
 
@@ -2019,7 +2014,7 @@ watch(() => exchangeItems.value.map(item => ({
                   <label class="ex-field-label">{{ t('exchange.operations.amount') }}</label>
                   <input
                     type="text"
-                    :value="item.sourceAmount ? item.sourceAmount.toString().replace('.', ',') : ''"
+                    :value="item.amountText !== undefined ? item.amountText : (item.sourceAmount ? item.sourceAmount.toString().replace('.', ',') : '')"
                     @input="updateAmount(item, ($event.target as HTMLInputElement).value)"
                     class="ex-input ex-input--mono"
                     placeholder="0,00"

@@ -7,6 +7,7 @@ import { useExchangeStore } from '@/stores/exchange'
 import apiService from '@/services/apiservice'
 import LanguageSelector from '@/components/common/LanguageSelector.vue'
 import { useNotification } from '@/composables/useNotification'
+import { formatAmount } from '@/utils/currency'
 
 const notification = useNotification()
 const router = useRouter()
@@ -150,8 +151,8 @@ const tickerRates = computed(() => {
       if (!uniqueRatesMap.has(key)) {
         uniqueRatesMap.set(key, {
           code: rate.sourceCurrencyCode,
-          buyRate: (rate.buyRate ?? 0).toFixed(2),
-          sellRate: (rate.sellRate ?? 0).toFixed(2),
+          buyRate: formatAmount(rate.buyRate, 2),
+          sellRate: formatAmount(rate.sellRate, 2),
           countryCode: getCurrencyCountryCode(rate.sourceCurrencyCode),
           officeId: rate.officeId
         })
