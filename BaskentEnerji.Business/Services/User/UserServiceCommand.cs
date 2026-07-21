@@ -124,6 +124,8 @@ namespace BaskentEnerji.Business.Services.User
                 throw new InvalidOperationException("User with this email already exists");
             }
 
+            EnsurePasswordStrength(requestData.Password);
+
             // Hash the password
             var passwordHash = HashPassword(requestData.Password);
 
@@ -188,7 +190,13 @@ namespace BaskentEnerji.Business.Services.User
                 return false; // Invalid token or user not found
             }
 
+            EnsurePasswordStrength(newPassword);
+
             user.Password = HashPassword(newPassword);
+            // ChangeUserPassword'daki ile aynı — şifre sıfırlanmadan önce çalınmış bir JWT,
+            // LastPasswordChangeDate güncellenmezse token süresi dolana kadar (varsayılan 8 saat)
+            // geçerli kalmaya devam ederdi.
+            user.LastPasswordChangeDate = DateTime.UtcNow;
             await _dbContext.SaveChangesAsync();
             return true;
         }
@@ -342,15 +350,35 @@ namespace BaskentEnerji.Business.Services.User
                 userData.Rank = dbUser.Rank;
             }
 
+            // Sistemde en az bir Owner kalmalı — son Owner'ın rütbesi düşürülürse hiç kimse
+            // yönetici işlemleri (kullanıcı/ofis yönetimi vb.) yapamaz hale gelir.
+            if (dbUser.Rank == Entity.Rank.Owner && userData.Rank != Entity.Rank.Owner)
+            {
+                var otherOwnerCount = await _dbContext.Users
+                    .CountAsync(u => u.Rank == Entity.Rank.Owner && u.Id != dbUser.Id);
+                if (otherOwnerCount == 0)
+                    throw new ApiException(HttpStatusCode.BadRequest, "Sistemdeki son Owner rütbesi düşürülemez.");
+            }
+
             _dbContext.Entry(dbUser).CurrentValues.SetValues(userData);
             await _dbContext.SaveChangesAsync();
 
+        }
+
+        private const int MinPasswordLength = 8;
+
+        private void EnsurePasswordStrength(string password)
+        {
+            if (string.IsNullOrEmpty(password) || password.Length < MinPasswordLength)
+                throw new ApiException(HttpStatusCode.BadRequest, $"Şifre en az {MinPasswordLength} karakter olmalıdır.");
         }
 
         public async Task<bool> ChangeUserPassword(rm_change_user_password requestData)
         {
             if (!await _validationService.IsOwnerAsync() && !await _validationService.IsAdminAsync())
                 throw new ApiException(HttpStatusCode.Forbidden, "Bu işlem için Admin veya Owner yetkisi gereklidir.");
+
+            EnsurePasswordStrength(requestData.NewPassword);
 
             var user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == requestData.UserId);
             if (user == null)

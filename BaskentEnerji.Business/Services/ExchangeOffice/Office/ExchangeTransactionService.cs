@@ -170,10 +170,12 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                         // Alınan bacak: satın alma (WAC güncelle)
                         await _wacService.RecalculateWacOnPurchaseAsync(vaultId, singleRequest.SourceCurrencyId, singleRequest.SourceAmount, sourceRate, exchangeTransaction.Id);
 
-                        // Verilen bacak: satış — yeterli bakiye kontrolü + gerçekleşen kâr
+                        // Verilen bacak: satış — yeterli bakiye kontrolü + WAC-altı zarar onayı + gerçekleşen kâr
                         var currentTargetBalance = await _vaultService.GetLockedBalanceAsync(vaultId, singleRequest.TargetCurrencyId);
                         if (currentTargetBalance < targetAmount)
                             throw new ApiException(HttpStatusCode.BadRequest, "Insufficient vault balance");
+
+                        await EnsureSellRateAboveWacAsync(vaultId, singleRequest.TargetCurrencyId, targetRate, targetAmount, singleRequest.OwnerOverrideLoss, "Arbitraj — verilen birimin");
 
                         profit = await _wacService.CalculateRealizedProfitAsync(targetRate, targetAmount, vaultId, singleRequest.TargetCurrencyId);
                         var newTargetQty = currentTargetBalance - targetAmount;
@@ -270,6 +272,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                             var currentBalance = await _vaultService.GetLockedBalanceAsync(vaultId, singleRequest.SourceCurrencyId);
                             if (currentBalance < singleRequest.SourceAmount)
                                 throw new ApiException(HttpStatusCode.BadRequest, $"Insufficient vault balance");
+
+                            await EnsureSellRateAboveWacAsync(vaultId, singleRequest.SourceCurrencyId, rate, singleRequest.SourceAmount, singleRequest.OwnerOverrideLoss, "Satış");
 
                             profit = await _wacService.CalculateRealizedProfitAsync(rate, singleRequest.SourceAmount, vaultId, singleRequest.SourceCurrencyId);
                             var newQty = currentBalance - singleRequest.SourceAmount;
@@ -426,6 +430,11 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
         public async Task<Transaction> TransferBetweenVaultsAsync(rm_transferbetweenvaults request)
         {
+            if (request.SourceVaultId == request.TargetVaultId)
+                throw new ApiException(HttpStatusCode.BadRequest, "Kaynak ve hedef kasa aynı olamaz.");
+            if (request.Amount <= 0)
+                throw new ApiException(HttpStatusCode.BadRequest, "Transfer tutarı sıfırdan büyük olmalıdır.");
+
             using var transaction = await _context.Database.BeginTransactionAsync();
 
             try
@@ -658,6 +667,25 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             var deviation = Math.Abs(actualRate - marketRate) / marketRate;
             if (deviation > 0.20m && !ownerOverrideLoss)
                 throw new ApiException(HttpStatusCode.BadRequest, $"{rateLabel} piyasa kurundan %{deviation * 100:F1} sapıyor. Onay için Owner yetkisi gereklidir.");
+        }
+
+        // WAC-altı (maliyetin altında) zararlı satış onayı önceden yalnızca ExchangeValidationService
+        // içinde uygulanıyordu — ama bu servis her çağrı yolunda (örn. Telegram operatör onay akışı,
+        // TelegramOperatorController.cs) devreye girmiyordu, dolayısıyla o yollardan hiç onaysız zararlı
+        // satış geçebiliyordu. Artık asıl parayı hareket ettiren bu metodun içinde, tüm çağrı yollarını
+        // kapsayacak şekilde uygulanıyor (hem normal satış hem arbitraj bacağı için).
+        private async Task EnsureSellRateAboveWacAsync(Guid vaultId, Guid currencyId, decimal sellRate, decimal quantity, bool ownerOverrideLoss, string legLabel)
+        {
+            var wac = await _wacService.GetWacAsync(vaultId, currencyId);
+            if (wac <= 0 || sellRate >= wac) return;
+
+            var loss = (wac - sellRate) * quantity;
+            if (ownerOverrideLoss) return;
+
+            var isOwner = await _validationService.IsOwnerAsync();
+            if (!isOwner)
+                throw new ApiException(HttpStatusCode.Forbidden,
+                    $"{legLabel} satış kuru ({sellRate:F4}) maliyetin ({wac:F4}) altında. Tahmini zarar: {loss:F2} TL. Sadece Patron onaylayabilir.");
         }
 
         private string GenerateTransactionNumber()

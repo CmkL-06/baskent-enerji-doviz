@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using BaskentEnerji.Data.Contexts;
 using BaskentEnerji.Entity;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Security.Claims;
@@ -114,14 +115,32 @@ namespace BaskentEnerji.Business.Services.Permission
                 .FirstOrDefaultAsync();
         }
 
+        public async Task<List<Guid>> GetAccessibleOfficeIdsAsync()
+        {
+            var userId = GetCurrentUserId();
+            if (!userId.HasValue)
+                return new List<Guid>();
+
+            return await _dbContext.User_Offices
+                .Where(uo => uo.UserId == userId.Value && uo.IsActive)
+                .Select(uo => uo.OfficeId)
+                .ToListAsync();
+        }
+
         public async Task EnsureNotViewerAsync(Guid officeId)
         {
             if (await IsAdminAsync()) return; // Owner + Admin her zaman muaf
 
             var role = await GetOfficeRoleAsync(officeId);
-            if (role == OfficeRole.Viewer)
+            // GetOfficeRoleAsync, kullanıcının o ofisle HİÇBİR ilişkisi (User_Offices kaydı) yoksa
+            // null döner — role == OfficeRole.Viewer kontrolü bu durumda false olup sessizce
+            // GEÇERDİ. Yani başka bir ofiste Editor olan biri, o ofise hiç erişimi olmayan bir
+            // officeId vererek bu kontrolü atlatıp o ofisin verilerini değiştirebiliyordu (IDOR).
+            // Erişimi olmayan (null) kullanıcı, Viewer'dan daha az yetkiye sahip olmalı — bu yüzden
+            // aynı şekilde (hatta daha sıkı) engellenmesi gerekir.
+            if (role == null || role == OfficeRole.Viewer)
                 throw new ApiException(HttpStatusCode.Forbidden,
-                    "İzleyici (Viewer) rolündeki kullanıcılar bu işlemi gerçekleştiremez. Sadece görüntüleme yetkiniz var.");
+                    "Bu ofis için işlem yapma yetkiniz yok.");
         }
 
         private Guid? GetCurrentUserId()

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using BaskentEnerji.Business.Exceptions;
 using BaskentEnerji.Business.Infrastructure.ExchangeOffice.Office;
 using BaskentEnerji.Business.Infrastructure.ExchangeOffice.Party;
 using BaskentEnerji.Business.Services.Permission;
@@ -12,6 +13,7 @@ using BaskentEnerji.Entity.Modals.ViewModals.ExchangeOffice.Party;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 
 namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
@@ -22,13 +24,15 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
         private readonly ILogger<PartyAccountService> _logger;
         private readonly ValidationService _validationService;
         private readonly IVaultService _vaultService;
+        private readonly IPartyCreditService _creditService;
 
-        public PartyAccountService(BaskentEnerjiDbContext context, ILogger<PartyAccountService> logger, ValidationService validationService, IVaultService vaultService)
+        public PartyAccountService(BaskentEnerjiDbContext context, ILogger<PartyAccountService> logger, ValidationService validationService, IVaultService vaultService, IPartyCreditService creditService)
         {
             _context = context;
             _logger = logger;
             _validationService = validationService;
             _vaultService = vaultService;
+            _creditService = creditService;
         }
 
         public async Task<vm_partyaccount> CreateAccountAsync(Guid partyId, Guid currencyId)
@@ -65,6 +69,13 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
 
         public async Task<List<vm_partyaccount>> GetPartyAccountsAsync(Guid partyId)
         {
+            var partyOfficeId = await _context.Parties
+                .Where(p => p.Id == partyId)
+                .Select(p => p.OfficeId)
+                .FirstOrDefaultAsync();
+            if (partyOfficeId != Guid.Empty)
+                await _validationService.ValidateOfficeAccessAsync(partyOfficeId);
+
             var accounts = await _context.PartyAccounts
                 .AsNoTracking()
                 .Include(a => a.Currency)
@@ -91,8 +102,22 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
                 if (account == null)
                     throw new InvalidOperationException("Party account not found");
 
+                if (request.Amount <= 0)
+                    throw new ApiException(HttpStatusCode.BadRequest, "Tutar sıfırdan büyük olmalıdır.");
+
                 if (account.Party != null)
                     await _validationService.EnsureNotViewerAsync(account.Party.OfficeId);
+
+                // Kredi limiti kontrolü — daha önce hiç uygulanmıyordu (bkz. PartyTransactionIntegration'daki
+                // aynı düzeltme). Manuel borç (Debit) girişi, kredi limitini aşıyorsa reddedilir.
+                if (request.EntryType == EntryType.Debit)
+                {
+                    var availability = await _creditService.CheckCreditAvailabilityAsync(account.PartyId, account.CurrencyId, request.Amount);
+                    if (availability.HasCreditLimit && !availability.IsApproved)
+                        throw new ApiException(HttpStatusCode.BadRequest,
+                            $"Cari hesap kredi limiti aşılıyor. Mevcut bakiye: {availability.CurrentBalance:F2}, " +
+                            $"Limit: {availability.CreditLimit:F2}, İstenen: {request.Amount:F2}.");
+                }
 
                 var entry = new PartyAccountEntry
                 {
@@ -169,6 +194,9 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
             if (party == null)
                 throw new InvalidOperationException("Party not found");
 
+            if (request.Amount == 0)
+                throw new ApiException(HttpStatusCode.BadRequest, "Tutar sıfır olamaz.");
+
             await _validationService.EnsureNotViewerAsync(party.OfficeId);
 
             var tryCurrency = await _context.Currencies.FirstOrDefaultAsync(c => c.CurrencyCode == "TRY");
@@ -232,7 +260,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
                     var exchangeRateEntity = await _context.ExchangeRates
                         .Where(r => r.SourceCurrencyId == request.CurrencyId
                             && r.TargetCurrencyId == tryCurrency.Id
-                            && r.OfficeId == request.OfficeId)
+                            && r.OfficeId == party.OfficeId)
                         .OrderByDescending(r => r.CreatedDate)
                         .FirstOrDefaultAsync();
 
@@ -243,6 +271,17 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
                 }
 
                 tlAmount = positiveAmount * exchangeRate;
+            }
+
+            // Kredi limiti kontrolü — Debit (party'ye para verme / borcunu artırma) durumunda uygulanır,
+            // Credit (tahsilat) borcu azalttığı için engellenmemeli.
+            if (request.Type == EntryType.Debit)
+            {
+                var availability = await _creditService.CheckCreditAvailabilityAsync(request.PartyId, request.CurrencyId, positiveAmount);
+                if (availability.HasCreditLimit && !availability.IsApproved)
+                    throw new ApiException(HttpStatusCode.BadRequest,
+                        $"Cari hesap kredi limiti aşılıyor. Mevcut bakiye: {availability.CurrentBalance:F2}, " +
+                        $"Limit: {availability.CreditLimit:F2}, İstenen: {positiveAmount:F2}.");
             }
 
             // Entry oluştur
@@ -298,7 +337,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
 
             // Kasayı güncelle (gelen para birimi cinsinden)
             var activeVault = await _context.Vaults
-                .FirstOrDefaultAsync(v => v.OfficeId == request.OfficeId && v.IsActive);
+                .FirstOrDefaultAsync(v => v.OfficeId == party.OfficeId && v.IsActive);
 
             if (activeVault != null)
             {
@@ -330,6 +369,13 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
 
         public async Task<List<vm_partyaccountentry>> GetAccountEntriesAsync(Guid accountId, DateTime? fromDate = null, DateTime? toDate = null, PaymentStatus? status = null)
         {
+            var accountOfficeId = await _context.PartyAccounts
+                .Where(a => a.Id == accountId)
+                .Select(a => a.Party.OfficeId)
+                .FirstOrDefaultAsync();
+            if (accountOfficeId != Guid.Empty)
+                await _validationService.ValidateOfficeAccessAsync(accountOfficeId);
+
             // SIMPLIFIED QUERY - removed all joins to test performance
             // If this is fast, the problem is with SQL Server query plan optimization
             var query = _context.PartyAccountEntries

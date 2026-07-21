@@ -1,5 +1,7 @@
 using BaskentEnerji.Business.Infrastructure.Telegram;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using System;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -15,10 +17,12 @@ namespace BaskentEnerji.Business.Services.Telegram
     public class TelegramNotificationService : ITelegramNotificationService
     {
         private readonly IConfiguration _configuration;
+        private readonly ILogger<TelegramNotificationService> _logger;
 
-        public TelegramNotificationService(IConfiguration configuration)
+        public TelegramNotificationService(IConfiguration configuration, ILogger<TelegramNotificationService> logger)
         {
             _configuration = configuration;
+            _logger = logger;
         }
 
         public async Task SendMessageAsync(long chatId, string text)
@@ -34,7 +38,10 @@ namespace BaskentEnerji.Business.Services.Telegram
                     $"https://api.telegram.org/bot{botToken}/sendMessage",
                     new StringContent(payload, Encoding.UTF8, "application/json"));
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Telegram bildirimi gönderilemedi (chatId: {ChatId})", chatId);
+            }
         }
     }
 }

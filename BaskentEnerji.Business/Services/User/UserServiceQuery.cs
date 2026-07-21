@@ -31,7 +31,11 @@ namespace BaskentEnerji.Business.Services.User
   
         public async Task<vm_user> GetUser(rm_user_get FilterData)
         {
-            if (!await _validationService.IsStaff()) throw new ApiException(HttpStatusCode.Unauthorized, "You have no permission to do this.");
+            // IsStaff() herhangi bir personelin ID/kullanıcı adı/e-posta vererek BAŞKA bir
+            // kullanıcının (Owner/Admin dahil) tam profilini çekmesine izin veriyordu (IDOR).
+            // Bu endpoint şu an kod tabanında yalnızca Admin panelinden kullanılıyor — kendi
+            // profilini görüntüleme ihtiyacı yok, bu yüzden Admin/Owner ile sınırlanıyor.
+            if (!await _validationService.IsAdminAsync()) throw new ApiException(HttpStatusCode.Forbidden, "You have no permission to do this.");
 
             var query =  _dbContext.Users.AsQueryable();
 

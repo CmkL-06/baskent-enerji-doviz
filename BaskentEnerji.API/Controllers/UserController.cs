@@ -118,6 +118,9 @@ namespace BaskentEnerji.API.Controllers
         [Authorize]
         public async Task<List<vm_user_login_history_entry>> GetUserLoginHistory(Guid id, [FromQuery] int? year, [FromQuery] int? month)
         {
+            if (!await _validationService.HasPermissionAsync(id))
+                throw new ApiException(HttpStatusCode.Forbidden, "Bu kullanıcının giriş geçmişini görüntüleme yetkiniz yok.");
+
             return await _userServiceQuery.GetUserLoginHistory(id, year, month);
         }
 
@@ -125,6 +128,9 @@ namespace BaskentEnerji.API.Controllers
         [Authorize]
         public async Task<vm_user_daily_detail> GetUserDailyDetail(Guid id, [FromQuery] DateTime date)
         {
+            if (!await _validationService.HasPermissionAsync(id))
+                throw new ApiException(HttpStatusCode.Forbidden, "Bu kullanıcının aktivite detayını görüntüleme yetkiniz yok.");
+
             return await _userServiceQuery.GetUserDailyDetail(id, date);
         }
 

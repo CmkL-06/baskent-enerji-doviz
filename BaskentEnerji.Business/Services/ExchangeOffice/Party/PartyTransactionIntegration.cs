@@ -1,10 +1,14 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using BaskentEnerji.Business.Exceptions;
+using BaskentEnerji.Business.Infrastructure.ExchangeOffice.Party;
 using BaskentEnerji.Data.Contexts;
 using BaskentEnerji.Entity.Entities.ExchangeOffice.Office;
 using BaskentEnerji.Entity.Entities.ExchangeOffice.Party;
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 
 namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
@@ -13,11 +17,13 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
     {
         private readonly BaskentEnerjiDbContext _context;
         private readonly ILogger<PartyTransactionIntegration> _logger;
+        private readonly IPartyCreditService _creditService;
 
-        public PartyTransactionIntegration(BaskentEnerjiDbContext context, ILogger<PartyTransactionIntegration> logger)
+        public PartyTransactionIntegration(BaskentEnerjiDbContext context, ILogger<PartyTransactionIntegration> logger, IPartyCreditService creditService)
         {
             _context = context;
             _logger = logger;
+            _creditService = creditService;
         }
 
         /// <summary>
@@ -38,6 +44,27 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
                 {
                     _logger.LogWarning($"Party {transaction.PartyId} not found for transaction {transaction.TransactionNumber}");
                     return;
+                }
+
+                // Kredi limiti kontrolü — daha önce CheckCreditAvailabilityAsync hiçbir çağrı yolunda
+                // kullanılmıyordu, bir müşteriye kredi limiti tanımlansa bile sistem sınırsız
+                // borçlanmaya izin veriyordu. Asıl bakiye güncellemesinden ÖNCE, para birimi bazında
+                // net borç (Debit) artışını kontrol ediyoruz — aşarsa işlem tamamen rollback olur
+                // (bu metod ProcessExchangeAsync'in dış DB transaction'ı içinde çağrılıyor).
+                var debitDeltasByCurrency = new Dictionary<Guid, decimal>();
+                foreach (var d in transaction.Details)
+                {
+                    var (t, a) = DetermineEntryTypeAndAmount(transaction.Type, d);
+                    if (t != EntryType.Debit || a == 0) continue;
+                    debitDeltasByCurrency[d.CurrencyId] = debitDeltasByCurrency.GetValueOrDefault(d.CurrencyId) + a;
+                }
+                foreach (var (currencyId, deltaAmount) in debitDeltasByCurrency)
+                {
+                    var availability = await _creditService.CheckCreditAvailabilityAsync(party.Id, currencyId, deltaAmount);
+                    if (availability.HasCreditLimit && !availability.IsApproved)
+                        throw new ApiException(HttpStatusCode.BadRequest,
+                            $"Cari hesap kredi limiti aşılıyor. Mevcut bakiye: {availability.CurrentBalance:F2}, " +
+                            $"Limit: {availability.CreditLimit:F2}, İstenen: {deltaAmount:F2}. Sadece Patron/Admin limiti güncelleyebilir.");
                 }
 
                 // Process each transaction detail
@@ -130,10 +157,14 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
                         ReconciledDate = DateTime.UtcNow
                     };
 
-                    // Calculate running balance
+                    // Calculate running balance — CreatePartyAccountEntriesAsync'teki ile AYNI sıralama
+                    // kullanılmalı (EntryDate önce, sonra CreatedDate); sadece CreatedDate'e göre
+                    // sıralamak, geriye dönük tarihli (EntryDate geçmişte olan) kayıtlar varken
+                    // yanlış "önceki bakiye"yi seçip RunningBalance'ı o noktadan sonra tutarsız bırakırdı.
                     var previousBalance = await _context.PartyAccountEntries
                         .Where(e => e.PartyAccountId == entry.PartyAccountId)
-                        .OrderByDescending(e => e.CreatedDate)
+                        .OrderByDescending(e => e.EntryDate)
+                        .ThenByDescending(e => e.CreatedDate)
                         .Select(e => e.RunningBalance)
                         .FirstOrDefaultAsync();
 

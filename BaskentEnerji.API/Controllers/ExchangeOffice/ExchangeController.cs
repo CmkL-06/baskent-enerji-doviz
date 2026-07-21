@@ -50,6 +50,9 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         private readonly IUserOfficeService _userOfficeService;
         private readonly IExpenseDefinitionService _expenseDefinitionService;
         private readonly IExpensePaymentService _expensePaymentService;
+        private readonly IExpenseBudgetService _expenseBudgetService;
+        private readonly IExpenseReminderService _expenseReminderService;
+        private readonly IExpenseCategoryService _expenseCategoryService;
         private readonly ITRC20Service _trc20Service;
         private readonly IWacService _wacService;
         private readonly IDayClosureService _dayClosureService;
@@ -72,6 +75,9 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             IUserOfficeService userOfficeService,
             IExpenseDefinitionService expenseDefinitionService,
             IExpensePaymentService expensePaymentService,
+            IExpenseBudgetService expenseBudgetService,
+            IExpenseReminderService expenseReminderService,
+            IExpenseCategoryService expenseCategoryService,
             ITRC20Service trc20Service,
             IWacService wacService,
             IDayClosureService dayClosureService,
@@ -96,6 +102,9 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             _userOfficeService = userOfficeService;
             _expenseDefinitionService = expenseDefinitionService;
             _expensePaymentService = expensePaymentService;
+            _expenseBudgetService = expenseBudgetService;
+            _expenseReminderService = expenseReminderService;
+            _expenseCategoryService = expenseCategoryService;
             _trc20Service = trc20Service;
             _wacService = wacService;
             _dayClosureService = dayClosureService;
@@ -272,6 +281,14 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         public async Task VoidVaultBalanceHistory(Guid id, [FromBody] rm_void_vault_balance_history data)
         {
             await _vaultService.VoidVaultBalanceHistoryAsync(id, data?.Reason);
+        }
+
+        // Birleştirilmiş (Alış/Satış) kasa hareketi görünümündeki iki bacağı (alınan+verilen) tek
+        // bir DB transaction'ında birlikte iptal eder — bkz. VaultService.VoidVaultBalanceHistoriesAsync.
+        [HttpPost("vault-balance-history/void-group")]
+        public async Task VoidVaultBalanceHistoryGroup([FromBody] rm_void_vault_balance_history_group data)
+        {
+            await _vaultService.VoidVaultBalanceHistoriesAsync(data.HistoryIds, data?.Reason);
         }
 
         [HttpPost("office")]
@@ -2142,6 +2159,10 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
                 var result = await _expenseDefinitionService.CreateDefinitionAsync(request);
                 return Ok(result);
             }
+            catch (ApiException)
+            {
+                throw;
+            }
             catch (InvalidOperationException ex)
             {
                 return BadRequest(new { error = ex.Message });
@@ -2164,6 +2185,10 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
                 request.Id = id;
                 var result = await _expenseDefinitionService.UpdateDefinitionAsync(request);
                 return Ok(result);
+            }
+            catch (ApiException)
+            {
+                throw;
             }
             catch (InvalidOperationException ex)
             {
@@ -2189,6 +2214,10 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
                     return NotFound(new { error = "Expense definition not found" });
 
                 return Ok(new { message = "Expense definition deleted successfully" });
+            }
+            catch (ApiException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -2242,21 +2271,138 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
         /// <summary>
         /// Get expense definitions by category
         /// </summary>
-        [HttpGet("expense/definitions/category/{category}")]
+        [HttpGet("expense/definitions/category/{categoryId}")]
         public async Task<ActionResult<List<vm_expensedefinition>>> GetExpenseDefinitionsByCategory(
-            int category,
+            Guid categoryId,
             [FromQuery] Guid officeId)
         {
             try
             {
                 await _permissionService.ValidateOfficeAccessAsync(officeId);
-                var result = await _expenseDefinitionService.GetDefinitionsByCategoryAsync(officeId, category);
+                var result = await _expenseDefinitionService.GetDefinitionsByCategoryAsync(officeId, categoryId);
                 return Ok(result);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting expense definitions by category");
                 return StatusCode(500, new { error = "An error occurred while getting expense definitions" });
+            }
+        }
+
+        /// <summary>
+        /// Kullanıcı tarafından yönetilebilen gider kategorileri (Currency ile aynı desen).
+        /// </summary>
+        [HttpGet("expense/categories")]
+        public async Task<ActionResult<List<vm_expensecategory>>> GetExpenseCategories()
+        {
+            try
+            {
+                var result = await _expenseCategoryService.GetAllCategoriesAsync();
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting expense categories");
+                return StatusCode(500, new { error = "An error occurred while getting expense categories" });
+            }
+        }
+
+        [HttpPost("expense/categories")]
+        public async Task<ActionResult<vm_expensecategory>> SaveExpenseCategory([FromBody] rm_expensecategory request)
+        {
+            if (!await _permissionService.IsAdminAsync())
+                return StatusCode(403, new { error = "Bu işlem için Admin yetkisi gereklidir." });
+
+            try
+            {
+                var result = await _expenseCategoryService.SaveCategoryAsync(request);
+                return Ok(result);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error saving expense category");
+                return StatusCode(500, new { error = "An error occurred while saving expense category" });
+            }
+        }
+
+        [HttpPost("expense/categories/delete/{id}")]
+        public async Task<ActionResult> DeleteExpenseCategory(Guid id)
+        {
+            if (!await _permissionService.IsAdminAsync())
+                return StatusCode(403, new { error = "Bu işlem için Admin yetkisi gereklidir." });
+
+            try
+            {
+                await _expenseCategoryService.DeleteCategoryAsync(id);
+                return Ok(new { message = "Expense category deleted successfully" });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting expense category");
+                return StatusCode(500, new { error = "An error occurred while deleting expense category" });
+            }
+        }
+
+        /// <summary>
+        /// Vadesi yaklaşan/gecikmiş tekrarlayan gider kalemleri (salt-okunur, hiçbir tabloya yazmaz)
+        /// </summary>
+        [HttpGet("expense/definitions/upcoming")]
+        public async Task<ActionResult<List<vm_expensedefinition>>> GetUpcomingExpenseDefinitions([FromQuery] Guid officeId)
+        {
+            try
+            {
+                await _permissionService.ValidateOfficeAccessAsync(officeId);
+                var result = await _expenseReminderService.GetUpcomingRecurringAsync(officeId);
+                return Ok(result);
+            }
+            catch (ApiException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting upcoming expense definitions");
+                return StatusCode(500, new { error = "An error occurred while getting upcoming expense definitions" });
+            }
+        }
+
+        /// <summary>
+        /// Bir gider kalemi için kronolojik ekstre (Cari ekstresindeki running-total deseninin
+        /// uyarlanması) — running total, ortalama tutar, sıradaki vade dahil.
+        /// </summary>
+        [HttpGet("expense/definitions/{id}/statement")]
+        public async Task<ActionResult<vm_expensedefinitionstatement>> GetExpenseDefinitionStatement(
+            Guid id,
+            [FromQuery] DateTime? fromDate = null,
+            [FromQuery] DateTime? toDate = null)
+        {
+            try
+            {
+                var definition = await _expenseDefinitionService.GetDefinitionAsync(id);
+                if (definition == null)
+                    return NotFound(new { error = "Expense definition not found" });
+
+                await _permissionService.ValidateOfficeAccessAsync(definition.OfficeId);
+
+                var result = await _expenseDefinitionService.GetDefinitionStatementAsync(id, fromDate, toDate);
+                return Ok(result);
+            }
+            catch (ApiException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting expense definition statement");
+                return StatusCode(500, new { error = "An error occurred while getting expense definition statement" });
             }
         }
 
@@ -2270,6 +2416,10 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             {
                 var result = await _expensePaymentService.CreatePaymentAsync(request);
                 return Ok(result);
+            }
+            catch (ApiException)
+            {
+                throw;
             }
             catch (InvalidOperationException ex)
             {
@@ -2363,6 +2513,10 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
 
                 return Ok(new { message = "Expense payment deleted successfully" });
             }
+            catch (ApiException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error deleting expense payment");
@@ -2411,6 +2565,111 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             {
                 _logger.LogError(ex, "Error getting expenses by category");
                 return StatusCode(500, new { error = "An error occurred while getting expenses by category" });
+            }
+        }
+
+        /// <summary>
+        /// Get expense payments pending Owner approval
+        /// </summary>
+        [HttpGet("expense/payments/pending-approvals")]
+        public async Task<ActionResult<List<vm_expensepayment>>> GetPendingExpenseApprovals([FromQuery] Guid? officeId = null)
+        {
+            if (officeId.HasValue)
+            {
+                await _permissionService.ValidateOfficeAccessAsync(officeId.Value);
+                var result = await _expensePaymentService.GetPendingApprovalsAsync(officeId);
+                return Ok(result);
+            }
+
+            // officeId verilmediğinde: admin/owner için tüm ofisler, diğer roller için yalnızca
+            // kendi erişimi olan ofisler döner — başka ofislerin bekleyen onaylarının sızmasını önler.
+            if (await _permissionService.IsAdminAsync())
+            {
+                var allOfficesResult = await _expensePaymentService.GetPendingApprovalsAsync(null);
+                return Ok(allOfficesResult);
+            }
+
+            var accessibleOfficeIds = await _permissionService.GetAccessibleOfficeIdsAsync();
+            var scopedResult = await _expensePaymentService.GetPendingApprovalsForOfficesAsync(accessibleOfficeIds);
+            return Ok(scopedResult);
+        }
+
+        /// <summary>
+        /// Approve or reject a pending expense payment (Owner-only)
+        /// </summary>
+        [HttpPost("expense/payments/{id}/approve")]
+        public async Task<ActionResult<vm_expensepayment>> ApproveExpensePayment(Guid id, [FromBody] rm_approveexpensepayment request)
+        {
+            var result = await _expensePaymentService.ApproveExpensePaymentAsync(id, request.Approve, request.RejectionNote);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Create or update (upsert) a monthly category budget
+        /// </summary>
+        [HttpPost("expense/budgets")]
+        public async Task<ActionResult> SetExpenseBudget([FromBody] rm_expensebudget request)
+        {
+            try
+            {
+                await _expenseBudgetService.SetBudgetAsync(request);
+                return Ok(new { message = "Bütçe kaydedildi" });
+            }
+            catch (ApiException)
+            {
+                throw;
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting expense budget");
+                return StatusCode(500, new { error = "An error occurred while setting the budget" });
+            }
+        }
+
+        /// <summary>
+        /// Get budget-vs-actual status per category for a given month
+        /// </summary>
+        [HttpGet("expense/budgets/status")]
+        public async Task<ActionResult<List<vm_expensebudgetstatus>>> GetExpenseBudgetStatus(
+            [FromQuery] Guid officeId,
+            [FromQuery] int year,
+            [FromQuery] int month)
+        {
+            try
+            {
+                await _permissionService.ValidateOfficeAccessAsync(officeId);
+                var result = await _expenseBudgetService.GetBudgetStatusAsync(officeId, year, month);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting expense budget status");
+                return StatusCode(500, new { error = "An error occurred while getting the budget status" });
+            }
+        }
+
+        /// <summary>
+        /// Get the last N months of total-budget-vs-total-actual (for the trend chart)
+        /// </summary>
+        [HttpGet("expense/budgets/history")]
+        public async Task<ActionResult<List<vm_expensebudgethistory>>> GetExpenseBudgetHistory(
+            [FromQuery] Guid officeId,
+            [FromQuery] int months = 12)
+        {
+            try
+            {
+                await _permissionService.ValidateOfficeAccessAsync(officeId);
+                var result = await _expenseBudgetService.GetBudgetHistoryAsync(officeId, months);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting expense budget history");
+                return StatusCode(500, new { error = "An error occurred while getting the budget history" });
             }
         }
 

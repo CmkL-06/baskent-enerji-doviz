@@ -658,10 +658,20 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 else if (data.amount > 0)
                 {
                     iType = TransactionType.Deposit;
+                    if (string.IsNullOrWhiteSpace(data.description))
+                        throw new ApiException(System.Net.HttpStatusCode.BadRequest, "TL/kasa girişlerinde açıklama zorunludur.");
                 }
                 else
                 {
                     iType = TransactionType.Withdrawal;
+                    if (string.IsNullOrWhiteSpace(data.description))
+                        throw new ApiException(System.Net.HttpStatusCode.BadRequest, "TL/kasa çıkışlarında açıklama zorunludur.");
+                    // Manuel kasa çıkışı, kasada olmayan parayı "yok yere" negatif bakiyeye
+                    // düşürebiliyordu — frontend'de eskiden hiç kontrol yoktu, backend de
+                    // balance.Balance += data.amount'ı (satır 646) hiç sınırlamıyordu.
+                    if (balance.Balance < 0)
+                        throw new ApiException(System.Net.HttpStatusCode.BadRequest,
+                            $"Yetersiz bakiye: kasada {currentBalance:F2} {balance.Currency?.CurrencyCode} var, {Math.Abs(data.amount):F2} çekilmeye çalışıldı.");
                 }
             }
             else
@@ -705,6 +715,29 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
         // silmek yerine "iptal" (soft-delete) eder ve o vault+para birimi için
         // silinmemiş tüm geçmişi yeniden oynatarak (replay) güncel bakiyeyi
         // yeniden hesaplar — kaydın sırası/tipi ne olursa olsun her zaman doğru sonucu garanti eder.
+        // Birleştirilmiş (Alış/Satış) kasa hareketi satırlarının iki bacağını (alınan+verilen)
+        // aynı anda iptal eder. Tek tek void çağrısı yapılsaydı, ikinci bacak API/ağ hatasıyla
+        // başarısız olduğunda ilk bacak zaten iptal edilmiş kalır ve tutarsız bir durum oluşurdu —
+        // bu yüzden tek bir DB transaction'ı içinde sarmalanıyor: biri başarısız olursa hiçbiri
+        // kalıcı olmaz.
+        public async Task VoidVaultBalanceHistoriesAsync(List<Guid> historyIds, string reason)
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                foreach (var id in historyIds)
+                {
+                    await VoidVaultBalanceHistoryAsync(id, reason);
+                }
+                await transaction.CommitAsync();
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        }
+
         public async Task VoidVaultBalanceHistoryAsync(Guid historyId, string reason)
         {
             if (!await _validationService.IsOwnerAsync())
@@ -832,6 +865,25 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             var officeId = dbVault?.OfficeId;
             if (officeId.HasValue)
                 await _validationService.EnsureNotViewerAsync(officeId.Value);
+
+            // ExpensePayments -> Vault FK artık Restrict (denetim izini korumak için) — bu yüzden
+            // ilişkili gider ödemesi olan bir kasa silinmeye çalışılırsa burada açıkça engellenir,
+            // aksi halde ham bir FK constraint hatası kullanıcıya 500 olarak yansırdı.
+            var hasExpensePayments = await _context.ExpensePayments.AnyAsync(ep => ep.VaultId == id);
+            if (hasExpensePayments)
+                throw new InvalidOperationException("Bu kasaya bağlı gider ödemeleri bulunduğu için kasa silinemez.");
+
+            // Bakiyesi sıfır olmayan bir kasa silinirse, o para sessizce "yok olur" — kasa ve
+            // ilişkili işlemler kayıttan kalkar ama gerçekte kimseye ait olmayan bir bakiye ortada
+            // kalmış olur (denetim izi kopar). Silmeden önce tüm para birimlerinde bakiyenin sıfır
+            // olduğunu doğruluyoruz.
+            var nonZeroBalance = await _context.VaultBalances
+                .Include(vb => vb.Currency)
+                .Where(vb => vb.VaultId == id && vb.Balance != 0)
+                .FirstOrDefaultAsync();
+            if (nonZeroBalance != null)
+                throw new InvalidOperationException(
+                    $"Bu kasada {nonZeroBalance.Currency?.CurrencyCode} cinsinden {nonZeroBalance.Balance:F2} bakiye bulunduğu için kasa silinemez. Önce bakiyeyi sıfırlayın.");
 
             var dbTransactions = _context.Transactions.Where(x => x.VaultId == dbVault.Id);
             _context.Transactions.RemoveRange(dbTransactions);
@@ -1157,6 +1209,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 if (vault == null)
                     throw new Exception("Vault not found");
 
+                await _validationService.EnsureNotViewerAsync(vault.OfficeId);
+
                 var vaultCount = new VaultCount
                 {
                     Id = Guid.NewGuid(),
@@ -1173,23 +1227,50 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
                 foreach (var detail in data.CountDetails)
                 {
-                    // Get current system balance
-                    var systemBalance = await _context.VaultBalances
-                        .Where(vb => vb.VaultId == data.VaultId && vb.CurrencyId == detail.CurrencyId)
-                        .Select(vb => vb.Balance)
-                        .FirstOrDefaultAsync();
+                    // Get current system balance (tracked entity — sayım farkını düzeltmek için
+                    // Balance'ı doğrudan güncelleyeceğiz, salt bir projeksiyon yetmez)
+                    var vaultBalance = await _context.VaultBalances
+                        .Include(vb => vb.Currency)
+                        .FirstOrDefaultAsync(vb => vb.VaultId == data.VaultId && vb.CurrencyId == detail.CurrencyId);
+                    var systemBalance = vaultBalance?.Balance ?? 0;
 
                     var discrepancy = detail.ActualAmount - systemBalance;
 
                     if (Math.Abs(discrepancy) > FinancialConstants.DiscrepancyThreshold)
                     {
                         vaultCount.HasDiscrepancy = true;
-                        var currency = await _context.Currencies
+                        var currencyCode = vaultBalance?.Currency?.CurrencyCode ?? (await _context.Currencies
                             .Where(c => c.Id == detail.CurrencyId)
                             .Select(c => c.CurrencyCode)
-                            .FirstOrDefaultAsync();
-                        
-                        discrepancyDetails.Add($"{currency}: Beklenen {systemBalance:F2}, SayÄ±lan {detail.ActualAmount:F2}, Fark {discrepancy:F2}");
+                            .FirstOrDefaultAsync());
+
+                        discrepancyDetails.Add($"{currencyCode}: Beklenen {systemBalance:F2}, SayÄ±lan {detail.ActualAmount:F2}, Fark {discrepancy:F2}");
+
+                        // Sayım, sistemdeki bakiyeden farklı bir tutar tespit ettiğinde, bu fark
+                        // öncesinde sadece VaultCount/VaultCountDetail'da raporlanıyordu ama kasanın
+                        // gerçek bakiyesi hiç düzeltilmiyordu — sayım "doğru" tutarı bulduktan sonra
+                        // bile sistem yanlış bakiyeyle çalışmaya devam ediyordu. Burada bakiyeyi
+                        // sayılan tutara eşitleyip UpdateVaultBalanceAsync'teki manuel düzeltme ile
+                        // aynı desende bir Adjustment kaydı oluşturuyoruz.
+                        if (vaultBalance != null)
+                        {
+                            vaultBalance.Balance = detail.ActualAmount;
+                            vaultBalance.LastUpdated = DateTime.UtcNow;
+
+                            _context.VaultBalanceHistories.Add(new VaultBalanceHistory
+                            {
+                                Id = Guid.NewGuid(),
+                                Balance = discrepancy,
+                                CreatedDate = DateTime.UtcNow,
+                                Currency = vaultBalance.Currency,
+                                CurrencyId = vaultBalance.CurrencyId,
+                                Description = $"Kasa sayımı düzeltmesi: {currencyCode} {systemBalance:F2} -> {detail.ActualAmount:F2} ({discrepancy:F2})",
+                                VaultId = data.VaultId,
+                                Vault = vault,
+                                TransactionType = TransactionType.Adjustment,
+                                UserId = Guid.Parse(_validationService.GetUserID())
+                            });
+                        }
                     }
 
                     var countDetail = new VaultCountDetail

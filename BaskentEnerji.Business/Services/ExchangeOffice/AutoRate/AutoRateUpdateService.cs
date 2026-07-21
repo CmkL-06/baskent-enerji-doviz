@@ -69,6 +69,15 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.AutoRate
 
             try
             {
+                // Background service (5 dk periyodik) ve manuel "Şimdi Güncelle" endpoint'i aynı
+                // metoda çıkıyor; kilit olmadan ikisi çakışırsa aynı kur çifti için çift
+                // ExchangeRateHistory kaydı oluşabilir. sp_getapplock ile serileştiriyoruz —
+                // ofis belirtilmişse o ofise özel, belirtilmemişse (tüm ofisler) global kilit.
+                var lockResource = request.OfficeId.HasValue ? $"AutoRateUpdate_{request.OfficeId}" : "AutoRateUpdate_Global";
+                await _context.Database.ExecuteSqlRawAsync(
+                    "EXEC sp_getapplock @Resource = {0}, @LockMode = 'Exclusive', @LockOwner = 'Session', @LockTimeout = 15000",
+                    lockResource);
+
                 // 1. Ayarları yükle
                 var settings = await _context.Set<ExchangeSettings>()
                     .OrderBy(s => s.CreatedDate)

@@ -19,6 +19,7 @@ namespace BaskentEnerji.Business.Infrastructure.ExchangeOffice.Office
         Task<decimal> GetTotalAssetsInBaseCurrencyAsync(Guid? officeId = null);
         Task UpdateVaultBalanceAsync(rm_updatevaultbalance data);
         Task VoidVaultBalanceHistoryAsync(Guid historyId, string reason);
+        Task VoidVaultBalanceHistoriesAsync(List<Guid> historyIds, string reason);
         Task<bool> CheckVaultBalanceAsync(Guid vaultId, Guid currencyId, decimal requiredAmount);
         Task<decimal> GetLockedBalanceAsync(Guid vaultId, Guid currencyId);
         

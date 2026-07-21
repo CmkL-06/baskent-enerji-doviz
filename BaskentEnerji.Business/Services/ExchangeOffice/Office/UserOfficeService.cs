@@ -1,6 +1,8 @@
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
+using BaskentEnerji.Business.Exceptions;
 using BaskentEnerji.Business.Infrastructure.ExchangeOffice.Office;
+using BaskentEnerji.Business.Services.Permission;
 using BaskentEnerji.Data.Contexts;
 using BaskentEnerji.Entity.Entities.ExchangeOffice.Office;
 using BaskentEnerji.Entity.Modals.RequestModals.ExchangeService.Office;
@@ -8,6 +10,7 @@ using BaskentEnerji.Entity.Modals.ViewModals.ExchangeOFfice.Office;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 
 namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
@@ -16,11 +19,23 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
     {
         private readonly BaskentEnerjiDbContext _context;
         private readonly IMapper _mapper;
+        private readonly ValidationService _validationService;
 
-        public UserOfficeService(BaskentEnerjiDbContext context, IMapper mapper)
+        public UserOfficeService(BaskentEnerjiDbContext context, IMapper mapper, ValidationService validationService)
         {
             _context = context;
             _mapper = mapper;
+            _validationService = validationService;
+        }
+
+        // Bir kullanıcının hangi ofislere bağlı olduğunu değiştirmek (dolayısıyla o ofislerdeki
+        // rolünü/erişimini belirlemek) tamamen ofis-bağımsız, sistem geneli bir yetki devridir —
+        // bu yüzden tekil bir officeId'ye göre değil, doğrudan Admin/Owner rütbesine göre korunur.
+        // Aksi halde herhangi bir kimliği doğrulanmış kullanıcı kendini istediği ofise ekleyebilir.
+        private async Task EnsureAdminAsync()
+        {
+            if (!await _validationService.IsAdminAsync())
+                throw new ApiException(HttpStatusCode.Forbidden, "Bu işlem için Admin veya Owner yetkisi gerekir.");
         }
 
         public async Task<List<vm_useroffice>> GetUserOfficesAsync(Guid userId)
@@ -57,6 +72,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
         public async Task<vm_useroffice> AttachOfficeToUserAsync(rm_useroffice model)
         {
+            await EnsureAdminAsync();
             try
             {
                 var existingUserOffice = await _context.User_Offices
@@ -88,6 +104,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
         public async Task<bool> RemoveOfficeFromUserAsync(Guid userId, Guid officeId)
         {
+            await EnsureAdminAsync();
             try
             {
                 var userOffice = await _context.User_Offices
@@ -108,6 +125,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
         public async Task<bool> UpdateUserOfficesAsync(Guid userId, List<Guid> officeIds)
         {
+            await EnsureAdminAsync();
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {

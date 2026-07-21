@@ -36,11 +36,27 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
             {
                 await _validationService.EnsureNotViewerAsync(request.OfficeId);
 
-                // Validate party code uniqueness
-               // var exists = await _context.Parties
-                  //  .AnyAsync(p => p.PartyCode == request.PartyCode && p.OfficeId == request.OfficeId);
+                // Validate party code uniqueness within the office
+                var exists = await _context.Parties
+                    .AnyAsync(p => p.PartyCode == request.PartyCode && p.OfficeId == request.OfficeId);
 
-                var exists = _context.Parties.FirstOrDefault(x => x.PartyCode == request.PartyCode);
+                if (exists)
+                {
+                    throw new InvalidOperationException($"Party code '{request.PartyCode}' already exists for this office.");
+                }
+
+                // Check email uniqueness only if email is provided
+                if (!string.IsNullOrWhiteSpace(request.Email))
+                {
+                    var emailExists = await _context.Parties
+                        .AnyAsync(p => p.Email == request.Email);
+
+                    if (emailExists)
+                    {
+                        throw new InvalidOperationException($"Email '{request.Email}' is already registered.");
+                    }
+                }
+
                 var party = new Entity.Entities.ExchangeOffice.Party.Party
                 {
                     PartyCode = request.PartyCode,
@@ -58,61 +74,31 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
                     OfficeId = request.OfficeId,
                     CreatedByUserId = Guid.Parse(_validationService.GetUserID()),
                     Status = PartyStatus.Active,
-                    Id = exists != null ? exists.Id : Guid.NewGuid(),
+                    Id = Guid.NewGuid(),
                 };
-                
-                if (exists != null)
-                {
-                   
-                    _context.Parties.Entry(exists).CurrentValues.SetValues(party);
 
-                   // throw new InvalidOperationException($"Party code '{request.PartyCode}' already exists for this office.");
-                } else
-                {
-
-
-                    // Create party
-
-                    // Check email uniqueness only if email is provided
-                    if (!string.IsNullOrWhiteSpace(request.Email))
-                    {
-                        var emailExists = await _context.Parties
-                            .AnyAsync(p => p.Email == request.Email);
-
-                        if (emailExists)
-                        {
-                            throw new InvalidOperationException($"Email '{request.Email}' is already registered.");
-                        }
-                    }
-
-                    _context.Parties.Add(party);
-                }
-
-               
+                _context.Parties.Add(party);
                 await _context.SaveChangesAsync();
 
-                // Auto-create accounts for all active currencies (only for new parties)
-                if (exists == null)
+                // Auto-create accounts for all active currencies
+                var activeCurrencies = await _context.Currencies
+                    .ToListAsync();
+
+                foreach (var currency in activeCurrencies)
                 {
-                    var activeCurrencies = await _context.Currencies
-                        .ToListAsync();
-
-                    foreach (var currency in activeCurrencies)
+                    var account = new PartyAccount
                     {
-                        var account = new PartyAccount
-                        {
-                            PartyId = party.Id,
-                            CurrencyId = currency.Id,
-                            AccountNumber = $"PA{DateTime.UtcNow:yyyyMMdd}{Guid.NewGuid().ToString("N").Substring(0, 6).ToUpper()}",
-                            Balance = 0,
-                            BlockedAmount = 0,
-                            Status = AccountStatus.Active
-                        };
-                        _context.PartyAccounts.Add(account);
-                    }
-
-                    await _context.SaveChangesAsync();
+                        PartyId = party.Id,
+                        CurrencyId = currency.Id,
+                        AccountNumber = $"PA{DateTime.UtcNow:yyyyMMdd}{Guid.NewGuid().ToString("N").Substring(0, 6).ToUpper()}",
+                        Balance = 0,
+                        BlockedAmount = 0,
+                        Status = AccountStatus.Active
+                    };
+                    _context.PartyAccounts.Add(account);
                 }
+
+                await _context.SaveChangesAsync();
 
                 _logger.LogInformation($"Party created: {party.PartyCode} - {party.Name}");
 
@@ -213,6 +199,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
                 {
                     return null;
                 }
+
+                await _validationService.ValidateOfficeAccessAsync(party.OfficeId);
 
                 // Calculate summary values
                 var totalReceivables = party.Accounts.Sum(a => a.Balance > 0 ? a.Balance : 0);
@@ -387,6 +375,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
                     throw new InvalidOperationException("Party not found.");
                 }
 
+                await _validationService.EnsureNotViewerAsync(party.OfficeId);
+
                 party.Status = PartyStatus.Inactive;
                 party.Notes = $"{party.Notes}\n[{DateTime.UtcNow:yyyy-MM-dd}] Deactivated: {reason}";
                 party.ModifiedDate = DateTime.UtcNow;
@@ -413,6 +403,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
                 {
                     throw new InvalidOperationException("Party not found.");
                 }
+
+                await _validationService.EnsureNotViewerAsync(party.OfficeId);
 
                 party.Status = PartyStatus.Active;
                 party.Notes = $"{party.Notes}\n[{DateTime.UtcNow:yyyy-MM-dd}] Reactivated";
@@ -449,6 +441,11 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
                 }
 
                 await _validationService.EnsureNotViewerAsync(party.OfficeId);
+
+                var nonZeroAccount = party.Accounts?.FirstOrDefault(a => a.Balance != 0);
+                if (nonZeroAccount != null)
+                    throw new InvalidOperationException(
+                        $"Bu cari hesapta bakiye bulunduğu için silinemez. Önce bakiyeyi sıfırlayın.");
 
                 // Remove all account entries first
                 if (party.Accounts != null)
@@ -523,6 +520,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
                     throw new InvalidOperationException("Party not found.");
                 }
 
+                await _validationService.EnsureNotViewerAsync(party.OfficeId);
+
                 var contact = new PartyContact
                 {
                     PartyId = partyId,
@@ -571,6 +570,12 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
                     throw new InvalidOperationException("Contact not found.");
                 }
 
+                var contactPartyOfficeId = await _context.Parties
+                    .Where(p => p.Id == contact.PartyId)
+                    .Select(p => p.OfficeId)
+                    .FirstOrDefaultAsync();
+                await _validationService.EnsureNotViewerAsync(contactPartyOfficeId);
+
                 contact.ContactName = request.ContactName;
                 contact.Position = request.Position;
                 contact.Email = request.Email;
@@ -613,6 +618,12 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
                 {
                     throw new InvalidOperationException("Contact not found.");
                 }
+
+                var contactPartyOfficeId = await _context.Parties
+                    .Where(p => p.Id == contact.PartyId)
+                    .Select(p => p.OfficeId)
+                    .FirstOrDefaultAsync();
+                await _validationService.EnsureNotViewerAsync(contactPartyOfficeId);
 
                 _context.PartyContacts.Remove(contact);
                 await _context.SaveChangesAsync();
