@@ -9,7 +9,7 @@ namespace BaskentEnerji.Entity.Modals.ViewModals.ExchangeOFfice.Expense
         public Guid ExpenseDefinitionId { get; set; }
         public string ExpenseDefinitionName { get; set; }
         public string ExpenseDefinitionCode { get; set; }
-        public ExpenseCategory Category { get; set; }
+        public Guid CategoryId { get; set; }
         public string CategoryName { get; set; }
         public Guid VaultId { get; set; }
         public string VaultName { get; set; }
@@ -32,5 +32,8 @@ namespace BaskentEnerji.Entity.Modals.ViewModals.ExchangeOFfice.Expense
         public string? DeletedByUserName { get; set; }
         public DateTime CreatedDate { get; set; }
         public string CreatedByUserName { get; set; }
+        public string? ApprovedByUserName { get; set; }
+        public DateTime? ApprovedAt { get; set; }
+        public string? RejectionNote { get; set; }
     }
 }

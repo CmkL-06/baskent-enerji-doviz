@@ -10,7 +10,7 @@ namespace BaskentEnerji.Entity.Modals.ViewModals.ExchangeOFfice.Expense
         public string OfficeName { get; set; }
         public string Code { get; set; }
         public string Name { get; set; }
-        public ExpenseCategory Category { get; set; }
+        public Guid CategoryId { get; set; }
         public string CategoryName { get; set; }
         public string? Description { get; set; }
         public bool IsActive { get; set; }
@@ -23,5 +23,9 @@ namespace BaskentEnerji.Entity.Modals.ViewModals.ExchangeOFfice.Expense
         public DateTime CreatedDate { get; set; }
         public decimal TotalPayments { get; set; }
         public int PaymentCount { get; set; }
+        public string? AccountReference { get; set; }
+        public int? DueDayOfMonth { get; set; }
+        public DateTime? NextDueDate { get; set; }
+        public string? DueStatus { get; set; }
     }
 }

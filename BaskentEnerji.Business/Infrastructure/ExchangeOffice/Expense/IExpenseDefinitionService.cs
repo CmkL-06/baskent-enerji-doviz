@@ -13,7 +13,8 @@ namespace BaskentEnerji.Business.Infrastructure.ExchangeOffice.Expense
         Task<bool> DeleteDefinitionAsync(Guid id);
         Task<vm_expensedefinition> GetDefinitionAsync(Guid id);
         Task<List<vm_expensedefinition>> GetDefinitionsAsync(Guid officeId, bool? isActive = null);
-        Task<List<vm_expensedefinition>> GetDefinitionsByCategoryAsync(Guid officeId, int category);
+        Task<List<vm_expensedefinition>> GetDefinitionsByCategoryAsync(Guid officeId, Guid categoryId);
         Task<bool> IsCodeUniqueAsync(Guid officeId, string code, Guid? excludeId = null);
+        Task<vm_expensedefinitionstatement> GetDefinitionStatementAsync(Guid definitionId, DateTime? fromDate = null, DateTime? toDate = null);
     }
 }

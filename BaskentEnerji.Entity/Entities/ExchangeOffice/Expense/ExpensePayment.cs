@@ -20,13 +20,19 @@ namespace BaskentEnerji.Entity.Entities.ExchangeOffice.Expense
         public Guid? DeletedByUserId { get; set; }
         public DateTime? DeletedDate { get; set; }
         public Guid CreatedByUserId { get; set; }
-        
+
+        // Onay akışı: eşik üstü ödemeler Pending oluşturulur, Owner onaylar/reddeder.
+        public Guid? ApprovedByUserId { get; set; }
+        public DateTime? ApprovedAt { get; set; }
+        public string? RejectionNote { get; set; }
+
         // Navigation properties
         public ExpenseDefinition ExpenseDefinition { get; set; }
         public Office.Vault Vault { get; set; }
         public Currency.Currency Currency { get; set; }
         public User.User CreatedByUser { get; set; }
         public User.User DeletedByUser { get; set; }
+        public User.User ApprovedByUser { get; set; }
     }
 
     public enum PaymentMethod

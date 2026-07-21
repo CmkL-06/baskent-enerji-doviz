@@ -20,7 +20,7 @@ namespace BaskentEnerji.Entity.Modals.RequestModals.ExchangeService.Expense
         public string Name { get; set; }
         
         [Required]
-        public ExpenseCategory Category { get; set; }
+        public Guid CategoryId { get; set; }
         
         [StringLength(500)]
         public string? Description { get; set; }
@@ -33,7 +33,13 @@ namespace BaskentEnerji.Entity.Modals.RequestModals.ExchangeService.Expense
         
         [Range(0, double.MaxValue)]
         public decimal? DefaultAmount { get; set; }
-        
+
         public Guid? DefaultCurrencyId { get; set; }
+
+        [StringLength(100)]
+        public string? AccountReference { get; set; }
+
+        [Range(1, 31)]
+        public int? DueDayOfMonth { get; set; }
     }
 }

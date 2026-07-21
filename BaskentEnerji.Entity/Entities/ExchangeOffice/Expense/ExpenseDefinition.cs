@@ -8,32 +8,28 @@ namespace BaskentEnerji.Entity.Entities.ExchangeOffice.Expense
         public Guid OfficeId { get; set; }
         public string Code { get; set; }
         public string Name { get; set; }
-        public ExpenseCategory Category { get; set; }
+        public Guid CategoryId { get; set; }
         public string? Description { get; set; }
         public bool IsActive { get; set; } = true;
         public bool IsRecurring { get; set; } = false;
         public RecurrencePeriod? RecurrencePeriod { get; set; }
         public decimal? DefaultAmount { get; set; }
         public Guid? DefaultCurrencyId { get; set; }
-        
+
+        // Abone/sözleşme no gibi dönemden döneme değişmeyen sabit referans (elektrik/su/internet
+        // abone numarası, kira sözleşme no vb.) — her ödemenin kendi ReferenceNumber'ı (fatura no)
+        // ile karıştırılmamalı.
+        public string? AccountReference { get; set; }
+
+        // Yalnızca RecurrencePeriod == Monthly için anlamlı: ayın hangi günü vade geldiği (örn.
+        // kira ayın 5'i). Boş ise vade, son ödemeden itibaren dönemsel olarak hesaplanır.
+        public int? DueDayOfMonth { get; set; }
+
         // Navigation properties
         public Office.Office Office { get; set; }
         public Currency.Currency DefaultCurrency { get; set; }
+        public ExpenseCategoryDefinition Category { get; set; }
         public ICollection<ExpensePayment> Payments { get; set; }
-    }
-
-    public enum ExpenseCategory
-    {
-        Salary = 1,
-        Rent = 2,
-        Utilities = 3,
-        Office = 4,
-        Marketing = 5,
-        Travel = 6,
-        Insurance = 7,
-        Tax = 8,
-        Maintenance = 9,
-        Other = 10
     }
 
     public enum RecurrencePeriod

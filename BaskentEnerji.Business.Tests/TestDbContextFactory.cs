@@ -320,6 +320,115 @@ CREATE TABLE dbo.OfficeTransfers (
     OfficeId uniqueidentifier NULL,
     OfficeId1 uniqueidentifier NULL
 );
+IF OBJECT_ID('dbo.User_Offices') IS NULL
+CREATE TABLE dbo.User_Offices (
+    Id uniqueidentifier NOT NULL PRIMARY KEY,
+    UserId uniqueidentifier NOT NULL,
+    OfficeId uniqueidentifier NOT NULL,
+    Role int NOT NULL DEFAULT 2,
+    IsActive bit NOT NULL DEFAULT 1,
+    CreatedDate datetime2 NOT NULL DEFAULT SYSUTCDATETIME()
+);
+IF OBJECT_ID('dbo.ExpenseCategories') IS NULL
+CREATE TABLE dbo.ExpenseCategories (
+    Id uniqueidentifier NOT NULL PRIMARY KEY,
+    Name nvarchar(100) NOT NULL,
+    IsActive bit NOT NULL DEFAULT 1,
+    CreatedDate datetime2 NOT NULL DEFAULT SYSUTCDATETIME()
+);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ExpenseCategories_Name' AND object_id = OBJECT_ID('dbo.ExpenseCategories'))
+CREATE UNIQUE INDEX IX_ExpenseCategories_Name ON dbo.ExpenseCategories(Name);
+IF OBJECT_ID('dbo.ExpenseDefinitions') IS NULL
+CREATE TABLE dbo.ExpenseDefinitions (
+    Id uniqueidentifier NOT NULL PRIMARY KEY,
+    OfficeId uniqueidentifier NOT NULL,
+    Code nvarchar(450) NOT NULL DEFAULT '',
+    Name nvarchar(max) NOT NULL DEFAULT '',
+    CategoryId uniqueidentifier NOT NULL,
+    Description nvarchar(max) NULL,
+    IsActive bit NOT NULL DEFAULT 1,
+    IsRecurring bit NOT NULL DEFAULT 0,
+    RecurrencePeriod int NULL,
+    DefaultAmount decimal(18,4) NULL,
+    DefaultCurrencyId uniqueidentifier NULL,
+    CreatedDate datetime2 NOT NULL DEFAULT SYSUTCDATETIME()
+);
+-- Eski (Category int) şemadan yükseltme — enum'dan entity'ye geçiş. Statik SQL, henüz var
+-- olmayan CategoryId kolonuna IF bloğu içinde bile derleme zamanında bağlanmaya çalışır (SQL
+-- Server ad-hoc batch davranışı) — bu yüzden EXEC() ile çalışma zamanına erteleniyor.
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ExpenseDefinitions') AND name = 'Category')
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ExpenseDefinitions') AND name = 'CategoryId')
+        EXEC('ALTER TABLE dbo.ExpenseDefinitions ADD CategoryId uniqueidentifier NULL');
+    EXEC('UPDATE dbo.ExpenseDefinitions SET CategoryId = ''11111111-1111-1111-1111-111111111110'' WHERE CategoryId IS NULL');
+    EXEC('ALTER TABLE dbo.ExpenseDefinitions ALTER COLUMN CategoryId uniqueidentifier NOT NULL');
+    EXEC('ALTER TABLE dbo.ExpenseDefinitions DROP COLUMN Category');
+END
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ExpenseDefinitions') AND name = 'AccountReference')
+ALTER TABLE dbo.ExpenseDefinitions ADD AccountReference nvarchar(100) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ExpenseDefinitions') AND name = 'DueDayOfMonth')
+ALTER TABLE dbo.ExpenseDefinitions ADD DueDayOfMonth int NULL;
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ExpenseDefinitions') AND name = 'Code' AND max_length = -1)
+BEGIN
+    DECLARE @codeDefaultName nvarchar(200) = (
+        SELECT dc.name FROM sys.default_constraints dc
+        JOIN sys.columns c ON c.default_object_id = dc.object_id
+        WHERE dc.parent_object_id = OBJECT_ID('dbo.ExpenseDefinitions') AND c.name = 'Code'
+    );
+    IF @codeDefaultName IS NOT NULL
+        EXEC('ALTER TABLE dbo.ExpenseDefinitions DROP CONSTRAINT ' + @codeDefaultName);
+    ALTER TABLE dbo.ExpenseDefinitions ALTER COLUMN Code nvarchar(450) NOT NULL;
+END
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ExpenseDefinitions_OfficeId_Code' AND object_id = OBJECT_ID('dbo.ExpenseDefinitions'))
+CREATE UNIQUE INDEX IX_ExpenseDefinitions_OfficeId_Code ON dbo.ExpenseDefinitions(OfficeId, Code);
+IF OBJECT_ID('dbo.ExpensePayments') IS NULL
+CREATE TABLE dbo.ExpensePayments (
+    Id uniqueidentifier NOT NULL PRIMARY KEY,
+    ExpenseDefinitionId uniqueidentifier NOT NULL,
+    VaultId uniqueidentifier NOT NULL,
+    CurrencyId uniqueidentifier NOT NULL,
+    PaymentNumber nvarchar(max) NOT NULL DEFAULT '',
+    PaymentDate datetime2 NOT NULL,
+    Amount decimal(18,4) NOT NULL,
+    PaymentMethod int NOT NULL,
+    ReferenceNumber nvarchar(max) NULL,
+    Description nvarchar(max) NULL,
+    Receipt nvarchar(max) NULL,
+    Status int NOT NULL,
+    IsDeleted bit NOT NULL DEFAULT 0,
+    DeletedReason nvarchar(max) NULL,
+    DeletedByUserId uniqueidentifier NULL,
+    DeletedDate datetime2 NULL,
+    CreatedByUserId uniqueidentifier NOT NULL,
+    ApprovedByUserId uniqueidentifier NULL,
+    ApprovedAt datetime2 NULL,
+    RejectionNote nvarchar(max) NULL,
+    CreatedDate datetime2 NOT NULL DEFAULT SYSUTCDATETIME()
+);
+IF OBJECT_ID('dbo.ExpenseBudgets') IS NULL
+CREATE TABLE dbo.ExpenseBudgets (
+    Id uniqueidentifier NOT NULL PRIMARY KEY,
+    OfficeId uniqueidentifier NOT NULL,
+    CategoryId uniqueidentifier NOT NULL,
+    Year int NOT NULL,
+    Month int NOT NULL,
+    BudgetAmount decimal(18,4) NOT NULL,
+    CreatedByUserId uniqueidentifier NOT NULL,
+    CreatedDate datetime2 NOT NULL DEFAULT SYSUTCDATETIME()
+);
+-- Eski (Category int) şemadan yükseltme — enum'dan entity'ye geçiş (EXEC ile çalışma zamanına ertelenir)
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ExpenseBudgets') AND name = 'Category')
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ExpenseBudgets') AND name = 'CategoryId')
+        EXEC('ALTER TABLE dbo.ExpenseBudgets ADD CategoryId uniqueidentifier NULL');
+    EXEC('UPDATE dbo.ExpenseBudgets SET CategoryId = ''11111111-1111-1111-1111-111111111110'' WHERE CategoryId IS NULL');
+    IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ExpenseBudgets_OfficeId_Category_Year_Month' AND object_id = OBJECT_ID('dbo.ExpenseBudgets'))
+        EXEC('DROP INDEX IX_ExpenseBudgets_OfficeId_Category_Year_Month ON dbo.ExpenseBudgets');
+    EXEC('ALTER TABLE dbo.ExpenseBudgets ALTER COLUMN CategoryId uniqueidentifier NOT NULL');
+    EXEC('ALTER TABLE dbo.ExpenseBudgets DROP COLUMN Category');
+END
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ExpenseBudgets_OfficeId_CategoryId_Year_Month' AND object_id = OBJECT_ID('dbo.ExpenseBudgets'))
+EXEC('CREATE UNIQUE INDEX IX_ExpenseBudgets_OfficeId_CategoryId_Year_Month ON dbo.ExpenseBudgets(OfficeId, CategoryId, Year, Month)');
 IF OBJECT_ID('dbo.PartyAccounts') IS NULL
 CREATE TABLE dbo.PartyAccounts (
     Id uniqueidentifier NOT NULL PRIMARY KEY,

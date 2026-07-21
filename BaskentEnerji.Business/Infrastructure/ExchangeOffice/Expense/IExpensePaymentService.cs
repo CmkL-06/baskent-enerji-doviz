@@ -14,6 +14,9 @@ namespace BaskentEnerji.Business.Infrastructure.ExchangeOffice.Expense
         Task<List<vm_expensepayment>> GetPaymentsByDefinitionAsync(Guid definitionId, DateTime? startDate = null, DateTime? endDate = null);
         Task<bool> DeletePaymentAsync(Guid id, string reason);
         Task<decimal> GetTotalExpensesAsync(Guid officeId, DateTime startDate, DateTime endDate);
-        Task<Dictionary<string, decimal>> GetExpensesByCategoryAsync(Guid officeId, DateTime startDate, DateTime endDate);
+        Task<Dictionary<Guid, decimal>> GetExpensesByCategoryAsync(Guid officeId, DateTime startDate, DateTime endDate);
+        Task<List<vm_expensepayment>> GetPendingApprovalsAsync(Guid? officeId = null);
+        Task<List<vm_expensepayment>> GetPendingApprovalsForOfficesAsync(List<Guid> officeIds);
+        Task<vm_expensepayment> ApproveExpensePaymentAsync(Guid paymentId, bool approve, string rejectionNote);
     }
 }

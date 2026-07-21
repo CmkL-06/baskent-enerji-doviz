@@ -1,6 +1,7 @@
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using BaskentEnerji.Business.Infrastructure.ExchangeOffice.Expense;
+using BaskentEnerji.Business.Services.Permission;
 using BaskentEnerji.Data.Contexts;
 using BaskentEnerji.Entity.Entities.ExchangeOffice.Expense;
 using BaskentEnerji.Entity.Modals.RequestModals.ExchangeService.Expense;
@@ -16,19 +17,38 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Expense
     {
         private readonly BaskentEnerjiDbContext _context;
         private readonly IMapper _mapper;
+        private readonly ValidationService _validationService;
+        private readonly IExpenseReminderService _reminderService;
 
-        public ExpenseDefinitionService(BaskentEnerjiDbContext context, IMapper mapper)
+        public ExpenseDefinitionService(BaskentEnerjiDbContext context, IMapper mapper, ValidationService validationService, IExpenseReminderService reminderService)
         {
             _context = context;
             _mapper = mapper;
+            _validationService = validationService;
+            _reminderService = reminderService;
         }
 
         public async Task<vm_expensedefinition> CreateDefinitionAsync(rm_expensedefinition request)
         {
+            await _validationService.EnsureNotViewerAsync(request.OfficeId);
+
+            // Ham SQL FK ihlali (DbUpdateException) yerine kullanıcıya anlaşılır bir hata dönmek
+            // için — geçersiz/silinmiş bir OfficeId (örn. bayat frontend seçimi) burada yakalanır.
+            var officeExists = await _context.Offices.AnyAsync(o => o.Id == request.OfficeId);
+            if (!officeExists)
+                throw new InvalidOperationException("Belirtilen ofis bulunamadı. Lütfen sayfayı yenileyip tekrar deneyin.");
+
+            var categoryExists = await _context.ExpenseCategories.AnyAsync(c => c.Id == request.CategoryId);
+            if (!categoryExists)
+                throw new InvalidOperationException("Belirtilen gider kategorisi bulunamadı. Lütfen sayfayı yenileyip tekrar deneyin.");
+
+            if (request.IsRecurring && !request.RecurrencePeriod.HasValue)
+                throw new InvalidOperationException("Tekrarlayan gider için bir tekrar periyodu seçilmelidir.");
+
             // Check if code is unique
             var existingCode = await _context.ExpenseDefinitions
                 .AnyAsync(ed => ed.OfficeId == request.OfficeId && ed.Code == request.Code);
-            
+
             if (existingCode)
                 throw new InvalidOperationException($"Expense code '{request.Code}' already exists for this office");
 
@@ -38,18 +58,30 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Expense
                 OfficeId = request.OfficeId,
                 Code = request.Code,
                 Name = request.Name,
-                Category = request.Category,
+                CategoryId = request.CategoryId,
                 Description = request.Description,
                 IsActive = request.IsActive,
                 IsRecurring = request.IsRecurring,
                 RecurrencePeriod = request.RecurrencePeriod,
                 DefaultAmount = request.DefaultAmount,
                 DefaultCurrencyId = request.DefaultCurrencyId,
+                AccountReference = request.AccountReference,
+                DueDayOfMonth = request.DueDayOfMonth,
                 CreatedDate = DateTime.UtcNow
             };
 
             _context.ExpenseDefinitions.Add(definition);
-            await _context.SaveChangesAsync();
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex) when (
+                ex.InnerException is Microsoft.Data.SqlClient.SqlException sqlEx &&
+                (sqlEx.Number == 2601 || sqlEx.Number == 2627))
+            {
+                throw new InvalidOperationException($"Expense code '{request.Code}' already exists for this office");
+            }
 
             return await GetDefinitionAsync(definition.Id);
         }
@@ -65,6 +97,17 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Expense
             if (definition == null)
                 throw new InvalidOperationException("Expense definition not found");
 
+            // Yetki kontrolü, sahte request.OfficeId ile atlatılamasın diye yüklenen kaydın
+            // gerçek OfficeId'si ile yapılıyor (request.OfficeId değil).
+            await _validationService.EnsureNotViewerAsync(definition.OfficeId);
+
+            var categoryExists = await _context.ExpenseCategories.AnyAsync(c => c.Id == request.CategoryId);
+            if (!categoryExists)
+                throw new InvalidOperationException("Belirtilen gider kategorisi bulunamadı. Lütfen sayfayı yenileyip tekrar deneyin.");
+
+            if (request.IsRecurring && !request.RecurrencePeriod.HasValue)
+                throw new InvalidOperationException("Tekrarlayan gider için bir tekrar periyodu seçilmelidir.");
+
             // Check if code is unique (excluding current record)
             var existingCode = await _context.ExpenseDefinitions
                 .AnyAsync(ed => ed.OfficeId == request.OfficeId && 
@@ -76,15 +119,26 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Expense
 
             definition.Code = request.Code;
             definition.Name = request.Name;
-            definition.Category = request.Category;
+            definition.CategoryId = request.CategoryId;
             definition.Description = request.Description;
             definition.IsActive = request.IsActive;
             definition.IsRecurring = request.IsRecurring;
             definition.RecurrencePeriod = request.RecurrencePeriod;
             definition.DefaultAmount = request.DefaultAmount;
             definition.DefaultCurrencyId = request.DefaultCurrencyId;
+            definition.AccountReference = request.AccountReference;
+            definition.DueDayOfMonth = request.DueDayOfMonth;
 
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex) when (
+                ex.InnerException is Microsoft.Data.SqlClient.SqlException sqlEx &&
+                (sqlEx.Number == 2601 || sqlEx.Number == 2627))
+            {
+                throw new InvalidOperationException($"Expense code '{request.Code}' already exists for this office");
+            }
 
             return await GetDefinitionAsync(definition.Id);
         }
@@ -97,6 +151,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Expense
 
             if (definition == null)
                 return false;
+
+            await _validationService.EnsureNotViewerAsync(definition.OfficeId);
 
             // Check if there are any payments
             if (definition.Payments != null && definition.Payments.Any())
@@ -120,6 +176,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Expense
             var definition = await _context.ExpenseDefinitions
                 .Include(ed => ed.Office)
                 .Include(ed => ed.DefaultCurrency)
+                .Include(ed => ed.Category)
                 .Include(ed => ed.Payments)
                 .FirstOrDefaultAsync(ed => ed.Id == id);
 
@@ -134,6 +191,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Expense
             var query = _context.ExpenseDefinitions
                 .Include(ed => ed.Office)
                 .Include(ed => ed.DefaultCurrency)
+                .Include(ed => ed.Category)
                 .Include(ed => ed.Payments)
                 .Where(ed => ed.OfficeId == officeId);
 
@@ -145,13 +203,14 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Expense
             return definitions.Select(MapToViewModel).ToList();
         }
 
-        public async Task<List<vm_expensedefinition>> GetDefinitionsByCategoryAsync(Guid officeId, int category)
+        public async Task<List<vm_expensedefinition>> GetDefinitionsByCategoryAsync(Guid officeId, Guid categoryId)
         {
             var definitions = await _context.ExpenseDefinitions
                 .Include(ed => ed.Office)
                 .Include(ed => ed.DefaultCurrency)
+                .Include(ed => ed.Category)
                 .Include(ed => ed.Payments)
-                .Where(ed => ed.OfficeId == officeId && (int)ed.Category == category && ed.IsActive)
+                .Where(ed => ed.OfficeId == officeId && ed.CategoryId == categoryId && ed.IsActive)
                 .OrderBy(ed => ed.Name)
                 .ToListAsync();
 
@@ -178,8 +237,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Expense
                 OfficeName = definition.Office?.OfficeName,
                 Code = definition.Code,
                 Name = definition.Name,
-                Category = definition.Category,
-                CategoryName = GetCategoryName(definition.Category),
+                CategoryId = definition.CategoryId,
+                CategoryName = definition.Category?.Name,
                 Description = definition.Description,
                 IsActive = definition.IsActive,
                 IsRecurring = definition.IsRecurring,
@@ -191,25 +250,93 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Expense
                 DefaultCurrencyCode = definition.DefaultCurrency?.CurrencyCode,
                 CreatedDate = definition.CreatedDate,
                 TotalPayments = definition.Payments?.Where(p => !p.IsDeleted).Sum(p => p.Amount) ?? 0,
-                PaymentCount = definition.Payments?.Count(p => !p.IsDeleted) ?? 0
+                PaymentCount = definition.Payments?.Count(p => !p.IsDeleted) ?? 0,
+                AccountReference = definition.AccountReference,
+                DueDayOfMonth = definition.DueDayOfMonth
             };
         }
 
-        private string GetCategoryName(ExpenseCategory category)
+        public async Task<vm_expensedefinitionstatement> GetDefinitionStatementAsync(Guid definitionId, DateTime? fromDate = null, DateTime? toDate = null)
         {
-            return category switch
+            var definition = await _context.ExpenseDefinitions
+                .Include(ed => ed.Category)
+                .FirstOrDefaultAsync(ed => ed.Id == definitionId);
+
+            if (definition == null)
+                return null;
+
+            var query = _context.ExpensePayments
+                .Include(ep => ep.Currency)
+                .Where(ep => ep.ExpenseDefinitionId == definitionId && !ep.IsDeleted);
+
+            if (fromDate.HasValue)
+                query = query.Where(ep => ep.PaymentDate >= fromDate.Value.Date);
+
+            if (toDate.HasValue)
             {
-                ExpenseCategory.Salary => "Maaş",
-                ExpenseCategory.Rent => "Kira",
-                ExpenseCategory.Utilities => "Faturalar",
-                ExpenseCategory.Office => "Ofis Giderleri",
-                ExpenseCategory.Marketing => "Pazarlama",
-                ExpenseCategory.Travel => "Seyahat",
-                ExpenseCategory.Insurance => "Sigorta",
-                ExpenseCategory.Tax => "Vergi",
-                ExpenseCategory.Maintenance => "Bakım",
-                ExpenseCategory.Other => "Diğer",
-                _ => category.ToString()
+                var endOfDay = toDate.Value.Date.AddDays(1).AddSeconds(-1);
+                query = query.Where(ep => ep.PaymentDate <= endOfDay);
+            }
+
+            var payments = await query.OrderBy(ep => ep.PaymentDate).ToListAsync();
+
+            // Cari (Party) ekstresindeki running-balance desenini birebir uyarlıyor: kronolojik
+            // sırayla ilerleyen kümülatif toplam. Yalnızca Paid ödemeler gerçek harcama sayılır —
+            // Pending/Cancelled kayıtlar toplamı etkilemez ama listede görünür (durumu ile birlikte).
+            decimal runningTotal = 0;
+            var lines = new List<vm_expensedefinitionstatementline>();
+            foreach (var payment in payments)
+            {
+                if (payment.Status == ExpenseStatus.Paid)
+                    runningTotal += payment.Amount;
+
+                lines.Add(new vm_expensedefinitionstatementline
+                {
+                    PaymentId = payment.Id,
+                    PaymentNumber = payment.PaymentNumber,
+                    PaymentDate = payment.PaymentDate,
+                    Amount = payment.Amount,
+                    RunningTotal = runningTotal,
+                    CurrencyCode = payment.Currency?.CurrencyCode,
+                    StatusName = GetStatusName(payment.Status),
+                    ReferenceNumber = payment.ReferenceNumber,
+                    Description = payment.Description
+                });
+            }
+
+            var paidPayments = payments.Where(p => p.Status == ExpenseStatus.Paid).ToList();
+            var (nextDueDate, dueStatus) = await _reminderService.CalculateNextDueAsync(definitionId);
+
+            return new vm_expensedefinitionstatement
+            {
+                DefinitionId = definition.Id,
+                Code = definition.Code,
+                Name = definition.Name,
+                CategoryId = definition.CategoryId,
+                CategoryName = definition.Category?.Name,
+                AccountReference = definition.AccountReference,
+                IsRecurring = definition.IsRecurring,
+                RecurrencePeriod = definition.RecurrencePeriod,
+                RecurrencePeriodName = definition.RecurrencePeriod.HasValue ? GetRecurrencePeriodName(definition.RecurrencePeriod.Value) : null,
+                NextDueDate = nextDueDate,
+                DueStatus = dueStatus,
+                TotalPaid = paidPayments.Sum(p => p.Amount),
+                PaymentCount = paidPayments.Count,
+                AverageAmount = paidPayments.Count > 0 ? paidPayments.Average(p => p.Amount) : 0,
+                LastPaymentDate = paidPayments.OrderByDescending(p => p.PaymentDate).FirstOrDefault()?.PaymentDate,
+                Lines = lines
+            };
+        }
+
+        private string GetStatusName(ExpenseStatus status)
+        {
+            return status switch
+            {
+                ExpenseStatus.Pending => "Beklemede",
+                ExpenseStatus.Paid => "Ödendi",
+                ExpenseStatus.Cancelled => "İptal Edildi",
+                ExpenseStatus.Refunded => "İade Edildi",
+                _ => status.ToString()
             };
         }
 

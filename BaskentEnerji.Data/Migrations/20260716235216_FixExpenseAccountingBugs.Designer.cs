@@ -4,6 +4,7 @@ using BaskentEnerji.Data.Contexts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BaskentEnerji.Data.Migrations
 {
     [DbContext(typeof(BaskentEnerjiDbContext))]
-    partial class BaskentEnerjiDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260716235216_FixExpenseAccountingBugs")]
+    partial class FixExpenseAccountingBugs
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -908,8 +911,8 @@ namespace BaskentEnerji.Data.Migrations
                         .HasPrecision(18, 4)
                         .HasColumnType("decimal(18,4)");
 
-                    b.Property<Guid>("CategoryId")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<int>("Category")
+                        .HasColumnType("int");
 
                     b.Property<Guid>("CreatedByUserId")
                         .HasColumnType("uniqueidentifier");
@@ -928,39 +931,12 @@ namespace BaskentEnerji.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CategoryId");
-
                     b.HasIndex("CreatedByUserId");
 
-                    b.HasIndex("OfficeId", "CategoryId", "Year", "Month")
+                    b.HasIndex("OfficeId", "Category", "Year", "Month")
                         .IsUnique();
 
                     b.ToTable("ExpenseBudgets");
-                });
-
-            modelBuilder.Entity("BaskentEnerji.Entity.Entities.ExchangeOffice.Expense.ExpenseCategoryDefinition", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("CreatedDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Name")
-                        .IsUnique();
-
-                    b.ToTable("ExpenseCategories");
                 });
 
             modelBuilder.Entity("BaskentEnerji.Entity.Entities.ExchangeOffice.Expense.ExpenseDefinition", b =>
@@ -969,12 +945,8 @@ namespace BaskentEnerji.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<string>("AccountReference")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<Guid>("CategoryId")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<int>("Category")
+                        .HasColumnType("int");
 
                     b.Property<string>("Code")
                         .IsRequired()
@@ -993,9 +965,6 @@ namespace BaskentEnerji.Data.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int?>("DueDayOfMonth")
-                        .HasColumnType("int");
-
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
@@ -1013,8 +982,6 @@ namespace BaskentEnerji.Data.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("CategoryId");
 
                     b.HasIndex("DefaultCurrencyId");
 
@@ -4469,12 +4436,6 @@ namespace BaskentEnerji.Data.Migrations
 
             modelBuilder.Entity("BaskentEnerji.Entity.Entities.ExchangeOffice.Expense.ExpenseBudget", b =>
                 {
-                    b.HasOne("BaskentEnerji.Entity.Entities.ExchangeOffice.Expense.ExpenseCategoryDefinition", "Category")
-                        .WithMany("ExpenseBudgets")
-                        .HasForeignKey("CategoryId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("BaskentEnerji.Entity.Entities.User.User", "CreatedByUser")
                         .WithMany()
                         .HasForeignKey("CreatedByUserId")
@@ -4487,8 +4448,6 @@ namespace BaskentEnerji.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Category");
-
                     b.Navigation("CreatedByUser");
 
                     b.Navigation("Office");
@@ -4496,12 +4455,6 @@ namespace BaskentEnerji.Data.Migrations
 
             modelBuilder.Entity("BaskentEnerji.Entity.Entities.ExchangeOffice.Expense.ExpenseDefinition", b =>
                 {
-                    b.HasOne("BaskentEnerji.Entity.Entities.ExchangeOffice.Expense.ExpenseCategoryDefinition", "Category")
-                        .WithMany("ExpenseDefinitions")
-                        .HasForeignKey("CategoryId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("BaskentEnerji.Entity.Entities.ExchangeOffice.Currency.Currency", "DefaultCurrency")
                         .WithMany()
                         .HasForeignKey("DefaultCurrencyId");
@@ -4511,8 +4464,6 @@ namespace BaskentEnerji.Data.Migrations
                         .HasForeignKey("OfficeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Category");
 
                     b.Navigation("DefaultCurrency");
 
@@ -5419,13 +5370,6 @@ namespace BaskentEnerji.Data.Migrations
                     b.Navigation("TargetRates");
 
                     b.Navigation("VaultBalances");
-                });
-
-            modelBuilder.Entity("BaskentEnerji.Entity.Entities.ExchangeOffice.Expense.ExpenseCategoryDefinition", b =>
-                {
-                    b.Navigation("ExpenseBudgets");
-
-                    b.Navigation("ExpenseDefinitions");
                 });
 
             modelBuilder.Entity("BaskentEnerji.Entity.Entities.ExchangeOffice.Expense.ExpenseDefinition", b =>

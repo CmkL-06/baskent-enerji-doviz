@@ -450,16 +450,56 @@ namespace BaskentEnerji.Data.Contexts
                 entity.Property(e => e.RunningBalance).HasPrecision(18, 4);
             });
 
+            // --- ExpenseCategoryDefinition ---
+            // Currency ile aynı desen (global, DB-backed, kullanıcı yönetimli) — Category silinmesi
+            // ExpenseDefinition/ExpenseBudget'ta öksüz kayıt bırakmasın diye Restrict.
+            modelBuilder.Entity<ExpenseCategoryDefinition>(entity =>
+            {
+                entity.Property(e => e.Name).HasMaxLength(100).IsRequired();
+                entity.HasIndex(e => e.Name).IsUnique();
+            });
+
             // --- ExpenseDefinition ---
             modelBuilder.Entity<ExpenseDefinition>(entity =>
             {
                 entity.Property(e => e.DefaultAmount).HasPrecision(18, 4);
+                entity.Property(e => e.AccountReference).HasMaxLength(100);
+                entity.HasIndex(e => new { e.OfficeId, e.Code }).IsUnique();
+
+                entity.HasOne(ed => ed.Category)
+                    .WithMany(c => c.ExpenseDefinitions)
+                    .HasForeignKey(ed => ed.CategoryId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             // --- ExpensePayment ---
             modelBuilder.Entity<ExpensePayment>(entity =>
             {
                 entity.Property(e => e.Amount).HasPrecision(18, 4);
+
+                // Bir ExpenseDefinition veya Vault silinirse ExpensePayments'ın Cascade ile
+                // otomatik silinmesini engelle — finansal denetim izi kaybolmasın.
+                entity.HasOne(ep => ep.ExpenseDefinition)
+                    .WithMany(ed => ed.Payments)
+                    .HasForeignKey(ep => ep.ExpenseDefinitionId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(ep => ep.Vault)
+                    .WithMany()
+                    .HasForeignKey(ep => ep.VaultId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // --- ExpenseBudget ---
+            modelBuilder.Entity<ExpenseBudget>(entity =>
+            {
+                entity.Property(e => e.BudgetAmount).HasPrecision(18, 4);
+                entity.HasIndex(e => new { e.OfficeId, e.CategoryId, e.Year, e.Month }).IsUnique();
+
+                entity.HasOne(eb => eb.Category)
+                    .WithMany(c => c.ExpenseBudgets)
+                    .HasForeignKey(eb => eb.CategoryId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             // --- Coin_User ---
@@ -625,6 +665,8 @@ namespace BaskentEnerji.Data.Contexts
         // ExchangeOffice — Expense
         public DbSet<ExpenseDefinition> ExpenseDefinitions { get; set; } = null!;
         public DbSet<ExpensePayment> ExpensePayments { get; set; } = null!;
+        public DbSet<ExpenseBudget> ExpenseBudgets { get; set; } = null!;
+        public DbSet<ExpenseCategoryDefinition> ExpenseCategories { get; set; } = null!;
 
         // Site — Genel
         public DbSet<Analytics> Analytics { get; set; } = null!;
