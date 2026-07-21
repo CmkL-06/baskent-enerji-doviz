@@ -18,6 +18,7 @@ namespace BaskentEnerji.Entity.Modals.ViewModals.ExchangeOFfice.Office
         public decimal Balance { get; set; }
         public decimal AvailableBalance => Balance;
         public decimal ValueInBaseCurrency { get; set; }
+        public decimal RunningBalance { get; set; }
         public TransactionType TransactionType { get; set; }
         public bool IsParty { get; set; }
     }

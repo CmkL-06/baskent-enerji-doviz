@@ -19,7 +19,11 @@ async function voidVaultBalanceHistory(vh: any) {
   const reason = prompt('İptal sebebi (opsiyonel):') || 'Owner tarafından iptal edildi'
   voidingId.value = vh.id
   try {
-    await apiService.voidVaultBalanceHistory(vh.id, reason)
+    if (vh.isCombined) {
+      await apiService.voidVaultBalanceHistoryGroup(vh.legs.map((l: any) => l.id), reason)
+    } else {
+      await apiService.voidVaultBalanceHistory(vh.id, reason)
+    }
     notification.success('Kasa hareketi iptal edildi')
     await fetchReport()
   } catch (e: any) {
@@ -253,15 +257,57 @@ const volumesByCurrency = computed(() => {
 
 const currencyRows = computed(() => reportData.value?.currencyDetails ?? [])
 
+// Alış/Satış/Döviz işlemlerinde her işlem kasada iki ayrı satır oluşturur (alınan döviz +
+// karşılığında verilen TL/döviz). Aynı açıklamaya (Exchange transaction EX-...) ve kasaya
+// sahip, biri giriş biri çıkış olan tam 2 satırlık çiftleri "X alındı, karşılığında Y verildi"
+// şeklinde TEK satırda göstermek için birleştiriyoruz — ham kayıtlar (iptal/void için) korunur.
+const EXCHANGE_VAULT_TX_TYPES = new Set([0, 1])
+
 const vaultRows = computed(() => {
   const histories = reportData.value?.vaultBalanceHistories ?? []
-  return histories.map((h: any) => ({
+  const mapped = histories.map((h: any) => ({
     ...h,
     amount: Math.abs(h.balance ?? 0),
     isDeposit: (h.balance ?? 0) >= 0,
     typeLabel: txTypeLabels[h.transactionType] ?? 'Bilinmeyen',
     typeColor: txTypeColors[h.transactionType] ?? '#6b7280',
   }))
+
+  const groups = new Map<string, any[]>()
+  const singles: any[] = []
+  for (const row of mapped) {
+    if (!EXCHANGE_VAULT_TX_TYPES.has(row.transactionType) || !row.description) {
+      singles.push(row)
+      continue
+    }
+    const key = `${row.description}|${row.vaultId}`
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key)!.push(row)
+  }
+
+  const rows: any[] = [...singles]
+  for (const group of groups.values()) {
+    if (group.length === 2 && group[0].isDeposit !== group[1].isDeposit) {
+      const received = group.find((r: any) => r.isDeposit)
+      const given = group.find((r: any) => !r.isDeposit)
+      rows.push({
+        ...received,
+        isCombined: true,
+        legs: group,
+        receivedAmount: received.amount,
+        receivedCurrencyCode: received.currencyCode,
+        receivedBalance: received.runningBalance,
+        givenAmount: given.amount,
+        givenCurrencyCode: given.currencyCode,
+        givenBalance: given.runningBalance,
+        valueInBaseCurrency: received.valueInBaseCurrency || given.valueInBaseCurrency,
+      })
+    } else {
+      rows.push(...group)
+    }
+  }
+
+  return rows.sort((a: any, b: any) => new Date(b.createdDate ?? b.date).getTime() - new Date(a.createdDate ?? a.date).getTime())
 })
 
 const transactions = computed(() => reportData.value?.transactions ?? [])
@@ -862,9 +908,9 @@ onMounted(async () => {
                 <th>Tarih</th>
                 <th>Tür</th>
                 <th>İşlem Tipi</th>
-                <th>Döviz</th>
-                <th>Miktar</th>
-                <th>TRY Karşılığı</th>
+                <th>Alınan</th>
+                <th>Verilen</th>
+                <th>Bakiye</th>
                 <th>Personel</th>
                 <th>Açıklama</th>
                 <th v-if="authStore.isOwner"></th>
@@ -875,7 +921,8 @@ onMounted(async () => {
                 <tr class="expandable-row" :class="{ expanded: expandedVaultRow === i }" @click="toggleVaultRow(i)">
                   <td class="no-wrap">{{ fmtDateTime(vh.createdDate ?? vh.date) }}</td>
                   <td>
-                    <span class="status-chip" :class="vh.isDeposit ? 'done' : 'pend'">
+                    <span v-if="vh.isCombined" class="status-chip" style="--tag-color:#8b5cf6">Döviz</span>
+                    <span v-else class="status-chip" :class="vh.isDeposit ? 'done' : 'pend'">
                       {{ vh.isDeposit ? 'Giriş' : 'Çıkış' }}
                     </span>
                   </td>
@@ -887,14 +934,43 @@ onMounted(async () => {
                       <span class="material-symbols-outlined" aria-hidden="true">person</span>
                     </span>
                   </td>
-                  <td>
-                    <div class="cur-cell">
-                      <img v-if="getCurrencyFlagImg(vh.currencyCode)" :src="getCurrencyFlagImg(vh.currencyCode)" class="cur-flag cur-flag--sm" />
-                      <span>{{ vh.currencyCode }}</span>
-                    </div>
+                  <td class="mono">
+                    <template v-if="vh.isCombined">
+                      <div class="cur-cell pos">
+                        <img v-if="getCurrencyFlagImg(vh.receivedCurrencyCode)" :src="getCurrencyFlagImg(vh.receivedCurrencyCode)" class="cur-flag cur-flag--sm" />
+                        <span>{{ fmt(vh.receivedAmount) }} {{ vh.receivedCurrencyCode }}</span>
+                      </div>
+                    </template>
+                    <template v-else-if="vh.isDeposit">
+                      <div class="cur-cell pos">
+                        <img v-if="getCurrencyFlagImg(vh.currencyCode)" :src="getCurrencyFlagImg(vh.currencyCode)" class="cur-flag cur-flag--sm" />
+                        <span>{{ fmt(Math.abs(vh.amount ?? 0)) }} {{ vh.currencyCode }}</span>
+                      </div>
+                    </template>
+                    <span v-else class="text-muted">—</span>
                   </td>
-                  <td :class="vh.isDeposit ? 'pos' : 'neg'">{{ vh.isDeposit ? '+' : '-' }}{{ fmt(Math.abs(vh.amount ?? 0)) }}</td>
-                  <td class="text-muted mono">{{ vh.valueInBaseCurrency ? fmt(vh.valueInBaseCurrency) + ' ₺' : '-' }}</td>
+                  <td class="mono">
+                    <template v-if="vh.isCombined">
+                      <div class="cur-cell neg">
+                        <img v-if="getCurrencyFlagImg(vh.givenCurrencyCode)" :src="getCurrencyFlagImg(vh.givenCurrencyCode)" class="cur-flag cur-flag--sm" />
+                        <span>{{ fmt(vh.givenAmount) }} {{ vh.givenCurrencyCode }}</span>
+                      </div>
+                    </template>
+                    <template v-else-if="!vh.isDeposit">
+                      <div class="cur-cell neg">
+                        <img v-if="getCurrencyFlagImg(vh.currencyCode)" :src="getCurrencyFlagImg(vh.currencyCode)" class="cur-flag cur-flag--sm" />
+                        <span>{{ fmt(Math.abs(vh.amount ?? 0)) }} {{ vh.currencyCode }}</span>
+                      </div>
+                    </template>
+                    <span v-else class="text-muted">—</span>
+                  </td>
+                  <td class="mono text-muted balance-cell">
+                    <template v-if="vh.isCombined">
+                      <span>{{ fmt(vh.receivedBalance) }} {{ vh.receivedCurrencyCode }}</span>
+                      <span>{{ fmt(vh.givenBalance) }} {{ vh.givenCurrencyCode }}</span>
+                    </template>
+                    <span v-else>{{ fmt(vh.runningBalance) }} {{ vh.currencyCode }}</span>
+                  </td>
                   <td>
                     <span v-if="vh.user" class="user-tag">
                       <span class="material-symbols-outlined" aria-hidden="true">person</span>
@@ -915,6 +991,10 @@ onMounted(async () => {
                       <div class="cd-item">
                         <span class="cd-label">Tam Açıklama</span>
                         <span class="cd-val">{{ vh.description ?? '—' }}</span>
+                      </div>
+                      <div class="cd-item" v-if="vh.valueInBaseCurrency">
+                        <span class="cd-label">Değerleme (günlük ort. kur)</span>
+                        <span class="cd-val">{{ fmt(vh.valueInBaseCurrency) }} ₺</span>
                       </div>
                       <div class="cd-item" v-if="vh.isGhost">
                         <span class="cd-label">Not</span>
@@ -1332,6 +1412,7 @@ onMounted(async () => {
 
 /* ── Currency Cell ── */
 .cur-cell { display: flex; align-items: center; gap: 6px; }
+.balance-cell { display: flex; flex-direction: column; gap: 2px; font-size: 12px; white-space: nowrap; }
 .cur-flag { width: 22px; height: 16px; object-fit: cover; border-radius: 2px; border: 1px solid rgba(0,0,0,.08); }
 .cur-flag--sm { width: 18px; height: 13px; }
 .cur-code { font-weight: 600; color: var(--color-primary); font-size: 12px; }

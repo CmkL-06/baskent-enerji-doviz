@@ -36,11 +36,21 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
         public async Task<vm_zreport> GetDailyZReport(Guid? officeId, DateTime date)
         {
-            var startDate = date.Date;
-            var endDate = startDate.AddDays(1).AddSeconds(-1);
+            // DayClosureService "iş günü"nü Türkiye yerel saatine göre belirliyor (TurkeyTz.Date).
+            // Burada da aynı yerel takvim gününün sınırları kullanılıyor, ama işlemler DB'de UTC
+            // olarak kaydedildiği için (TransactionDate = DateTime.UtcNow) sorgu filtresine geçmeden
+            // önce bu yerel gün sınırları UTC'ye çevrilmeli — aksi halde TRT 00:00-03:00 arası
+            // işlemler (henüz UTC gece yarısı geçmemişken) bir önceki takvim gününe düşer ve
+            // gün kapanışının "bugün" saydığı işlemlerle Z-Raporu'nun gösterdiği işlemler ayrışır.
+            var localDayStart = date.Date;
+            var utcStart = TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(localDayStart, DateTimeKind.Unspecified), TurkeyTz);
+            var utcEnd = utcStart.AddDays(1).AddTicks(-1);
+
+            var startDate = utcStart;
+            var endDate = utcEnd;
 
             // Check cache first
-            var cacheKey = $"ZReport_Daily_{officeId}_{startDate:yyyyMMdd}";
+            var cacheKey = $"ZReport_Daily_{officeId}_{localDayStart:yyyyMMdd}";
             if (_memoryCache.TryGetValue(cacheKey, out vm_zreport cachedReport))
             {
                 return cachedReport;
@@ -263,6 +273,12 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 VaultBalancesByCurrency = new Dictionary<string, decimal>()
             };
 
+            // Ciro/İşlem Hacmi (TotalForeignCurrencyProcessed) her işlemde BİR kez artırılmalı.
+            // Normal alım-satımda zaten tek yabancı bacak var (TRY bacağı yukarıda atlanıyor), ama
+            // arbitraj (çapraz kur) işlemlerinde 2 yabancı bacak var — ikisi de aşağıdaki döngüde
+            // işlendiği için düzeltme olmadan tek bir arbitraj işlemi ciroyu iki katı artırıyordu.
+            var volumeCountedTransactionIds = new HashSet<Guid>();
+
             // Process transactions
             foreach (var transaction in transactions)
             {
@@ -327,6 +343,9 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                             summary.TotalVolumesByCurrency[currencyCode] = 0;
                         summary.TotalVolumesByCurrency[currencyCode] += amount;
 
+                        if (volumeCountedTransactionIds.Add(transaction.Id))
+                            summary.TotalForeignCurrencyProcessed += amountInTRY;
+
                         // Correct interpretation from exchange office perspective:
                         // Debit = We are giving out/selling this currency
                         // Credit = We are receiving/buying this currency
@@ -342,8 +361,6 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                             currencyDetail.TotalSellRevenue += amountInTRY;
                             currencyDetail.SellTransactionCount++;
                         }
-
-                        summary.TotalForeignCurrencyProcessed += amountInTRY;
 
                         // Track cash volumes
                         if (transaction.PartyId == null)
@@ -550,6 +567,29 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 totalValueInBaseCurrency += valueInTRY;
             }
 
+            // Kasa Hareketleri tablosunda her satır için "Bakiye" (o kasa+para birimindeki işlem
+            // sonrası bakiye) gösterebilmek üzere, rapor başlangıcından ÖNCEKİ toplam (açılış
+            // bakiyesi) tek sorguda çekilir; ardından rapor aralığındaki satırlar tarihe göre
+            // artan sırada gezilerek kümülatif bakiye hesaplanır.
+            var vaultCurrencyPairs = vaultHistories.Select(vh => new { vh.VaultId, vh.CurrencyId }).Distinct().ToList();
+            var pairVaultIds = vaultCurrencyPairs.Select(p => p.VaultId).Distinct().ToList();
+            var pairCurrencyIds = vaultCurrencyPairs.Select(p => p.CurrencyId).Distinct().ToList();
+            var openingBalanceRows = await _context.VaultBalanceHistories
+                .Where(vh => pairVaultIds.Contains(vh.VaultId) && pairCurrencyIds.Contains(vh.CurrencyId) &&
+                             vh.CreatedDate < startDate && !vh.IsDeleted && !vh.IsGhost)
+                .GroupBy(vh => new { vh.VaultId, vh.CurrencyId })
+                .Select(g => new { g.Key.VaultId, g.Key.CurrencyId, Sum = g.Sum(x => x.Balance) })
+                .ToListAsync();
+
+            var runningTotals = openingBalanceRows.ToDictionary(r => (r.VaultId, r.CurrencyId), r => r.Sum);
+            var runningBalanceById = new Dictionary<Guid, decimal>();
+            foreach (var vh in vaultHistories.OrderBy(vh => vh.CreatedDate))
+            {
+                var key = (vh.VaultId, vh.CurrencyId);
+                runningTotals[key] = runningTotals.GetValueOrDefault(key) + vh.Balance;
+                runningBalanceById[vh.Id] = runningTotals[key];
+            }
+
             // Calculate vault operations and build history list
             decimal totalDeposits = 0m;
             decimal totalWithdrawals = 0m;
@@ -582,6 +622,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     TransactionType = vaultHistory.TransactionType,
                     CreatedDate = vaultHistory.CreatedDate,
                     ValueInBaseCurrency = amountInTRY,
+                    RunningBalance = runningBalanceById.GetValueOrDefault(vaultHistory.Id),
                     IsParty = vaultHistory.IsParty,
                     User = vaultHistory.UserId.HasValue && historyUsers.ContainsKey(vaultHistory.UserId.Value) 
                         ? historyUsers[vaultHistory.UserId.Value] 
@@ -665,6 +706,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             var totalCashProfit = 0m;
             var totalCashVolume = 0m;
             var totalVaultValue = 0m;
+            var totalCashTransactionCount = 0;
 
             foreach (var office in offices)
             {
@@ -768,6 +810,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     totalCashProfit += officeReport.CashOnlySummary.CashProfit;
                     totalCashVolume += officeReport.CashOnlySummary.CashVolumeInTRY;
                     totalVaultValue += officeReport.CashOnlySummary.TotalVaultValueInTRY;
+                    totalCashTransactionCount += officeReport.CashOnlySummary.CashTransactionCount;
                 }
                 
                 // Aggregate balance histories
@@ -823,7 +866,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             {
                 CashProfit = totalCashProfit,
                 CashVolumeInTRY = totalCashVolume,
-                TotalVaultValueInTRY = totalVaultValue
+                TotalVaultValueInTRY = totalVaultValue,
+                CashTransactionCount = totalCashTransactionCount
             };
 
             report.OfficeName = "All Offices";
