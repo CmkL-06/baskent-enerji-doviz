@@ -16,6 +16,11 @@ namespace BaskentEnerji.Entity.Entities.Telegram
         [MaxLength(20)]
         public string? Status { get; set; }
 
+        // 'exchange' (varsayilan), 'dealer_entry' (cari hesap kaydi retry'i),
+        // 'exchange_missing_rate' (kur eksik, otomatik tekrar denenmez)
+        [MaxLength(20)]
+        public string? OperationType { get; set; }
+
         public int? Attempts { get; set; }
         public int? MaxAttempts { get; set; }
         public DateTime? LastAttempt { get; set; }

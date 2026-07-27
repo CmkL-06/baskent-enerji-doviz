@@ -21,5 +21,10 @@ namespace BaskentEnerji.Entity.Modals.ViewModals.ExchangeOFfice.Office
         public decimal RunningBalance { get; set; }
         public TransactionType TransactionType { get; set; }
         public bool IsParty { get; set; }
+        public decimal? AppliedRate { get; set; }
+        // Bu bacak kasadan satılan bir döviz ise, satıştan hemen önceki ortalama alış maliyeti (WAC).
+        // AppliedRate = satış kuru, CostBasisRate = maliyet (alış) kuru — ikisi arasındaki fark kârı verir.
+        public decimal? CostBasisRate { get; set; }
+        public decimal? TransactionProfit { get; set; }
     }
 }

@@ -24,14 +24,31 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
         private readonly IMapper _mapper;
         private readonly IMemoryCache _memoryCache;
         private readonly ValidationService _validationService;
+        private readonly IWacService _wacService;
         private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(1);
 
-        public VaultService(BaskentEnerjiDbContext context, IMapper mapper, IMemoryCache memoryCache, ValidationService validationService)
+        public VaultService(BaskentEnerjiDbContext context, IMapper mapper, IMemoryCache memoryCache, ValidationService validationService, IWacService wacService)
         {
             _context = context;
             _mapper = mapper;
             _memoryCache = memoryCache;
             _validationService = validationService;
+            _wacService = wacService;
+        }
+
+        // Satılmamış (elde kalan) döviz stoku, gerçekleşmemiş kâr/zararı erken muhasebeleştirmemek
+        // için güncel piyasa kuru yerine ortalama alış maliyetiyle (WAC) değerlenir — gerçek kâr/zarar
+        // yalnızca fiili satış anında sisteme işlenir. WAC henüz oluşmamışsa (hiç alış yapılmamış
+        // para birimi) bilgi amaçlı olarak güncel piyasa kuruna düşülür.
+        private async Task<Dictionary<(Guid VaultId, Guid CurrencyId), decimal>> GetWacsForVaultsAsync(List<Guid> vaultIds)
+        {
+            var rows = await _context.CurrencyWacs
+                .Where(w => vaultIds.Contains(w.VaultId) && w.Quantity > 0)
+                .ToListAsync();
+
+            return rows
+                .GroupBy(w => (w.VaultId, w.CurrencyId))
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(w => w.LastUpdated).First().Wac);
         }
 
         public async Task<decimal> GetTotalAssetsInBaseCurrencyAsync(Guid? officeId = null)
@@ -125,6 +142,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             // Pre-fetch exchange rates for all currencies
             var currencyIds = vault.Balances.Select(b => b.CurrencyId).Distinct().ToList();
             var exchangeRates = await GetExchangeRatesForCurrenciesAsync(currencyIds);
+            var vaultWacs = await _wacService.GetAllWacsForVaultAsync(vaultId);
             var baseCurrencyId = await GetBaseCurrencyIdAsync();
 
             decimal totalValue = 0;
@@ -133,6 +151,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             {
                 decimal valueInBase;
                 decimal exchangeRate;
+                decimal unrealizedProfit = 0;
 
                 if (balance.CurrencyId == baseCurrencyId)
                 {
@@ -141,11 +160,16 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 }
                 else
                 {
-                    if (exchangeRates.TryGetValue(balance.CurrencyId, out var foundRate))
-                        exchangeRate = foundRate;
-                    else
-                        exchangeRate = 0;
+                    var hasWac = vaultWacs.TryGetValue(balance.CurrencyId, out var wacRate) && wacRate > 0;
+                    var hasMarketRate = exchangeRates.TryGetValue(balance.CurrencyId, out var marketRate);
+
+                    exchangeRate = hasWac ? wacRate : (hasMarketRate ? marketRate : 0);
                     valueInBase = balance.Balance * exchangeRate;
+
+                    // Defter değeri (WAC) sabit kalır; piyasa kuruyla WAC arasındaki fark, henüz
+                    // gerçekleşmemiş kâr/zarar olarak AYRICA gösterilir (TMS 21 — kur farkı bilgisi).
+                    if (hasWac && hasMarketRate)
+                        unrealizedProfit = (marketRate - wacRate) * balance.Balance;
                 }
 
                 summary.Balances.Add(new vm_vaultbalance
@@ -155,7 +179,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     CurrencyName = balance.Currency.CurrencyName,
                     Balance = balance.Balance,
                     ValueInBaseCurrency = valueInBase,
-                    ExchangeRateToBase = exchangeRate
+                    ExchangeRateToBase = exchangeRate,
+                    UnrealizedProfit = unrealizedProfit
                 });
 
                 totalValue += valueInBase;
@@ -275,6 +300,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
             // Pre-fetch all exchange rates at once
             var exchangeRates = await GetExchangeRatesForCurrenciesAsync(allCurrencyIds);
+            var allVaultWacs = await GetWacsForVaultsAsync(vaults.Select(v => v.Id).ToList());
             var baseCurrencyId = await GetBaseCurrencyIdAsync();
 
             var summaries = new List<vm_vaultsummary>();
@@ -304,6 +330,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 {
                     decimal valueInBase;
                     decimal exchangeRate;
+                    decimal unrealizedProfit = 0;
 
                     if (balance.CurrencyId == baseCurrencyId)
                     {
@@ -312,8 +339,14 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     }
                     else
                     {
-                        exchangeRate = exchangeRates.GetValueOrDefault(balance.CurrencyId, 0);
+                        var hasWac = allVaultWacs.TryGetValue((vault.Id, balance.CurrencyId), out var wacRate) && wacRate > 0;
+                        var hasMarketRate = exchangeRates.TryGetValue(balance.CurrencyId, out var marketRate);
+
+                        exchangeRate = hasWac ? wacRate : (hasMarketRate ? marketRate : 0);
                         valueInBase = balance.Balance * exchangeRate;
+
+                        if (hasWac && hasMarketRate)
+                            unrealizedProfit = (marketRate - wacRate) * balance.Balance;
                     }
 
                     summary.Balances.Add(new vm_vaultbalance
@@ -324,6 +357,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                         Balance = balance.Balance,
                         ExchangeRateToBase = exchangeRate,
                         ValueInBaseCurrency = valueInBase,
+                        UnrealizedProfit = unrealizedProfit
                     });
 
 

@@ -290,10 +290,47 @@ const vaultRows = computed(() => {
     if (group.length === 2 && group[0].isDeposit !== group[1].isDeposit) {
       const received = group.find((r: any) => r.isDeposit)
       const given = group.find((r: any) => !r.isDeposit)
+
+      // İşlem tipi (Buy/Exchange) tek başına Alış/Satış/Arbitraj ayrımını vermiyor — backend'de
+      // "Exchange" hem satışı hem arbitrajı kapsıyor. Hangi bacağın TRY olduğuna bakarak gerçek
+      // yönü (müşteriden döviz mi alındı, müşteriye mi satıldı) belirleyip etiket/renk buna göre
+      // ayarlanıyor; iki bacak da yabancıysa (TRY yok) arbitraj olarak işaretleniyor.
+      let typeLabel = received.typeLabel
+      let typeColor = received.typeColor
+      if (received.currencyCode === 'TRY') {
+        typeLabel = 'Döviz Satış'
+        typeColor = '#ef4444'
+      } else if (given.currencyCode === 'TRY') {
+        typeLabel = 'Döviz Alış'
+        typeColor = '#10b981'
+      } else {
+        typeLabel = 'Arbitraj'
+        typeColor = '#8b5cf6'
+      }
+
+      // Döviz Satış'ta "Alış Kuru" olarak işlemin KENDİ kurunu değil, satıştan önceki ortalama
+      // alış maliyetini (costBasisRate/WAC) gösteriyoruz — aksi halde alış ve satış kuru hep aynı
+      // (tek işlem kuru) görünüp kâr nereden geldiği anlaşılmıyor. Satış kuru, işlemin gerçek kuru.
+      const isSatis = typeLabel === 'Döviz Satış'
+      const saleRate = isSatis ? given.appliedRate : null
+      let costBasisRate = isSatis && given.costBasisRate > 0 ? given.costBasisRate : null
+      if (isSatis && !costBasisRate) {
+        // WAC geçmişinde bu işlem için maliyet kuru loglanmamış/0 kalmış (nadir bir veri
+        // tutarsızlığı) — zaten güvenilir olan Net Kâr/Zarar ve Satış Kuru'ndan geriye doğru
+        // türetiyoruz, böylece "boş" göstermek yerine ekrandaki kârla tutarlı bir sayı gösteriyoruz.
+        const profit = received.transactionProfit ?? given.transactionProfit
+        const qty = Math.abs(given.amount)
+        if (profit !== null && profit !== undefined && qty > 0 && saleRate) {
+          costBasisRate = saleRate - (profit / qty)
+        }
+      }
+
       rows.push({
         ...received,
         isCombined: true,
         legs: group,
+        typeLabel,
+        typeColor,
         receivedAmount: received.amount,
         receivedCurrencyCode: received.currencyCode,
         receivedBalance: received.runningBalance,
@@ -301,6 +338,11 @@ const vaultRows = computed(() => {
         givenCurrencyCode: given.currencyCode,
         givenBalance: given.runningBalance,
         valueInBaseCurrency: received.valueInBaseCurrency || given.valueInBaseCurrency,
+        receivedRate: received.appliedRate,
+        givenRate: given.appliedRate,
+        costBasisRate,
+        saleRate,
+        profit: received.transactionProfit ?? given.transactionProfit,
       })
     } else {
       rows.push(...group)
@@ -996,6 +1038,43 @@ onMounted(async () => {
                         <span class="cd-label">Değerleme (günlük ort. kur)</span>
                         <span class="cd-val">{{ fmt(vh.valueInBaseCurrency) }} ₺</span>
                       </div>
+                      <!-- Döviz Satış: "Alış Kuru" satılan dövizin satıştan ÖNCEKİ ortalama maliyetidir
+                           (WAC), "Satış Kuru" o an uygulanan gerçek satış kurudur — ikisi arasındaki
+                           fark, aşağıdaki Net Kâr/Zarar'ın nereden geldiğini açıklar. -->
+                      <template v-if="vh.isCombined && vh.typeLabel === 'Döviz Satış'">
+                        <div class="cd-item" v-if="vh.costBasisRate">
+                          <span class="cd-label">Ort. Alış Kuru (Maliyet) — {{ vh.givenCurrencyCode }}</span>
+                          <span class="cd-val">{{ fmt(vh.costBasisRate) }}</span>
+                        </div>
+                        <div class="cd-item" v-if="vh.saleRate">
+                          <span class="cd-label">Satış Kuru — {{ vh.givenCurrencyCode }}</span>
+                          <span class="cd-val">{{ fmt(vh.saleRate) }}</span>
+                        </div>
+                      </template>
+                      <template v-else-if="vh.isCombined">
+                        <div class="cd-item" v-if="vh.receivedRate">
+                          <span class="cd-label">Alış Kuru ({{ vh.receivedCurrencyCode }})</span>
+                          <span class="cd-val">{{ fmt(vh.receivedRate) }}</span>
+                        </div>
+                        <div class="cd-item" v-if="vh.givenRate">
+                          <span class="cd-label">Satış Kuru ({{ vh.givenCurrencyCode }})</span>
+                          <span class="cd-val">{{ fmt(vh.givenRate) }}</span>
+                        </div>
+                      </template>
+                      <div class="cd-item" v-if="!vh.isCombined && vh.appliedRate">
+                        <span class="cd-label">Uygulanan Kur</span>
+                        <span class="cd-val">{{ fmt(vh.appliedRate) }}</span>
+                      </div>
+                      <div class="cd-item" v-if="(vh.isCombined ? vh.profit : vh.transactionProfit) !== null && (vh.isCombined ? vh.profit : vh.transactionProfit) !== undefined">
+                        <span class="cd-label">Net Kâr/Zarar</span>
+                        <span class="cd-val" :class="(vh.isCombined ? vh.profit : vh.transactionProfit) < 0 ? 'profit-neg' : 'profit-pos'">
+                          {{ fmt(vh.isCombined ? vh.profit : vh.transactionProfit) }} ₺
+                        </span>
+                      </div>
+                      <div class="loss-warning" v-if="(vh.isCombined ? vh.profit : vh.transactionProfit) < 0">
+                        <span class="material-symbols-outlined" aria-hidden="true">warning</span>
+                        Bu işlemde zarar tespit edildi.
+                      </div>
                       <div class="cd-item" v-if="vh.isGhost">
                         <span class="cd-label">Not</span>
                         <span class="cd-val">Ghost (gölge) hesap hareketi</span>
@@ -1430,6 +1509,16 @@ onMounted(async () => {
 .cd-item { display: flex; flex-direction: column; gap: 2px; }
 .cd-label { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: .04em; }
 .cd-val { font-size: 14px; font-weight: 600; color: #111; }
+.profit-pos { color: #10b981; }
+.profit-neg { color: #ef4444; }
+.loss-warning {
+  display: flex; align-items: center; gap: 6px;
+  flex-basis: 100%;
+  padding: 8px 12px;
+  background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px;
+  color: #b91c1c; font-size: 13px; font-weight: 600;
+}
+.loss-warning .material-symbols-outlined { font-size: 18px; }
 
 /* ── Party Cards ── */
 .party-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; padding: 14px 18px; }

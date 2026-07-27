@@ -981,10 +981,15 @@ async def _complete_usdt(context, user_id, transaction_id, txid, confirmations,
         # CryptoDeposit güncelle
         db.update_crypto_deposit(txid=txid, confirmations=confirmations, status='confirmed')
 
-        # Transaction güncelle
-        db.update_transaction(transaction_id,
-                              txid=txid, crypto_verified=1,
-                              status='completed', completed_at=datetime.now())
+        # Transaction alanlarını güncelle (durum hariç)
+        db.update_transaction(transaction_id, txid=txid, crypto_verified=1)
+
+        # Atomik tamamlama -- çift tamamlamaya karşı gerçek koruma (DB seviyesi,
+        # asyncio.Lock sadece bu process içini korur, botlar ayrı process)
+        if not db.complete_transaction_atomic(transaction_id):
+            logger.warning(f"İşlem #{transaction_id} zaten tamamlanmış (atomic guard), tekrar işlenmeyecek")
+            set_state(user_id, 'completed', transaction_id)
+            return
 
         # Dealer bakiye düş
         trans = db.get_transaction(transaction_id)
@@ -994,7 +999,7 @@ async def _complete_usdt(context, user_id, transaction_id, txid, confirmations,
                 rates = get_rates()
                 rate = rates.get('USDT', Config.DEFAULT_USDT_RATE)
             amount_try = float(trans['amount']) * rate
-            db.reduce_dealer_balance(trans['referral_code'], amount_try)
+            db.reduce_dealer_balance(trans['referral_code'], amount_try, transaction_id=transaction_id)
 
         # BaşkentEnerji API
         try:

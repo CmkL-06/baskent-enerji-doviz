@@ -19,5 +19,8 @@ namespace BaskentEnerji.Entity.Modals.ViewModals.ExchangeOFfice.Office
         public decimal AvailableBalance => Balance;
         public decimal ValueInBaseCurrency { get; set; }
         public decimal ExchangeRateToBase { get; set; }
+        // ValueInBaseCurrency defter (WAC) değeridir. Bu alan, güncel piyasa kuruyla WAC arasındaki
+        // farkı (henüz gerçekleşmemiş kâr/zarar) TMS 21 uyumu için ayrıca gösterir — WAC yoksa 0.
+        public decimal UnrealizedProfit { get; set; }
     }
 }

@@ -89,7 +89,7 @@ namespace BaskentEnerji.Business.Tests
         private ExpensePaymentService CreateService(BaskentEnerjiDbContext ctx, Guid actingUserId)
         {
             var validationService = TestAuthHelper.CreateValidationService(actingUserId, ctx);
-            var vaultService = new VaultService(ctx, null!, new MemoryCache(new MemoryCacheOptions()), validationService);
+            var vaultService = new VaultService(ctx, null!, new MemoryCache(new MemoryCacheOptions()), validationService, new WacService(ctx));
             return new ExpensePaymentService(ctx, null!, vaultService, validationService);
         }
 

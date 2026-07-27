@@ -34,10 +34,36 @@ namespace BaskentEnerji.API.Controllers.Telegram
                 throw new ApiException(HttpStatusCode.Forbidden, "Staff yetkisi gereklidir.");
         }
 
+        private async Task RequireAdmin()
+        {
+            if (!await _validationService.IsAdminAsync())
+                throw new ApiException(HttpStatusCode.Forbidden, "Admin yetkisi gereklidir.");
+        }
+
+        // Bayi-kapsamli endpoint'lerde IDOR korumasi: Admin/Owner her bayiyi gorebilir,
+        // diger (Staff rank) kullanicilar SADECE kendi DealerReferralCode'una eslesen
+        // bayinin verisine erisebilir -- URL/body'de baska bir bayinin kodu verilse bile.
+        private async Task EnsureOwnDealerOrAdmin(string dealerCode)
+        {
+            if (await _validationService.IsAdminAsync())
+                return;
+
+            var userIdStr = _validationService.GetUserID();
+            if (!Guid.TryParse(userIdStr, out var userId))
+                throw new ApiException(HttpStatusCode.Unauthorized, "Geçersiz kullanıcı");
+
+            var user = await _db.Users.FindAsync(userId);
+            if (user == null || string.IsNullOrEmpty(user.DealerReferralCode)
+                || !string.Equals(user.DealerReferralCode, dealerCode, StringComparison.OrdinalIgnoreCase))
+                throw new ApiException(HttpStatusCode.Forbidden, "Bu bayinin verilerine erişim yetkiniz yok.");
+        }
+
         [HttpGet("dashboard")]
-        public async Task<IActionResult> Dashboard()
+        public async Task<IActionResult> Dashboard(int txSkip = 0, int txTake = 200)
         {
             await RequireStaff();
+            txTake = Math.Clamp(txTake, 1, 500);
+            txSkip = Math.Max(txSkip, 0);
 
             var userIdStr = _validationService.GetUserID();
             if (!Guid.TryParse(userIdStr, out var userId))
@@ -81,6 +107,10 @@ namespace BaskentEnerji.API.Controllers.Telegram
             var dealerName = tgDealer?.DealerName ?? $"{user.Firstname} {user.Lastname}".Trim();
             var dealerBalance = tgDealer?.Balance ?? 0;
 
+            // Aggregate toplamlar (givenTl/usdtTotal/vb.) tum islemler uzerinden hesaplanir,
+            // ama panelde gosterilen listeyi sinirsiz buyumesin diye sayfaliyoruz.
+            var pagedTxs = txs.Skip(txSkip).Take(txTake).ToList();
+
             return Ok(new
             {
                 balance = dealerBalance,
@@ -90,7 +120,9 @@ namespace BaskentEnerji.API.Controllers.Telegram
                 dealer_name = dealerName,
                 dealer_code = dealerCode,
                 staff_name = $"{user.Firstname} {user.Lastname}".Trim(),
-                transactions = txs,
+                transactions = pagedTxs,
+                total_tx_count = txs.Count,
+                has_more_tx = txSkip + pagedTxs.Count < txs.Count,
                 crypto_summary = new
                 {
                     total_usdt_tx = cryptoTxs.Count,
@@ -172,6 +204,8 @@ namespace BaskentEnerji.API.Controllers.Telegram
                 throw new ApiException(HttpStatusCode.BadRequest, "Kur sıfır veya negatif olamaz");
             if (string.IsNullOrWhiteSpace(req.DealerCode))
                 throw new ApiException(HttpStatusCode.BadRequest, "Bayi kodu boş olamaz");
+
+            await EnsureOwnDealerOrAdmin(req.DealerCode);
 
             var dealer = await _db.TgDealers
                 .FirstOrDefaultAsync(d => d.DealerCode == req.DealerCode && d.IsActive);
@@ -299,7 +333,8 @@ namespace BaskentEnerji.API.Controllers.Telegram
         [HttpGet("cari-summary")]
         public async Task<IActionResult> CariSummary()
         {
-            await RequireStaff();
+            // Tum bayilerin toplu ozeti -- tek bayiye ozgu olmadigi icin Admin/Owner ile sinirli.
+            await RequireAdmin();
 
             var dealers = await _db.TgDealers
                 .Where(d => d.PartyId != null)
@@ -360,6 +395,7 @@ namespace BaskentEnerji.API.Controllers.Telegram
         public async Task<IActionResult> CariEntries(string code)
         {
             await RequireStaff();
+            await EnsureOwnDealerOrAdmin(code);
 
             var dealer = await _db.TgDealers.FirstOrDefaultAsync(d => d.DealerCode == code);
             if (dealer?.PartyId == null)
@@ -428,6 +464,8 @@ namespace BaskentEnerji.API.Controllers.Telegram
                 throw new ApiException(HttpStatusCode.BadRequest, "Ödeme tutarı sıfır veya negatif olamaz");
             if (string.IsNullOrWhiteSpace(req.DealerCode))
                 throw new ApiException(HttpStatusCode.BadRequest, "Bayi kodu boş olamaz");
+
+            await EnsureOwnDealerOrAdmin(req.DealerCode);
 
             var dealer = await _db.TgDealers.FirstOrDefaultAsync(d => d.DealerCode == req.DealerCode);
             if (dealer?.PartyId == null)

@@ -28,6 +28,19 @@ from baskent_api import send_exchange_for_transaction, record_dealer_entry
 
 logger = logging.getLogger(__name__)
 
+# _approve_payment icin islem-basi kilit -- main_bot.py'deki _completion_locks
+# ile ayni desen. Gercek koruma db.complete_transaction_atomic'in donus degeridir,
+# bu kilit tek process icini korumak icin ek/ucuz bir guvence.
+_completion_locks: dict[int, asyncio.Lock] = {}
+
+
+def _get_completion_lock(transaction_id: int) -> asyncio.Lock:
+    lock = _completion_locks.get(transaction_id)
+    if lock is None:
+        lock = asyncio.Lock()
+        _completion_locks[transaction_id] = lock
+    return lock
+
 # ═══════════════════════════════════════════════
 # AKTİF İŞLEMLER (memory cache — DB ile yedekli)
 # ═══════════════════════════════════════════════
@@ -240,127 +253,132 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ═══════════════════════════════════════════════
 
 async def _approve_payment(query, tid: int, provider_id: int):
-    # İşlemi tamamla
-    trans = db.get_transaction(tid)
-    if not trans:
-        await query.answer("❌ İşlem bulunamadı!", show_alert=True)
-        return
+    async with _get_completion_lock(tid):
+        # İşlemi tamamla
+        trans = db.get_transaction(tid)
+        if not trans:
+            await query.answer("❌ İşlem bulunamadı!", show_alert=True)
+            return
 
-    # Zaten tamamlanmış mı kontrol et (çift onay koruması)
-    if trans.get('status') == 'completed':
-        logger.warning(f"İşlem #{tid} zaten tamamlanmış, tekrar onaylanmayacak")
-        await query.answer("⚠️ Bu ödeme zaten onaylanmış!", show_alert=True)
-        return
+        # Zaten tamamlanmış mı kontrol et (hızlı yol, atomik değil)
+        if trans.get('status') == 'completed':
+            logger.warning(f"İşlem #{tid} zaten tamamlanmış, tekrar onaylanmayacak")
+            await query.answer("⚠️ Bu ödeme zaten onaylanmış!", show_alert=True)
+            return
 
-    # Mevcut completion_code varsa onu kullan, yoksa yeni üret
-    completion_code = trans.get('completion_code')
-    if not completion_code:
-        completion_code = str(random.randint(10000, 99999))
-        db.update_transaction(tid, completion_code=completion_code)
+        # Mevcut completion_code varsa onu kullan, yoksa yeni üret
+        completion_code = trans.get('completion_code')
+        if not completion_code:
+            completion_code = str(random.randint(10000, 99999))
+            db.update_transaction(tid, completion_code=completion_code)
 
-    # İşlemi tamamlandı olarak işaretle
-    db.complete_transaction(tid, completion_code)
+        # Atomik tamamlama -- çift onaya karşı gerçek koruma (DB seviyesi,
+        # botlar ayrı process olduğu için yukarıdaki kontrol tek başına yetmez)
+        if not db.complete_transaction_atomic(tid, completion_code):
+            logger.warning(f"İşlem #{tid} zaten tamamlanmış (atomic guard), tekrar işlenmeyecek")
+            await query.answer("⚠️ Bu ödeme zaten onaylanmış!", show_alert=True)
+            return
 
-    # Dealer bakiyesinden düş
-    try_amount = trans.get('try_amount') or trans.get('amount_try')
-    referral_code = trans.get('referral_code')
-    if try_amount and referral_code:
-        db.reduce_dealer_balance(referral_code, float(try_amount))
-        logger.info(f"Dealer {referral_code} bakiye düşürüldü: {try_amount} TRY (İşlem #{tid})")
+        # Dealer bakiyesinden düş
+        try_amount = trans.get('try_amount') or trans.get('amount_try')
+        referral_code = trans.get('referral_code')
+        if try_amount and referral_code:
+            db.reduce_dealer_balance(referral_code, float(try_amount), transaction_id=tid)
+            logger.info(f"Dealer {referral_code} bakiye düşürüldü: {try_amount} TRY (İşlem #{tid})")
 
-    # Mesajı DB'ye kaydet
-    db.save_message(tid, provider_id, 'bank_provider',
-                    f"ÖDEME ONAYLANDI - {query.from_user.first_name} - İşlem Kodu: {completion_code}")
+        # Mesajı DB'ye kaydet
+        db.save_message(tid, provider_id, 'bank_provider',
+                        f"ÖDEME ONAYLANDI - {query.from_user.first_name} - İşlem Kodu: {completion_code}")
 
-    # BaşkentEnerji API'ye gönder
-    try:
-        send_exchange_for_transaction(tid)
-    except Exception as e:
-        logger.error(f"BaşkentEnerji API hatası (İşlem #{tid}): {e}")
-
-    # Cari hesap kaydı
-    if try_amount and referral_code:
+        # BaşkentEnerji API'ye gönder
         try:
-            rate = float(trans.get('exchange_rate') or 0)
-            amount = float(trans.get('amount') or 0)
-            if rate <= 0 or amount <= 0:
-                logger.warning(f"İşlem #{tid} rate={rate} amount={amount} — cari kayıt atlanıyor")
-            else:
-                record_dealer_entry(
-                    dealer_code=referral_code,
-                    currency=trans.get('currency', 'RUBLE'),
-                    amount=amount,
-                    amount_try=float(try_amount),
-                    exchange_rate=rate,
-                    is_buy=True,
-                    transaction_id=tid
-                )
+            send_exchange_for_transaction(tid)
         except Exception as e:
-            logger.error(f"Cari hesap kayıt hatası (İşlem #{tid}): {e}")
+            logger.error(f"BaşkentEnerji API hatası (İşlem #{tid}): {e}")
 
-    # Kanal mesajını güncelle
-    try:
-        await query.edit_message_caption(
-            caption=(
-                f"✅ <b>İŞLEM TAMAMLANDI</b>\n"
-                f"━━━━━━━━━━━━━━━\n"
-                f"🔖 İşlem ID: #{tid}\n"
-                f"✔️ Ödeme onaylandı\n"
-                f"👤 Onaylayan: {html.escape(query.from_user.first_name)}\n"
-                f"⏰ {datetime.now().strftime('%H:%M')}"
-            ),
-            parse_mode="HTML"
-        )
-    except Exception:
+        # Cari hesap kaydı
+        if try_amount and referral_code:
+            try:
+                rate = float(trans.get('exchange_rate') or 0)
+                amount = float(trans.get('amount') or 0)
+                if rate <= 0 or amount <= 0:
+                    logger.warning(f"İşlem #{tid} rate={rate} amount={amount} — cari kayıt atlanıyor")
+                else:
+                    record_dealer_entry(
+                        dealer_code=referral_code,
+                        currency=trans.get('currency', 'RUBLE'),
+                        amount=amount,
+                        amount_try=float(try_amount),
+                        exchange_rate=rate,
+                        is_buy=True,
+                        transaction_id=tid
+                    )
+            except Exception as e:
+                logger.error(f"Cari hesap kayıt hatası (İşlem #{tid}): {e}")
+
+        # Kanal mesajını güncelle
         try:
-            await query.edit_message_text(
-                f"✅ <b>İŞLEM TAMAMLANDI</b>\n"
-                f"━━━━━━━━━━━━━━━\n"
-                f"🔖 İşlem ID: #{tid}\n"
-                f"✔️ Ödeme onaylandı\n"
-                f"👤 Onaylayan: {html.escape(query.from_user.first_name)}\n"
-                f"⏰ {datetime.now().strftime('%H:%M')}",
+            await query.edit_message_caption(
+                caption=(
+                    f"✅ <b>İŞLEM TAMAMLANDI</b>\n"
+                    f"━━━━━━━━━━━━━━━\n"
+                    f"🔖 İşlem ID: #{tid}\n"
+                    f"✔️ Ödeme onaylandı\n"
+                    f"👤 Onaylayan: {html.escape(query.from_user.first_name)}\n"
+                    f"⏰ {datetime.now().strftime('%H:%M')}"
+                ),
                 parse_mode="HTML"
             )
-        except Exception as e:
-            logger.error(f"Kanal mesajı güncelleme hatası: {e}")
-
-    # Müşteriye tamamlanma bildirimi
-    customer_id = trans.get('customer_id')
-    if customer_id:
-        lang = _get_customer_lang(customer_id)
-        ruble_amount = trans.get('amount', 0)
-        exchange_rate = trans.get('exchange_rate', 0)
-        try_amount_val = float(try_amount) if try_amount else 0
-
-        try:
-            async with Bot(token=Config.MAIN_BOT_TOKEN) as main_bot:
-                await main_bot.send_message(
-                    chat_id=customer_id,
-                    text=(
-                        f"{t('ruble_transaction_completed', lang)}\n\n"
-                        f"🎯 <b>{html.escape(t('completion_code_label', lang, code=completion_code))}</b>\n\n"
-                        f"{t('transaction_details_header', lang)}\n"
-                        f"• {t('transaction_id_label', lang, tid=tid)}\n"
-                        f"• {t('ruble_amount_label', lang, amount=f'{ruble_amount:,.2f}')}\n"
-                        f"• {t('try_amount_label', lang, amount=f'{try_amount_val:,.2f}')}\n"
-                        f"• {t('exchange_rate_label', lang, rate=f'{exchange_rate:.4f}')}\n"
-                        f"• {t('status_approved', lang)}\n\n"
-                        f"⚠️ <b>{html.escape(t('show_code_to_dealer', lang))}</b>\n\n"
-                        f"{t('thank_you', lang)}"
-                    ),
+        except Exception:
+            try:
+                await query.edit_message_text(
+                    f"✅ <b>İŞLEM TAMAMLANDI</b>\n"
+                    f"━━━━━━━━━━━━━━━\n"
+                    f"🔖 İşlem ID: #{tid}\n"
+                    f"✔️ Ödeme onaylandı\n"
+                    f"👤 Onaylayan: {html.escape(query.from_user.first_name)}\n"
+                    f"⏰ {datetime.now().strftime('%H:%M')}",
                     parse_mode="HTML"
                 )
-        except Exception as e:
-            logger.error(f"Müşteriye tamamlama bildirimi hatası: {e}")
+            except Exception as e:
+                logger.error(f"Kanal mesajı güncelleme hatası: {e}")
 
-    # Web panele bildirim
-    db.notify_web_panel(tid)
+        # Müşteriye tamamlanma bildirimi
+        customer_id = trans.get('customer_id')
+        if customer_id:
+            lang = _get_customer_lang(customer_id)
+            ruble_amount = trans.get('amount', 0)
+            exchange_rate = trans.get('exchange_rate', 0)
+            try_amount_val = float(try_amount) if try_amount else 0
 
-    # Cache temizle
-    active_ruble_transactions.pop(tid, None)
+            try:
+                async with Bot(token=Config.MAIN_BOT_TOKEN) as main_bot:
+                    await main_bot.send_message(
+                        chat_id=customer_id,
+                        text=(
+                            f"{t('ruble_transaction_completed', lang)}\n\n"
+                            f"🎯 <b>{html.escape(t('completion_code_label', lang, code=completion_code))}</b>\n\n"
+                            f"{t('transaction_details_header', lang)}\n"
+                            f"• {t('transaction_id_label', lang, tid=tid)}\n"
+                            f"• {t('ruble_amount_label', lang, amount=f'{ruble_amount:,.2f}')}\n"
+                            f"• {t('try_amount_label', lang, amount=f'{try_amount_val:,.2f}')}\n"
+                            f"• {t('exchange_rate_label', lang, rate=f'{exchange_rate:.4f}')}\n"
+                            f"• {t('status_approved', lang)}\n\n"
+                            f"⚠️ <b>{html.escape(t('show_code_to_dealer', lang))}</b>\n\n"
+                            f"{t('thank_you', lang)}"
+                        ),
+                        parse_mode="HTML"
+                    )
+            except Exception as e:
+                logger.error(f"Müşteriye tamamlama bildirimi hatası: {e}")
 
-    await query.answer("✅ İşlem başarıyla onaylandı!", show_alert=True)
+        # Web panele bildirim
+        db.notify_web_panel(tid)
+
+        # Cache temizle
+        active_ruble_transactions.pop(tid, None)
+
+        await query.answer("✅ İşlem başarıyla onaylandı!", show_alert=True)
 
 
 # ═══════════════════════════════════════════════

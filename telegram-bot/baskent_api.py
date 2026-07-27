@@ -141,7 +141,10 @@ def record_dealer_entry(dealer_code, currency, amount, amount_try,
             time.sleep(2 * attempt)
 
     logger.error(f"[CariHesap] İşlem #{transaction_id}: {max_attempts} denemenin tamamı başarısız — "
-                 f"vault güncellendi ama cari hesap kaydı düşmedi, manuel kontrol gerekir.")
+                 f"vault güncellendi ama cari hesap kaydı düşmedi, kalıcı kuyruğa ekleniyor.")
+    if transaction_id is not None:
+        from database import enqueue_baskent_api
+        enqueue_baskent_api(transaction_id, operation_type='dealer_entry')
     return False
 
 
@@ -165,17 +168,23 @@ def send_exchange_for_transaction(transaction_id, enqueue_on_fail=True):
 
             if row:
                 vault_id, dealer_name, is_buy, rate, amount, currency = row
+                if not rate:
+                    logger.error(f"[BaşkentAPI] İşlem #{transaction_id}: ExchangeRate NULL/0 — "
+                                 f"gönderilmiyor, kuyruğa eklenip manuel kontrol için işaretleniyor.")
+                    if enqueue_on_fail:
+                        enqueue_baskent_api(transaction_id, operation_type='exchange_missing_rate', max_attempts=1)
+                    return False
                 success = send_exchange(
                     transaction_id=transaction_id,
                     dealer_vault_id=vault_id,
                     currency=currency,
                     amount=amount,
                     is_buy=(is_buy == 1) if is_buy is not None else True,
-                    rate=rate or (39.0 if currency == 'USDT' else 0.40),
+                    rate=rate,
                     dealer_name=dealer_name
                 )
                 if not success and enqueue_on_fail:
-                    enqueue_baskent_api(transaction_id)
+                    enqueue_baskent_api(transaction_id, operation_type='exchange')
                     logger.info(f"[BaşkentAPI] İşlem #{transaction_id} kuyruğa eklendi")
                 return success
     except Exception as e:
@@ -183,10 +192,48 @@ def send_exchange_for_transaction(transaction_id, enqueue_on_fail=True):
         if enqueue_on_fail:
             try:
                 from database import enqueue_baskent_api
-                enqueue_baskent_api(transaction_id)
+                enqueue_baskent_api(transaction_id, operation_type='exchange')
             except Exception:
                 pass
     return False
+
+
+def _retry_dealer_entry_from_tx(transaction_id):
+    """
+    Kuyruktaki bir 'dealer_entry' kaydini yeniden islemek icin islem+bayi
+    bilgisini TgTransactions/TgDealers'dan yeniden okuyup record_dealer_entry'yi
+    tekrar cagirir. Kuyruk zaten tekrar deneme mekanizmasi oldugu icin burada
+    max_attempts=1 ile cagriliyor (in-process 3x backoff'un ustune kuyruk
+    tarafinda tekrar backoff birikmesin diye).
+    """
+    from database import get_conn
+    try:
+        with get_conn() as conn:
+            c = conn.cursor()
+            c.execute("""
+                SELECT t.ReferralCode, t.Currency, t.Amount, t.TryAmount,
+                       t.ExchangeRate, t.IsBuy
+                FROM TgTransactions t
+                WHERE t.TransactionId = ?
+            """, transaction_id)
+            row = c.fetchone()
+            if not row:
+                logger.error(f"[CariHesap Queue] İşlem #{transaction_id} bulunamadı")
+                return False
+            dealer_code, currency, amount, amount_try, exchange_rate, is_buy = row
+            return record_dealer_entry(
+                dealer_code=dealer_code,
+                currency=currency,
+                amount=amount,
+                amount_try=amount_try,
+                exchange_rate=exchange_rate,
+                is_buy=(is_buy == 1) if is_buy is not None else True,
+                transaction_id=transaction_id,
+                max_attempts=1
+            )
+    except Exception as e:
+        logger.error(f"[CariHesap Queue] İşlem #{transaction_id} yeniden deneme hatası: {e}")
+        return False
 
 
 async def process_queue():
@@ -205,8 +252,16 @@ async def process_queue():
             for item in pending:
                 qid = item['queue_id']
                 tid = item['transaction_id']
+                op_type = item.get('operation_type') or 'exchange'
                 try:
-                    success = send_exchange_for_transaction(tid, enqueue_on_fail=False)
+                    if op_type == 'dealer_entry':
+                        success = _retry_dealer_entry_from_tx(tid)
+                    elif op_type == 'exchange_missing_rate':
+                        # Kur kendiliginden gelmeyecek, otomatik tekrar denemenin anlami yok
+                        update_baskent_queue(qid, 'failed', 'Kur eksik, manuel kontrol gerekli')
+                        continue
+                    else:
+                        success = send_exchange_for_transaction(tid, enqueue_on_fail=False)
                     if success:
                         update_baskent_queue(qid, 'success')
                         logger.info(f"[BaşkentAPI Queue] #{tid} başarılı")

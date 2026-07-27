@@ -151,6 +151,21 @@ namespace BaskentEnerji.API.Controllers
             return BadRequest(new { Message = "Failed to change password" });
         }
 
+        [HttpPost("change-my-password")]
+        [Authorize]
+        [EnableRateLimiting("sensitive")]
+        public async Task<IActionResult> ChangeMyPassword([FromBody] rm_change_my_password requestData)
+        {
+            var userIdStr = _validationService.GetUserID();
+            if (!Guid.TryParse(userIdStr, out var userId))
+                throw new ApiException(HttpStatusCode.Unauthorized, "Geçersiz kullanıcı");
+
+            var result = await _userServiceCommand.ChangeOwnPassword(userId, requestData.CurrentPassword, requestData.NewPassword);
+            if (result)
+                return Ok(new { Message = "Password changed successfully", ShouldLogout = true });
+            return BadRequest(new { Message = "Failed to change password" });
+        }
+
         [HttpPost("logout-all")]
         [Authorize]
         public async Task<IActionResult> LogoutAllUsers()

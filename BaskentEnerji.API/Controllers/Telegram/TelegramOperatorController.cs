@@ -64,19 +64,35 @@ namespace BaskentEnerji.API.Controllers.Telegram
             return user?.TelegramOperatorId;
         }
 
+        // Admin/Owner her zaman muaf. Staff-rank bir kullanicinin TelegramOperatorId'si
+        // atanmamissa (CreateOperator hic cagrilmamis), onceden bu durum sessizce "tum
+        // islemleri gor" ve "AssignedOperatorId'yi null'a dusur" seklinde davraniyordu --
+        // bu, izolasyonu atlayan gercek bir veri/erisim hatasiydi. Simdi acikca reddediyoruz.
+        private async Task<long> RequireAssignedOperator()
+        {
+            if (await _validationService.IsAdminAsync())
+                return 0; // cagiran taraf isAdmin kontrolunu ayrica yapar, bu deger kullanilmaz
+
+            var tgOpId = await GetCurrentTelegramOperatorId();
+            if (!tgOpId.HasValue)
+                throw new ApiException(HttpStatusCode.Forbidden,
+                    "Telegram operatör kimliğiniz atanmamış. Lütfen bir Admin'den yardım isteyin.");
+            return tgOpId.Value;
+        }
+
         [HttpGet("transactions")]
         public async Task<IActionResult> Transactions()
         {
             await RequireStaff();
 
             var isAdmin = await _validationService.IsAdminAsync();
-            var tgOpId = await GetCurrentTelegramOperatorId();
+            long? tgOpId = isAdmin ? await GetCurrentTelegramOperatorId() : await RequireAssignedOperator();
 
             IQueryable<TgTransaction> query = _db.TgTransactions
                 .Include(t => t.Customer);
 
-            if (!isAdmin && tgOpId.HasValue)
-                query = query.Where(t => t.AssignedOperatorId == tgOpId.Value);
+            if (!isAdmin)
+                query = query.Where(t => t.AssignedOperatorId == tgOpId!.Value);
 
             var txs = await query
                 .OrderByDescending(t => t.CreatedAt)
@@ -102,7 +118,11 @@ namespace BaskentEnerji.API.Controllers.Telegram
                     t.CustomerAddress,
                     t.CustomerPhone,
                     CustomerName = t.Customer != null ? t.Customer.FirstName : null,
-                    CustomerUsername = t.Customer != null ? t.Customer.Username : null
+                    CustomerUsername = t.Customer != null ? t.Customer.Username : null,
+                    Network = _db.TgCryptoDeposits
+                        .Where(d => d.TransactionId == t.TransactionId)
+                        .Select(d => d.Network)
+                        .FirstOrDefault()
                 })
                 .ToListAsync();
 
@@ -141,12 +161,16 @@ namespace BaskentEnerji.API.Controllers.Telegram
             if (string.IsNullOrWhiteSpace(req.Message))
                 throw new ApiException(HttpStatusCode.BadRequest, "Mesaj boş olamaz");
 
-            var tgOpId = await GetCurrentTelegramOperatorId();
+            var isAdmin = await _validationService.IsAdminAsync();
+            var tgOpId = isAdmin ? await GetCurrentTelegramOperatorId() : await RequireAssignedOperator();
 
             var msg = new TgMessage
             {
                 TransactionId = txId,
-                SenderId = tgOpId ?? 0,
+                // tgOpId TelegramOperatorId atanmamis bir Admin icin null olabilir --
+                // SenderId nullable oldugu icin ?? 0 gereksizdi ve gercek olmayan bir
+                // "operator #0" gonderen kaydi birakiyordu. NULL olarak birakiliyor.
+                SenderId = tgOpId,
                 SenderType = "operator",
                 MessageText = req.Message,
                 CreatedAt = DateTime.Now
@@ -190,7 +214,15 @@ namespace BaskentEnerji.API.Controllers.Telegram
             if (tx == null)
                 throw new ApiException(HttpStatusCode.NotFound, "İşlem bulunamadı");
 
-            var tgOpId = await GetCurrentTelegramOperatorId();
+            // Terminal durumdaki (tamamlanmış/reddedilmiş/iptal) bir işlem üzerinde tekrar aksiyon
+            // alınmasını engeller — aksi halde çift tıklama veya iki operatörün aynı anda "complete"
+            // çağırması ProcessExchangeAsync'i iki kez çalıştırıp kasayı iki kez düşürebilirdi.
+            var terminalStatuses = new[] { "completed", "cancelled", "rejected" };
+            if (terminalStatuses.Contains(tx.Status))
+                throw new ApiException(HttpStatusCode.Conflict, $"Bu işlem zaten '{tx.Status}' durumunda, tekrar işlem yapılamaz.");
+
+            var isAdminAction = await _validationService.IsAdminAsync();
+            var tgOpId = isAdminAction ? await GetCurrentTelegramOperatorId() : await RequireAssignedOperator();
             tx.Status = newStatus;
             tx.AssignedOperatorId = tgOpId;
 

@@ -32,7 +32,7 @@ namespace BaskentEnerji.Business.Tests
             var wacService = new WacService(ctx);
             var validationService = TestAuthHelper.CreateValidationService(actingUserId, ctx);
             var dayClosureService = new DayClosureService(ctx, wacService, validationService);
-            var vaultService = new VaultService(ctx, null!, new MemoryCache(new MemoryCacheOptions()), validationService);
+            var vaultService = new VaultService(ctx, null!, new MemoryCache(new MemoryCacheOptions()), validationService, wacService);
             return new ExchangeTransactionService(ctx, null!, vaultService, wacService, validationService, null!, new MemoryCache(new MemoryCacheOptions()), dayClosureService);
         }
 

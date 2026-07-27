@@ -207,6 +207,26 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 .OrderByDescending(vh => vh.CreatedDate)
                 .ToListAsync();
                 
+            // Kasa Hareketleri satırı genişletildiğinde uygulanan kur ve net kâr/zarar gösterebilmek
+            // için VaultBalanceHistory.Description'daki "Exchange transaction {TransactionNumber}"
+            // biçiminden gerçek Transaction kaydına geri bağlanılıyor (Details listesinden ilgili
+            // para biriminin Rate'i, Transaction'dan da Profit alınıyor).
+            var transactionsByNumber = transactions
+                .Where(t => !string.IsNullOrEmpty(t.TransactionNumber))
+                .GroupBy(t => t.TransactionNumber)
+                .ToDictionary(g => g.Key, g => g.First());
+
+            // Bir Satış işleminde "Alış Kuru" olarak GERÇEK işlem kurunu değil, o satıştan ÖNCEKİ
+            // ortalama alış maliyetini (WAC) göstermemiz gerekiyor — aksi halde iki kur da aynı
+            // (işlemin tek kuru) görünüp kâr/zarar farkı anlaşılmaz oluyor. Satış anında loglanan
+            // CurrencyWacHistories.OldWac, tam olarak o satıştan hemen önceki maliyet tabanıdır.
+            var reportTransactionIds = transactions.Select(t => t.Id).ToList();
+            var wacAtSaleByTransactionCurrency = await _context.CurrencyWacHistories
+                .Where(h => h.TransactionId != null && reportTransactionIds.Contains(h.TransactionId.Value))
+                .GroupBy(h => new { h.TransactionId, h.CurrencyId })
+                .Select(g => g.OrderBy(h => h.CreatedDate).First())
+                .ToDictionaryAsync(h => (h.TransactionId!.Value, h.CurrencyId), h => h.OldWac);
+
             // Also prepare balance histories for the report
             var balanceHistoriesForReport = new List<vm_vaultbalancehistory>();
             
@@ -568,26 +588,42 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             }
 
             // Kasa Hareketleri tablosunda her satır için "Bakiye" (o kasa+para birimindeki işlem
-            // sonrası bakiye) gösterebilmek üzere, rapor başlangıcından ÖNCEKİ toplam (açılış
-            // bakiyesi) tek sorguda çekilir; ardından rapor aralığındaki satırlar tarihe göre
-            // artan sırada gezilerek kümülatif bakiye hesaplanır.
+            // sonrası bakiye) gösterilir. Bunu geçmiş hareketlerin toplamından (açılış bakiyesi +
+            // kümülatif toplam) ileri doğru hesaplamak YANLIŞ — VaultBalanceHistory tablosundaki
+            // geçmiş kayıtlar (eski test senaryoları, elle düzeltmeler vb.) zamanla gerçek kasa
+            // bakiyesinden (VaultBalance.Balance) sapabiliyor; bu sapma ileri yönlü toplamda hiç
+            // düzelmeden sonsuza kadar taşınır. Bunun yerine ŞU AN doğrulanmış gerçek bakiyeye
+            // (vaultBalances, yukarıda zaten çekildi) ÇAPA atılıp, raporun bitiş tarihinden SONRA
+            // olan hareketler çıkarılarak "rapor bitiminde gerçek bakiye" bulunur; oradan geriye
+            // doğru (en yeniden en eskiye) her hareketin kendi tutarı düşülerek satır satır bakiye
+            // hesaplanır. Bu yöntem geçmişteki herhangi bir tutarsızlıktan etkilenmez, çünkü hep
+            // canlı/doğrulanmış bakiyeden başlar.
+            var currentBalanceByKey = vaultBalances.ToDictionary(vb => (vb.VaultId, vb.CurrencyId), vb => vb.Balance);
+
             var vaultCurrencyPairs = vaultHistories.Select(vh => new { vh.VaultId, vh.CurrencyId }).Distinct().ToList();
             var pairVaultIds = vaultCurrencyPairs.Select(p => p.VaultId).Distinct().ToList();
             var pairCurrencyIds = vaultCurrencyPairs.Select(p => p.CurrencyId).Distinct().ToList();
-            var openingBalanceRows = await _context.VaultBalanceHistories
+            var afterEndDateRows = await _context.VaultBalanceHistories
                 .Where(vh => pairVaultIds.Contains(vh.VaultId) && pairCurrencyIds.Contains(vh.CurrencyId) &&
-                             vh.CreatedDate < startDate && !vh.IsDeleted && !vh.IsGhost)
+                             vh.CreatedDate > endDate && !vh.IsDeleted && !vh.IsGhost)
                 .GroupBy(vh => new { vh.VaultId, vh.CurrencyId })
                 .Select(g => new { g.Key.VaultId, g.Key.CurrencyId, Sum = g.Sum(x => x.Balance) })
                 .ToListAsync();
+            var sumAfterEndDate = afterEndDateRows.ToDictionary(r => (r.VaultId, r.CurrencyId), r => r.Sum);
 
-            var runningTotals = openingBalanceRows.ToDictionary(r => (r.VaultId, r.CurrencyId), r => r.Sum);
             var runningBalanceById = new Dictionary<Guid, decimal>();
-            foreach (var vh in vaultHistories.OrderBy(vh => vh.CreatedDate))
+            var runningBalanceCursor = new Dictionary<(Guid, Guid), decimal>();
+            foreach (var vh in vaultHistories.OrderByDescending(vh => vh.CreatedDate))
             {
                 var key = (vh.VaultId, vh.CurrencyId);
-                runningTotals[key] = runningTotals.GetValueOrDefault(key) + vh.Balance;
-                runningBalanceById[vh.Id] = runningTotals[key];
+                if (!runningBalanceCursor.TryGetValue(key, out var cursor))
+                {
+                    var currentBalance = currentBalanceByKey.GetValueOrDefault(key);
+                    var afterEnd = sumAfterEndDate.GetValueOrDefault(key);
+                    cursor = currentBalance - afterEnd; // rapor bitiş tarihindeki gerçek bakiye
+                }
+                runningBalanceById[vh.Id] = cursor;
+                runningBalanceCursor[key] = cursor - vh.Balance;
             }
 
             // Calculate vault operations and build history list
@@ -596,8 +632,38 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
             foreach (var vaultHistory in vaultHistories)
             {
+                // "Exchange transaction {TransactionNumber}" açıklamasından gerçek işlemi bulup
+                // bu para birimi bacağının uygulanan kurunu ve işlemin net kâr/zararını ekliyoruz.
+                decimal? appliedRate = null;
+                decimal? costBasisRate = null;
+                decimal? transactionProfit = null;
+                if (vaultHistory.Description != null && vaultHistory.Description.StartsWith("Exchange transaction "))
+                {
+                    var txNumber = vaultHistory.Description.Substring("Exchange transaction ".Length).Trim();
+                    if (transactionsByNumber.TryGetValue(txNumber, out var matchedTx))
+                    {
+                        transactionProfit = matchedTx.Profit;
+                        var matchedDetail = matchedTx.Details?.FirstOrDefault(d => d.CurrencyId == vaultHistory.CurrencyId);
+                        appliedRate = matchedDetail?.Rate;
+
+                        // Bu bacak, kasadan SATILAN (Debit) bir döviz ise "Alış Kuru" olarak işlemin
+                        // kendi kurunu değil, satıştan hemen önceki ortalama alış maliyetini (WAC)
+                        // göster — aksi halde alış/satış kuru hep aynı görünüp kâr mantıksız kalıyor.
+                        if (matchedDetail != null && matchedDetail.Side == TransactionSide.Debit
+                            && vaultHistory.CurrencyId != tryCurrencyId
+                            && wacAtSaleByTransactionCurrency.TryGetValue((matchedTx.Id, vaultHistory.CurrencyId), out var wacAtSale))
+                        {
+                            costBasisRate = wacAtSale;
+                        }
+                    }
+                }
+
+                // Değerleme, personelin işlemde GERÇEKTEN kullandığı kuru baz alır (appliedRate);
+                // yalnızca bir işlem eşleşmediğinde (manuel yatırma/çekme/düzeltme vb.) genel piyasa
+                // kuruna düşülür. Bu, KRUB/MEUR gibi otomatik kur kaynağı olmayan birimlerde de
+                // değerlemenin 0 TRY görünmesini engeller.
                 decimal histRate = vaultHistory.CurrencyId == tryCurrencyId ? 1m
-                    : allExchangeRates.TryGetValue(vaultHistory.CurrencyId, out var histRateObj) ? histRateObj.BuyRate : 0m;
+                    : appliedRate ?? (allExchangeRates.TryGetValue(vaultHistory.CurrencyId, out var histRateObj) ? histRateObj.BuyRate : 0m);
 
                 decimal amountInTRY = Math.Abs(vaultHistory.Balance) * histRate;
 
@@ -609,7 +675,7 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 {
                     totalWithdrawals += amountInTRY;
                 }
-                
+
                 // Add to balance histories for report
                 var historyItem = new vm_vaultbalancehistory
                 {
@@ -624,8 +690,11 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     ValueInBaseCurrency = amountInTRY,
                     RunningBalance = runningBalanceById.GetValueOrDefault(vaultHistory.Id),
                     IsParty = vaultHistory.IsParty,
-                    User = vaultHistory.UserId.HasValue && historyUsers.ContainsKey(vaultHistory.UserId.Value) 
-                        ? historyUsers[vaultHistory.UserId.Value] 
+                    AppliedRate = appliedRate,
+                    CostBasisRate = costBasisRate,
+                    TransactionProfit = transactionProfit,
+                    User = vaultHistory.UserId.HasValue && historyUsers.ContainsKey(vaultHistory.UserId.Value)
+                        ? historyUsers[vaultHistory.UserId.Value]
                         : "System"
                 };
                 balanceHistoriesForReport.Add(historyItem);

@@ -4,6 +4,7 @@ using BaskentEnerji.Data.Contexts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BaskentEnerji.Data.Migrations
 {
     [DbContext(typeof(BaskentEnerjiDbContext))]
-    partial class BaskentEnerjiDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260727171348_AddUniqueIndexOnPartyAccountEntries")]
+    partial class AddUniqueIndexOnPartyAccountEntries
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -3531,10 +3534,6 @@ namespace BaskentEnerji.Data.Migrations
 
                     b.Property<int?>("MaxAttempts")
                         .HasColumnType("int");
-
-                    b.Property<string>("OperationType")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
 
                     b.Property<string>("Status")
                         .HasMaxLength(20)

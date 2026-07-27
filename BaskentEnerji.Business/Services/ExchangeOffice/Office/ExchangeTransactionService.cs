@@ -147,6 +147,9 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                         var sourceRate = singleRequest.SourceCustomRate.Value;
                         var targetRate = singleRequest.TargetCustomRate.Value;
 
+                        if (sourceRate <= 0 || targetRate <= 0)
+                            throw new ApiException(HttpStatusCode.BadRequest, "Arbitraj kurları sıfır veya negatif olamaz.");
+
                         // Piyasa sapma kontrolü: her birim için kendi TRY bazlı piyasa kuruna göre ayrı ayrı (varsa)
                         var tryCurrency = currencyDict.Values.FirstOrDefault(c => c.CurrencyCode == "TRY");
                         if (tryCurrency != null)
@@ -241,6 +244,9 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     // Calculate amounts for this exchange
                     var marketRate = singleRequest.IsBuyingFromCustomer ? exchangeRate.BuyRate : exchangeRate.SellRate;
                     rate = singleRequest.CustomRate ?? marketRate;
+
+                    if (rate <= 0)
+                        throw new ApiException(HttpStatusCode.BadRequest, "Kur sıfır veya negatif olamaz.");
 
                     // Validate custom rate is within acceptable bounds (max 20% deviation from market)
                     if (singleRequest.CustomRate.HasValue && marketRate > 0)

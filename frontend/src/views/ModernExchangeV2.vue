@@ -529,6 +529,10 @@ function addToBatch() {
     const parsed = parseNum(batchCustomRate.value)
     if (parsed > 0) rate = parsed
   }
+  if (!(rate > 0)) {
+    notification.warning('Geçerli bir kur bulunamadı')
+    return
+  }
   batchQueue.value.push({
     id: crypto.randomUUID(),
     type: batchType.value,
@@ -551,6 +555,8 @@ function removeBatchItem(id: string) {
 }
 
 async function submitBatch() {
+  if (isLoading.value) return
+  if (authStore.isViewerForOffice(selectedOfficeId.value)) return
   if (batchQueue.value.length === 0) {
     notification.warning('Kuyrukta işlem yok')
     return
@@ -765,6 +771,15 @@ const updateExchangeRate = async (item: ExchangeItem) => {
       if (item.sourceAmount > 0) {
         item.targetAmount = item.sourceAmount * rate
       }
+    } else if (transactionType.value === 'sell' && item.sourceCurrencyId && getWacForCurrency(item.sourceCurrencyId) > 0) {
+      // Bu para birimi hiç satılmadığı için tanımlı bir satış kuru yok (satılmamış para birimi) —
+      // kör bir 0 yerine, personelin GERÇEKTEN o kasadaki ortalama alış maliyetini (WAC) başlangıç
+      // kuru olarak görmesini sağlıyoruz. WAC'ın altına inildiğinde zaten mevcut zarar uyarısı devreye girer.
+      const wac = getWacForCurrency(item.sourceCurrencyId)
+      item.exchangeRate = wac
+      if (item.sourceAmount > 0) {
+        item.targetAmount = item.sourceAmount * wac
+      }
     } else {
       item.exchangeRate = 0
       item.targetAmount = 0
@@ -872,14 +887,19 @@ const validateExchange = async () => {
       return false
     }
     
-    if (!item.exchangeRate && !item.customRate) {
+    const hasNumericCustomRate = item.customRate !== undefined && item.customRate !== null && item.customRate !== '' && parseNum(item.customRate) > 0
+    if (!(item.exchangeRate > 0) && !hasNumericCustomRate) {
       notification.error('Kur bilgisi bulunamadı')
       return false
     }
 
-    if (terminalMode.value === 'arbitrage' && (!item.customRate || !item.targetCustomRate)) {
-      notification.error('Arbitraj işlemi için hem alınan hem verilen birimin kuru girilmelidir')
-      return false
+    if (terminalMode.value === 'arbitrage') {
+      const hasSourceRate = item.customRate !== undefined && item.customRate !== null && item.customRate !== '' && parseNum(item.customRate) > 0
+      const hasTargetRate = item.targetCustomRate !== undefined && item.targetCustomRate !== null && item.targetCustomRate !== '' && parseNum(item.targetCustomRate) > 0
+      if (!hasSourceRate || !hasTargetRate) {
+        notification.error('Arbitraj işlemi için hem alınan hem verilen birimin kuru girilmelidir')
+        return false
+      }
     }
   }
 
@@ -913,8 +933,10 @@ const validateExchange = async () => {
 }
 
 const submitExchange = async () => {
+  if (isLoading.value) return
+  if (authStore.isViewerForOffice(selectedOfficeId.value)) return
   if (!(await validateExchange())) return
-  
+
   isLoading.value = true
   try {
     const isArbitrageMode = terminalMode.value === 'arbitrage'
@@ -2218,6 +2240,7 @@ watch(() => exchangeItems.value.map(item => ({
 
             <!-- Submit -->
             <button
+              v-if="!authStore.isViewerForOffice(selectedOfficeId)"
               @click="submitExchange"
               :disabled="isLoading || exchangeItems.length === 0 || !selectedOfficeId || !selectedVaultId || (transactionType === 'sell' && exchangeItems.some(item => isSellBelowWac(item)) && !ownerOverrideLoss)"
               class="ex-submit-btn"

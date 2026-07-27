@@ -2210,10 +2210,13 @@ namespace BaskentEnerji.API.Controllers.ExchangeOffice
             try
             {
                 var result = await _expenseDefinitionService.DeleteDefinitionAsync(id);
-                if (!result)
+                if (result == null)
                     return NotFound(new { error = "Expense definition not found" });
 
-                return Ok(new { message = "Expense definition deleted successfully" });
+                // "deactivated": ödeme geçmişi olan bir tanım — geçmiş kayıtlar bozulmasın diye
+                // gerçekten silinmeyip pasife alındı. Frontend'in kullanıcıya bunu net şekilde
+                // anlatabilmesi için sonucu ayrıca dönüyoruz.
+                return Ok(new { message = "Expense definition deleted successfully", action = result });
             }
             catch (ApiException)
             {

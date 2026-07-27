@@ -53,6 +53,19 @@
           </svg>
         </button>
       </div>
+
+      <div v-if="vaultSwitcherOptions.length > 1" class="vault-switcher">
+        <button
+          v-for="opt in vaultSwitcherOptions"
+          :key="opt.id"
+          type="button"
+          class="vault-switcher-tab"
+          :class="{ active: opt.isActive }"
+          @click="switchVault(opt.id)"
+        >
+          {{ opt.name }}
+        </button>
+      </div>
     </div>
 
     <div v-if="vault && !isLoading" class="vault-content">
@@ -222,6 +235,9 @@
                   <span class="amount in-base">
                     {{ formatCurrency(balance.valueInBaseCurrency || 0, 'TRY') }}
                   </span>
+                  <span v-if="balance.unrealizedProfit" class="amount" :class="balance.unrealizedProfit < 0 ? 'unrealized-neg' : 'unrealized-pos'" style="display:block;font-size:11px">
+                    {{ balance.unrealizedProfit > 0 ? '+' : '' }}{{ formatCurrency(balance.unrealizedProfit, 'TRY') }} (anlık fark)
+                  </span>
                 </td>
                 <td v-if="authStore.isAdmin">
                   <button @click="updateBalance(balance)" class="balance-update-btn" title="Bakiye Güncelle">
@@ -276,6 +292,12 @@
               <div class="balance-row">
                 <span class="balance-label">Değer</span>
                 <span class="balance-value in-base">{{ formatCurrency(balance.valueInBaseCurrency || 0, 'TRY') }}</span>
+              </div>
+              <div class="balance-row" v-if="balance.unrealizedProfit">
+                <span class="balance-label">Anlık Piyasa Farkı</span>
+                <span class="balance-value" :class="balance.unrealizedProfit < 0 ? 'unrealized-neg' : 'unrealized-pos'">
+                  {{ balance.unrealizedProfit > 0 ? '+' : '' }}{{ formatCurrency(balance.unrealizedProfit, 'TRY') }}
+                </span>
               </div>
             </div>
           </div>
@@ -975,6 +997,24 @@ const availableBalances = computed(() => {
   return vault.value.balances.filter(b => (b.availableBalance || b.balance) > 0)
 })
 
+// Kasa seçici: aktif kasa + diğer kasalar tek listede, isme göre sıralı.
+const vaultSwitcherOptions = computed(() => {
+  const current = vault.value
+  const activeId = current ? (current.vaultId || current.id) : null
+  const list = current ? [current, ...otherVaults.value] : otherVaults.value
+  return list
+    .filter((v: any) => v)
+    .sort((a: any, b: any) => (a.vaultName || '').localeCompare(b.vaultName || ''))
+    .map((v: any) => ({ id: v.vaultId || v.id, name: v.vaultName, isActive: (v.vaultId || v.id) === activeId }))
+})
+
+function switchVault(vaultId: string) {
+  const currentId = vault.value ? (vault.value.vaultId || vault.value.id) : null
+  if (!vaultId || vaultId === currentId) return
+  localStorage.setItem('selectedVaultId', vaultId)
+  router.push(`/ihtiyar/vaults/${vaultId}`)
+}
+
 const selectedWithdrawBalance = computed(() =>
   availableBalances.value.find(b => b.currencyId === withdrawForm.value.currencyId) ?? null
 )
@@ -1478,6 +1518,15 @@ const closeDropdowns = () => {
 async function loadForCurrentRoute() {
   if (!route.params.id) {
     try {
+      // Kullanıcı daha önce kasa sekmesinden bir kasa seçtiyse, o kasayı hatırla —
+      // yalnızca hiç seçim yokken (ilk giriş) ofis/ilk-kasa fallback'ine düş.
+      const rememberedVaultId = localStorage.getItem('selectedVaultId')
+      if (rememberedVaultId) {
+        router.replace(`/ihtiyar/vaults/${rememberedVaultId}`)
+        await loadVaultData(rememberedVaultId)
+        return
+      }
+
       const userOfficeId = localStorage.getItem('selectedOfficeId')
       let allVaults: any[] = []
       if (userOfficeId) {
@@ -1570,6 +1619,38 @@ onUnmounted(() => {
   display: flex;
   align-items: flex-start;
   gap: 2rem;
+}
+
+.vault-switcher {
+  position: relative;
+  max-width: 1400px;
+  margin: 1rem auto 0;
+  padding: 0 2rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.vault-switcher-tab {
+  padding: 0.5rem 1.125rem;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-md);
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 500;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.vault-switcher-tab:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.vault-switcher-tab.active {
+  background: white;
+  color: var(--color-primary, #4f46e5);
+  border-color: white;
 }
 
 .back-button {
@@ -2120,6 +2201,9 @@ onUnmounted(() => {
   color: var(--color-text-secondary);
   font-size: 0.875rem;
 }
+
+.unrealized-pos { color: #16a34a; }
+.unrealized-neg { color: var(--color-danger, #dc2626); }
 
 /* Balance History */
 .history-header {

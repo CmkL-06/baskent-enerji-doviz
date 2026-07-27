@@ -8,8 +8,6 @@ import { useExpandable } from '@/composables/useExpandable'
 import AppKpiCard from '@/components/common/AppKpiCard.vue'
 import AppPageHeader from '@/components/common/AppPageHeader.vue'
 import AppEmptyState from '@/components/common/AppEmptyState.vue'
-import VolumeDonutChart from '@/components/common/VolumeDonutChart.vue'
-import TrendLineChart from '@/components/common/TrendLineChart.vue'
 
 const authStore = useAuthStore()
 const exchangeStore = useExchangeStore()
@@ -25,7 +23,6 @@ const payments = ref<any[]>([])
 const currencies = ref<any[]>([])
 const pendingApprovals = ref<any[]>([])
 const budgetStatus = ref<any[]>([])
-const budgetHistory = ref<any[]>([])
 
 // Gider kategorileri — artık sabit enum değil, kullanıcı tarafından yönetilebilen (Currency ile
 // aynı desende) bir liste. `categoryMap` hızlı isim çözümlemesi için.
@@ -227,17 +224,6 @@ const totalExpense = computed(() =>
   filteredPayments.value.filter(p => p.status === 2 && !p.isDeleted).reduce((sum, p) => sum + (p.amount || 0), 0)
 )
 
-const categoryBreakdown = computed(() => {
-  const map: Record<string, number> = {}
-  filteredPayments.value.filter(p => p.status === 2 && !p.isDeleted).forEach(p => {
-    const cat = p.categoryName || categoryMap.value[p.categoryId] || 'Diğer'
-    map[cat] = (map[cat] || 0) + (p.amount || 0)
-  })
-  return Object.entries(map).sort((a, b) => b[1] - a[1])
-})
-
-const donutData = computed(() => categoryBreakdown.value.map(([code, amount]) => ({ code, amount })))
-
 // Bütçe bölümü: servisin döndürdüğü (bütçesi VEYA gerçekleşeni olan) kategorilere ek olarak,
 // henüz hiç bütçesi/harcaması olmayan kategoriler de "0" ile gösterilir — kullanıcı herhangi bir
 // kategoriye ilk kez bütçe girebilsin diye.
@@ -248,6 +234,12 @@ const budgetRows = computed(() => {
     return existing ?? { categoryId: c.id, categoryName: c.name, budgetAmount: 0, actualAmount: 0, percentUsed: 0, statusLevel: 'none' }
   }).sort((a: any, b: any) => b.actualAmount - a.actualAmount)
 })
+
+// Hiç bütçesi/harcaması olmayan kategoriler tam boyutlu kart yerine tek satırlık bir özet
+// şeridinde toplanır — anlamsız "₺0,00 / ₺0,00" kalabalığını önlemek için.
+const activeBudgetRows = computed(() => budgetRows.value.filter((r: any) => r.budgetAmount > 0 || r.actualAmount > 0))
+const dormantBudgetRows = computed(() => budgetRows.value.filter((r: any) => r.budgetAmount === 0 && r.actualAmount === 0))
+const showDormantCategories = ref(false)
 
 const budgetSummary = computed(() => {
   const withBudget = budgetRows.value.filter((r: any) => r.budgetAmount > 0)
@@ -268,10 +260,6 @@ function budgetCategoryPayments(categoryId: string) {
       new Date(p.paymentDate).getMonth() + 1 === budgetMonth.value)
     .sort((a: any, b: any) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime())
 }
-
-const trendLabels = computed(() => budgetHistory.value.map((h: any) => h.label))
-const trendActual = computed(() => budgetHistory.value.map((h: any) => h.totalActual))
-const trendBudget = computed(() => budgetHistory.value.map((h: any) => h.totalBudget))
 
 function fmt(n: number): string {
   return new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0)
@@ -313,7 +301,7 @@ async function loadAll() {
     definitions.value = Array.isArray(defs) ? defs : (defs?.items ?? [])
     payments.value = Array.isArray(pays) ? pays : (pays?.items ?? [])
     currencies.value = Array.isArray(curs) ? curs : (curs?.items ?? [])
-    await Promise.all([loadCategories(), loadPendingApprovals(), loadBudgetStatus(), loadBudgetHistory(), loadUpcomingDefinitions()])
+    await Promise.all([loadCategories(), loadPendingApprovals(), loadBudgetStatus(), loadUpcomingDefinitions()])
   } catch (e: any) {
     error.value = e?.response?.data?.error || e.message || 'Veriler yüklenemedi'
   } finally {
@@ -369,14 +357,6 @@ async function loadBudgetStatus() {
   }
 }
 
-async function loadBudgetHistory() {
-  if (!officeId.value) return
-  try {
-    budgetHistory.value = await apiService.getExpenseBudgetHistory(officeId.value, 12) ?? []
-  } catch (e) {
-    console.error('Bütçe geçmişi yüklenemedi:', e)
-  }
-}
 
 onMounted(loadAll)
 
@@ -471,7 +451,10 @@ function openEditDef(d: any) {
 }
 
 async function saveDef() {
-  if (!defForm.value.name.trim()) return
+  if (!defForm.value.name.trim()) {
+    notification.warning('Gider kalemi adı boş olamaz')
+    return
+  }
   if (defForm.value.defaultAmount != null && defForm.value.defaultAmount < 0) {
     notification.warning('Varsayılan tutar negatif olamaz')
     return
@@ -499,8 +482,14 @@ async function saveDef() {
 
 async function deleteDef(d: any) {
   try {
-    await apiService.deleteExpenseDefinition(d.id)
-    notification.success('Tanım silindi')
+    const res = await apiService.deleteExpenseDefinition(d.id)
+    // Ödemesi olan bir tanım gerçekten silinmez, sadece pasife alınır — kullanıcı "silindi"
+    // dediği halde listede "Pasif" olarak kalmasının kafa karıştırmaması için ayrı mesaj.
+    if (res?.action === 'deactivated') {
+      notification.success('Bu kalemin geçmiş ödeme kaydı olduğu için tamamen silinmedi, "Pasif" durumuna alındı')
+    } else {
+      notification.success('Tanım silindi')
+    }
     defDeleteConfirmId.value = null
     await loadAll()
   } catch (e: any) {
@@ -734,7 +723,7 @@ const activeTab = ref<'payments' | 'definitions'>('payments')
       </div>
       <div class="budget-cards">
         <div
-          v-for="row in budgetRows" :key="row.categoryId"
+          v-for="row in (showDormantCategories ? budgetRows : activeBudgetRows)" :key="row.categoryId"
           class="budget-card" :class="['budget-card--' + row.statusLevel, { 'budget-card--open': isBudgetExpanded(row.categoryId) }]"
         >
           <div class="budget-card-head">
@@ -786,10 +775,11 @@ const activeTab = ref<'payments' | 'definitions'>('payments')
           >
             <div class="budget-card-amounts">
               <span class="budget-actual">₺{{ fmt(row.actualAmount) }}</span>
-              <span class="budget-sep">/ ₺{{ fmt(row.budgetAmount) }}</span>
+              <span v-if="row.budgetAmount > 0" class="budget-sep">/ ₺{{ fmt(row.budgetAmount) }}</span>
+              <span v-else class="budget-no-limit">Bütçe belirlenmedi</span>
               <span v-if="row.budgetAmount > 0" class="budget-percent" :class="'budget-percent--' + row.statusLevel">%{{ fmt(row.percentUsed) }}</span>
             </div>
-            <div class="budget-bar-wrap">
+            <div v-if="row.budgetAmount > 0" class="budget-bar-wrap">
               <div class="budget-bar" :class="'budget-bar--' + row.statusLevel" :style="{ width: Math.min(100, row.percentUsed) + '%' }"></div>
             </div>
             <div v-if="row.budgetAmount > 0" class="budget-remaining">
@@ -826,6 +816,13 @@ const activeTab = ref<'payments' | 'definitions'>('payments')
           </div>
         </div>
       </div>
+      <button
+        v-if="dormantBudgetRows.length" type="button" class="dormant-toggle"
+        @click="showDormantCategories = !showDormantCategories"
+      >
+        <span class="material-symbols-outlined" aria-hidden="true">{{ showDormantCategories ? 'expand_less' : 'expand_more' }}</span>
+        {{ showDormantCategories ? 'Kullanılmayan kategorileri gizle' : `Kullanılmayan ${dormantBudgetRows.length} kategoriyi göster` }}
+      </button>
     </div>
 
     <!-- Gider Kayıtları: filtre + tab + liste/tablo tek panelde -->
@@ -922,30 +919,6 @@ const activeTab = ref<'payments' | 'definitions'>('payments')
       <AppEmptyState v-else icon="receipt_long" message="Henüz gider ödemesi kaydedilmemiş. Kira, fatura, maaş gibi bir gideri kaydetmek için başlayın — gider türünü de aynı adımda oluşturabilirsiniz.">
         <button v-if="!authStore.isViewerForOffice(officeId)" class="exp-btn primary" @click="openCreatePay()">İlk Gideri Ekle</button>
       </AppEmptyState>
-
-      <!-- Kategori dağılımı + aylık trend -->
-      <div v-if="categoryBreakdown.length" class="analytics-zone">
-        <div class="analytics-zone-title">
-          <span class="material-symbols-outlined" aria-hidden="true">insights</span>
-          <span>Kategori &amp; Bütçe Analizi</span>
-        </div>
-        <div class="analytics-row">
-        <div class="analytics-card">
-          <h3>Kategori Dağılımı</h3>
-          <VolumeDonutChart :items="donutData" />
-        </div>
-        <div class="analytics-card">
-          <h3>Aylık Bütçe vs Gerçekleşen</h3>
-          <TrendLineChart
-            :labels="trendLabels"
-            :profit-series="trendActual"
-            :volume-series="trendBudget"
-            profit-label="Gerçekleşen (₺)"
-            volume-label="Bütçe (₺)"
-          />
-        </div>
-        </div>
-      </div>
     </div>
 
     <!-- Definitions Table -->
@@ -1412,6 +1385,14 @@ const activeTab = ref<'payments' | 'definitions'>('payments')
 .budget-percent--none { background: color-mix(in srgb, var(--color-text-secondary) 12%, transparent); color: var(--color-text-secondary); }
 .budget-remaining { font-size: 12px; color: var(--color-text-secondary); }
 .budget-sep { color: var(--color-text-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.budget-no-limit { color: var(--color-text-muted); font-size: 11px; font-style: italic; }
+.dormant-toggle {
+  display: flex; align-items: center; gap: 6px; margin: 12px 16px 4px;
+  padding: 8px 12px; background: none; border: 1px dashed var(--color-border); border-radius: var(--radius-md);
+  color: var(--color-text-secondary); font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.dormant-toggle:hover { background: var(--color-bg-hover, rgba(0,0,0,.03)); }
+.dormant-toggle .material-symbols-outlined { font-size: 16px; }
 .budget-bar-wrap { height: 8px; background: var(--color-bg-page); border-radius: var(--radius-sm); overflow: hidden; }
 .budget-bar { height: 100%; border-radius: var(--radius-sm); transition: width .3s; }
 .budget-bar--green { background: linear-gradient(90deg, var(--color-success) 0%, color-mix(in srgb, var(--color-success) 75%, white) 100%); }
@@ -1549,19 +1530,6 @@ const activeTab = ref<'payments' | 'definitions'>('payments')
 .icon-btn:disabled { opacity: .5; cursor: not-allowed; }
 .icon-btn .material-symbols-outlined { font-size: 18px; }
 
-/* Analiz (donut + trend) — zone başlığı ile gruplanır */
-.analytics-zone { margin-top: 20px; padding: 0 16px 16px; }
-.analytics-zone-title {
-  display: flex; align-items: center; gap: 8px; padding: 8px 0 12px 10px;
-  border-left: 4px solid var(--color-primary); font-size: 13px; font-weight: 700; color: var(--color-text);
-}
-.analytics-zone-title .material-symbols-outlined {
-  font-size: 18px; color: var(--color-primary); font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24;
-}
-.analytics-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.analytics-card { background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-bold); padding: 16px; }
-.analytics-card h3 { font-size: 13px; font-weight: 700; color: var(--color-text); margin: 0 0 12px; }
-
 /* Loading / Error */
 .exp-loading { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 48px; color: var(--color-text-secondary); font-size: 14px; }
 .spinner { width: 20px; height: 20px; border: 2px solid #e5e7eb; border-top-color: var(--color-primary); border-radius: 50%; animation: spin .6s linear infinite; }
@@ -1642,6 +1610,5 @@ textarea.form-input { resize: vertical; }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
   .filter-bar { flex-direction: column; }
   .form-row { flex-direction: column; }
-  .analytics-row { grid-template-columns: 1fr; }
 }
 </style>

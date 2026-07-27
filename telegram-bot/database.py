@@ -6,6 +6,7 @@ mtturkey_exchange DB'sindeki TgXxx tablolari kullanilir (PascalCase sutunlar).
 """
 import pyodbc
 import logging
+import time
 from datetime import datetime
 from contextlib import contextmanager
 from config import Config
@@ -15,9 +16,15 @@ logger = logging.getLogger(__name__)
 # ===================================================
 # BAGLANTI HAVUZU
 # ===================================================
+# Havuzdaki her girdi (conn, created_at) tuple'i -- pyodbc.Connection
+# nesnelerine keyfi ozellik eklemek guvenilir olmadigi icin yaratilma zamani
+# ayri tutuluyor. MAX_CONN_LIFETIME'i asan baglantilar, canlilik kontrolunden
+# gecse bile zorla yenilenir (uzun sureli SQL Server tarafli timeout/DNS
+# degisikligi gibi durumlara karsi).
 
 _pool = []
 _POOL_SIZE = 5
+_MAX_CONN_LIFETIME = 1800  # saniye (30 dakika)
 
 
 def _create_connection():
@@ -43,19 +50,26 @@ def get_conn():
     """
     conn = None
     while _pool:
-        conn = _pool.pop()
+        pooled_conn, created_at = _pool.pop()
+        if time.monotonic() - created_at > _MAX_CONN_LIFETIME:
+            try:
+                pooled_conn.close()
+            except Exception:
+                pass
+            continue
         try:
-            conn.cursor().execute("SELECT 1")
+            pooled_conn.cursor().execute("SELECT 1")
+            conn, conn_created_at = pooled_conn, created_at
             break
         except Exception:
             try:
-                conn.close()
+                pooled_conn.close()
             except Exception:
                 pass
-            conn = None
 
     if conn is None:
         conn = _create_connection()
+        conn_created_at = time.monotonic()
 
     if conn is None:
         raise ConnectionError("Veritabanina baglanilmadi")
@@ -72,7 +86,7 @@ def get_conn():
         if len(_pool) < _POOL_SIZE:
             try:
                 conn.rollback()
-                _pool.append(conn)
+                _pool.append((conn, conn_created_at))
             except Exception:
                 try:
                     conn.close()
@@ -398,6 +412,39 @@ def complete_transaction(transaction_id, completion_code=None):
     if completion_code:
         updates['completion_code'] = str(completion_code)
     return update_transaction(transaction_id, **updates)
+
+
+def complete_transaction_atomic(transaction_id, completion_code=None):
+    """
+    Islemi SADECE henuz 'completed' olmayan bir durumdaysa tamamlar.
+    Cok-processli bot mimarisinde (main_bot/operator_bot/ruble_bot ayri
+    python.exe surecleri) ayni transaction_id icin ayni anda iki tamamlama
+    denemesi gelebilir; asyncio.Lock sadece tek surec icini korur, bu yuzden
+    gercek koruma SQL Server'in satir seviyesi atomik UPDATE'ine dayanir.
+
+    Donus: True  -> bu cagri islemi tamamladi (bakiye dusme/API cagrilarina devam et)
+           False -> zaten completed idi (dur, kullaniciya bildir, tekrar isleme)
+    """
+    try:
+        with get_conn() as conn:
+            c = conn.cursor()
+            if completion_code:
+                c.execute("""
+                    UPDATE TgTransactions
+                    SET Status = 'completed', CompletedAt = GETDATE(), CompletionCode = ?
+                    WHERE TransactionId = ? AND Status <> 'completed'
+                """, str(completion_code), transaction_id)
+            else:
+                c.execute("""
+                    UPDATE TgTransactions
+                    SET Status = 'completed', CompletedAt = GETDATE()
+                    WHERE TransactionId = ? AND Status <> 'completed'
+                """, transaction_id)
+            conn.commit()
+            return c.rowcount > 0
+    except Exception as e:
+        logger.error(f"DB error in complete_transaction_atomic: {e}")
+        return False
 
 
 def cancel_transaction(transaction_id, customer_id):
@@ -738,15 +785,29 @@ def find_dealer_by_city(city_text):
     return None
 
 
-def reduce_dealer_balance(dealer_code, amount_try):
-    """Bayi bakiyesinden dus"""
+def reduce_dealer_balance(dealer_code, amount_try, transaction_id=None):
+    """
+    Bayi bakiyesinden dus. Negatife dusme engellenmez (islem zaten tamamlanmis
+    sayildigi icin dusumu engellemek daha buyuk bir tutarsizlik yaratir -- negatif
+    bakiye 'bayi acik' durumunu mesru sekilde temsil edebilir), ama izlenebilirlik
+    icin loglanir.
+    """
     try:
         with get_conn() as conn:
             c = conn.cursor()
             c.execute("""
-                UPDATE TgDealers SET Balance = Balance - ? WHERE DealerCode = ?
+                UPDATE TgDealers
+                SET Balance = Balance - ?
+                OUTPUT INSERTED.Balance
+                WHERE DealerCode = ?
             """, amount_try, dealer_code)
+            row = c.fetchone()
             conn.commit()
+            if row and row[0] < 0:
+                logger.warning(
+                    f"Dealer {dealer_code} bakiyesi negatife dustu: {row[0]} "
+                    f"(TransactionId={transaction_id}, dusulen={amount_try})"
+                )
             return True
     except Exception as e:
         logger.error(f"DB error in reduce_dealer_balance: {e}")
@@ -1125,18 +1186,35 @@ def get_bot_heartbeats():
 # BASKENT API KUYRUK ISLEMLERI
 # ===================================================
 
-def enqueue_baskent_api(transaction_id):
-    """Basarisiz BaskentEnerji API cagrisini kuyruga ekle"""
+def enqueue_baskent_api(transaction_id, operation_type='exchange', max_attempts=None):
+    """
+    Basarisiz BaskentEnerji API cagrisini kuyruga ekle.
+    max_attempts verilirse (orn. kur eksikse otomatik tekrar denemenin anlami
+    olmadigi 'exchange_missing_rate' durumu icin 1), varsayilan DB degeri (5)
+    yerine o kullanilir -- boylece bu kayitlar process_queue() tarafindan
+    bosuna tekrar tekrar denenmez, sadece admin panelde manuel mudahale
+    bekleyen bir kayit olarak gorunur.
+    """
     try:
         with get_conn() as conn:
             c = conn.cursor()
-            c.execute("""
-                IF NOT EXISTS (
-                    SELECT 1 FROM TgApiQueue
-                    WHERE TransactionId = ? AND Status = 'pending'
-                )
-                INSERT INTO TgApiQueue (TransactionId) VALUES (?)
-            """, transaction_id, transaction_id)
+            if max_attempts is not None:
+                c.execute("""
+                    IF NOT EXISTS (
+                        SELECT 1 FROM TgApiQueue
+                        WHERE TransactionId = ? AND Status = 'pending' AND OperationType = ?
+                    )
+                    INSERT INTO TgApiQueue (TransactionId, OperationType, MaxAttempts)
+                    VALUES (?, ?, ?)
+                """, transaction_id, operation_type, transaction_id, operation_type, max_attempts)
+            else:
+                c.execute("""
+                    IF NOT EXISTS (
+                        SELECT 1 FROM TgApiQueue
+                        WHERE TransactionId = ? AND Status = 'pending' AND OperationType = ?
+                    )
+                    INSERT INTO TgApiQueue (TransactionId, OperationType) VALUES (?, ?)
+                """, transaction_id, operation_type, transaction_id, operation_type)
             conn.commit()
             return True
     except Exception as e:
@@ -1152,7 +1230,7 @@ def get_pending_baskent_queue():
             c.execute("""
                 SELECT QueueId AS queue_id, TransactionId AS transaction_id,
                        Attempts AS attempts, MaxAttempts AS max_attempts,
-                       LastError AS last_error
+                       LastError AS last_error, OperationType AS operation_type
                 FROM TgApiQueue
                 WHERE Status = 'pending' AND Attempts < MaxAttempts
                 ORDER BY CreatedAt ASC

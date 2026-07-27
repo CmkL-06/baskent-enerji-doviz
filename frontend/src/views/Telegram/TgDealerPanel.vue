@@ -2,8 +2,38 @@
 import { ref, computed, onMounted, onUnmounted, useTemplateRef } from 'vue'
 import apiService from '@/services/apiservice'
 import { formatAmount } from '@/utils/currency'
+import { useAuthStore } from '@/stores/auth'
 
+const authStore = useAuthStore()
 const loading = ref(true)
+
+const showPasswordForm = ref(false)
+const passwordForm = ref({ current: '', next: '' })
+const passwordLoading = ref(false)
+const passwordMessage = ref('')
+const passwordError = ref(false)
+
+async function changePassword() {
+  passwordMessage.value = ''
+  if (passwordForm.value.next.length < 8) {
+    passwordError.value = true
+    passwordMessage.value = 'Yeni şifre en az 8 karakter olmalı.'
+    return
+  }
+  passwordLoading.value = true
+  try {
+    await apiService.changeMyPassword(passwordForm.value.current, passwordForm.value.next)
+    passwordError.value = false
+    passwordMessage.value = 'Şifreniz güncellendi. Tekrar giriş yapmanız gerekecek.'
+    passwordForm.value = { current: '', next: '' }
+    setTimeout(() => authStore.logout(), 2000)
+  } catch (e: any) {
+    passwordError.value = true
+    passwordMessage.value = e?.response?.data?.message || 'Şifre değiştirilemedi.'
+  } finally {
+    passwordLoading.value = false
+  }
+}
 
 const dashboard = ref<any>({
   balance: 0, given_tl: 0, usdt: 0, rub: 0,
@@ -82,19 +112,43 @@ function disconnectSSE() {
   if (eventSource) { eventSource.close(); eventSource = null }
 }
 
+const txHasMore = ref(false)
+const txTotalCount = ref(0)
+const txLoadingMore = ref(false)
+
 async function loadData() {
   try {
     const [dashRes, depositRes] = await Promise.all([
-      apiService.get('/tg/dealer/dashboard'),
+      apiService.get('/tg/dealer/dashboard', { params: { txSkip: 0, txTake: 200 } }),
       apiService.get('/tg/dealer/crypto-deposits').catch(() => ({ deposits: [] }))
     ])
     dashboard.value = dashRes
     cryptoDeposits.value = depositRes?.deposits ?? []
+    txTotalCount.value = dashRes?.total_tx_count ?? (dashRes?.transactions?.length ?? 0)
+    txHasMore.value = !!dashRes?.has_more_tx
     if (dashRes?.dealer_code && !cariLoaded.value) {
       loadCariData(dashRes.dealer_code)
     }
   } catch (e) { console.error('Dealer dashboard error:', e) }
   finally { loading.value = false }
+}
+
+async function loadMoreTransactions() {
+  if (txLoadingMore.value || !txHasMore.value || !dashboard.value?.dealer_code) return
+  txLoadingMore.value = true
+  try {
+    const skipAtRequestTime = dashboard.value.transactions.length
+    const res = await apiService.get('/tg/dealer/dashboard', {
+      params: { txSkip: skipAtRequestTime, txTake: 200 }
+    })
+    // Bekleme sirasinda loadData() araya girip dashboard.value'yu tamamen yenilemis
+    // olabilir -- id'ye gore tekilleyerek cakisan :key ile cift render'i onluyoruz.
+    const existingIds = new Set(dashboard.value.transactions.map((t: any) => t.id))
+    const newOnes = (res?.transactions ?? []).filter((t: any) => !existingIds.has(t.id))
+    dashboard.value.transactions = [...dashboard.value.transactions, ...newOnes]
+    txHasMore.value = !!res?.has_more_tx
+  } catch (e) { console.error('Daha fazla islem yuklenemedi:', e) }
+  finally { txLoadingMore.value = false }
 }
 
 async function loadCariData(code: string) {
@@ -165,6 +219,22 @@ onUnmounted(() => {
             <div v-if="dashboard.staff_name && dashboard.staff_name !== dashboard.dealer_name" class="dealer-staff">Personel: {{ dashboard.staff_name }}</div>
           </div>
         </div>
+        <button type="button" class="logout-btn" @click="showPasswordForm = !showPasswordForm">
+          <span class="material-symbols-outlined" aria-hidden="true">lock</span>
+          Şifre Değiştir
+        </button>
+      </div>
+
+      <!-- Şifre Değiştir Formu -->
+      <div v-if="showPasswordForm" class="password-form">
+        <div class="password-form-row">
+          <input v-model="passwordForm.current" type="password" placeholder="Mevcut şifre" class="form-input" />
+          <input v-model="passwordForm.next" type="password" placeholder="Yeni şifre (en az 8 karakter)" class="form-input" />
+          <button type="button" class="qr-download-btn" :disabled="passwordLoading" @click="changePassword">
+            {{ passwordLoading ? 'Kaydediliyor...' : 'Kaydet' }}
+          </button>
+        </div>
+        <div v-if="passwordMessage" class="password-message" :class="{ error: passwordError }">{{ passwordMessage }}</div>
       </div>
 
       <!-- Summary Cards -->
@@ -343,6 +413,11 @@ onUnmounted(() => {
           </tbody>
         </table>
       </div>
+      <div v-if="txHasMore" style="text-align:center; margin-top:12px">
+        <button class="qr-download-btn" :disabled="txLoadingMore" @click="loadMoreTransactions">
+          {{ txLoadingMore ? 'Yükleniyor...' : `Daha Fazla Yükle (${dashboard.transactions.length}/${txTotalCount})` }}
+        </button>
+      </div>
 
       <!-- Auto refresh indicator -->
       <div class="refresh-indicator">
@@ -363,6 +438,15 @@ onUnmounted(() => {
 .dealer-code { font-size: 13px; color: var(--color-text-secondary, #6b7280); }
 .dealer-code code { background: var(--color-hover, #f3f4f6); padding: 2px 8px; border-radius: var(--radius-sm); font-weight: 600; }
 .dealer-staff { font-size: 12px; color: var(--color-text-secondary, #9ca3af); margin-top: 2px; }
+.logout-btn { display: flex; align-items: center; gap: 6px; padding: 8px 14px; background: var(--color-bg-card, #fff); border: 1px solid var(--color-border); border-radius: var(--radius-md); color: var(--color-text-secondary, #6b7280); font-size: 13px; font-weight: 600; cursor: pointer; transition: background-color 0.2s ease, color 0.2s ease; }
+.logout-btn:hover { background: var(--color-hover, #f3f4f6); color: var(--color-primary, var(--color-secondary-hover)); }
+.logout-btn .material-symbols-outlined { font-size: 18px; }
+
+.password-form { background: var(--color-bg-card, #fff); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 12px 16px; margin-bottom: 16px; }
+.password-form-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.password-form-row .form-input { flex: 1; min-width: 160px; padding: 8px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: 13px; }
+.password-message { margin-top: 8px; font-size: 12px; color: var(--color-success, #10b981); }
+.password-message.error { color: var(--color-danger, #dc2626); }
 
 .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
 .summary-card { padding: 16px; background: var(--color-bg-card, #fff); border: 1px solid var(--color-border); border-radius: var(--radius-md); text-align: center; box-shadow: var(--shadow-bold); }
@@ -428,4 +512,11 @@ onUnmounted(() => {
 
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 480px) {
+  .summary-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+  .qr-body { flex-direction: column; align-items: center; text-align: center; }
+  .qr-image { width: 120px; height: 120px; }
+  .qr-details { min-width: 0; width: 100%; }
+}
 </style>

@@ -13,6 +13,7 @@ const messages = ref<any[]>([])
 const newMessage = ref('')
 const sendingMsg = ref(false)
 const activeFilter = ref('active')
+const actionLoading = ref(false)
 
 let eventSource: EventSource | null = null
 let audioCtx: AudioContext | null = null
@@ -37,7 +38,7 @@ async function loadTransactions() {
   try {
     const res = await apiService.get('/tg/operator/transactions')
     transactions.value = res?.transactions ?? []
-  } catch (e) { console.error(e) }
+  } catch (e: any) { notification.error(e?.response?.data?.message || 'İşlemler yüklenemedi') }
   finally { loading.value = false }
 }
 
@@ -48,7 +49,25 @@ async function selectTransaction(tx: any) {
     messages.value = res?.messages ?? []
     await nextTick()
     scrollChatBottom()
-  } catch (e) { console.error(e) }
+  } catch (e: any) { notification.error(e?.response?.data?.message || 'Sohbet yüklenemedi') }
+}
+
+function openAttachment(url: string) {
+  window.open(url, '_blank', 'noopener')
+}
+
+function copyTxid(txid: string) {
+  navigator.clipboard?.writeText(txid)
+  notification.success('TXID kopyalandı')
+}
+
+function explorerUrl(tx: any): string | null {
+  if (!tx?.txid) return null
+  const network = (tx.network || '').toUpperCase()
+  if (network.includes('TRC20') || network.includes('TRON')) return `https://tronscan.org/#/transaction/${tx.txid}`
+  if (network.includes('ERC20') || network.includes('ETH')) return `https://etherscan.io/tx/${tx.txid}`
+  if (network.includes('BEP20') || network.includes('BSC')) return `https://bscscan.com/tx/${tx.txid}`
+  return null
 }
 
 async function sendChat() {
@@ -61,7 +80,7 @@ async function sendChat() {
     messages.value = res?.messages ?? []
     await nextTick()
     scrollChatBottom()
-  } catch (e) { console.error(e) }
+  } catch (e: any) { notification.error(e?.response?.data?.message || 'Mesaj gönderilemedi') }
   finally { sendingMsg.value = false }
 }
 
@@ -88,12 +107,13 @@ async function verifyCrypto() {
 }
 
 async function doAction(action: string) {
-  if (!selectedTx.value) return
+  if (!selectedTx.value || actionLoading.value) return
   const labels: Record<string, string> = {
     approve: 'Kabul etmek', complete: 'Tamamlamak', reject: 'Reddetmek', cancel: 'İptal etmek'
   }
   if (!confirm(`İşlemi ${labels[action]} istediğinize emin misiniz?`)) return
 
+  actionLoading.value = true
   try {
     const res = await apiService.post(`/tg/operator/transaction/${selectedTx.value.id}/${action}`)
     if (res?.status) selectedTx.value.status = res.status
@@ -101,7 +121,12 @@ async function doAction(action: string) {
     if (selectedTx.value) {
       selectedTx.value = transactions.value.find((t: any) => t.id === selectedTx.value.id) || null
     }
-  } catch (e) { console.error(e) }
+  } catch (e: any) {
+    console.error(e)
+    notification.error(e?.response?.data?.message || 'İşlem gerçekleştirilemedi')
+  } finally {
+    actionLoading.value = false
+  }
 }
 
 function scrollChatBottom() {
@@ -243,7 +268,13 @@ onUnmounted(() => {
               <div v-for="msg in messages" :key="msg.id"
                 class="chat-msg" :class="msg.senderType === 'operator' ? 'sent' : 'received'">
                 <div class="msg-bubble">
-                  {{ msg.message }}
+                  <div v-if="msg.fileUrl && msg.fileType?.startsWith('image')" class="msg-attachment">
+                    <img :src="msg.fileUrl" alt="Ek" @click="openAttachment(msg.fileUrl)" />
+                  </div>
+                  <a v-else-if="msg.fileUrl" :href="msg.fileUrl" target="_blank" rel="noopener" class="msg-file-link">
+                    <span class="material-symbols-outlined" aria-hidden="true">attach_file</span> Dosyayı Aç
+                  </a>
+                  <span v-if="msg.message">{{ msg.message }}</span>
                   <span class="msg-time">{{ formatTime(msg.createdAt) }}</span>
                 </div>
               </div>
@@ -301,7 +332,19 @@ onUnmounted(() => {
             <div class="detail-grid">
               <div class="detail-row">
                 <span class="dl">TXID</span>
-                <span class="dv txid-val" :title="selectedTx.txid">{{ selectedTx.txid ? (selectedTx.txid.substring(0, 12) + '...') : '—' }}</span>
+                <span class="dv txid-val" :title="selectedTx.txid">
+                  {{ selectedTx.txid ? (selectedTx.txid.substring(0, 12) + '...') : '—' }}
+                  <button v-if="selectedTx.txid" class="txid-copy-btn" @click="copyTxid(selectedTx.txid)" title="TXID'yi kopyala">
+                    <span class="material-symbols-outlined" aria-hidden="true">content_copy</span>
+                  </button>
+                  <a v-if="selectedTx.txid && explorerUrl(selectedTx)" :href="explorerUrl(selectedTx)!" target="_blank" rel="noopener" class="txid-explorer-link" title="Blok gezgininde aç">
+                    <span class="material-symbols-outlined" aria-hidden="true">open_in_new</span>
+                  </a>
+                </span>
+              </div>
+              <div class="detail-row" v-if="selectedTx.network">
+                <span class="dl">Ağ</span>
+                <span class="dv">{{ selectedTx.network }}</span>
               </div>
               <div class="detail-row">
                 <span class="dl">Doğrulama</span>
@@ -386,6 +429,9 @@ onUnmounted(() => {
 .sent .msg-bubble { background: var(--color-primary, var(--color-secondary-hover)); color: #fff; border-bottom-right-radius: var(--radius-sm); }
 .received .msg-bubble { background: var(--color-hover, #f3f4f6); color: var(--color-text, var(--color-text)); border-bottom-left-radius: var(--radius-sm); }
 .msg-time { font-size: 10px; opacity: 0.6; margin-left: 8px; white-space: nowrap; }
+.msg-attachment img { max-width: 220px; max-height: 220px; border-radius: 8px; cursor: pointer; display: block; margin-bottom: 4px; }
+.msg-file-link { display: flex; align-items: center; gap: 4px; margin-bottom: 4px; color: inherit; text-decoration: underline; font-size: 12px; }
+.msg-file-link .material-symbols-outlined { font-size: 16px; }
 .chat-empty { text-align: center; padding: 40px; color: var(--color-text-secondary, #9ca3af); font-size: 13px; }
 
 .chat-input { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--color-border); }
@@ -419,7 +465,10 @@ onUnmounted(() => {
 .action-btn.verify-crypto { background: #8b5cf6; margin-top: 8px; }
 
 .crypto-verify-section .detail-title { display: flex; align-items: center; gap: 6px; }
-.txid-val { font-family: monospace; font-size: 12px; }
+.txid-val { font-family: monospace; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; }
+.txid-copy-btn, .txid-explorer-link { display: inline-flex; align-items: center; background: none; border: none; cursor: pointer; color: var(--color-text-secondary, #9ca3af); padding: 0; }
+.txid-copy-btn:hover, .txid-explorer-link:hover { color: var(--color-primary, var(--color-secondary-hover)); }
+.txid-copy-btn .material-symbols-outlined, .txid-explorer-link .material-symbols-outlined { font-size: 14px; }
 
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

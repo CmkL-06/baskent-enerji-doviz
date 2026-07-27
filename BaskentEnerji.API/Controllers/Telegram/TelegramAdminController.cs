@@ -8,6 +8,8 @@ using BaskentEnerji.Business.Infrastructure.ExchangeOffice.Office;
 using BaskentEnerji.Business.Services.Telegram;
 using BaskentEnerji.Data.Contexts;
 using BaskentEnerji.Entity.Entities.Telegram;
+using BaskentEnerji.Business.Infrastructure.User;
+using BaskentEnerji.Entity.Modals.RequestModals.User;
 using System;
 using System.Linq;
 using System.Net;
@@ -92,13 +94,18 @@ namespace BaskentEnerji.API.Controllers.Telegram
         }
 
         [HttpGet("transactions")]
-        public async Task<IActionResult> Transactions()
+        public async Task<IActionResult> Transactions(int skip = 0, int take = 200)
         {
             await RequireAdmin();
 
-            var txs = await _db.TgTransactions
-                .Include(t => t.Customer)
-                .OrderByDescending(t => t.CreatedAt)
+            take = Math.Clamp(take, 1, 500);
+            skip = Math.Max(skip, 0);
+
+            var baseQuery = _db.TgTransactions.Include(t => t.Customer).OrderByDescending(t => t.CreatedAt);
+            var totalCount = await _db.TgTransactions.CountAsync();
+
+            var txs = await baseQuery
+                .Skip(skip).Take(take)
                 .Select(t => new
                 {
                     Id = t.TransactionId,
@@ -119,7 +126,7 @@ namespace BaskentEnerji.API.Controllers.Telegram
                 })
                 .ToListAsync();
 
-            return Ok(new { transactions = txs });
+            return Ok(new { transactions = txs, total_count = totalCount, has_more = skip + txs.Count < totalCount });
         }
 
         [HttpGet("dealers")]
@@ -329,6 +336,163 @@ namespace BaskentEnerji.API.Controllers.Telegram
             }
         }
 
+        // Sistem kullanicisi olusturma + bayi atamasini TEK ATOMIK cagriya indirger.
+        // Onceden: /user/register (Rank=User=1 varsayilan) -> elle Rank yukselt -> CreateDealer,
+        // 3 ayri, unutulmasi kolay adimdi. Burada NewUser cagrilir, Rank hemen Staff'a cekilir,
+        // ardindan CreateDealer'in Party/PartyAccount/TgDealer olusturma govdesi ayni transaction'da tekrarlanir.
+        [HttpPost("provision-dealer-user")]
+        public async Task<IActionResult> ProvisionDealerUser(
+            [FromBody] ProvisionDealerUserRequest req,
+            [FromServices] IUserServiceCommand userService)
+        {
+            await RequireAdmin();
+
+            if (string.IsNullOrWhiteSpace(req.Username) || string.IsNullOrWhiteSpace(req.Mail)
+                || string.IsNullOrWhiteSpace(req.Password) || string.IsNullOrWhiteSpace(req.Name))
+                throw new ApiException(HttpStatusCode.BadRequest, "Kullanıcı adı, mail, şifre ve ad gerekli.");
+            if (req.DealerType == TgDealerType.Branch && !req.VaultId.HasValue)
+                throw new ApiException(HttpStatusCode.BadRequest, "Şube tipi bayiler için Kasa (VaultId) seçilmelidir.");
+            if (req.DealerType == TgDealerType.External && req.VaultId.HasValue)
+                throw new ApiException(HttpStatusCode.BadRequest, "Harici bayilere Kasa bağlanamaz.");
+
+            using var tx = await _db.Database.BeginTransactionAsync();
+            try
+            {
+                Entity.Modals.ResponseModals.User.rsp_user_login created;
+                try
+                {
+                    created = await userService.NewUser(new rm_user_register
+                    {
+                        Username = req.Username,
+                        Mail = req.Mail,
+                        Password = req.Password,
+                        Firstname = req.Name
+                    }, HttpContext);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    throw new ApiException(HttpStatusCode.Conflict, ex.Message);
+                }
+
+                var user = await _db.Users.FirstAsync(u => u.Id == created.UserInfo.Id);
+                user.Rank = Entity.Rank.Staff;
+
+                var dealerCode = string.IsNullOrWhiteSpace(req.DealerCode)
+                    ? await GenerateReadableDealerCodeAsync(req.Name)
+                    : req.DealerCode.Trim().ToUpperInvariant();
+
+                if (await _db.TgDealers.AnyAsync(d => d.DealerCode == dealerCode))
+                    throw new ApiException(HttpStatusCode.Conflict, $"Bayi kodu '{dealerCode}' zaten kullanılıyor.");
+
+                Guid partyOfficeId;
+                string? vaultIdString = null;
+                if (req.DealerType == TgDealerType.Branch)
+                {
+                    var vault = await _db.Vaults.FirstOrDefaultAsync(v => v.Id == req.VaultId!.Value);
+                    if (vault == null)
+                        throw new ApiException(HttpStatusCode.BadRequest, "Belirtilen Kasa bulunamadı.");
+                    partyOfficeId = vault.OfficeId;
+                    vaultIdString = vault.Id.ToString();
+                }
+                else
+                {
+                    var merkez = await _db.Offices.FirstOrDefaultAsync(o => o.OfficeType == Entity.OfficeType.Merkez);
+                    if (merkez == null)
+                        throw new ApiException(HttpStatusCode.InternalServerError, "Merkez ofis bulunamadı — harici bayi cari hesabı bağlanamıyor.");
+                    partyOfficeId = merkez.Id;
+                }
+
+                var tryCurrency = await _db.Set<BaskentEnerji.Entity.Entities.ExchangeOffice.Currency.Currency>()
+                    .FirstOrDefaultAsync(c => c.CurrencyCode == "TRY");
+                if (tryCurrency == null)
+                    throw new ApiException(HttpStatusCode.InternalServerError, "TRY para birimi bulunamadı.");
+
+                var party = new BaskentEnerji.Entity.Entities.ExchangeOffice.Party.Party
+                {
+                    OfficeId = partyOfficeId,
+                    PartyCode = dealerCode,
+                    Name = req.Name,
+                    Type = BaskentEnerji.Entity.Entities.ExchangeOffice.Party.PartyType.Both,
+                    IsActive = true
+                };
+                _db.Set<BaskentEnerji.Entity.Entities.ExchangeOffice.Party.Party>().Add(party);
+                await _db.SaveChangesAsync();
+
+                await _partyAccountService.CreateAccountAsync(party.Id, tryCurrency.Id);
+
+                _db.TgDealers.Add(new TgDealer
+                {
+                    DealerCode = dealerCode,
+                    DealerName = req.Name,
+                    DealerType = req.DealerType,
+                    Balance = 0,
+                    IsActive = true,
+                    CommissionRate = req.CommissionRate ?? 1.5m,
+                    PartyId = party.Id,
+                    VaultId = vaultIdString,
+                    CreatedAt = DateTime.UtcNow
+                });
+                user.DealerReferralCode = dealerCode;
+
+                await _db.SaveChangesAsync();
+                await tx.CommitAsync();
+
+                return Ok(new { success = true, user_id = user.Id, dealer_code = dealerCode });
+            }
+            catch
+            {
+                await tx.RollbackAsync();
+                throw;
+            }
+        }
+
+        // Operatör icin ayni tek-adimli provizyon (bayiden daha basit: Party/PartyAccount gerekmez).
+        [HttpPost("provision-operator-user")]
+        public async Task<IActionResult> ProvisionOperatorUser(
+            [FromBody] ProvisionOperatorUserRequest req,
+            [FromServices] IUserServiceCommand userService)
+        {
+            await RequireAdmin();
+
+            if (string.IsNullOrWhiteSpace(req.Username) || string.IsNullOrWhiteSpace(req.Mail)
+                || string.IsNullOrWhiteSpace(req.Password) || string.IsNullOrWhiteSpace(req.Name))
+                throw new ApiException(HttpStatusCode.BadRequest, "Kullanıcı adı, mail, şifre ve ad gerekli.");
+
+            using var tx = await _db.Database.BeginTransactionAsync();
+            try
+            {
+                Entity.Modals.ResponseModals.User.rsp_user_login created;
+                try
+                {
+                    created = await userService.NewUser(new rm_user_register
+                    {
+                        Username = req.Username,
+                        Mail = req.Mail,
+                        Password = req.Password,
+                        Firstname = req.Name
+                    }, HttpContext);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    throw new ApiException(HttpStatusCode.Conflict, ex.Message);
+                }
+
+                var user = await _db.Users.FirstAsync(u => u.Id == created.UserInfo.Id);
+                user.Rank = Entity.Rank.Staff;
+                user.TelegramOperatorId = req.TelegramId;
+
+                await _db.SaveChangesAsync();
+                await tx.CommitAsync();
+
+                return Ok(new { success = true, user_id = user.Id });
+            }
+            catch
+            {
+                await tx.RollbackAsync();
+                throw;
+            }
+        }
+
         [HttpGet("operators")]
         public async Task<IActionResult> GetOperators()
         {
@@ -361,11 +525,69 @@ namespace BaskentEnerji.API.Controllers.Telegram
             var user = await _db.Users.FirstOrDefaultAsync(u => u.Username == req.Username);
             if (user == null)
                 throw new ApiException(HttpStatusCode.BadRequest, "Kullanıcı bulunamadı.");
+            if (user.TelegramOperatorId.HasValue)
+                throw new ApiException(HttpStatusCode.Conflict, "Bu kullanıcı zaten bir operatöre atanmış.");
 
             user.TelegramOperatorId = req.TelegramId;
             _db.Users.Update(user);
             await _db.SaveChangesAsync();
 
+            return Ok(new { success = true });
+        }
+
+        // ═══════════════════════════════════════════════
+        // BOT OPERATÖRLERİ — TgOperators (Telegram /start ile kendi kendine kayıt)
+        // ═══════════════════════════════════════════════
+
+        [HttpGet("bot-operators")]
+        public async Task<IActionResult> GetBotOperators()
+        {
+            await RequireAdmin();
+
+            var botOperators = await _db.TgOperators
+                .OrderByDescending(o => o.CreatedAt)
+                .ToListAsync();
+
+            var linkedIds = await _db.Users
+                .Where(u => u.TelegramOperatorId != null)
+                .Select(u => u.TelegramOperatorId!.Value)
+                .ToListAsync();
+
+            var result = botOperators.Select(o => new
+            {
+                operator_id = o.OperatorId,
+                first_name = o.FirstName,
+                username = o.Username,
+                is_active = o.IsActive,
+                is_admin = o.IsAdmin,
+                created_at = o.CreatedAt,
+                has_matching_system_user = linkedIds.Contains(o.OperatorId)
+            });
+
+            return Ok(new { bot_operators = result });
+        }
+
+        [HttpPost("bot-operators/{id}/activate")]
+        public async Task<IActionResult> ActivateBotOperator(long id)
+        {
+            await RequireAdmin();
+            var op = await _db.TgOperators.FindAsync(id);
+            if (op == null)
+                throw new ApiException(HttpStatusCode.NotFound, "Bot operatörü bulunamadı.");
+            op.IsActive = true;
+            await _db.SaveChangesAsync();
+            return Ok(new { success = true });
+        }
+
+        [HttpPost("bot-operators/{id}/deactivate")]
+        public async Task<IActionResult> DeactivateBotOperator(long id)
+        {
+            await RequireAdmin();
+            var op = await _db.TgOperators.FindAsync(id);
+            if (op == null)
+                throw new ApiException(HttpStatusCode.NotFound, "Bot operatörü bulunamadı.");
+            op.IsActive = false;
+            await _db.SaveChangesAsync();
             return Ok(new { success = true });
         }
 
@@ -407,6 +629,7 @@ namespace BaskentEnerji.API.Controllers.Telegram
             public string? Firstname { get; set; }
             public string? Lastname { get; set; }
             public int? Rank { get; set; }
+            public decimal? CommissionRate { get; set; }
         }
 
         // Bayi/Şube kartının kendi bilgilerini (görünen ad, şehir, adres) ve atanmış
@@ -426,11 +649,20 @@ namespace BaskentEnerji.API.Controllers.Telegram
                 if (request.DealerName != null) tgd.DealerName = request.DealerName;
                 if (request.City != null) tgd.City = request.City;
                 if (request.Address != null) tgd.Address = request.Address;
+                if (request.CommissionRate.HasValue) tgd.CommissionRate = request.CommissionRate.Value;
             }
 
             if (request.Firstname != null) user.Firstname = request.Firstname;
             if (request.Lastname != null) user.Lastname = request.Lastname;
-            if (request.Rank.HasValue) user.Rank = (Entity.Rank)request.Rank.Value;
+            if (request.Rank.HasValue)
+            {
+                if (!Enum.IsDefined(typeof(Entity.Rank), request.Rank.Value))
+                    throw new ApiException(HttpStatusCode.BadRequest, "Geçersiz rütbe değeri.");
+                var requestedRank = (Entity.Rank)request.Rank.Value;
+                if (requestedRank == Entity.Rank.Owner && !await _validationService.IsOwnerAsync())
+                    throw new ApiException(HttpStatusCode.Forbidden, "Owner rütbesi yalnızca bir Owner tarafından verilebilir.");
+                user.Rank = requestedRank;
+            }
 
             await _db.SaveChangesAsync();
             return Ok(new { success = true });
@@ -475,6 +707,8 @@ namespace BaskentEnerji.API.Controllers.Telegram
                 throw new ApiException(HttpStatusCode.BadRequest, "Para birimi gerekli.");
             if (req.BuyRate <= 0 || req.SellRate <= 0)
                 throw new ApiException(HttpStatusCode.BadRequest, "Kurlar sıfır veya negatif olamaz.");
+            if (req.BuyRate >= req.SellRate)
+                throw new ApiException(HttpStatusCode.BadRequest, "Alış kuru satış kurundan küçük olmalıdır.");
 
             var dealer = await _db.TgDealers.FirstOrDefaultAsync(d => d.DealerCode == code);
             if (dealer == null)
@@ -549,6 +783,8 @@ namespace BaskentEnerji.API.Controllers.Telegram
                 throw new ApiException(HttpStatusCode.BadRequest, "Para birimi gerekli.");
             if (req.BuyRate <= 0 || req.SellRate <= 0)
                 throw new ApiException(HttpStatusCode.BadRequest, "Kurlar sıfır veya negatif olamaz.");
+            if (req.BuyRate >= req.SellRate)
+                throw new ApiException(HttpStatusCode.BadRequest, "Alış kuru satış kurundan küçük olmalıdır.");
 
             var currencyCode = TgCurrencyMapper.ToSystemCurrencyCode(req.Currency);
 
@@ -658,6 +894,8 @@ namespace BaskentEnerji.API.Controllers.Telegram
 
             if (req.BuyRate <= 0 || req.SellRate <= 0)
                 throw new ApiException(HttpStatusCode.BadRequest, "Kurlar sıfır veya negatif olamaz.");
+            if (req.BuyRate >= req.SellRate)
+                throw new ApiException(HttpStatusCode.BadRequest, "Alış kuru satış kurundan küçük olmalıdır.");
 
             var (officeId, tryCurrencyId) = await ResolveBranchContextAsync(code);
             var currencyCode = TgCurrencyMapper.ToSystemCurrencyCode(req.Currency);
@@ -939,6 +1177,28 @@ namespace BaskentEnerji.API.Controllers.Telegram
     public class CreateOperatorRequest
     {
         public string Username { get; set; } = "";
+        public long? TelegramId { get; set; }
+    }
+
+    public class ProvisionDealerUserRequest
+    {
+        public string Username { get; set; } = "";
+        public string Mail { get; set; } = "";
+        public string Password { get; set; } = "";
+        public string Name { get; set; } = "";
+        [JsonConverter(typeof(JsonStringEnumConverter))]
+        public TgDealerType DealerType { get; set; } = TgDealerType.External;
+        public Guid? VaultId { get; set; }
+        public decimal? CommissionRate { get; set; }
+        public string? DealerCode { get; set; }
+    }
+
+    public class ProvisionOperatorUserRequest
+    {
+        public string Username { get; set; } = "";
+        public string Mail { get; set; } = "";
+        public string Password { get; set; } = "";
+        public string Name { get; set; } = "";
         public long? TelegramId { get; set; }
     }
 }

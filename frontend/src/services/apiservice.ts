@@ -62,10 +62,14 @@ const apiService = {
   // ── Auth  [UserController → /api/v1/user/*]
   login:              (data: any)                        => post('/user/login', data),
   registerUser:       (data: any)                        => post('/user/register', data),
+  forgotPassword:     (email: string)                    => post('/user/forgot-password', { Email: email }),
+  resetPassword:      (data: { email: string; token: string; newPassword: string }) =>
+    post('/user/reset-password', { Email: data.email, Token: data.token, NewPassword: data.newPassword }),
   updateUser:         (data: any)                        => post('/user/update', data),
   getUsers:           (params?: any)                     => get('/user/Users', { params }),
   getUser:            (params?: any)                     => get('/user/User', { params }),
   changeUserPassword: (userId: any, newPassword: string) => post('/user/change-password', { UserId: userId, NewPassword: newPassword }),
+  changeMyPassword:   (currentPassword: string, newPassword: string) => post('/user/change-my-password', { CurrentPassword: currentPassword, NewPassword: newPassword }),
   logoutAllUsers:     ()                                 => post('/user/logout-all'),
   getUserActivity:    ()                                 => get('/user/activity'),
   getUserLoginHistory: (userId: any, year?: number, month?: number) => {

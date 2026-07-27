@@ -21,6 +21,7 @@ const botStatus = ref<Record<string, any>>({})
 const transactions = ref<any[]>([])
 const dealers = ref<any[]>([])
 const operators = ref<any[]>([])
+const botOperators = ref<any[]>([])
 const cryptoDeposits = ref<any[]>([])
 const cryptoSummary = ref<any>({
   total_deposits: 0, pending_deposits: 0, confirmed_deposits: 0,
@@ -44,7 +45,10 @@ const paymentLoading = ref(false)
 
 // Create forms
 const showCreateDealer = ref(false)
-const newDealer = ref({ username: '', name: '', dealerType: 'External', vaultId: '' })
+const newDealer = ref({ username: '', name: '', dealerType: 'External', vaultId: '', mail: '', password: '', commissionRate: 1.5 })
+// true: yeni sistem kullanıcısı + bayi tek adımda oluşturulur (provision-dealer-user).
+// false: eski akış — Username zaten var olan bir kullanıcıya ait olmalı (dealers).
+const provisionNewUser = ref(true)
 const vaults = ref<any[]>([])
 const createdDealerResult = ref<{ dealerCode: string; qrLink: string; qrImageUrl: string } | null>(null)
 const BOT_USERNAME = 'MoneyExchangeTurkeyBot'
@@ -95,28 +99,63 @@ async function loadDashboard() {
     dashboard.value = dashRes
     stats.value = statsRes
     botStatus.value = botRes
-  } catch (e) { console.error('Dashboard load error:', e) }
+  } catch (e: any) { notification.error(e?.response?.data?.message || 'Kontrol paneli yüklenemedi') }
 }
+
+const txHasMore = ref(false)
+const txTotalCount = ref(0)
+const txLoadingMore = ref(false)
 
 async function loadTransactions() {
   try {
-    const res = await apiService.get('/tg/admin/transactions')
+    const res = await apiService.get('/tg/admin/transactions', { params: { skip: 0, take: 200 } })
     transactions.value = res?.transactions ?? []
-  } catch (e) { console.error(e) }
+    txTotalCount.value = res?.total_count ?? transactions.value.length
+    txHasMore.value = !!res?.has_more
+  } catch (e: any) { notification.error(e?.response?.data?.message || 'İşlemler yüklenemedi') }
+}
+
+async function loadMoreTransactions() {
+  if (txLoadingMore.value || !txHasMore.value) return
+  txLoadingMore.value = true
+  try {
+    const res = await apiService.get('/tg/admin/transactions', { params: { skip: transactions.value.length, take: 200 } })
+    transactions.value = [...transactions.value, ...(res?.transactions ?? [])]
+    txHasMore.value = !!res?.has_more
+  } catch (e: any) { notification.error(e?.response?.data?.message || 'Daha fazla işlem yüklenemedi') }
+  finally { txLoadingMore.value = false }
 }
 
 async function loadDealers() {
   try {
     const res = await apiService.get('/tg/admin/dealers')
     dealers.value = res?.dealers ?? []
-  } catch (e) { console.error(e) }
+  } catch (e: any) { notification.error(e?.response?.data?.message || 'Bayiler yüklenemedi') }
 }
 
 async function loadOperators() {
   try {
     const res = await apiService.get('/tg/admin/operators')
     operators.value = res?.operators ?? []
-  } catch (e) { console.error(e) }
+  } catch (e: any) { notification.error(e?.response?.data?.message || 'Operatörler yüklenemedi') }
+}
+
+async function loadBotOperators() {
+  try {
+    const res = await apiService.get('/tg/admin/bot-operators')
+    botOperators.value = res?.bot_operators ?? []
+  } catch (e: any) {
+    notification.error(e?.response?.data?.message || 'Bot operatörleri yüklenemedi')
+  }
+}
+
+async function toggleBotOperator(op: any) {
+  try {
+    await apiService.post(`/tg/admin/bot-operators/${op.operator_id}/${op.is_active ? 'deactivate' : 'activate'}`)
+    await loadBotOperators()
+  } catch (e: any) {
+    notification.error(e?.response?.data?.message || 'Hata oluştu')
+  }
 }
 
 async function loadCryptoDeposits() {
@@ -129,7 +168,7 @@ async function loadCryptoDeposits() {
     cryptoDeposits.value = depRes?.deposits ?? []
     cryptoSummary.value = sumRes ?? cryptoSummary.value
     exchangeRates.value = rateRes?.rates ?? []
-  } catch (e) { console.error(e) }
+  } catch (e: any) { notification.error(e?.response?.data?.message || 'Kripto verileri yüklenemedi') }
 }
 
 async function saveRate(rate: any) {
@@ -155,21 +194,21 @@ async function loadApiQueue() {
   try {
     const res = await apiService.get('/tg/admin/baskent-queue')
     apiQueue.value = res
-  } catch (e) { console.error(e) }
+  } catch (e: any) { notification.error(e?.response?.data?.message || 'API kuyruğu yüklenemedi') }
 }
 
 async function loadLoginLogs() {
   try {
     const res = await apiService.get('/tg/admin/login-logs')
     loginLogs.value = res?.logs ?? []
-  } catch (e) { console.error(e) }
+  } catch (e: any) { notification.error(e?.response?.data?.message || 'Loglar yüklenemedi') }
 }
 
 async function loadCariSummary() {
   try {
     const res = await apiService.getTgCariSummary()
     cariSummary.value = res ?? cariSummary.value
-  } catch (e) { console.error(e) }
+  } catch (e: any) { notification.error(e?.response?.data?.message || 'Cari özet yüklenemedi') }
 }
 
 async function loadCariEntries(code: string) {
@@ -177,7 +216,7 @@ async function loadCariEntries(code: string) {
   try {
     const res = await apiService.getTgCariEntries(code)
     cariEntries.value = res ?? cariEntries.value
-  } catch (e) { console.error(e) }
+  } catch (e: any) { notification.error(e?.response?.data?.message || 'Cari ekstre yüklenemedi') }
 }
 
 function openPaymentForm(d: any) {
@@ -200,11 +239,19 @@ async function submitPayment() {
   } finally { paymentLoading.value = false }
 }
 
+const retryingQueueId = ref<number | null>(null)
 async function retryQueue(queueId: number) {
+  if (retryingQueueId.value !== null) return
+  retryingQueueId.value = queueId
   try {
     await apiService.post(`/tg/admin/baskent-queue/${queueId}/retry`)
     await loadApiQueue()
-  } catch (e) { console.error(e) }
+  } catch (e: any) {
+    console.error(e)
+    notification.error(e?.response?.data?.message || 'Yeniden deneme başarısız')
+  } finally {
+    retryingQueueId.value = null
+  }
 }
 
 async function loadVaults() {
@@ -216,19 +263,31 @@ async function loadVaults() {
 }
 
 async function createDealer() {
+  if (createLoading.value) return
   if (!newDealer.value.username.trim() || !newDealer.value.name.trim()) return
   if (newDealer.value.dealerType === 'Branch' && !newDealer.value.vaultId) {
     notification.error('Şube tipi için bir Kasa seçmelisiniz.')
     return
   }
+  if (provisionNewUser.value && (!newDealer.value.mail.trim() || !newDealer.value.password.trim())) {
+    notification.error('Yeni kullanıcı için mail ve şifre gerekli.')
+    return
+  }
   createLoading.value = true
   try {
-    const res = await apiService.post('/tg/admin/dealers', {
+    const endpoint = provisionNewUser.value ? '/tg/admin/provision-dealer-user' : '/tg/admin/dealers'
+    const payload: any = {
       username: newDealer.value.username,
       name: newDealer.value.name,
       dealerType: newDealer.value.dealerType,
-      vaultId: newDealer.value.dealerType === 'Branch' ? newDealer.value.vaultId : null
-    })
+      vaultId: newDealer.value.dealerType === 'Branch' ? newDealer.value.vaultId : null,
+      commissionRate: newDealer.value.commissionRate
+    }
+    if (provisionNewUser.value) {
+      payload.mail = newDealer.value.mail
+      payload.password = newDealer.value.password
+    }
+    const res = await apiService.post(endpoint, payload)
     const dealerCode = res?.dealer_code
     const qrLink = `https://t.me/${BOT_USERNAME}?start=${dealerCode}`
     createdDealerResult.value = {
@@ -236,7 +295,7 @@ async function createDealer() {
       qrLink,
       qrImageUrl: `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrLink)}`
     }
-    newDealer.value = { username: '', name: '', dealerType: 'External', vaultId: '' }
+    newDealer.value = { username: '', name: '', dealerType: 'External', vaultId: '', mail: '', password: '', commissionRate: 1.5 }
     await loadDealers()
   } catch (e: any) {
     notification.error(e?.response?.data?.message || e?.message || 'Hata oluştu')
@@ -268,7 +327,7 @@ const DEALER_RANKS = [
   { value: 99, label: 'Admin' },
 ]
 const editingDealerInfoFor = ref<string | null>(null)
-const dealerInfoForm = ref({ dealerName: '', city: '', address: '', rank: 50 })
+const dealerInfoForm = ref({ dealerName: '', city: '', address: '', rank: 50, commissionRate: 1.5 })
 const dealerInfoSaving = ref(false)
 
 function openDealerInfoEdit(d: any) {
@@ -279,7 +338,8 @@ function openDealerInfoEdit(d: any) {
     dealerName: d.dealer_name || '',
     city: d.city || '',
     address: d.address || '',
-    rank: d.rank ?? (d.is_active ? 50 : 0)
+    rank: d.rank ?? (d.is_active ? 50 : 0),
+    commissionRate: d.commission_rate ?? 1.5
   }
 }
 
@@ -290,7 +350,8 @@ async function saveDealerInfo(code: string) {
       dealerName: dealerInfoForm.value.dealerName,
       city: dealerInfoForm.value.city,
       address: dealerInfoForm.value.address,
-      rank: dealerInfoForm.value.rank
+      rank: dealerInfoForm.value.rank,
+      commissionRate: dealerInfoForm.value.commissionRate
     })
     notification.success('Bayi bilgileri güncellendi')
     editingDealerInfoFor.value = null
@@ -315,7 +376,7 @@ async function openDealerRates(code: string, isBranch: boolean) {
     for (const r of (res?.rates ?? [])) {
       if (form[r.currency]) form[r.currency] = { buyRate: r.buyRate, sellRate: r.sellRate }
     }
-  } catch (e) { console.error(e) }
+  } catch (e: any) { notification.error(e?.response?.data?.message || 'Bayi kurları yüklenemedi') }
   dealerRateForm.value = form
 }
 
@@ -348,7 +409,7 @@ async function loadRateHistory(code: string, currency: string) {
   try {
     const res = await apiService.get(`${rateBasePath(code, editingDealerIsBranch.value)}/${currency}/history`)
     dealerRateHistory.value = { ...dealerRateHistory.value, [currency]: res?.history ?? [] }
-  } catch (e) { console.error(e) }
+  } catch (e: any) { notification.error(e?.response?.data?.message || 'Kur geçmişi yüklenemedi') }
 }
 
 async function copyFromMerkez(currency: string) {
@@ -364,7 +425,7 @@ async function copyFromMerkez(currency: string) {
     }
     dealerRateForm.value[currency] = { buyRate: match.buyRate, sellRate: match.sellRate }
     notification.success(`Merkez kuru getirildi — kaydetmeden önce spread'i ayarlayabilirsiniz.`)
-  } catch (e) { console.error(e) }
+  } catch (e: any) { notification.error(e?.response?.data?.message || 'Merkez kuru getirilemedi') }
 }
 
 async function applyRateToAllExternal(code: string, currency: string) {
@@ -406,10 +467,11 @@ async function deleteDealer(userId: string) {
   try {
     await apiService.delete(`/tg/admin/dealers/${userId}`)
     await loadDealers()
-  } catch (e) { console.error(e) }
+  } catch (e: any) { notification.error(e?.response?.data?.message || 'Bayi ataması kaldırılamadı') }
 }
 
 async function createOperator() {
+  if (createLoading.value) return
   if (!newOperator.value.username.trim()) return
   createLoading.value = true
   try {
@@ -430,7 +492,7 @@ async function deleteOperator(userId: string) {
   try {
     await apiService.delete(`/tg/admin/operators/${userId}`)
     await loadOperators()
-  } catch (e) { console.error(e) }
+  } catch (e: any) { notification.error(e?.response?.data?.message || 'Operatör ataması kaldırılamadı') }
 }
 
 function switchTab(tab: string) {
@@ -438,6 +500,7 @@ function switchTab(tab: string) {
   if (tab === 'transactions') loadTransactions()
   else if (tab === 'dealers') loadDealers()
   else if (tab === 'operators') loadOperators()
+  else if (tab === 'botOperators') loadBotOperators()
   else if (tab === 'crypto') loadCryptoDeposits()
   else if (tab === 'cari') loadCariSummary()
   else if (tab === 'queue') loadApiQueue()
@@ -499,6 +562,7 @@ onUnmounted(() => {
         { key: 'transactions', icon: 'receipt_long', label: 'İşlemler' },
         { key: 'dealers', icon: 'storefront', label: 'Bayiler' },
         { key: 'operators', icon: 'support_agent', label: 'Operatörler' },
+        { key: 'botOperators', icon: 'smart_toy', label: 'Bot Operatörleri' },
         { key: 'crypto', icon: 'currency_bitcoin', label: 'Kripto' },
         { key: 'cari', icon: 'account_balance_wallet', label: 'Cari Hesap' },
         { key: 'queue', icon: 'queue', label: 'API Kuyruk' },
@@ -684,6 +748,11 @@ onUnmounted(() => {
           </tbody>
         </table>
       </div>
+      <div v-if="txHasMore" style="text-align:center; margin-top:12px">
+        <button class="action-sm save" :disabled="txLoadingMore" @click="loadMoreTransactions">
+          {{ txLoadingMore ? 'Yükleniyor...' : `Daha Fazla Yükle (${transactions.length}/${txTotalCount})` }}
+        </button>
+      </div>
     </div>
 
     <!-- ═══════ DEALERS ═══════ -->
@@ -700,13 +769,29 @@ onUnmounted(() => {
       <div v-if="showCreateDealer" class="create-form">
         <template v-if="!createdDealerResult">
           <div class="form-row">
+            <label class="remember-me" style="cursor:pointer">
+              <input type="checkbox" v-model="provisionNewUser" />
+              <span>Yeni sistem kullanıcısı da oluştur (tek adımda)</span>
+            </label>
+          </div>
+          <div class="form-row">
             <div class="form-group">
-              <label>Sistem Kullanıcı Adı</label>
-              <input v-model="newDealer.username" placeholder="Mevcut kullanıcı adı..." class="form-input" />
+              <label>{{ provisionNewUser ? 'Yeni Kullanıcı Adı' : 'Mevcut Sistem Kullanıcı Adı' }}</label>
+              <input v-model="newDealer.username" :placeholder="provisionNewUser ? 'Yeni kullanıcı adı...' : 'Mevcut kullanıcı adı...'" class="form-input" />
             </div>
             <div class="form-group">
               <label>Bayi / Şube Adı</label>
               <input v-model="newDealer.name" placeholder="örn. Ankara" class="form-input" />
+            </div>
+          </div>
+          <div class="form-row" v-if="provisionNewUser">
+            <div class="form-group">
+              <label>Mail</label>
+              <input v-model="newDealer.mail" type="email" placeholder="ornek@baskentenerji.com" class="form-input" />
+            </div>
+            <div class="form-group">
+              <label>Şifre</label>
+              <input v-model="newDealer.password" type="password" placeholder="En az 8 karakter" class="form-input" />
             </div>
           </div>
           <div class="form-row">
@@ -726,6 +811,10 @@ onUnmounted(() => {
                 </option>
               </select>
             </div>
+            <div class="form-group">
+              <label>Komisyon Oranı (%)</label>
+              <input v-model.number="newDealer.commissionRate" type="number" step="0.1" min="0" class="form-input" />
+            </div>
           </div>
           <div class="form-row">
             <button class="action-sm save" :disabled="createLoading" @click="createDealer">
@@ -733,7 +822,12 @@ onUnmounted(() => {
               {{ createLoading ? 'Kaydediliyor...' : 'Kaydet' }}
             </button>
           </div>
-          <div class="form-hint">Mevcut bir sistem kullanıcısını bayi/şube olarak atar; cari hesap ve (Şube ise) Kasa bağlantısı otomatik kurulur. Harici bayiler için oluşturduktan sonra "Kur Ayarla"dan alış/satış kurunu tanımlamanız gerekir.</div>
+          <div class="form-hint">
+            {{ provisionNewUser
+              ? 'Yeni sistem kullanıcısı Staff rütbesiyle oluşturulur, bayi/şube ataması ve cari hesap otomatik kurulur.'
+              : 'Mevcut bir sistem kullanıcısını bayi/şube olarak atar; cari hesap ve (Şube ise) Kasa bağlantısı otomatik kurulur.' }}
+            Harici bayiler için oluşturduktan sonra "Kur Ayarla"dan alış/satış kurunu tanımlamanız gerekir.
+          </div>
         </template>
 
         <!-- Oluşturma sonucu: hazır QR + link -->
@@ -780,6 +874,10 @@ onUnmounted(() => {
               <div class="dealer-stat-val">{{ d.completed_tx }}</div>
               <div class="dealer-stat-label">Tamamlanan</div>
             </div>
+            <div class="dealer-stat">
+              <div class="dealer-stat-val">%{{ d.commission_rate }}</div>
+              <div class="dealer-stat-label">Komisyon</div>
+            </div>
           </div>
           <div class="dealer-card-footer">
             <span class="dealer-card-user"><span class="material-symbols-outlined" aria-hidden="true" style="font-size:14px">person</span> {{ d.username }} · {{ d.name }}</span>
@@ -811,6 +909,10 @@ onUnmounted(() => {
                 <label>Adres</label>
                 <input v-model="dealerInfoForm.address" type="text" class="rate-input" style="width:100%" />
               </div>
+            </div>
+            <div class="dealer-info-field">
+              <label>Komisyon Oranı (%)</label>
+              <input v-model.number="dealerInfoForm.commissionRate" type="number" step="0.1" min="0" class="rate-input" style="width:100%" />
             </div>
             <div class="dealer-info-field">
               <label>Yetki Seviyesi</label>
@@ -924,6 +1026,45 @@ onUnmounted(() => {
               </td>
             </tr>
             <tr v-if="!operators.length"><td colspan="6" class="empty-msg">Operatör bulunamadı</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ═══════ BOT OPERATORS (TgOperators — Telegram /start ile kendi kendine kayıt) ═══════ -->
+    <div v-else-if="activeTab === 'botOperators'" class="tg-content">
+      <div class="toolbar">
+        <div class="section-title" style="margin:0"><span class="material-symbols-outlined" aria-hidden="true">smart_toy</span> Bot Operatörleri</div>
+      </div>
+      <div class="form-hint" style="margin-bottom:12px">
+        Operatör botuna <code>/start</code> yazarak kendi kendine kayıt olmuş Telegram kullanıcıları. Aktif hale getirmeden bu kişiler operatör botunu kullanamaz.
+      </div>
+
+      <div class="tg-table-wrap">
+        <table class="tg-table">
+          <thead>
+            <tr><th>Telegram ID</th><th>Kullanıcı Adı</th><th>Ad</th><th>Bot Admin</th><th>Sistem Kullanıcısı</th><th>Durum</th><th>Kayıt Tarihi</th><th></th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="op in botOperators" :key="op.operator_id">
+              <td><code>{{ op.operator_id }}</code></td>
+              <td>{{ op.username }}</td>
+              <td>{{ op.first_name }}</td>
+              <td>{{ op.is_admin ? 'Evet' : 'Hayır' }}</td>
+              <td>
+                <span class="status-badge" :style="{ background: op.has_matching_system_user ? '#10b981' : '#9ca3af' }">
+                  {{ op.has_matching_system_user ? 'Eşleşiyor' : 'Yok' }}
+                </span>
+              </td>
+              <td><span class="status-badge" :style="{ background: op.is_active ? '#10b981' : '#ef4444' }">{{ op.is_active ? 'Aktif' : 'Pasif' }}</span></td>
+              <td>{{ formatDate(op.created_at) }}</td>
+              <td>
+                <button class="action-sm save" @click="toggleBotOperator(op)">
+                  {{ op.is_active ? 'Pasife Al' : 'Aktive Et' }}
+                </button>
+              </td>
+            </tr>
+            <tr v-if="!botOperators.length"><td colspan="8" class="empty-msg">Bekleyen bot operatör kaydı yok</td></tr>
           </tbody>
         </table>
       </div>
@@ -1170,7 +1311,7 @@ onUnmounted(() => {
               <td class="error-cell" :title="q.lastError">{{ q.lastError || '—' }}</td>
               <td>{{ formatDate(q.createdAt) }}</td>
               <td>
-                <button v-if="q.status === 'failed'" class="icon-btn" @click="retryQueue(q.queueId)" title="Tekrar Dene">
+                <button v-if="q.status === 'failed'" class="icon-btn" :disabled="retryingQueueId === q.queueId" @click="retryQueue(q.queueId)" title="Tekrar Dene">
                   <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
                 </button>
               </td>

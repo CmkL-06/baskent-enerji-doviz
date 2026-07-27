@@ -19,6 +19,7 @@ namespace BaskentEnerji.Business.Infrastructure.User
         Task<bool> ActivateEmail(string email, string token);
         Task UpdateUser(rm_user_update userData);
         Task<bool> ChangeUserPassword(rm_change_user_password requestData);
+        Task<bool> ChangeOwnPassword(Guid userId, string currentPassword, string newPassword);
         Task<bool> LogoutAllUsers();
     }
 }

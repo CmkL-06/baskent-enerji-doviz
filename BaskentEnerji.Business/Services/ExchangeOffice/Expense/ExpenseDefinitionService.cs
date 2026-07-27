@@ -143,14 +143,14 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Expense
             return await GetDefinitionAsync(definition.Id);
         }
 
-        public async Task<bool> DeleteDefinitionAsync(Guid id)
+        public async Task<string?> DeleteDefinitionAsync(Guid id)
         {
             var definition = await _context.ExpenseDefinitions
                 .Include(ed => ed.Payments)
                 .FirstOrDefaultAsync(ed => ed.Id == id);
 
             if (definition == null)
-                return false;
+                return null;
 
             await _validationService.EnsureNotViewerAsync(definition.OfficeId);
 
@@ -160,15 +160,15 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Expense
                 // Soft delete - just mark as inactive
                 definition.IsActive = false;
                 await _context.SaveChangesAsync();
+                return "deactivated";
             }
             else
             {
                 // Hard delete if no payments
                 _context.ExpenseDefinitions.Remove(definition);
                 await _context.SaveChangesAsync();
+                return "deleted";
             }
-
-            return true;
         }
 
         public async Task<vm_expensedefinition> GetDefinitionAsync(Guid id)

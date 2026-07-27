@@ -15,6 +15,12 @@ const router = createRouter({
       meta: { requiresAuth: false }
     },
     {
+      path: '/reset-password',
+      name: 'ResetPassword',
+      component: () => import('@/views/ResetPassword.vue'),
+      meta: { requiresAuth: false }
+    },
+    {
       path: '/ihtiyar',
       component: () => import('@/layouts/ModernLayout.vue'),
       meta: { requiresAuth: true },
@@ -46,7 +52,7 @@ const router = createRouter({
         // Telegram MTT
         { path: 'tg-admin',             name: 'TgAdmin',           component: () => import('@/views/Telegram/TgAdminPanel.vue'), meta: { adminOnly: true } },
         { path: 'tg-dealer',            name: 'TgDealer',          component: () => import('@/views/Telegram/TgDealerPanel.vue') },
-        { path: 'tg-operator',          name: 'TgOperator',        component: () => import('@/views/Telegram/TgOperatorPanel.vue') },
+        { path: 'tg-operator',          name: 'TgOperator',        component: () => import('@/views/Telegram/TgOperatorPanel.vue'), meta: { staffOnly: true } },
       ]
     },
     { path: '/desktop', redirect: '/ihtiyar/dashboard' },
@@ -61,6 +67,8 @@ router.beforeEach((to, _from, next) => {
   } else if (to.meta.ownerOnly && !auth.isOwner) {
     next('/ihtiyar/dashboard')
   } else if (to.meta.adminOnly && !auth.isAdmin) {
+    next('/ihtiyar/dashboard')
+  } else if (to.meta.staffOnly && !auth.isModerator) {
     next('/ihtiyar/dashboard')
   } else {
     next()

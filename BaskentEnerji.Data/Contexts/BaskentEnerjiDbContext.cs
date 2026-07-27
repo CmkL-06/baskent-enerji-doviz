@@ -409,6 +409,16 @@ namespace BaskentEnerji.Data.Contexts
                 entity.Property(e => e.RunningBalance).HasPrecision(18, 4);
                 entity.Property(e => e.OriginalAmount).HasPrecision(18, 4);
                 entity.Property(e => e.ExchangeRate).HasPrecision(18, 6);
+
+                // Ayni islem (ReferenceNumber = TransactionId) icin ayni cari hesaba iki kez
+                // kayit dusulmesini DB seviyesinde engeller (Telegram bot tarafinin retry/kuyruk
+                // mekanizmasi icin idempotency guvence altina alinir; uygulama seviyesinde zaten
+                // bir AnyAsync kontrolu var -- TelegramDealerController.RecordEntry -- ama gercek
+                // eszamanlilik altinda tek basina yeterli degildi).
+                entity.HasIndex(e => new { e.PartyAccountId, e.ReferenceNumber })
+                    .IsUnique()
+                    .HasFilter("[ReferenceNumber] IS NOT NULL AND [IsReversed] = 0")
+                    .HasDatabaseName("IX_PartyAccountEntries_PartyAccountId_ReferenceNumber");
             });
 
             // --- PartyCreditLimit ---

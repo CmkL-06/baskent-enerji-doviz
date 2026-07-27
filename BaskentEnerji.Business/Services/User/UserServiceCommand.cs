@@ -1,3 +1,4 @@
+using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Security.Claims;
@@ -136,8 +137,8 @@ namespace BaskentEnerji.Business.Services.User
                 Username = requestData.Username,
                 Mail = requestData.Mail,
                 Password = passwordHash,
-                Firstname = requestData.Firstname,
-                Lastname = requestData.Lastname,
+                Firstname = requestData.Firstname ?? "",
+                Lastname = requestData.Lastname ?? "",
                 Rank = Entity.Rank.User,
                 FirstIp = tools_string.GetIpAddress(httpContext),
                 LastIp = tools_string.GetIpAddress(httpContext),
@@ -310,8 +311,7 @@ namespace BaskentEnerji.Business.Services.User
 
         private async Task SendPasswordResetEmail(Entity.Entities.User.User user, string token)
         {
-            //    var resetLink = $"https://yourdomain.com/reset-password?token={token}";
-            var resetLink = $"{_configuration["site:domain"]}?token={token}";
+            var resetLink = $"{_configuration["site:domain"]}/reset-password?token={Uri.EscapeDataString(token)}&email={Uri.EscapeDataString(user.Mail)}";
             var subject = "Password Reset Request";
             var htmlMessage = $"<p>Please reset your password by clicking <a href='{resetLink}'>here</a>.</p>";
             await _emailSender.SendEmailAsync(user.Mail, subject, htmlMessage);
@@ -388,6 +388,28 @@ namespace BaskentEnerji.Business.Services.User
             user.Password = HashPassword(requestData.NewPassword);
 
             // Update last password change date to invalidate existing tokens
+            user.LastPasswordChangeDate = DateTime.UtcNow;
+
+            await _dbContext.SaveChangesAsync();
+            return true;
+        }
+
+        // Owner/Admin'in ChangeUserPassword ile başkasının şifresini sıfırlamasından farklı olarak,
+        // bu metod herhangi bir rütbe gerektirmez (herkes kendi şifresini değiştirebilmeli) ama
+        // mevcut şifreyi doğrular -- oturumu ele geçiren biri, oturumdaki kişinin şifresini
+        // bilmeden sessizce yeni bir şifre koyamasın diye.
+        public async Task<bool> ChangeOwnPassword(Guid userId, string currentPassword, string newPassword)
+        {
+            var user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId);
+            if (user == null)
+                throw new ApiException(HttpStatusCode.NotFound, "Kullanıcı bulunamadı.");
+
+            if (!VerifyPassword(currentPassword, user.Password))
+                throw new ApiException(HttpStatusCode.BadRequest, "Mevcut şifre yanlış.");
+
+            EnsurePasswordStrength(newPassword);
+
+            user.Password = HashPassword(newPassword);
             user.LastPasswordChangeDate = DateTime.UtcNow;
 
             await _dbContext.SaveChangesAsync();

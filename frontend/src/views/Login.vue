@@ -20,7 +20,7 @@
         </div>
 
         <!-- Login Form -->
-        <form @submit.prevent="handleSubmit" class="login-form">
+        <form v-if="!showForgotPassword" @submit.prevent="handleSubmit" class="login-form">
           <div class="form-group">
             <div class="input-wrapper">
               <span class="material-symbols-outlined input-icon">person</span>
@@ -34,13 +34,13 @@
               >
             </div>
           </div>
-          
+
           <div class="form-group">
             <div class="input-wrapper">
               <span class="material-symbols-outlined input-icon">lock</span>
-              <input 
-                v-model="loginForm.password" 
-                type="password" 
+              <input
+                v-model="loginForm.password"
+                type="password"
                 required
                 placeholder="Şifre"
                 class="form-input"
@@ -55,7 +55,7 @@
               <input type="checkbox" v-model="rememberMe">
               <span>Beni hatırla</span>
             </label>
-            <span class="forgot-password disabled-link">Şifremi unuttum</span>
+            <span class="forgot-password" @click="showForgotPassword = true">Şifremi unuttum</span>
           </div>
 
           <!-- Error Message -->
@@ -96,6 +96,48 @@
           </div>
         </form>
 
+        <!-- Forgot Password Form -->
+        <form v-else @submit.prevent="handleForgotPassword" class="login-form">
+          <p class="forgot-password-hint">
+            Kullanıcı hesabınızın e-posta adresini girin, şifre sıfırlama bağlantısı gönderelim.
+          </p>
+          <div class="form-group">
+            <div class="input-wrapper">
+              <span class="material-symbols-outlined input-icon">mail</span>
+              <input
+                v-model="forgotEmail"
+                type="email"
+                required
+                placeholder="E-posta adresiniz"
+                class="form-input"
+                :disabled="forgotLoading"
+              >
+            </div>
+          </div>
+
+          <transition name="fade">
+            <div v-if="forgotMessage" class="success-message">
+              <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+              {{ forgotMessage }}
+            </div>
+          </transition>
+
+          <button type="submit" class="submit-btn" :disabled="forgotLoading">
+            <span v-if="forgotLoading" class="loading-spinner">
+              <span class="spinner"></span>
+              Gönderiliyor...
+            </span>
+            <span v-else class="btn-content">
+              <span class="material-symbols-outlined" aria-hidden="true">send</span>
+              Sıfırlama Bağlantısı Gönder
+            </span>
+          </button>
+
+          <button type="button" class="link-btn" @click="showForgotPassword = false; forgotMessage = ''">
+            ← Girişe dön
+          </button>
+        </form>
+
         <!-- Footer -->
         <div class="login-footer">
           <p>&copy; {{ new Date().getFullYear() }} Exchange Office. Tüm hakları saklıdır.</p>
@@ -108,6 +150,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import apiService from '@/services/apiservice'
 
 const authStore = useAuthStore()
 const rememberMe = ref(false)
@@ -117,23 +160,42 @@ const loginForm = reactive({
   password: ''
 })
 
+const showForgotPassword = ref(false)
+const forgotEmail = ref('')
+const forgotLoading = ref(false)
+const forgotMessage = ref('')
+
 async function handleSubmit() {
   try {
     const loginData = {
       mail: loginForm.username,
       password: loginForm.password
     }
-    
+
     await authStore.login(loginData)
-    
+
     // Store UI preference (always modern now)
     localStorage.setItem('uiStyle', 'modern')
-    
+
     if (rememberMe.value) {
       localStorage.setItem('rememberMe', 'true')
     }
   } catch (error) {
     // Error is handled in store
+  }
+}
+
+async function handleForgotPassword() {
+  forgotLoading.value = true
+  forgotMessage.value = ''
+  try {
+    await apiService.forgotPassword(forgotEmail.value)
+  } catch {
+    // Backend zaten anonim/genel bir mesajla cevap veriyor; hata olsa da
+    // e-posta adresinin var olup olmadığını sızdırmamak için ayrım yapmıyoruz.
+  } finally {
+    forgotLoading.value = false
+    forgotMessage.value = 'Bu e-posta sistemde kayıtlıysa, şifre sıfırlama bağlantısı gönderildi.'
   }
 }
 
@@ -353,10 +415,53 @@ onMounted(() => {
 }
 
 .forgot-password {
-  color: var(--color-text-muted);
+  color: var(--color-primary);
   font-size: 0.9rem;
   font-weight: 500;
-  cursor: default;
+  cursor: pointer;
+}
+
+.forgot-password:hover {
+  text-decoration: underline;
+}
+
+.forgot-password-hint {
+  margin: 0 0 1.5rem;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.success-message {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1rem;
+  background: var(--color-success-bg, #e6f9ee);
+  border: 1px solid var(--color-success, #10b981);
+  border-radius: var(--radius-md);
+  color: var(--color-success, #10b981);
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+}
+
+.success-message .material-symbols-outlined {
+  font-size: 20px;
+}
+
+.link-btn {
+  width: 100%;
+  margin-top: 1rem;
+  padding: 0.5rem;
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.link-btn:hover {
+  color: var(--color-primary);
 }
 
 /* Error Message */

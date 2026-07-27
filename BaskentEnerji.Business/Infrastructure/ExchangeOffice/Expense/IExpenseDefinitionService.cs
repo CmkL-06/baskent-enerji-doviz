@@ -10,7 +10,11 @@ namespace BaskentEnerji.Business.Infrastructure.ExchangeOffice.Expense
     {
         Task<vm_expensedefinition> CreateDefinitionAsync(rm_expensedefinition request);
         Task<vm_expensedefinition> UpdateDefinitionAsync(rm_expensedefinition request);
-        Task<bool> DeleteDefinitionAsync(Guid id);
+        // Ödemesi olan bir tanım gerçekten silinmez (geçmiş kayıtlar bozulmasın diye) — sadece
+        // pasife alınır. Dönüş değeri null (bulunamadı), "deleted" (gerçekten silindi) veya
+        // "deactivated" (ödemesi olduğu için pasife alındı) olabilir; frontend'in doğru mesajı
+        // gösterebilmesi için bu ayrım gerekiyor.
+        Task<string?> DeleteDefinitionAsync(Guid id);
         Task<vm_expensedefinition> GetDefinitionAsync(Guid id);
         Task<List<vm_expensedefinition>> GetDefinitionsAsync(Guid officeId, bool? isActive = null);
         Task<List<vm_expensedefinition>> GetDefinitionsByCategoryAsync(Guid officeId, Guid categoryId);

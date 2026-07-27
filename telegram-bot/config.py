@@ -67,9 +67,7 @@ class Config:
     DEFAULT_USDT_RATE = float(os.getenv('DEFAULT_USDT_RATE', '39.00'))
     DEFAULT_RUB_RATE = float(os.getenv('DEFAULT_RUB_RATE', '0.40'))
 
-    # ── Flask / Web Panel ──
-    FLASK_SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key')
-    FLASK_PORT = int(os.getenv('FLASK_PORT', '5000'))
+    # ── .NET API'ye SSE bildirimi (notify_web_panel) ──
     WEB_PANEL_URL = os.getenv('WEB_PANEL_URL', 'http://localhost:5000')
     NOTIFY_SECRET = os.getenv('NOTIFY_SECRET', 'bsk-notify-2026-secret')
 
