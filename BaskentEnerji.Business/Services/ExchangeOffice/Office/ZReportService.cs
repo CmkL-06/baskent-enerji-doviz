@@ -417,7 +417,12 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             }
 
             // Pre-fetch data to avoid N+1 queries in loops below
-            var allCurrencies = await _context.Currencies.AsNoTracking().ToDictionaryAsync(c => c.CurrencyCode, c => c);
+            // NOT: CurrencyCode üzerinde DB seviyesinde bir unique kısıt yok, bu yüzden ToDictionaryAsync
+            // doğrudan kullanılırsa aynı koda sahip birden fazla satır olduğunda "duplicate key" hatası
+            // atar. GroupBy ile tekilleştirip her koddan ilk kaydı alıyoruz.
+            var allCurrencies = (await _context.Currencies.AsNoTracking().ToListAsync())
+                .GroupBy(c => c.CurrencyCode)
+                .ToDictionary(g => g.Key, g => g.First());
             var tryCurrency = allCurrencies.GetValueOrDefault("TRY");
             var tryCurrencyId = tryCurrency?.Id ?? Guid.Empty;
 

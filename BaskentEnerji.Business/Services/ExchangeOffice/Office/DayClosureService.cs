@@ -535,12 +535,17 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 ? $"{lastClosure.ClosedByUser.Firstname} {lastClosure.ClosedByUser.Lastname}"
                 : null;
 
+            // businessDate Türkiye yerel takvim günüdür, TransactionDate ise UTC olarak kaydediliyor
+            // (bkz. CloseDayAsync'teki aynı düzeltme notu) — sınırlar UTC'ye çevrilmeden karşılaştırılırsa
+            // TRT 00:00-03:00 arası işlemler yanlış güne düşer.
+            var dayStart = TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(today, DateTimeKind.Unspecified), TurkeyTz);
+            var dayEnd = dayStart.AddDays(1);
             var todaysTransactions = await _context.Transactions
                 .AsNoTracking()
                 .Include(t => t.Details).ThenInclude(d => d.Currency)
                 .Include(t => t.User)
                 .Where(t => t.Vault.OfficeId == officeId &&
-                            t.TransactionDate.Date == today &&
+                            t.TransactionDate >= dayStart && t.TransactionDate < dayEnd &&
                             t.Status == TransactionStatus.Completed &&
                             !t.IsDeleted)
                 .OrderBy(t => t.TransactionDate)

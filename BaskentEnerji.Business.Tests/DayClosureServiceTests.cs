@@ -305,6 +305,14 @@ namespace BaskentEnerji.Business.Tests
         {
             var s = await SeedAsync();
 
+            // DayClosureService.PopulateActivitySummaryAsync "bugün"ü Türkiye yerel takvim gününe göre
+            // hesaplayıp UTC gün sınırlarıyla karşılaştırıyor — TransactionDate burada ham
+            // "DateTime.UtcNow.Date" yerine aynı Türkiye iş günü sınırına göre kurulmalı, aksi halde
+            // TRT 00:00-03:00 arasında (UTC gün henüz dönmemişken) test flaky hale gelir.
+            var turkeyTz = TimeZoneInfo.FindSystemTimeZoneById("Turkey Standard Time");
+            var turkeyToday = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, turkeyTz).Date;
+            var businessDayStartUtc = TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(turkeyToday, DateTimeKind.Unspecified), turkeyTz);
+
             using (var ctx = TestDbContextFactory.Create())
             {
                 var earlierTransaction = new Transaction
@@ -314,7 +322,7 @@ namespace BaskentEnerji.Business.Tests
                     VaultId = s.VaultId,
                     UserId = s.StaffUserId,
                     Type = TransactionType.Exchange,
-                    TransactionDate = DateTime.UtcNow.Date.AddHours(9),
+                    TransactionDate = businessDayStartUtc.AddHours(9),
                     Status = TransactionStatus.Completed,
                     Profit = 0,
                     Details = new List<TransactionDetail>
@@ -331,7 +339,7 @@ namespace BaskentEnerji.Business.Tests
                     VaultId = s.VaultId,
                     UserId = s.OwnerUserId,
                     Type = TransactionType.Exchange,
-                    TransactionDate = DateTime.UtcNow.Date.AddHours(15),
+                    TransactionDate = businessDayStartUtc.AddHours(15),
                     Status = TransactionStatus.Completed,
                     Profit = 0,
                     Details = new List<TransactionDetail>
