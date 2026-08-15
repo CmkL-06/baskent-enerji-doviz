@@ -105,11 +105,17 @@ namespace BaskentEnerji.Business.Services.Site.Tag
 
         public async Task RemoveTagFromArticle(Guid id)
         {
+            if (!await _validationService.IsStaff())
+                throw new ApiException(HttpStatusCode.Unauthorized, "You have no permission to do this.");
+
             await _dbContext.Blog_Article_Tags.Where(x => x.Id == id).ExecuteDeleteAsync();
         }
 
         public async Task RemoveTagFromCategory(Guid id)
         {
+            if (!await _validationService.IsStaff())
+                throw new ApiException(HttpStatusCode.Unauthorized, "You have no permission to do this.");
+
             await _dbContext.Blog_Category_Tags.Where(x => x.Id == id).ExecuteDeleteAsync();
         }
     }

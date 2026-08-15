@@ -208,6 +208,8 @@ namespace BaskentEnerji.API.Controllers.Telegram
                     dealer_type = tgd?.DealerType.ToString() ?? "External",
                     vault_id = tgd?.VaultId,
                     commission_rate = tgd?.CommissionRate ?? 1.5m,
+                    crypto_address = tgd?.CryptoAddress,
+                    crypto_network = tgd?.CryptoNetwork,
                     total_tx = txc?.Total ?? 0,
                     completed_tx = txc?.Completed ?? 0,
                     oldest_rate_update = oldestRateUpdate,
@@ -317,6 +319,8 @@ namespace BaskentEnerji.API.Controllers.Telegram
                     CommissionRate = req.CommissionRate ?? 1.5m,
                     PartyId = party.Id,
                     VaultId = vaultIdString,
+                    CryptoAddress = string.IsNullOrWhiteSpace(req.CryptoAddress) ? null : req.CryptoAddress.Trim(),
+                    CryptoNetwork = string.IsNullOrWhiteSpace(req.CryptoNetwork) ? null : req.CryptoNetwork.Trim(),
                     CreatedAt = DateTime.UtcNow
                 };
                 _db.TgDealers.Add(dealer);
@@ -430,6 +434,8 @@ namespace BaskentEnerji.API.Controllers.Telegram
                     CommissionRate = req.CommissionRate ?? 1.5m,
                     PartyId = party.Id,
                     VaultId = vaultIdString,
+                    CryptoAddress = string.IsNullOrWhiteSpace(req.CryptoAddress) ? null : req.CryptoAddress.Trim(),
+                    CryptoNetwork = string.IsNullOrWhiteSpace(req.CryptoNetwork) ? null : req.CryptoNetwork.Trim(),
                     CreatedAt = DateTime.UtcNow
                 });
                 user.DealerReferralCode = dealerCode;
@@ -630,6 +636,8 @@ namespace BaskentEnerji.API.Controllers.Telegram
             public string? Lastname { get; set; }
             public int? Rank { get; set; }
             public decimal? CommissionRate { get; set; }
+            public string? CryptoAddress { get; set; }
+            public string? CryptoNetwork { get; set; }
         }
 
         // Bayi/Şube kartının kendi bilgilerini (görünen ad, şehir, adres) ve atanmış
@@ -650,6 +658,8 @@ namespace BaskentEnerji.API.Controllers.Telegram
                 if (request.City != null) tgd.City = request.City;
                 if (request.Address != null) tgd.Address = request.Address;
                 if (request.CommissionRate.HasValue) tgd.CommissionRate = request.CommissionRate.Value;
+                if (request.CryptoAddress != null) tgd.CryptoAddress = request.CryptoAddress;
+                if (request.CryptoNetwork != null) tgd.CryptoNetwork = request.CryptoNetwork;
             }
 
             if (request.Firstname != null) user.Firstname = request.Firstname;
@@ -1172,6 +1182,8 @@ namespace BaskentEnerji.API.Controllers.Telegram
         public Guid? VaultId { get; set; }
         public decimal? CommissionRate { get; set; }
         public string? DealerCode { get; set; }
+        public string? CryptoAddress { get; set; }
+        public string? CryptoNetwork { get; set; }
     }
 
     public class CreateOperatorRequest
@@ -1191,6 +1203,8 @@ namespace BaskentEnerji.API.Controllers.Telegram
         public Guid? VaultId { get; set; }
         public decimal? CommissionRate { get; set; }
         public string? DealerCode { get; set; }
+        public string? CryptoAddress { get; set; }
+        public string? CryptoNetwork { get; set; }
     }
 
     public class ProvisionOperatorUserRequest

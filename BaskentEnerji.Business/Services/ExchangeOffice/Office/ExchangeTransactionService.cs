@@ -141,6 +141,13 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     {
                         // Arbitraj (çapraz kur): iki yabancı para birimi arasında doğrudan değişim, TRY bacağı yok.
                         // Alınan (source) birim ALIŞ kuruyla, verilen (target) birim SATIŞ kuruyla değerlenir.
+                        // Denetim bulgusu: aynı para birimi hem alınan hem verilen taraf olarak seçilirse,
+                        // aynı transaction içinde önce WAC'ı satın alma ile yukarı çekip hemen ardından o
+                        // GÜNCELLENMİŞ WAC üzerinden kâr hesaplamak (satılan birimlerin maliyet tabanına
+                        // aynı işlemde henüz alınmış birimlerin karışması) mantıksız/hatalı bir sonuç verirdi.
+                        if (singleRequest.SourceCurrencyId == singleRequest.TargetCurrencyId)
+                            throw new ApiException(HttpStatusCode.BadRequest, "Arbitraj işleminde alınan ve verilen para birimi aynı olamaz.");
+
                         if (!singleRequest.SourceCustomRate.HasValue || !singleRequest.TargetCustomRate.HasValue)
                             throw new ApiException(HttpStatusCode.BadRequest, "Arbitraj işlemi için hem alınan hem verilen birimin kuru girilmelidir.");
 

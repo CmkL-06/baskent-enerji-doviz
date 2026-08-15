@@ -3,6 +3,9 @@ import { ref, computed, onMounted } from 'vue'
 import apiService from '@/services/apiservice'
 import AppKpiCard from '@/components/common/AppKpiCard.vue'
 import AppPageHeader from '@/components/common/AppPageHeader.vue'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
 
 interface Currency {
   id: string
@@ -182,7 +185,7 @@ onMounted(loadCurrencies)
 
     <!-- Header -->
     <AppPageHeader icon="currency_exchange" title="Para Birimi Yönetimi" :subtitle="currencies.length + ' para birimi kayıtlı'">
-      <button class="cm-btn cm-btn-primary" @click="openCreate">
+      <button v-if="authStore.isAdmin" class="cm-btn cm-btn-primary" @click="openCreate">
         <span class="material-symbols-outlined" aria-hidden="true">add_circle</span> Yeni Ekle
       </button>
     </AppPageHeader>
@@ -242,12 +245,14 @@ onMounted(loadCurrencies)
               </td>
               <td class="cm-cell-date">{{ formatDate(c.createdDate) }}</td>
               <td class="cm-cell-actions" @click.stop>
-                <button class="cm-icon-btn" @click="openEdit(c)" title="Düzenle">
-                  <span class="material-symbols-outlined" aria-hidden="true">edit</span>
-                </button>
-                <button class="cm-icon-btn cm-icon-danger" @click="confirmDelete(c)" title="Sil">
-                  <span class="material-symbols-outlined" aria-hidden="true">delete</span>
-                </button>
+                <template v-if="authStore.isAdmin">
+                  <button class="cm-icon-btn" @click="openEdit(c)" title="Düzenle">
+                    <span class="material-symbols-outlined" aria-hidden="true">edit</span>
+                  </button>
+                  <button class="cm-icon-btn cm-icon-danger" @click="confirmDelete(c)" title="Sil">
+                    <span class="material-symbols-outlined" aria-hidden="true">delete</span>
+                  </button>
+                </template>
               </td>
             </tr>
             <!-- Expanded Detail -->

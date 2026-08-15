@@ -498,11 +498,21 @@ async function deleteDef(d: any) {
 }
 
 // Payment CRUD
-function openCreatePay(defId?: string) {
+// categoryId: bir kategori kartından ("+ Gider Ekle") açılırsa, gider türü listesini o
+// kategoriyle sınırlamak ve yeni tür oluşturulursa doğru kategoriye atamak için kullanılır.
+const payFormCategoryId = ref<string>('')
+
+function openCreatePay(defId?: string, categoryId?: string) {
+  payFormCategoryId.value = categoryId ?? ''
+  const scopedDefs = categoryId
+    ? definitions.value.filter((d: any) => d.categoryId === categoryId && d.isActive !== false)
+    : definitions.value
+
   payForm.value = {
-    // Henüz hiç tanım yoksa kullanıcıyı doğrudan "yeni tür oluştur" moduna al —
-    // ayrı bir "Gider Tanımları" adımına gitmeye zorlamadan tek modalda tamamlansın.
-    expenseDefinitionId: defId || (definitions.value.length === 0 ? NEW_DEF_OPTION : ''),
+    // Henüz hiç tanım yoksa (ya da kategori kartından girilip o kategoride hiç tanım yoksa)
+    // kullanıcıyı doğrudan "yeni tür oluştur" moduna al — ayrı bir adıma gitmeye zorlamadan
+    // tek modalda tamamlansın.
+    expenseDefinitionId: defId || (scopedDefs.length === 0 ? NEW_DEF_OPTION : ''),
     // Gider ödemelerinin neredeyse tamamı TRY cinsinden yapılıyor — para birimi listesinin
     // ham (alfabetik olmayan) sırasındaki ilk öğeye (ör. MGBP) değil, TRY'ye varsayılan yapılır.
     currencyId: (currencies.value.find((c: any) => (c.code || c.currencyCode) === 'TRY')?.id
@@ -512,9 +522,16 @@ function openCreatePay(defId?: string) {
     amount: null, paymentMethod: 1, referenceNumber: '', description: '',
   }
   quickDefName.value = ''
-  quickDefCategoryId.value = activeCategories.value[0]?.id ?? ''
+  quickDefCategoryId.value = categoryId || activeCategories.value[0]?.id || ''
   showPayModal.value = true
 }
+
+// Modalda gösterilecek gider türü listesi — bir kategori kartından açıldıysa o kategoriyle
+// sınırlanır, genel "+ Yeni Gider" butonundan açıldıysa tüm türler listelenir.
+const payFormDefinitions = computed(() => {
+  const list = definitions.value.filter((d: any) => d.isActive !== false)
+  return payFormCategoryId.value ? list.filter((d: any) => d.categoryId === payFormCategoryId.value) : list
+})
 
 // Bir tanım seçildiğinde varsayılan tutar/para birimi varsa formu önceden doldur.
 watch(() => payForm.value.expenseDefinitionId, (defId) => {
@@ -760,6 +777,15 @@ const activeTab = ref<'payments' | 'definitions'>('payments')
                 @click.stop="categoryDeleteConfirmId = row.categoryId"
               >
                 <span class="material-symbols-outlined" aria-hidden="true">delete</span>
+              </button>
+              <button
+                v-if="!authStore.isViewerForOffice(officeId)"
+                class="exp-btn primary budget-card-add-btn"
+                title="Bu kategoriye gider ekle"
+                @click.stop="openCreatePay(undefined, row.categoryId)"
+              >
+                <span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px">add</span>
+                Gider Ekle
               </button>
             </template>
             <button
@@ -1169,11 +1195,15 @@ const activeTab = ref<'payments' | 'definitions'>('payments')
           <button class="icon-btn" @click="showPayModal = false"><span class="material-symbols-outlined" aria-hidden="true">close</span></button>
         </div>
         <div class="modal-body">
+          <div v-if="payFormCategoryId" class="pay-category-hint">
+            <span class="material-symbols-outlined" aria-hidden="true">category</span>
+            Kategori: <strong>{{ categoryMap[payFormCategoryId] }}</strong>
+          </div>
           <div class="form-group">
             <label>Gider Türü *</label>
             <select v-model="payForm.expenseDefinitionId" class="form-input">
               <option value="" disabled>Seçiniz</option>
-              <option v-for="d in definitions.filter(x => x.isActive !== false)" :key="d.id" :value="d.id">{{ d.name }}</option>
+              <option v-for="d in payFormDefinitions" :key="d.id" :value="d.id">{{ d.name }}</option>
               <option :value="NEW_DEF_OPTION">+ Yeni Gider Türü Ekle...</option>
             </select>
           </div>
@@ -1185,7 +1215,7 @@ const activeTab = ref<'payments' | 'definitions'>('payments')
               </div>
               <div class="form-group">
                 <label>Kategori</label>
-                <select v-model="quickDefCategoryId" class="form-input">
+                <select v-model="quickDefCategoryId" class="form-input" :disabled="!!payFormCategoryId">
                   <option v-for="c in activeCategories" :key="c.id" :value="c.id">{{ c.name }}</option>
                 </select>
               </div>
@@ -1375,6 +1405,16 @@ const activeTab = ref<'payments' | 'definitions'>('payments')
   background: none; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer;
 }
 .budget-card-chevron { font-size: 20px; color: var(--color-text-muted); transition: transform .15s; }
+.budget-card-add-btn {
+  flex-shrink: 0; margin-left: auto; padding: 4px 10px; font-size: 12px; gap: 4px;
+  border-radius: var(--radius-sm);
+}
+.budget-card-add-btn .material-symbols-outlined { font-size: 15px; }
+.pay-category-hint {
+  display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--color-text);
+  background: var(--color-primary-light); border-radius: var(--radius-sm); padding: 8px 12px; margin-bottom: 14px;
+}
+.pay-category-hint .material-symbols-outlined { font-size: 16px; color: var(--color-primary); }
 .budget-card-chevron--open { transform: rotate(180deg); color: var(--color-primary); }
 .budget-card-amounts { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
 .budget-actual { font-size: 24px; font-weight: 700; color: var(--color-text); font-variant-numeric: tabular-nums; }

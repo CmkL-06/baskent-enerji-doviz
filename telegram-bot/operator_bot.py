@@ -155,8 +155,18 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # ── Kayıtlı değil → otomatik kayıt (pasif) ──
+    # ── Kayıtlı değil → sadece geçerli bir davet tokeni ile kayıt açılır ──
+    # (önceden herkes /start yazarak pasif bir kayıt oluşturabiliyordu; artık
+    # Owner'ın ürettiği tek kullanımlık, 24 saatlik bir token gerekiyor)
     if not operator:
+        token = context.args[0] if context.args else None
+        if not token or not db.validate_and_consume_invite_token(token, user_id):
+            await update.message.reply_text(
+                "⛔ Bu botu kullanma yetkiniz yok.\n\n"
+                "Lütfen yöneticinizden bir davet linki isteyin."
+            )
+            return
+
         db.register_operator(user)
         await update.message.reply_text(
             (
@@ -482,7 +492,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer("Aktif operatör değilsiniz.", show_alert=True)
             return
         tid = int(data.split("_")[1])
-        await _complete_transaction(query, context, operator_id, tid)
+        await _complete_transaction(query, context, operator_id, tid, can_manage)
         return
 
 
@@ -697,8 +707,10 @@ async def _take_customer(query, context, operator_id: int, tid: int, cid: int):
         )
         return
 
-    # İşlemi operatöre ata
-    db.update_transaction(tid, assigned_operator_id=operator_id, status='in_progress')
+    # İşlemi operatöre ata (atomik — başka bir operatör aynı anda almışsa başarısız olur)
+    if not db.assign_transaction_to_operator(tid, operator_id):
+        await query.answer("⚠️ Bu müşteri az önce başka bir operatöre atandı.", show_alert=True)
+        return
 
     # Active chat'e ekle
     active_chats[operator_id] = {
@@ -749,13 +761,21 @@ async def _take_customer(query, context, operator_id: int, tid: int, cid: int):
 # İŞLEM TAMAMLAMA
 # ═══════════════════════════════════════════════
 
-async def _complete_transaction(query, context, operator_id: int, tid: int):
+async def _complete_transaction(query, context, operator_id: int, tid: int, can_manage: bool = False):
     async with _get_completion_lock(tid):
         # Zaten tamamlanmış mı kontrol et (hızlı yol, atomik değil)
         trans = db.get_transaction(tid)
         if trans and trans.get('status') == 'completed':
             logger.warning(f"İşlem #{tid} zaten tamamlanmış, tekrar tamamlanmayacak")
             await query.answer("⚠️ Bu işlem zaten tamamlanmış!", show_alert=True)
+            return
+
+        # Sahiplik kontrolü: bu işlem başka bir operatöre atanmışsa, sadece o operatör
+        # (veya owner/admin) tamamlayabilir — aksi halde herhangi bir aktif operatör,
+        # callback_data'daki tid'yi tahmin/deneyerek başkasına atanmış bir işlemi
+        # tamamlayıp o operatörün müşterisinin bakiyesini/dealer hesabını düşürebilirdi.
+        if not can_manage and trans and trans.get('assigned_operator_id') not in (None, operator_id):
+            await query.answer("⚠️ Bu işlem size atanmamış, tamamlayamazsınız.", show_alert=True)
             return
 
         # Atomik tamamlama -- çift tamamlamaya karşı gerçek koruma (DB seviyesi,

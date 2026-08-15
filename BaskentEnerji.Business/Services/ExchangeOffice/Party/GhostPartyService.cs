@@ -97,8 +97,26 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
             };
         }
 
+        // Bir hayalet cari (partyId) birden fazla ofiste hesaba sahip olabilir; erişim
+        // denetimi bu ofislerin HER BİRİ için ayrı ayrı yapılır (Admin/Owner her zaman muaf).
+        private async Task EnsurePartyGhostAccessAsync(Guid partyId)
+        {
+            var officeIds = await _context.Set<GhostPartyAccount>()
+                .Where(x => x.PartyId == partyId)
+                .Select(x => x.OfficeId)
+                .Distinct()
+                .ToListAsync();
+
+            foreach (var officeId in officeIds)
+            {
+                await _validationService.ValidateOfficeAccessAsync(officeId);
+            }
+        }
+
         public async Task<List<vm_ghostpartyaccount>> GetGhostAccountsByPartyAsync(Guid partyId)
         {
+            await EnsurePartyGhostAccessAsync(partyId);
+
             var accounts = await _context.Set<GhostPartyAccount>()
                 .Include(x => x.Party)
                 .Include(x => x.Office)
@@ -267,6 +285,13 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
 
         public async Task<List<vm_ghostpartyentry>> GetGhostEntriesAsync(Guid accountId, DateTime? fromDate = null, DateTime? toDate = null)
         {
+            var accountOfficeId = await _context.Set<GhostPartyAccount>()
+                .Where(x => x.Id == accountId)
+                .Select(x => (Guid?)x.OfficeId)
+                .FirstOrDefaultAsync();
+            if (accountOfficeId.HasValue)
+                await _validationService.ValidateOfficeAccessAsync(accountOfficeId.Value);
+
             var query = _context.Set<GhostPartyAccountEntry>()
                 .Include(x => x.GhostAccount)
                     .ThenInclude(x => x.Party)
@@ -530,6 +555,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
         // Balance and Reporting
         public async Task<vm_ghostpartybalance> GetGhostBalanceSummaryAsync(Guid partyId)
         {
+            await EnsurePartyGhostAccessAsync(partyId);
+
             var accounts = await _context.Set<GhostPartyAccount>()
                 .Include(x => x.Party)
                 .Include(x => x.Currency)
@@ -568,6 +595,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
 
         public async Task<List<vm_ghostpartystatement>> GetGhostStatementAsync(Guid partyId, DateTime fromDate, DateTime toDate)
         {
+            await EnsurePartyGhostAccessAsync(partyId);
+
             var entries = await _context.Set<GhostPartyAccountEntry>()
                 .Include(x => x.GhostAccount)
                 .Include(x => x.Currency)
@@ -595,6 +624,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
 
         public async Task<vm_ghostpartysummary> GetGhostPartySummaryAsync(Guid partyId)
         {
+            await EnsurePartyGhostAccessAsync(partyId);
+
             var party = await _context.Set<Entity.Entities.ExchangeOffice.Party.Party>()
                 .FirstOrDefaultAsync(x => x.Id == partyId);
 
@@ -665,13 +696,18 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
             }
 
             // Create vault balance history with IsGhost flag
+            // VaultBalanceHistory.Balance işaretli (signed) bir delta olarak tutulur —
+            // VaultService.VoidVaultBalanceHistoryAsync bakiyeyi bu alanları toplayarak
+            // ("replay") yeniden hesaplar. isDebit=true durumunda vaultBalance.Balance -= amount
+            // yapıldığı için burada da negatif yazılmalı, aksi halde bir hareket void edildiğinde
+            // replay bakiyeyi yanlış hesaplar.
             var history = new VaultBalanceHistory
             {
                 Id = Guid.NewGuid(),
                 VaultId = vaultId,
                 CurrencyId = currencyId,
                 UserId = userId,
-                Balance = amount,
+                Balance = isDebit ? -amount : amount,
                 Description = isDebit ? "Ghost party collection" : "Ghost party payment",
                 TransactionType = isDebit ? TransactionType.Withdrawal : TransactionType.Deposit,
                 IsGhost = true,  // Mark as ghost transaction

@@ -688,6 +688,16 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 {
                     iType = TransactionType.Adjustment;
                     data.description = $"{balance.Currency.CurrencyName} elle düzeltildi {currentBalance:0.00} -> {balance.Balance:0.00} ({balance.Balance - currentBalance:0.00}) ";
+
+                    // Manuel "tam bakiye düzeltmesi" bir fiziksel sayım düzeltmesidir — kasada
+                    // zaten olduğu varsayılan bir miktarı yansıtır, yeni bir "alış" değildir. Bu
+                    // yüzden WAC (birim maliyet) DEĞİŞTİRİLMEZ, sadece miktar senkronize edilir —
+                    // aksi halde bu düzeltmeyle eklenen kısmın maliyeti hiç kayda girmez ve
+                    // sonraki satışların kâr hesabı gerçek maliyeti yansıtmaz hale gelirdi.
+                    if (balance.Currency.CurrencyCode != "TRY")
+                    {
+                        await _wacService.AdjustWacQuantityAsync(data.vaultId, data.currencyId, balance.Balance, WacAdjustReason.ManualAdjustment);
+                    }
                 }
                 else if (data.amount > 0)
                 {
@@ -725,7 +735,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 Vault = balance.Vault,
                 Id = Guid.NewGuid(),
                 TransactionType = iType,
-                UserId = Guid.Parse(_validationService.GetUserID())
+                UserId = Guid.Parse(_validationService.GetUserID()),
+                IsAbsoluteBalance = data.isEntireBalance
             };
 
             //if (!data.isEntireBalance) _context.VaultBalanceHistories.Add(nHistory);
@@ -797,7 +808,12 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             decimal replayedBalance = 0;
             foreach (var row in remainingHistory)
             {
-                if (row.TransactionType == TransactionType.Adjustment)
+                // TransactionType.Adjustment iki farklı şeyi ifade edebilir: "elle düzeltildi" (Balance =
+                // mutlak yeni bakiye) veya "kasa sayımı"/"gün kapanışı sayım farkı" (Balance = sadece fark).
+                // Sadece IsAbsoluteBalance=true olanlar mutlak atama, geri kalan HER ŞEY (bu tür Adjustment
+                // kayıtları dahil) kümülatif toplamaya dahil edilmeli — aksi halde bir delta kaydı yanlışlıkla
+                // bakiyeyi o küçük delta değerine sıfırlar.
+                if (row.IsAbsoluteBalance)
                     replayedBalance = row.Balance;
                 else
                     replayedBalance += row.Balance;

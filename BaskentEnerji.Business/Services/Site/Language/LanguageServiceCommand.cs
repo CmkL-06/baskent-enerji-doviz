@@ -27,6 +27,8 @@ namespace BaskentEnerji.Business.Services.Site.Language
         }
         public async Task RemoveLanguage(Guid Id)
         {
+            if (!await _validationService.IsStaff()) throw new ApiException(HttpStatusCode.Unauthorized, "You have no permission to do this.");
+
             var dbLanguage = await _dbContext.Languages.FindAsync(Id);
             if (dbLanguage == null) throw new ApiException(System.Net.HttpStatusCode.NotFound, "Language couldn't be found.");
             if (dbLanguage.IsDefault) throw new ApiException(HttpStatusCode.NotAcceptable, "You can't remove default language.");
@@ -85,6 +87,8 @@ namespace BaskentEnerji.Business.Services.Site.Language
 
         public async Task SaveLanguage(rm_savelanguage data)
         {
+            if (!await _validationService.IsStaff()) throw new ApiException(HttpStatusCode.Unauthorized, "You have no permission to do this.");
+
             var dbLanguage = _dbContext.Languages.FirstOrDefault(x => x.Id == data.Id);
 
             if (data.IsDefault)

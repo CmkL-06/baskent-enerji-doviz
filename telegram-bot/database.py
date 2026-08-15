@@ -176,8 +176,8 @@ def upsert_customer(user):
                     WHERE CustomerId = ?
                 ELSE
                     INSERT INTO TgCustomers
-                        (CustomerId, FirstName, LastName, Username, LanguageCode)
-                    VALUES (?, ?, ?, ?, ?)
+                        (CustomerId, FirstName, LastName, Username, LanguageCode, CreatedAt, LastActivity)
+                    VALUES (?, ?, ?, ?, ?, GETDATE(), GETDATE())
             """,
                 user.id, user.first_name, user.last_name, user.username, lang, user.id,
                 user.id, user.first_name, user.last_name, user.username, lang
@@ -252,6 +252,30 @@ def update_transaction(transaction_id, **kwargs):
             return c.rowcount > 0
     except Exception as e:
         logger.error(f"Islem guncelleme hatasi: {e}")
+        return False
+
+
+def assign_transaction_to_operator(transaction_id, operator_id):
+    """İşlemi bir operatöre atomik olarak atar.
+
+    İki operatörün aynı anda "Bu Müşteriyi Al" butonuna basması durumunda sessiz
+    çifte atamayı önlemek için, sadece işlem HENÜZ atanmamışsa (veya zaten aynı
+    operatöre atanmışsa) güncelleme yapılır — WHERE koşulu bunu DB seviyesinde
+    atomik olarak garanti eder.
+    """
+    try:
+        with get_conn() as conn:
+            c = conn.cursor()
+            c.execute("""
+                UPDATE TgTransactions
+                SET AssignedOperatorId = ?, Status = 'in_progress'
+                WHERE TransactionId = ?
+                  AND (AssignedOperatorId IS NULL OR AssignedOperatorId = ?)
+            """, operator_id, transaction_id, operator_id)
+            conn.commit()
+            return c.rowcount > 0
+    except Exception as e:
+        logger.error(f"Islem atama hatasi: {e}")
         return False
 
 
@@ -526,6 +550,28 @@ def register_operator(user):
             return True
     except Exception as e:
         logger.error(f"Operator kayit hatasi: {e}")
+        return False
+
+
+def validate_and_consume_invite_token(token, telegram_id):
+    """Operatör davet tokenini dogrula ve atomik olarak tuket.
+
+    WHERE kosulu (UsedAt IS NULL AND ExpiresAt > GETUTCDATE()) sayesinde ayni
+    tokenin iki eszamanli istekle iki kez kullanilmasi engellenir; sadece
+    gecerli ve daha once kullanilmamis bir token icin rowcount > 0 doner.
+    """
+    try:
+        with get_conn() as conn:
+            c = conn.cursor()
+            c.execute("""
+                UPDATE TgOperatorInviteTokens
+                SET UsedAt = GETUTCDATE(), UsedByTelegramId = ?
+                WHERE Token = ? AND UsedAt IS NULL AND ExpiresAt > GETUTCDATE()
+            """, telegram_id, token)
+            conn.commit()
+            return c.rowcount > 0
+    except Exception as e:
+        logger.error(f"Invite token dogrulama hatasi: {e}")
         return False
 
 
@@ -904,22 +950,40 @@ def update_crypto_deposit(txid=None, transaction_id=None, **kwargs):
         return False
 
 
-def get_pending_crypto_deposit(transaction_id):
-    """Bekleyen crypto deposit bilgisini getir"""
+def get_pending_crypto_deposit(transaction_id, customer_id=None):
+    """Bekleyen crypto deposit bilgisini getir.
+
+    customer_id verilirse, işlemin gerçekten o müşteriye ait olduğu da doğrulanır —
+    aksi halde callback_data'daki transaction_id tahmin/deneme ile başka bir
+    müşterinin işlem durumunu (ve tamamlama kodunu) görüntülemek mümkün olurdu.
+    """
     try:
         with get_conn() as conn:
             c = conn.cursor()
-            c.execute("""
-                SELECT cd.Txid AS txid, cd.Amount AS amount,
-                       cd.Network AS network, cd.ToAddress AS to_address,
-                       cd.Confirmations AS confirmations,
-                       t.CompletionCode AS completion_code,
-                       d.ApiKey AS api_key, d.ApiSecret AS api_secret
-                FROM TgCryptoDeposits cd
-                JOIN TgTransactions t ON cd.TransactionId = t.TransactionId
-                JOIN TgDealers d ON cd.DealerId = d.DealerId
-                WHERE cd.TransactionId = ? AND cd.Status = 'pending'
-            """, transaction_id)
+            if customer_id is not None:
+                c.execute("""
+                    SELECT cd.Txid AS txid, cd.Amount AS amount,
+                           cd.Network AS network, cd.ToAddress AS to_address,
+                           cd.Confirmations AS confirmations,
+                           t.CompletionCode AS completion_code,
+                           d.ApiKey AS api_key, d.ApiSecret AS api_secret
+                    FROM TgCryptoDeposits cd
+                    JOIN TgTransactions t ON cd.TransactionId = t.TransactionId
+                    JOIN TgDealers d ON cd.DealerId = d.DealerId
+                    WHERE cd.TransactionId = ? AND cd.Status = 'pending' AND t.CustomerId = ?
+                """, transaction_id, customer_id)
+            else:
+                c.execute("""
+                    SELECT cd.Txid AS txid, cd.Amount AS amount,
+                           cd.Network AS network, cd.ToAddress AS to_address,
+                           cd.Confirmations AS confirmations,
+                           t.CompletionCode AS completion_code,
+                           d.ApiKey AS api_key, d.ApiSecret AS api_secret
+                    FROM TgCryptoDeposits cd
+                    JOIN TgTransactions t ON cd.TransactionId = t.TransactionId
+                    JOIN TgDealers d ON cd.DealerId = d.DealerId
+                    WHERE cd.TransactionId = ? AND cd.Status = 'pending'
+                """, transaction_id)
             row = c.fetchone()
             if row:
                 cols = [d[0] for d in c.description]
@@ -935,6 +999,9 @@ def get_pending_crypto_deposit(transaction_id):
 
 def notify_web_panel(transaction_id):
     """Web panele anlik bildirim gonder (.NET API SSE)"""
+    if not Config.NOTIFY_SECRET:
+        logger.warning("NOTIFY_SECRET tanımlı değil, web panel bildirimi atlanıyor")
+        return
     try:
         import requests as req
         req.post(

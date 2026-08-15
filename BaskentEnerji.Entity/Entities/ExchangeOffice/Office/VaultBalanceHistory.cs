@@ -26,5 +26,12 @@ namespace BaskentEnerji.Entity.Entities.ExchangeOffice.Office
         public TransactionType TransactionType { get; set; }
         public bool IsGhost { get; set; } = false;
         public bool IsParty { get; set; } = false;
+
+        // TransactionType.Adjustment iki farklı anlamda kullanılıyor: "elle düzeltildi" (tam bakiye
+        // override — Balance alanı MUTLAK yeni bakiyeyi tutar) ile "kasa sayımı"/"gün kapanışı sayım
+        // farkı" (Balance alanı sadece FARKI/delta'yı tutar). Bu ayrım olmadan bakiye replay/void
+        // mantığı (VaultService.VoidVaultBalanceHistoryAsync) her iki türü de aynı kabul edip mutlak
+        // değer gibi atıyor, delta kayıtlarında bakiyeyi yanlışlıkla o küçük delta değerine sıfırlıyor.
+        public bool IsAbsoluteBalance { get; set; } = false;
     }
 }

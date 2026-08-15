@@ -219,10 +219,16 @@ onUnmounted(() => {
             <div v-if="dashboard.staff_name && dashboard.staff_name !== dashboard.dealer_name" class="dealer-staff">Personel: {{ dashboard.staff_name }}</div>
           </div>
         </div>
-        <button type="button" class="logout-btn" @click="showPasswordForm = !showPasswordForm">
-          <span class="material-symbols-outlined" aria-hidden="true">lock</span>
-          Şifre Değiştir
-        </button>
+        <div style="display:flex; gap:8px;">
+          <button type="button" class="logout-btn" @click="showPasswordForm = !showPasswordForm">
+            <span class="material-symbols-outlined" aria-hidden="true">lock</span>
+            Şifre Değiştir
+          </button>
+          <button type="button" class="logout-btn" @click="authStore.logout()">
+            <span class="material-symbols-outlined" aria-hidden="true">logout</span>
+            Çıkış Yap
+          </button>
+        </div>
       </div>
 
       <!-- Şifre Değiştir Formu -->

@@ -5,6 +5,7 @@ python-telegram-bot 20.6 (async)
 """
 
 import asyncio
+import math
 import os
 import re
 import uuid
@@ -108,7 +109,14 @@ async def check_group_membership(context: ContextTypes.DEFAULT_TYPE, user_id: in
         member = await context.bot.get_chat_member(
             chat_id=Config.REQUIRED_GROUP_ID, user_id=user_id
         )
-        return member.status in ('member', 'administrator', 'creator')
+        if member.status in ('member', 'administrator', 'creator'):
+            return True
+        # Kalabalık gruplarda anti-spam nedeniyle yeni katılanlara 'restricted' statüsü
+        # verilebilir — kişi hâlâ üyedir (is_member=True), sadece bazı yetkileri kısıtlıdır.
+        # Bunu "gruba katılmadı" sanıp müşteriyi sonsuza kadar kapıda bırakmamak gerekir.
+        if member.status == 'restricted' and getattr(member, 'is_member', False):
+            return True
+        return False
     except Exception as e:
         err = str(e).lower()
         if 'chat not found' in err:
@@ -183,6 +191,10 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     context.user_data['referral'] = param
     context.user_data['dealer_name'] = dealer.get('dealer_name')
+    # referral, sadece bellek-içi context.user_data'da değil DB-destekli state'e de yazılır —
+    # müşteri gruba katılana kadar geçen sürede bot yeniden başlarsa (deploy/crash) referral
+    # kaybolmasın diye (bkz. handle_callback'teki "check_joined" dalı).
+    set_state(user_id, 'awaiting_group_join', referral=param, dealer_name=dealer.get('dealer_name'))
     await _proceed_after_referral(update.message, context, user_id, lang)
 
 
@@ -368,6 +380,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         referral = context.user_data.get('referral')
         if not referral:
+            # context.user_data bot yeniden başladığında sıfırlanır — DB-destekli state'ten kurtar.
+            saved = get_state(user_id)
+            if saved and saved.get('data', {}).get('referral'):
+                referral = saved['data']['referral']
+                context.user_data['referral'] = referral
+                context.user_data['dealer_name'] = saved['data'].get('dealer_name')
+        if not referral:
             await query.edit_message_text(
                 "⚠️ Oturum zaman aşımına uğradı.\nLütfen QR kodu tekrar okutun.",
                 parse_mode="Markdown"
@@ -441,7 +460,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ═══════════════════════════════════════════════
 
 async def _handle_refresh_status(query, context, transaction_id: int, user_id: int, lang: str):
-    deposit = db.get_pending_crypto_deposit(transaction_id)
+    deposit = db.get_pending_crypto_deposit(transaction_id, customer_id=user_id)
     if not deposit:
         await query.answer(t('no_pending_transaction', lang), show_alert=True)
         return
@@ -593,15 +612,27 @@ async def _handle_amount(update: Update, context: ContextTypes.DEFAULT_TYPE,
         await update.message.reply_text(t('invalid_amount', lang))
         return
 
+    # "inf"/"nan" gibi float() tarafından kabul edilen ama minimum kontrolünü (amount < MIN)
+    # sessizce atlatan (NaN karşılaştırmaları her zaman False döner) değerleri reddet.
+    if not math.isfinite(amount) or amount <= 0:
+        await update.message.reply_text(t('invalid_amount', lang))
+        return
+
     currency = context.user_data.get('currency', 'USDT')
     referral = context.user_data.get('referral', '')
 
-    # Minimum kontrol
+    # Minimum/maksimum kontrol
     if currency == 'USDT' and amount < Config.MIN_USDT:
         await update.message.reply_text(t('minimum_usdt_error', lang), parse_mode="Markdown")
         return
+    if currency == 'USDT' and amount > Config.MAX_USDT:
+        await update.message.reply_text(t('invalid_amount', lang))
+        return
     if currency == 'RUBLE' and amount < Config.MIN_RUBLE:
         await update.message.reply_text(t('minimum_ruble_error', lang), parse_mode="Markdown")
+        return
+    if currency == 'RUBLE' and amount > Config.MAX_RUBLE:
+        await update.message.reply_text(t('invalid_amount', lang))
         return
 
     context.user_data['amount'] = amount
@@ -844,7 +875,7 @@ async def _handle_txid(update: Update, context: ContextTypes.DEFAULT_TYPE,
             return
 
     # TXID uzunluk kontrolü
-    if len(txid) < Config.TXID_MIN_LENGTH:
+    if len(txid) < Config.TXID_MIN_LENGTH or len(txid) > Config.TXID_MAX_LENGTH:
         await update.message.reply_text(t('invalid_txid', lang), parse_mode="Markdown")
         return
 
@@ -1039,7 +1070,7 @@ async def _auto_update_progress(context, chat_id, message_id, transaction_id,
         if get_user_state_name(user_id) != 'waiting_confirmations':
             return
 
-        deposit = db.get_pending_crypto_deposit(transaction_id)
+        deposit = db.get_pending_crypto_deposit(transaction_id, customer_id=user_id)
         if not deposit:
             return
 

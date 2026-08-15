@@ -8,6 +8,7 @@ defineProps<{
   bg?: string
   delta?: number | null
   deltaLabel?: string
+  tooltip?: string
 }>()
 </script>
 
@@ -17,7 +18,10 @@ defineProps<{
       <span class="material-symbols-outlined" aria-hidden="true">{{ icon }}</span>
     </div>
     <div class="app-kpi-body">
-      <p class="app-kpi-label">{{ label }}</p>
+      <p class="app-kpi-label">
+        {{ label }}
+        <span v-if="tooltip" class="app-kpi-info material-symbols-outlined" aria-hidden="true" :title="tooltip">info</span>
+      </p>
       <p class="app-kpi-value" :style="{ color: color ?? '#111' }">{{ value }} <span v-if="unit" class="app-kpi-unit">{{ unit }}</span></p>
       <p v-if="delta !== undefined && delta !== null" class="app-kpi-delta" :class="delta >= 0 ? 'pos' : 'neg'">
         <span class="material-symbols-outlined" aria-hidden="true">{{ delta >= 0 ? 'arrow_upward' : 'arrow_downward' }}</span>
@@ -64,6 +68,15 @@ defineProps<{
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .04em;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.app-kpi-info {
+  font-size: 13px;
+  color: #9ca3af;
+  cursor: help;
+  text-transform: none;
 }
 .app-kpi-value {
   font-size: 17px;

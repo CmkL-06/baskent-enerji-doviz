@@ -22,6 +22,9 @@ const transactions = ref<any[]>([])
 const dealers = ref<any[]>([])
 const operators = ref<any[]>([])
 const botOperators = ref<any[]>([])
+const creatingInvite = ref(false)
+const lastInviteLink = ref('')
+const lastInviteExpiresAt = ref('')
 const cryptoDeposits = ref<any[]>([])
 const cryptoSummary = ref<any>({
   total_deposits: 0, pending_deposits: 0, confirmed_deposits: 0,
@@ -45,7 +48,7 @@ const paymentLoading = ref(false)
 
 // Create forms
 const showCreateDealer = ref(false)
-const newDealer = ref({ username: '', name: '', dealerType: 'External', vaultId: '', mail: '', password: '', commissionRate: 1.5 })
+const newDealer = ref({ username: '', name: '', dealerType: 'External', vaultId: '', mail: '', password: '', commissionRate: 1.5, cryptoAddress: '', cryptoNetwork: '' })
 // true: yeni sistem kullanıcısı + bayi tek adımda oluşturulur (provision-dealer-user).
 // false: eski akış — Username zaten var olan bir kullanıcıya ait olmalı (dealers).
 const provisionNewUser = ref(true)
@@ -155,6 +158,30 @@ async function toggleBotOperator(op: any) {
     await loadBotOperators()
   } catch (e: any) {
     notification.error(e?.response?.data?.message || 'Hata oluştu')
+  }
+}
+
+async function createOperatorInvite() {
+  if (creatingInvite.value) return
+  creatingInvite.value = true
+  try {
+    const res = await apiService.post('/tg/admin/operator-invite')
+    lastInviteLink.value = res?.deepLink || ''
+    lastInviteExpiresAt.value = res?.expiresAt || ''
+    notification.success('Davet linki oluşturuldu')
+  } catch (e: any) {
+    notification.error(e?.response?.data?.message || 'Davet linki oluşturulamadı')
+  } finally {
+    creatingInvite.value = false
+  }
+}
+
+async function copyInviteLink() {
+  try {
+    await navigator.clipboard.writeText(lastInviteLink.value)
+    notification.success('Bağlantı kopyalandı')
+  } catch {
+    notification.error('Kopyalanamadı')
   }
 }
 
@@ -281,7 +308,9 @@ async function createDealer() {
       name: newDealer.value.name,
       dealerType: newDealer.value.dealerType,
       vaultId: newDealer.value.dealerType === 'Branch' ? newDealer.value.vaultId : null,
-      commissionRate: newDealer.value.commissionRate
+      commissionRate: newDealer.value.commissionRate,
+      cryptoAddress: newDealer.value.dealerType === 'External' ? newDealer.value.cryptoAddress : null,
+      cryptoNetwork: newDealer.value.dealerType === 'External' ? newDealer.value.cryptoNetwork : null
     }
     if (provisionNewUser.value) {
       payload.mail = newDealer.value.mail
@@ -295,7 +324,7 @@ async function createDealer() {
       qrLink,
       qrImageUrl: `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrLink)}`
     }
-    newDealer.value = { username: '', name: '', dealerType: 'External', vaultId: '', mail: '', password: '', commissionRate: 1.5 }
+    newDealer.value = { username: '', name: '', dealerType: 'External', vaultId: '', mail: '', password: '', commissionRate: 1.5, cryptoAddress: '', cryptoNetwork: '' }
     await loadDealers()
   } catch (e: any) {
     notification.error(e?.response?.data?.message || e?.message || 'Hata oluştu')
@@ -327,7 +356,7 @@ const DEALER_RANKS = [
   { value: 99, label: 'Admin' },
 ]
 const editingDealerInfoFor = ref<string | null>(null)
-const dealerInfoForm = ref({ dealerName: '', city: '', address: '', rank: 50, commissionRate: 1.5 })
+const dealerInfoForm = ref({ dealerName: '', city: '', address: '', rank: 50, commissionRate: 1.5, cryptoAddress: '', cryptoNetwork: '' })
 const dealerInfoSaving = ref(false)
 
 function openDealerInfoEdit(d: any) {
@@ -339,7 +368,9 @@ function openDealerInfoEdit(d: any) {
     city: d.city || '',
     address: d.address || '',
     rank: d.rank ?? (d.is_active ? 50 : 0),
-    commissionRate: d.commission_rate ?? 1.5
+    commissionRate: d.commission_rate ?? 1.5,
+    cryptoAddress: d.crypto_address || '',
+    cryptoNetwork: d.crypto_network || ''
   }
 }
 
@@ -351,7 +382,9 @@ async function saveDealerInfo(code: string) {
       city: dealerInfoForm.value.city,
       address: dealerInfoForm.value.address,
       rank: dealerInfoForm.value.rank,
-      commissionRate: dealerInfoForm.value.commissionRate
+      commissionRate: dealerInfoForm.value.commissionRate,
+      cryptoAddress: dealerInfoForm.value.cryptoAddress,
+      cryptoNetwork: dealerInfoForm.value.cryptoNetwork
     })
     notification.success('Bayi bilgileri güncellendi')
     editingDealerInfoFor.value = null
@@ -816,6 +849,21 @@ onUnmounted(() => {
               <input v-model.number="newDealer.commissionRate" type="number" step="0.1" min="0" class="form-input" />
             </div>
           </div>
+          <div class="form-row" v-if="newDealer.dealerType === 'External'">
+            <div class="form-group">
+              <label>Kripto Yatırma Adresi</label>
+              <input v-model="newDealer.cryptoAddress" type="text" placeholder="Cüzdan adresi" class="form-input" />
+            </div>
+            <div class="form-group">
+              <label>Ağ</label>
+              <select v-model="newDealer.cryptoNetwork" class="form-input">
+                <option value="">-- Ağ seçin --</option>
+                <option value="TRC20">TRC20 (Tron)</option>
+                <option value="ERC20">ERC20 (Ethereum)</option>
+                <option value="BEP20">BEP20 (BSC)</option>
+              </select>
+            </div>
+          </div>
           <div class="form-row">
             <button class="action-sm save" :disabled="createLoading" @click="createDealer">
               <span class="material-symbols-outlined" aria-hidden="true" style="font-size:14px">check</span>
@@ -826,7 +874,7 @@ onUnmounted(() => {
             {{ provisionNewUser
               ? 'Yeni sistem kullanıcısı Staff rütbesiyle oluşturulur, bayi/şube ataması ve cari hesap otomatik kurulur.'
               : 'Mevcut bir sistem kullanıcısını bayi/şube olarak atar; cari hesap ve (Şube ise) Kasa bağlantısı otomatik kurulur.' }}
-            Harici bayiler için oluşturduktan sonra "Kur Ayarla"dan alış/satış kurunu tanımlamanız gerekir.
+            Harici bayiler için oluşturduktan sonra "Kur Ayarla"dan alış/satış kurunu, kripto/ruble işi yapan bayiler için de yatırma adresi/ağını tanımlamanız gerekir.
           </div>
         </template>
 
@@ -913,6 +961,21 @@ onUnmounted(() => {
             <div class="dealer-info-field">
               <label>Komisyon Oranı (%)</label>
               <input v-model.number="dealerInfoForm.commissionRate" type="number" step="0.1" min="0" class="rate-input" style="width:100%" />
+            </div>
+            <div class="dealer-info-row" v-if="d.dealer_type === 'External'">
+              <div class="dealer-info-field">
+                <label>Kripto Yatırma Adresi</label>
+                <input v-model="dealerInfoForm.cryptoAddress" type="text" class="rate-input" style="width:100%" />
+              </div>
+              <div class="dealer-info-field">
+                <label>Ağ</label>
+                <select v-model="dealerInfoForm.cryptoNetwork" class="rate-input" style="width:100%">
+                  <option value="">-- Ağ seçin --</option>
+                  <option value="TRC20">TRC20 (Tron)</option>
+                  <option value="ERC20">ERC20 (Ethereum)</option>
+                  <option value="BEP20">BEP20 (BSC)</option>
+                </select>
+              </div>
             </div>
             <div class="dealer-info-field">
               <label>Yetki Seviyesi</label>
@@ -1035,9 +1098,18 @@ onUnmounted(() => {
     <div v-else-if="activeTab === 'botOperators'" class="tg-content">
       <div class="toolbar">
         <div class="section-title" style="margin:0"><span class="material-symbols-outlined" aria-hidden="true">smart_toy</span> Bot Operatörleri</div>
+        <button class="action-sm save" :disabled="creatingInvite" @click="createOperatorInvite">
+          {{ creatingInvite ? 'Oluşturuluyor...' : '+ Davet Linki Oluştur' }}
+        </button>
       </div>
       <div class="form-hint" style="margin-bottom:12px">
-        Operatör botuna <code>/start</code> yazarak kendi kendine kayıt olmuş Telegram kullanıcıları. Aktif hale getirmeden bu kişiler operatör botunu kullanamaz.
+        Artık <code>/start</code> tek başına kayıt açmıyor — operatör adayının botu kullanabilmesi için önce burada bir davet linki oluşturup kendisine iletmeniz gerekir (link 24 saat, tek kullanımlık geçerlidir). Link kullanıldıktan sonra oluşan kayıt yine pasif başlar, aşağıdan "Aktive Et" ile onaylanır.
+      </div>
+      <div v-if="lastInviteLink" class="form-hint" style="margin-bottom:12px; background:#ecfdf5; border-color:#10b981; display:flex; align-items:center; gap:8px; flex-wrap:wrap">
+        <span class="material-symbols-outlined" aria-hidden="true" style="color:#10b981">link</span>
+        <code style="flex:1; min-width:200px; word-break:break-all">{{ lastInviteLink }}</code>
+        <button class="action-sm save" @click="copyInviteLink">Kopyala</button>
+        <span style="font-size:12px; color:var(--color-text-secondary)">Son geçerlilik: {{ formatDate(lastInviteExpiresAt) }}</span>
       </div>
 
       <div class="tg-table-wrap">

@@ -19,11 +19,13 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
     {
         private readonly BaskentEnerjiDbContext _db;
         private readonly ValidationService _validationService;
+        private readonly IWacService _wacService;
 
-        public OfficeTransferService(BaskentEnerjiDbContext db, ValidationService validationService)
+        public OfficeTransferService(BaskentEnerjiDbContext db, ValidationService validationService, IWacService wacService)
         {
             _db = db;
             _validationService = validationService;
+            _wacService = wacService;
         }
 
         public async Task<vm_officetransfer> CreateTransferRequestAsync(
@@ -132,6 +134,40 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                         await _db.VaultBalances.AddAsync(targetBalance);
                     }
                     targetBalance.Balance += model.Amount;
+
+                    // VaultService.VoidVaultBalanceHistoryAsync bakiyeleri VaultBalanceHistory
+                    // kayıtlarını replay ederek yeniden hesaplıyor — bu tabloya yazılmayan bir
+                    // hareket, aynı kasada başka bir hareket void edildiğinde sessizce kaybolur.
+                    // Transfer tutarları da diğer tüm bakiye değişiklikleri gibi buraya yazılmalı.
+                    await _db.VaultBalanceHistories.AddRangeAsync(
+                        new VaultBalanceHistory
+                        {
+                            Id = Guid.NewGuid(),
+                            VaultId = model.SourceVaultId,
+                            CurrencyId = model.CurrencyId,
+                            Balance = -model.Amount,
+                            Description = $"Şube transferi (giden) → {targetVault.Office?.OfficeName ?? targetVault.Name}",
+                            UserId = requestedByUserId,
+                            TransactionType = TransactionType.Transfer,
+                            CreatedDate = DateTime.UtcNow,
+                            IsDeleted = false,
+                            IsGhost = false,
+                            IsParty = false
+                        },
+                        new VaultBalanceHistory
+                        {
+                            Id = Guid.NewGuid(),
+                            VaultId = model.TargetVaultId,
+                            CurrencyId = model.CurrencyId,
+                            Balance = model.Amount,
+                            Description = $"Şube transferi (gelen) ← {sourceVault.Office?.OfficeName ?? sourceVault.Name}",
+                            UserId = requestedByUserId,
+                            TransactionType = TransactionType.Transfer,
+                            CreatedDate = DateTime.UtcNow,
+                            IsDeleted = false,
+                            IsGhost = false,
+                            IsParty = false
+                        });
                 }
 
                 await _db.OfficeTransfers.AddAsync(transfer);
@@ -222,6 +258,67 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     }
 
                     targetBalance.Balance += transfer.Amount;
+
+                    // Denetim bulgusu: transfer edilen para biriminin WAC (ortalama maliyet) kaydı
+                    // hiç güncellenmiyordu. Kaynak kasanın CurrencyWacs miktarı gerçek VaultBalance'tan
+                    // sessizce sapıyor, hedef kasa bu para birimini ilk kez alıyorsa maliyet tabanı
+                    // hiç oluşmuyordu (WAC=0) — bu da sonraki bir satışta kârın yanlışlıkla 0
+                    // görünmesine yol açıyordu (bkz. CalculateRealizedProfitAsync'teki WAC=0 durumu).
+                    var transferCurrency = await _db.Currencies.AsNoTracking().FirstOrDefaultAsync(c => c.Id == transfer.CurrencyId);
+                    if (transferCurrency != null && transferCurrency.CurrencyCode != "TRY")
+                    {
+                        var sourceWac = await _wacService.GetWacAsync(transfer.SourceVaultId, transfer.CurrencyId);
+
+                        // Kaynak: miktar azalır, maliyet tabanı (WAC) değişmez — fiziksel yer
+                        // değiştirme, yeni bir satış değil.
+                        await _wacService.AdjustWacQuantityAsync(transfer.SourceVaultId, transfer.CurrencyId, sourceBalance.Balance, WacAdjustReason.Transfer, transfer.Id);
+
+                        if (sourceWac > 0)
+                        {
+                            // Hedef: kaynağın maliyet tabanı biliniyorsa gerçek bir "alış" gibi işlenip
+                            // hedefin mevcut maliyetiyle ağırlıklı ortalaması alınır.
+                            await _wacService.RecalculateWacOnPurchaseAsync(transfer.TargetVaultId, transfer.CurrencyId, transfer.Amount, sourceWac, transfer.Id);
+                        }
+                        else
+                        {
+                            // Kaynağın da maliyet tabanı yoksa (WAC=0), hedefin mevcut WAC'ını
+                            // yanlışlıkla sıfıra doğru sulandırmamak için sadece miktar eklenir.
+                            var targetWacRow = await _db.CurrencyWacs.AsNoTracking()
+                                .FirstOrDefaultAsync(w => w.VaultId == transfer.TargetVaultId && w.CurrencyId == transfer.CurrencyId);
+                            var newTargetQty = (targetWacRow?.Quantity ?? 0) + transfer.Amount;
+                            await _wacService.AdjustWacQuantityAsync(transfer.TargetVaultId, transfer.CurrencyId, newTargetQty, WacAdjustReason.Transfer, transfer.Id);
+                        }
+                    }
+
+                    await _db.VaultBalanceHistories.AddRangeAsync(
+                        new VaultBalanceHistory
+                        {
+                            Id = Guid.NewGuid(),
+                            VaultId = transfer.SourceVaultId,
+                            CurrencyId = transfer.CurrencyId,
+                            Balance = -transfer.Amount,
+                            Description = $"Şube transferi (giden, onaylandı) → {transfer.TargetVault.Office?.OfficeName ?? transfer.TargetVault.Name}",
+                            UserId = approvedByUserId,
+                            TransactionType = TransactionType.Transfer,
+                            CreatedDate = DateTime.UtcNow,
+                            IsDeleted = false,
+                            IsGhost = false,
+                            IsParty = false
+                        },
+                        new VaultBalanceHistory
+                        {
+                            Id = Guid.NewGuid(),
+                            VaultId = transfer.TargetVaultId,
+                            CurrencyId = transfer.CurrencyId,
+                            Balance = transfer.Amount,
+                            Description = $"Şube transferi (gelen, onaylandı) ← {transfer.SourceVault.Office?.OfficeName ?? transfer.SourceVault.Name}",
+                            UserId = approvedByUserId,
+                            TransactionType = TransactionType.Transfer,
+                            CreatedDate = DateTime.UtcNow,
+                            IsDeleted = false,
+                            IsGhost = false,
+                            IsParty = false
+                        });
 
                     transfer.Status = TransferStatus.Completed;
                 }

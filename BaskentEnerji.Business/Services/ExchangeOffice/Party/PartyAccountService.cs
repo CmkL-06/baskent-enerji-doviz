@@ -164,8 +164,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
                             currencyId = account.CurrencyId,
                             amount = vaultAmountChange,
                             description = request.EntryType == EntryType.Debit
-                                ? $"Cari hesap ödemesi: {account.Party.Name} - {request.Description ?? "Ödeme"}"
-                                : $"Cari hesap tahsilatı: {account.Party.Name} - {request.Description ?? "Tahsilat"}",
+                                ? $"Cari Alacak Kaydı (Kasadan Çıkış): {account.Party.Name} - {request.Description ?? "Ödeme"}"
+                                : $"Cari Borç Kaydı (Kasaya Giriş): {account.Party.Name} - {request.Description ?? "Tahsilat"}",
                             isEntireBalance = false,
                             TransactionType = request.EntryType == EntryType.Debit ? TransactionType.Withdrawal : TransactionType.Deposit
                         };
@@ -347,8 +347,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
                     currencyId = request.CurrencyId, // Gelen para birimi
                     amount = request.Type == EntryType.Credit ? positiveAmount : -positiveAmount,
                     description = request.Type == EntryType.Credit
-                        ? $"Cari tahsilat: {party.Name} - {positiveAmount} {currencyCode}"
-                        : $"Cari ödeme: {party.Name} - {positiveAmount} {currencyCode}",
+                        ? $"Cari Borç Kaydı (Kasaya Giriş): {party.Name} - {positiveAmount} {currencyCode} — biz cariden borç aldık veya cari borcunu ödedi"
+                        : $"Cari Alacak Kaydı (Kasadan Çıkış): {party.Name} - {positiveAmount} {currencyCode} — biz cariye borç verdik veya borcumuzu ödedik",
                     isEntireBalance = false,
                     TransactionType = TransactionType.Party
                 };

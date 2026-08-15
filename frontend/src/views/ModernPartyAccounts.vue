@@ -119,6 +119,46 @@ const totals = computed(() => {
 
 const formatCurrency = (amount: number): string => formatAmount(amount, 2)
 
+// Ödeme modalı için canlı önizleme: seçili cariye/para birimine tipi ve tutarı uyguladığında
+// (backend PartyAccountService ile birebir aynı formül) yeni cari bakiye ve kasa yönü ne olacak?
+const paymentPreview = computed(() => {
+  const amt = Number(paymentForm.value.amount) || 0
+  const type = paymentForm.value.type  // 1=Debit, 2=Credit
+  const currencyId = paymentForm.value.currencyId
+  if (amt <= 0 || !currencyId || !selectedParty.value) return null
+
+  const currentAccount = (selectedParty.value.accounts || []).find((a: any) => a.currencyId === currencyId)
+  const currentBalance = currentAccount?.balance ?? 0
+  const currencyCode = currentAccount?.currencyCode ||
+    (currencies.value.find((c: any) => c.id === currencyId)?.currencyCode) || ''
+
+  // Backend mantığı (PartyAccountService.RecordPaymentAsync):
+  // Type.Credit (2): account.Balance -= amount, kasaya +amount girer
+  // Type.Debit (1):  account.Balance += amount, kasadan -amount çıkar
+  const isCredit = type === 2
+  const newBalance = isCredit ? currentBalance - amt : currentBalance + amt
+  const vaultDelta = isCredit ? amt : -amt
+
+  const balanceLabel = (b: number): string => {
+    if (Math.abs(b) < 0.005) return 'Bakiye kapandı (0)'
+    return b > 0
+      ? `Cari bize ${formatCurrency(b)} ${currencyCode} borçlu (Alacağımız)`
+      : `Biz cariye ${formatCurrency(Math.abs(b))} ${currencyCode} borçluyuz (Borcumuz)`
+  }
+
+  return {
+    currencyCode,
+    currentBalance,
+    newBalance,
+    vaultDelta,
+    balanceInterpretation: balanceLabel(newBalance),
+    currentInterpretation: balanceLabel(currentBalance),
+    vaultDirection: vaultDelta > 0
+      ? `Kasa: +${formatCurrency(vaultDelta)} ${currencyCode} (giriş)`
+      : `Kasa: ${formatCurrency(vaultDelta)} ${currencyCode} (çıkış)`,
+  }
+})
+
 const formatDate = (d: string | null | undefined): string => {
   if (!d) return '-'
   return new Date(d).toLocaleDateString('tr-TR')
@@ -243,7 +283,9 @@ async function saveParty() {
     showCreateModal.value = false
     await loadParties()
   } catch (e: any) {
-    notification.error(e?.response?.data?.message || 'Kayıt başarısız')
+    // Denetim bulgusu: backend hep {error: "..."} döndürüyor, {message: "..."} değil — bu yüzden
+    // gerçek hata sebebi hiç gösterilmiyor, kullanıcı sadece genel "başarısız" mesajını görüyordu.
+    notification.error(e?.response?.data?.error || e?.response?.data?.message || 'Kayıt başarısız')
   } finally {
     saving.value = false
   }
@@ -259,7 +301,7 @@ async function deleteParty(party: any) {
       activeTab.value = 'list'
     }
   } catch (e: any) {
-    notification.error(e?.response?.data?.message || 'Silme başarısız')
+    notification.error(e?.response?.data?.error || e?.response?.data?.message || 'Silme başarısız')
   }
 }
 
@@ -269,7 +311,11 @@ function openPaymentModal(party?: any) {
   if (!p) return
   paymentForm.value = {
     partyId: p.id,
-    currencyId: currencies.value[0]?.id ?? '',
+    // Denetim bulgusu: currencies.value[0] ham (alfabetik olmayan) API sırasındaki ilk öğeyi
+    // (ör. MGBP/KGS/ILS gibi bu ofis için hiç kur tanımlanmamış bir para birimini) alıyordu —
+    // kullanıcı dropdown'ı değiştirmezse ödeme sessizce yanlış/kur tanımsız bir para biriminde
+    // kaydedilmeye çalışılıyor ve backend "Exchange rate not found" ile reddediyordu.
+    currencyId: currencies.value.find((c: any) => c.currencyCode === 'TRY')?.id ?? currencies.value[0]?.id ?? '',
     amount: null,
     type: 1,
     paymentMethod: 1,
@@ -295,6 +341,11 @@ async function savePayment() {
   try {
     await apiService.createPartyPayment({
       ...paymentForm.value,
+      // Denetim bulgusu: backend rm_partypayment.PaymentMethod alanı string, ama form burada
+      // Number(key) ile sayısal değer tutuyordu (select'in :value="Number(key)" olması yüzünden).
+      // System.Text.Json sayı->string dönüşümüne izin vermediğinden istek JSON çözümleme
+      // aşamasında (controller koduna hiç ulaşmadan) sessizce 400 ile reddediliyordu.
+      paymentMethod: PAYMENT_METHODS[paymentForm.value.paymentMethod] || 'Nakit',
       officeId: officeId.value,
     })
     showPaymentModal.value = false
@@ -303,7 +354,7 @@ async function savePayment() {
       await selectParty(selectedParty.value)
     }
   } catch (e: any) {
-    notification.error(e?.response?.data?.message || 'Ödeme kaydedilemedi')
+    notification.error(e?.response?.data?.error || e?.response?.data?.message || 'Ödeme kaydedilemedi')
   } finally {
     saving.value = false
   }
@@ -389,8 +440,8 @@ onUnmounted(() => {
     <!-- KPI Cards -->
     <div v-if="activeTab === 'list'" class="kpi-grid">
       <AppKpiCard icon="people" label="Toplam Cari" :value="totals.count" color="var(--color-primary)" bg="var(--color-primary-light)" />
-      <AppKpiCard icon="arrow_downward" label="Toplam Alacak" :value="formatCurrency(totals.totalReceivables) + ' ₺'" color="var(--color-success)" bg="#ecfdf5" />
-      <AppKpiCard icon="arrow_upward" label="Toplam Borç" :value="formatCurrency(totals.totalDebts) + ' ₺'" color="#ef4444" bg="#fef2f2" />
+      <AppKpiCard icon="arrow_downward" label="Alacağımız (Bize Borçlu)" :value="formatCurrency(totals.totalReceivables) + ' ₺'" color="var(--color-success)" bg="#ecfdf5" />
+      <AppKpiCard icon="arrow_upward" label="Borcumuz (Cariye Borçlu)" :value="formatCurrency(totals.totalDebts) + ' ₺'" color="#ef4444" bg="#fef2f2" />
       <AppKpiCard icon="account_balance" label="Net Bakiye" :value="formatCurrency(totals.netBalance) + ' ₺'" :color="totals.netBalance >= 0 ? 'var(--color-success)' : '#ef4444'" :bg="totals.netBalance >= 0 ? '#ecfdf5' : '#fef2f2'" />
     </div>
 
@@ -408,8 +459,8 @@ onUnmounted(() => {
       </select>
       <div class="filter-chips">
         <button :class="['chip', filterBalance === '' ? 'chip-active' : '']" @click="filterBalance = ''">Tümü</button>
-        <button :class="['chip', filterBalance === 'receivables' ? 'chip-active' : '']" @click="filterBalance = 'receivables'">Alacaklılar</button>
-        <button :class="['chip', filterBalance === 'debts' ? 'chip-active' : '']" @click="filterBalance = 'debts'">Borçlular</button>
+        <button :class="['chip', filterBalance === 'receivables' ? 'chip-active' : '']" @click="filterBalance = 'receivables'">Bize Borçlu (Alacağımız)</button>
+        <button :class="['chip', filterBalance === 'debts' ? 'chip-active' : '']" @click="filterBalance = 'debts'">Bizim Borçlu (Cariye)</button>
       </div>
     </div>
 
@@ -523,10 +574,13 @@ onUnmounted(() => {
           </div>
           <div class="acc-balance" :class="acc.balance >= 0 ? 'balance-pos' : 'balance-neg'">
             {{ formatCurrency(acc.balance ?? 0) }}
+            <span class="bal-status" :class="acc.balance > 0 ? 'bal-status-alacak' : (acc.balance < 0 ? 'bal-status-borc' : 'bal-status-zero')">
+              {{ acc.balance > 0 ? 'ALACAK' : (acc.balance < 0 ? 'BORÇ' : 'KAPALI') }}
+            </span>
           </div>
           <div class="acc-meta">
-            <span>Borç: {{ formatCurrency(acc.totalDebits ?? 0) }}</span>
-            <span>Alacak: {{ formatCurrency(acc.totalCredits ?? 0) }}</span>
+            <span title="Bu cariye toplam yaptığımız ödemeler (defter borç sütunu)">Ödemelerimiz: {{ formatCurrency(acc.totalDebits ?? 0) }}</span>
+            <span title="Bu cariden toplam aldığımız (defter alacak sütunu)">Tahsilatlarımız: {{ formatCurrency(acc.totalCredits ?? 0) }}</span>
           </div>
           <div class="acc-meta">
             <span>{{ acc.transactionCount ?? 0 }} işlem</span>
@@ -664,9 +718,9 @@ onUnmounted(() => {
           <div class="form-grid-2">
             <div class="form-group">
               <label>İşlem Tipi</label>
-              <select v-model="paymentForm.type">
-                <option :value="1">Borç (Debit)</option>
-                <option :value="2">Alacak (Credit)</option>
+              <select v-model="paymentForm.type" class="type-select" :class="paymentForm.type === 2 ? 'type-borc' : 'type-alacak'">
+                <option :value="1">Alacak</option>
+                <option :value="2">Borç</option>
               </select>
             </div>
             <div class="form-group">
@@ -700,6 +754,29 @@ onUnmounted(() => {
             <div class="form-group full-width">
               <label>Açıklama</label>
               <textarea v-model="paymentForm.notes" rows="2" placeholder="Açıklama..."></textarea>
+            </div>
+          </div>
+          <div v-if="paymentPreview" class="payment-preview">
+            <div class="preview-header">
+              <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+              İşlem Sonrası Durum (Önizleme)
+            </div>
+            <div class="preview-body">
+              <div class="preview-row">
+                <span class="preview-label">Mevcut Cari Durum:</span>
+                <span class="preview-value">{{ paymentPreview.currentInterpretation }}</span>
+              </div>
+              <div class="preview-row preview-arrow">→</div>
+              <div class="preview-row preview-highlight">
+                <span class="preview-label">İşlem Sonrası Cari:</span>
+                <span class="preview-value">{{ paymentPreview.balanceInterpretation }}</span>
+              </div>
+              <div class="preview-row preview-vault">
+                <span class="preview-label">Kasa Etkisi:</span>
+                <span class="preview-value" :class="paymentPreview.vaultDelta > 0 ? 'text-success' : 'text-danger'">
+                  {{ paymentPreview.vaultDirection }}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -809,6 +886,109 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.form-help {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+.type-select {
+  font-weight: 700;
+  border-width: 2px;
+}
+.type-select.type-alacak {
+  color: #059669;
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.06);
+}
+.type-select.type-borc {
+  color: #dc2626;
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.06);
+}
+.bal-status {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border-radius: 4px;
+  vertical-align: middle;
+}
+.bal-status-alacak {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+.bal-status-borc {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.bal-status-zero {
+  background: rgba(107, 114, 128, 0.12);
+  color: #6b7280;
+  border: 1px solid rgba(107, 114, 128, 0.3);
+}
+.payment-preview {
+  margin-top: 16px;
+  padding: 14px 16px;
+  background: var(--color-bg-alt, #f8fafc);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-primary);
+  border-radius: 8px;
+}
+.preview-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--color-primary);
+  margin-bottom: 10px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.preview-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.preview-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+.preview-label {
+  color: var(--color-text-secondary);
+  min-width: 160px;
+}
+.preview-value {
+  font-weight: 500;
+  text-align: right;
+}
+.preview-arrow {
+  justify-content: center;
+  color: var(--color-primary);
+  font-weight: 700;
+  padding: 2px 0;
+}
+.preview-highlight {
+  padding: 8px 0;
+  border-top: 1px dashed var(--color-border);
+  border-bottom: 1px dashed var(--color-border);
+}
+.preview-highlight .preview-value {
+  font-weight: 700;
+}
+.preview-vault {
+  padding-top: 6px;
+}
+.text-success { color: var(--color-success); }
+.text-danger { color: #ef4444; }
 .party-wrap {
   padding: 24px;
   max-width: 1400px;

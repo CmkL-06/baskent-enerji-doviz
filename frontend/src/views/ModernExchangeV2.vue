@@ -758,11 +758,33 @@ const updateExchangeRate = async (item: ExchangeItem) => {
     item.targetAmount = item.sourceAmount
     return
   }
-  
+
+  // Arbitraj modu: source/target arasında doğrudan bir kur çifti genelde YOK (ikisi de yabancı
+  // para birimi) — bu yüzden normal moddaki gibi source→target çapraz kur sorgulamak ya 0 ya da
+  // (yanlışlıkla eşleşen alakasız bir kayıt varsa) hatalı bir değer döndürüyordu. Arbitrajda
+  // "Piyasa Alış" referansı, Alınan birimin KENDİ TRY bazlı alış kuru olmalı — backend'in ±%20
+  // sapma kontrolünde kullandığı kaynakla aynı.
+  if (terminalMode.value === 'arbitrage') {
+    try {
+      if (item.sourceCurrencyId === tryId.value) {
+        item.exchangeRate = 1
+      } else {
+        const marketBuy = exchangeStore.getExchangeRate(item.sourceCurrencyId, tryId.value, 'buy')
+        item.exchangeRate = marketBuy && marketBuy > 0 ? marketBuy : 0
+      }
+      item.targetAmount = item.sourceAmount > 0 && item.exchangeRate > 0 ? item.sourceAmount * item.exchangeRate : 0
+    } catch (error) {
+      console.error('Failed to get arbitrage market rate:', error)
+      item.exchangeRate = 0
+      item.targetAmount = 0
+    }
+    return
+  }
+
   try {
     const rate = exchangeStore.getExchangeRate(
-      item.sourceCurrencyId, 
-      item.targetCurrencyId, 
+      item.sourceCurrencyId,
+      item.targetCurrencyId,
       transactionType.value
     )
     
@@ -831,6 +853,76 @@ function recomputeArbitrageAmount(item: ExchangeItem) {
   } else {
     item.targetAmount = 0
   }
+}
+
+// Arbitraj modu: "Kar Marjı Uygula" butonu. Alınan birimin kuru (kullanıcı girmişse o,
+// girmemişse otomatik piyasa alış kuru) sabit kabul edilir; verilen birimin satış kuru,
+// piyasa satış kurunun marj% kadar üstüne çekilerek hesaplanır — targetRate = piyasaSatış /
+// (1 - marj/100). Bu, aynı TL karşılığı için müşteriye marj% kadar daha az birim verilmesini
+// sağlar (ofis TL bazında marj% kâr eder). Sonuç, personelin ödemesi gereken birim miktarı
+// olarak bildirilir.
+function applyArbMargin() {
+  if (terminalMode.value !== 'arbitrage') return
+  const margin = arbMarginPercent.value
+  if (!margin || margin <= 0) {
+    notification.warning('Önce bir kar marjı yüzdesi girin')
+    return
+  }
+  // Denetim bulgusu: targetRate = piyasaSatış / (1 - marj/100) formülünde marj %100'e
+  // ulaşır/geçerse payda sıfır veya negatif olur (Infinity/negatif kur) — üst sınır kontrolü
+  // yoktu. %100 ve üstü artık baştan reddediliyor.
+  if (margin >= 100) {
+    notification.error('Kar marjı %100 veya üstü olamaz')
+    return
+  }
+  // Backend'in ±%20 piyasa sapma kuralı (EnsureRateWithinMarketDeviation), bu formülde
+  // marj ≈ %16.67 ve üstünde devreye giriyor (sapma = marj/(100-marj)). Kullanıcı "Tamamla"ya
+  // basınca sürpriz bir "Owner yetkisi gereklidir" hatasıyla karşılaşmasın diye önceden uyarılır.
+  if (margin >= 100 * 20 / 120) {
+    notification.warning('Bu marj piyasa kurundan %20\'den fazla sapmaya neden olabilir — işlem tamamlanırken Owner onayı istenebilir.', { duration: 10000 })
+  }
+  if (!tryId.value) {
+    notification.warning('TRY para birimi bulunamadı')
+    return
+  }
+
+  const messages: string[] = []
+
+  for (const item of exchangeItems.value) {
+    if (!item.sourceCurrencyId || !item.targetCurrencyId || !item.sourceAmount) continue
+
+    let sourceRate = item.customRate ? parseNum(item.customRate) : 0
+    if (sourceRate <= 0) {
+      const marketBuy = exchangeStore.getExchangeRate(item.sourceCurrencyId, tryId.value, 'buy')
+      if (marketBuy && marketBuy > 0) {
+        sourceRate = marketBuy
+        item.customRate = marketBuy.toFixed(4)
+        item.rateManuallySet = true
+      }
+    }
+    if (sourceRate <= 0) continue
+
+    const targetMarketSell = exchangeStore.getExchangeRate(item.targetCurrencyId, tryId.value, 'sell')
+    if (!targetMarketSell || targetMarketSell <= 0) continue
+
+    const targetRate = targetMarketSell / (1 - margin / 100)
+    item.targetCustomRate = targetRate.toFixed(4)
+    recomputeArbitrageAmount(item)
+
+    const sourceCode = getCurrencyById(item.sourceCurrencyId)?.currencyCode || ''
+    const targetCode = getCurrencyById(item.targetCurrencyId)?.currencyCode || ''
+    messages.push(`${formatNumber(item.sourceAmount)} ${sourceCode} → ${formatNumber(item.targetAmount)} ${targetCode} ödenmeli`)
+  }
+
+  if (messages.length === 0) {
+    notification.warning('Marj uygulanacak geçerli satır bulunamadı (miktar, para birimlerini ve piyasa kurlarını kontrol edin)')
+    return
+  }
+
+  notification.success(`%${formatNumber(margin, 2)} kar marjı uygulandı:\n${messages.join('\n')}`, {
+    duration: 15000,
+    title: 'Ödenecek Tutar'
+  })
 }
 
 const handleRateBlur = (item: ExchangeItem) => {
@@ -1195,22 +1287,12 @@ function printReceipt(receipt?: typeof lastReceipt.value) {
     </div>`
   })
 
-  let marginHTML = ''
-  if (data.type === 'arbitrage' && arbMarginPercent.value > 0) {
-    marginHTML = `<div style="margin-top:16px;padding:12px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px">
-      <div style="font-weight:700;font-size:13px;color:#92400e;margin-bottom:8px">📊 Kar Marjı Hesabı (% ${formatNumber(arbMarginPercent.value, 2)})</div>`
-    data.items.forEach(item => {
-      const marginAmount = item.total * (arbMarginPercent.value / 100)
-      const customerRate = item.rate * (1 + arbMarginPercent.value / 100)
-      const customerTotal = item.amount * customerRate
-      marginHTML += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;font-family:monospace">
-        <span>${item.amount} ${item.source} → ${item.target}</span>
-        <span>Müşteri Kur: <strong>${formatNumber(customerRate, 4)}</strong> | Müşteri Tutar: <strong>${formatNumber(customerTotal)}</strong> | Kar: <strong style="color:#16a34a">+${formatNumber(marginAmount)}</strong> ${item.target}</span>
-      </div>`
-    })
-    const totalMarginProfit = data.items.reduce((s, item) => s + item.total * (arbMarginPercent.value / 100), 0)
-    marginHTML += `<div style="margin-top:8px;padding-top:8px;border-top:1px solid #fcd34d;font-weight:700;text-align:right;font-size:13px;color:#16a34a">Toplam Kar: +${formatNumber(totalMarginProfit)} ${data.items[0]?.target || ''}</div></div>`
-  }
+  // Denetim bulgusu: bu blok, item.rate (Alınan'ın piyasa alış kuru) üzerinden ayrı bir
+  // "marj hesabı" tahmin ediyordu — gerçekte "Marjı Uygula" ile hesaplanıp kaydedilen
+  // targetCustomRate/targetAmount (Verilen'in piyasa satış kuruna göre hesaplanan) ile
+  // tamamen farklı bir formüldü, fişte gösterilen "kar" işlemin gerçek kaydından sapıyordu.
+  // Fişteki tablo (rows) ve Toplam bölümü zaten item.rate/item.total üzerinden GERÇEK
+  // kaydedilen değerleri gösteriyor — ayrı bir tahmini blok gerekmiyor.
 
   printWindow.document.write(`<!DOCTYPE html><html><head><title>${typeLabel}</title>
 <style>
@@ -1243,7 +1325,6 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;padding:32px;line-h
   <div style="font-size:11px;color:#9ca3af;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">Toplam</div>
   ${totalsHTML}
 </div>
-${marginHTML}
 ${data.notes ? `<div style="margin-top:16px;padding:10px 14px;background:#f3f4f6;border-radius:6px;font-size:12px;color:#6b7280"><strong>Not:</strong> ${data.notes}</div>` : ''}
 <div style="margin-top:32px;text-align:center;font-size:10px;color:#d1d5db;border-top:1px solid #f3f4f6;padding-top:12px">Bu belge bilgi amaçlıdır • Başkent Enerji Döviz</div>
 </body></html>`)
@@ -1466,6 +1547,33 @@ function isSellBelowWac(item: ExchangeItem): boolean {
     if (parsed > 0) rate = parsed
   }
   return rate > 0 && rate < wac
+}
+
+// Arbitraj modu: "Verilen" (kasadan çıkan, müşteriye satılan) birim kendi WAC maliyetinin
+// altında bir kurla satılıyorsa zarar demektir — normal satıştaki aynı korumanın eşdeğeri.
+function isArbitrageSellBelowWac(item: ExchangeItem): boolean {
+  if (terminalMode.value !== 'arbitrage') return false
+  const foreignId = item.targetCurrencyId
+  if (!foreignId || foreignId === tryId.value) return false
+  const wac = getWacForCurrency(foreignId)
+  if (wac <= 0) return false
+  const rate = item.targetCustomRate ? parseNum(item.targetCustomRate) : 0
+  return rate > 0 && rate < wac
+}
+
+// Arbitraj modu: "Alınan" (müşteriden gelen) birim için piyasa kurunun üstünde ödeme
+// yapılıyorsa uyarı gösterir — item.exchangeRate, kullanıcı kuru elle değiştirmeden ÖNCE
+// çekilen piyasa kurunda donuk kalır (rateManuallySet sonrası bir daha güncellenmez), bu
+// yüzden güvenilir bir referans olarak kullanılabilir.
+function isArbitrageBuyAboveMarket(item: ExchangeItem): boolean {
+  if (terminalMode.value !== 'arbitrage') return false
+  if (!item.exchangeRate || item.exchangeRate <= 0) return false
+  let rate = item.exchangeRate
+  if (item.customRate !== null && item.customRate !== '') {
+    const parsed = parseNum(item.customRate)
+    if (parsed > 0) rate = parsed
+  }
+  return rate > item.exchangeRate
 }
 
 // Day closure check
@@ -1890,6 +1998,14 @@ watch(() => exchangeItems.value.map(item => ({
           inputmode="decimal"
         />
         <button
+          @click="applyArbMargin"
+          class="ex-btn ex-btn--green ex-btn--sm"
+          title="Girilen kar marjını verilen birimin satış kuruna uygula ve ödenecek miktarı hesapla"
+        >
+          <span class="material-symbols-outlined ex-icon-filled" style="font-size:16px">calculate</span>
+          Marjı Uygula
+        </button>
+        <button
           @click="buildReceiptFromCurrent(); printReceipt()"
           :disabled="!exchangeItems.some(i => i.sourceCurrencyId && i.targetCurrencyId && i.sourceAmount > 0)"
           class="ex-btn ex-btn--amber ex-btn--sm"
@@ -2098,7 +2214,29 @@ watch(() => exchangeItems.value.map(item => ({
                 </span>
               </div>
 
+              <!-- Arbitraj: Alınan birim için piyasa kuru referansı (fazla ödenmesin) -->
+              <div v-if="terminalMode === 'arbitrage' && item.sourceCurrencyId && item.exchangeRate > 0" class="ex-wac-row">
+                <span class="ex-wac-label">Piyasa Alış ({{ getCurrencyById(item.sourceCurrencyId)?.currencyCode || '' }}):</span>
+                <span class="ex-wac-value" :class="isArbitrageBuyAboveMarket(item) ? 'ex-wac-value--loss' : 'ex-wac-value--ok'">
+                  {{ formatNumber(item.exchangeRate, 4) }} ₺
+                </span>
+                <span v-if="isArbitrageBuyAboveMarket(item)" class="ex-wac-warn">
+                  <span class="material-symbols-outlined ex-icon-filled" style="font-size:16px">warning</span>
+                  Piyasanın üstünde ödeniyor!
+                </span>
+              </div>
 
+              <!-- Arbitraj: Verilen birim için WAC maliyeti (maliyetin altına satılmasın) -->
+              <div v-if="terminalMode === 'arbitrage' && item.targetCurrencyId && item.targetCurrencyId !== tryId && getWacForCurrency(item.targetCurrencyId) > 0" class="ex-wac-row">
+                <span class="ex-wac-label">WAC Maliyet ({{ getCurrencyById(item.targetCurrencyId)?.currencyCode || '' }}):</span>
+                <span class="ex-wac-value" :class="isArbitrageSellBelowWac(item) ? 'ex-wac-value--loss' : 'ex-wac-value--ok'">
+                  {{ formatNumber(getWacForCurrency(item.targetCurrencyId), 4) }} ₺
+                </span>
+                <span v-if="isArbitrageSellBelowWac(item)" class="ex-wac-warn">
+                  <span class="material-symbols-outlined ex-icon-filled" style="font-size:16px">warning</span>
+                  Maliyetin altında!
+                </span>
+              </div>
 
             </div>
           </div>
@@ -2209,7 +2347,7 @@ watch(() => exchangeItems.value.map(item => ({
             </div>
 
             <!-- WAC Warning + Owner Override -->
-            <div v-if="transactionType === 'sell' && exchangeItems.some(item => isSellBelowWac(item))" class="ex-wac-block">
+            <div v-if="(transactionType === 'sell' && exchangeItems.some(item => isSellBelowWac(item))) || (terminalMode === 'arbitrage' && exchangeItems.some(item => isArbitrageSellBelowWac(item)))" class="ex-wac-block">
               <div class="ex-wac-block-title">
                 <span class="material-symbols-outlined ex-icon-filled" style="font-size:18px">error</span>
                 Satış kuru WAC maliyetinin altında — zarar edilecek!
@@ -2242,7 +2380,7 @@ watch(() => exchangeItems.value.map(item => ({
             <button
               v-if="!authStore.isViewerForOffice(selectedOfficeId)"
               @click="submitExchange"
-              :disabled="isLoading || exchangeItems.length === 0 || !selectedOfficeId || !selectedVaultId || (transactionType === 'sell' && exchangeItems.some(item => isSellBelowWac(item)) && !ownerOverrideLoss)"
+              :disabled="isLoading || exchangeItems.length === 0 || !selectedOfficeId || !selectedVaultId || (transactionType === 'sell' && exchangeItems.some(item => isSellBelowWac(item)) && !ownerOverrideLoss) || (terminalMode === 'arbitrage' && exchangeItems.some(item => isArbitrageSellBelowWac(item)) && !ownerOverrideLoss)"
               class="ex-submit-btn"
               :class="transactionType === 'buy' ? 'ex-submit-btn--buy' : 'ex-submit-btn--sell'"
             >
@@ -3272,6 +3410,8 @@ watch(() => exchangeItems.value.map(item => ({
 .ex-btn--amber:hover { background: linear-gradient(135deg, var(--color-warning), #b45309); box-shadow: 0 6px 16px rgba(217,119,6,0.3); }
 .ex-btn--indigo { background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover)); box-shadow: 0 3px 10px rgba(79,70,229,0.25); }
 .ex-btn--indigo:hover { background: linear-gradient(135deg, var(--color-primary-hover), #4338ca); box-shadow: 0 6px 16px rgba(79,70,229,0.3); }
+.ex-btn--green { background: linear-gradient(135deg, #22c55e, var(--color-success)); box-shadow: 0 3px 10px rgba(22,163,74,0.25); }
+.ex-btn--green:hover { background: linear-gradient(135deg, var(--color-success), #15803d); box-shadow: 0 6px 16px rgba(22,163,74,0.3); }
 
 /* ═══ Today Stats ═══ */
 .ex-today-stats {

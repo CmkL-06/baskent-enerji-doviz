@@ -130,9 +130,13 @@ async function loadPending() {
   }
 }
 
+const approvingIds = ref(new Set<string>())
+
 async function handleApproval(item: any, isApproved: boolean) {
+  if (approvingIds.value.has(item.id)) return
   const notes = isApproved ? '' : (prompt('Red sebebi:') ?? '')
   if (!isApproved && notes === '') return
+  approvingIds.value.add(item.id)
   try {
     await apiService.approveOrRejectRate(item.id, {
       ApprovalId: item.id,
@@ -143,6 +147,8 @@ async function handleApproval(item: any, isApproved: boolean) {
     await loadPending()
   } catch (e: any) {
     notification.error(e?.response?.data?.message || 'İşlem başarısız')
+  } finally {
+    approvingIds.value.delete(item.id)
   }
 }
 
@@ -420,12 +426,14 @@ onMounted(async () => {
             <td>{{ item.reason || '-' }}</td>
             <td>{{ formatDateTime(item.createdAt) }}</td>
             <td class="text-center actions-cell">
-              <button class="btn-approve" @click="handleApproval(item, true)" title="Onayla">
-                <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
-              </button>
-              <button class="btn-reject" @click="handleApproval(item, false)" title="Reddet">
-                <span class="material-symbols-outlined" aria-hidden="true">cancel</span>
-              </button>
+              <template v-if="authStore.isAdmin">
+                <button class="btn-approve" :disabled="approvingIds.has(item.id)" @click="handleApproval(item, true)" title="Onayla">
+                  <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+                </button>
+                <button class="btn-reject" :disabled="approvingIds.has(item.id)" @click="handleApproval(item, false)" title="Reddet">
+                  <span class="material-symbols-outlined" aria-hidden="true">cancel</span>
+                </button>
+              </template>
             </td>
           </tr>
         </tbody>

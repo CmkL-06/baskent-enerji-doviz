@@ -21,6 +21,7 @@ namespace BaskentEnerji.Business.Infrastructure.ExchangeOffice.Office
         Sale,
         DayClosure,
         ManualAdjustment,
-        TransactionDelete
+        TransactionDelete,
+        Transfer
     }
 }

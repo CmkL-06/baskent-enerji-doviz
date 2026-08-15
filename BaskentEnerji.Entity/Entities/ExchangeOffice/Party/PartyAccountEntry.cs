@@ -15,7 +15,10 @@ namespace BaskentEnerji.Entity.Entities.ExchangeOffice.Party
         public DateTime? DueDate { get; set; }
         public string? ReferenceNumber { get; set; }
         public EntryType Type { get; set; }
-        public decimal Amount { get; set; } // TL karşılığı
+        public decimal Amount { get; set; } // Hesabın kendi para birimi cinsinden orijinal işlem tutarı
+        // Cari borç/alacak TL bazlı tek net pozisyon mantığı için TL karşılığı — farklı döviz cinsi
+        // ödemeler bu alan üzerinden PartyAccount.Balance'ı (TL) doğrudan etkiler, ayrı hesap açmadan.
+        public decimal? AmountInTRY { get; set; }
         public decimal PaidAmount { get; set; } = 0; // Bu kaleme kısmi/tam olarak ödenmiş toplam tutar
         public decimal RunningBalance { get; set; }
         public string Description { get; set; }

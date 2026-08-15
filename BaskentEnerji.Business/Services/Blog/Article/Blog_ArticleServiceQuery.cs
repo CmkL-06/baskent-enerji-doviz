@@ -119,7 +119,7 @@ namespace BaskentEnerji.Business.Services.Blog.Article
             if (data.isUnique.HasValue)
                 query = query.Where(a => a.IsUnique == data.isUnique.Value);
             if (data.isAnnouncement.HasValue)
-                query = query.Where(a => a.IsUnique == data.isAnnouncement.Value);
+                query = query.Where(a => a.IsAnnouncement == data.isAnnouncement.Value);
 
             var result = query.ProjectTo<rsp_article>(mapper.ConfigurationProvider).OrderByDescending(x => x.CreatedDate).ToList();
 
@@ -136,42 +136,6 @@ namespace BaskentEnerji.Business.Services.Blog.Article
         }
 
 
-        public List<rsp_article_guest> GetArticles_GuestOld(rm_article_guest data)
-        {
-            var query = _dbContext.Blog_Articles.AsQueryable();
-
-
-            if (data.catId.HasValue || data.catId != Guid.Empty)
-            {
-                query = query.Where(a => _dbContext.Blog_Article_Categories.Any(ac => ac.ArticleId == a.Id && ac.CategoryId == data.catId));
-            }
-
-            if (!string.IsNullOrEmpty(data.relatedLink))
-            {
-                var dbRelatedArticle = _dbContext.Blog_Articles.FirstOrDefault(x => x.SeoLink == data.relatedLink);
-                string relatedTitle = dbRelatedArticle?.SeoLink ?? data.relatedLink;
-                string[] relatedWords = relatedTitle.Split('-');
-                var dbArticles = _dbContext.Blog_Articles
-                    .Where(x => relatedWords.Any(word => x.SeoTitle.Contains(word))).ToList();
-                return mapper.Map<List<rsp_article_guest>>(dbArticles);
-            }
-
-
-
-            if (data.isEnabled.HasValue)
-                query = query.Where(a => a.IsEnabled == data.isEnabled.Value);
-
-            if (data.isUnique.HasValue)
-                query = query.Where(a => a.IsUnique == data.isUnique.Value);
-            if (data.isAnnouncement.HasValue)
-                query = query.Where(a => a.IsAnnouncement == data.isAnnouncement.Value);
-
-            var result = query.ProjectTo<rsp_article_guest>(mapper.ConfigurationProvider).OrderByDescending(x => x.CreatedDate).ToList();
-
-
-
-            return result;
-        }
         public List<rsp_article_guest> GetArticles_Guest(rm_article_guest data)
         {
             var query = _dbContext.Blog_Articles.AsQueryable();
@@ -218,7 +182,7 @@ namespace BaskentEnerji.Business.Services.Blog.Article
             if (!string.IsNullOrEmpty(data.Lang)) query = query.Where(x => x.Blog_Article_Categories.Any(c => c.Category.Language.LanguageCode == data.Lang));
           
             if (data.catId.HasValue) query = query.Where(x => x.Blog_Article_Categories.Any(ac => ac.CategoryId == data.catId));
-            if (string.IsNullOrEmpty(data.catLink)) query = query.Where(x => x.Blog_Article_Categories.Any(ac => ac.Category.SeoLink == data.catLink));
+            if (!string.IsNullOrEmpty(data.catLink)) query = query.Where(x => x.Blog_Article_Categories.Any(ac => ac.Category.SeoLink == data.catLink));
           
 
             if (data.isEnabled.HasValue)
@@ -321,7 +285,8 @@ namespace BaskentEnerji.Business.Services.Blog.Article
 
 
             var visitorIp = Tools.tools_string.GetIpAddress(httpContext);
-            var checkAlreadyViewed = _dbContext.Blog_Article_Visits.Where(x => x.VisitorIp == visitorIp).ToList();
+            var checkAlreadyViewed = _dbContext.Blog_Article_Visits
+                .Where(x => x.VisitorIp == visitorIp && x.ArticleId == dbArticle.Article.Id).ToList();
             if (checkAlreadyViewed.Count == 0)
             {
                 _dbContext.Blog_Article_Visits.Add(new Entity.Entities.Blog.Blog_Article_Visit

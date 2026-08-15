@@ -59,7 +59,10 @@ class Config:
     # ── Limitler ──
     MIN_USDT = float(os.getenv('MIN_USDT', '10'))
     MIN_RUBLE = float(os.getenv('MIN_RUBLE', '5000'))
+    MAX_USDT = float(os.getenv('MAX_USDT', '100000'))
+    MAX_RUBLE = float(os.getenv('MAX_RUBLE', '50000000'))
     TXID_MIN_LENGTH = int(os.getenv('TXID_MIN_LENGTH', '10'))
+    TXID_MAX_LENGTH = int(os.getenv('TXID_MAX_LENGTH', '128'))
     USDT_CONFIRMATIONS_REQUIRED = int(os.getenv('USDT_CONFIRMATIONS', '10'))
     TXID_VERIFY_TIME_LIMIT = int(os.getenv('TXID_VERIFY_TIME_LIMIT', '120'))  # dakika
 
@@ -68,8 +71,11 @@ class Config:
     DEFAULT_RUB_RATE = float(os.getenv('DEFAULT_RUB_RATE', '0.40'))
 
     # ── .NET API'ye SSE bildirimi (notify_web_panel) ──
+    # NOTIFY_SECRET için kaynak kodda bilinen/tahmin edilebilir bir varsayılan
+    # KULLANILMAZ — .env'de tanımlı değilse boş kalır ve notify_web_panel bu durumda
+    # isteği hiç göndermez (bkz. database.py notify_web_panel).
     WEB_PANEL_URL = os.getenv('WEB_PANEL_URL', 'http://localhost:5000')
-    NOTIFY_SECRET = os.getenv('NOTIFY_SECRET', 'bsk-notify-2026-secret')
+    NOTIFY_SECRET = os.getenv('NOTIFY_SECRET', '')
 
     # ── Dosya Yükleme ──
     UPLOAD_DIR = os.getenv('UPLOAD_DIR', 'uploads')

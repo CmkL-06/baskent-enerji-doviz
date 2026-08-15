@@ -432,6 +432,7 @@ async function submitModal() {
         break
       case 'loadBalance':
         if (!formBalance.value.vaultId || !formBalance.value.currencyId || !formBalance.value.amount) throw new Error('Tüm alanları doldurun')
+        if (Number(formBalance.value.amount) <= 0) throw new Error('Miktar sıfırdan büyük olmalıdır')
         await apiService.updateVaultBalance({
           vaultId: formBalance.value.vaultId, currencyId: formBalance.value.currencyId,
           amount: Number(formBalance.value.amount), description: formBalance.value.description || 'Dashboard bakiye yükleme',
@@ -441,6 +442,7 @@ async function submitModal() {
         break
       case 'transfer':
         if (!formTransfer.value.sourceVaultId || !formTransfer.value.targetVaultId || !formTransfer.value.currencyId || !formTransfer.value.amount) throw new Error('Tüm alanları doldurun')
+        if (Number(formTransfer.value.amount) <= 0) throw new Error('Miktar sıfırdan büyük olmalıdır')
         await apiService.createTransferRequest({
           sourceVaultId: formTransfer.value.sourceVaultId, targetVaultId: formTransfer.value.targetVaultId,
           currencyId: formTransfer.value.currencyId, amount: Number(formTransfer.value.amount),
@@ -573,7 +575,7 @@ onUnmounted(() => {
 
         <div class="sf-info-card">
           <div class="sf-info-head">
-            <span class="material-symbols-outlined" aria-hidden="true" style="color:var(--color-primary)">contacts</span>
+            <span class="material-symbols-outlined" aria-hidden="true">contacts</span>
             <span class="sf-info-title">Cari Hesaplar</span>
             <button class="sf-link-btn" @click="router.push('/ihtiyar/parties')">Detay <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></button>
           </div>
@@ -986,7 +988,13 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.db { padding: 24px; display: flex; flex-direction: column; gap: 18px; min-height: 100vh; }
+.db {
+  padding: 24px; display: flex; flex-direction: column; gap: 18px; min-height: 100vh;
+  background:
+    radial-gradient(1100px 480px at 8% -8%, rgba(124,58,237,0.07), transparent 60%),
+    radial-gradient(900px 420px at 96% 0%, rgba(14,165,233,0.06), transparent 55%),
+    radial-gradient(800px 500px at 50% 105%, rgba(245,158,11,0.05), transparent 60%);
+}
 .db-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60vh; gap: 16px; color: var(--color-text-secondary); }
 .spinner { width: 40px; height: 40px; border: 3px solid var(--color-border); border-top-color: var(--color-primary); border-radius: 50%; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -1396,10 +1404,11 @@ onUnmounted(() => {
 .sf-kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 .sf-kpi {
   display: flex; align-items: center; gap: 14px;
-  background: var(--color-bg-card); border: 1px solid #eef0f4; border-radius: var(--radius-lg); padding: 16px 18px;
-  transition: border-color .2s, box-shadow .2s;
+  background: var(--color-bg-card); border: 1px solid #eef0f4; border-left: 4px solid var(--kpi-accent, var(--color-primary));
+  border-radius: var(--radius-lg); padding: 16px 18px;
+  transition: border-color .2s, box-shadow .2s, transform .2s;
 }
-.sf-kpi:hover { border-color: #d4d8e8; box-shadow: 0 4px 16px -6px rgba(0,0,0,0.08); }
+.sf-kpi:hover { border-color: #d4d8e8; border-left-color: var(--kpi-accent, var(--color-primary)); box-shadow: 0 6px 18px -6px rgba(0,0,0,0.14); transform: translateY(-2px); }
 .sf-kpi-icon {
   width: 42px; height: 42px; border-radius: var(--radius-md);
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
@@ -1417,10 +1426,20 @@ onUnmounted(() => {
 .sf-panel:hover { border-color: #d4d8e8; box-shadow: 0 4px 16px -6px rgba(0,0,0,0.08); }
 .sf-panel-head {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 18px; border-bottom: 1px solid var(--color-bg-page);
+  padding: 14px 18px;
+}
+.sf-panel-head:not(.sf-vault-head) {
+  border-bottom: 3px solid var(--color-primary);
+  background: linear-gradient(180deg, var(--color-primary-light) 0%, #ffffff 100%);
 }
 .sf-panel-title { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: var(--color-text); }
 .sf-panel-title .material-symbols-outlined { font-size: 20px; color: var(--color-primary); }
+.sf-panel-head:not(.sf-vault-head) .sf-panel-title .material-symbols-outlined {
+  color: #fff; background: var(--color-primary);
+  width: 30px; height: 30px; border-radius: var(--radius-md);
+  display: flex; align-items: center; justify-content: center; font-size: 18px;
+  box-shadow: 0 3px 8px -2px rgba(99,102,241,0.4);
+}
 .sf-link-btn {
   display: inline-flex; align-items: center; gap: 3px;
   background: none; border: none; cursor: pointer;
@@ -1468,15 +1487,22 @@ onUnmounted(() => {
 .sf-vault-val { font-size: 11px; color: var(--color-text-muted); }
 
 .sf-info-card {
-  background: var(--color-bg-card); border: 1px solid #eef0f4; border-radius: var(--radius-lg); overflow: hidden;
+  background: var(--color-bg-card); border: 1px solid #eef0f4; border-top: 4px solid var(--color-warning);
+  border-radius: var(--radius-lg); overflow: hidden;
   transition: border-color .2s, box-shadow .2s;
 }
 .sf-info-card:hover { border-color: #d4d8e8; box-shadow: 0 4px 16px -6px rgba(0,0,0,0.08); }
 .sf-info-head {
   display: flex; align-items: center; gap: 8px;
-  padding: 14px 18px; border-bottom: 1px solid var(--color-bg-page);
+  padding: 14px 18px; border-bottom: 3px solid var(--color-warning);
+  background: linear-gradient(180deg, var(--color-warning-bg) 0%, #ffffff 100%);
 }
-.sf-info-head .material-symbols-outlined { font-size: 20px; }
+.sf-info-head .material-symbols-outlined {
+  color: #fff; background: var(--color-warning);
+  width: 30px; height: 30px; border-radius: var(--radius-md);
+  display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0;
+  box-shadow: 0 3px 8px -2px rgba(217,119,6,0.4);
+}
 .sf-info-title { flex: 1; font-size: 14px; font-weight: 700; color: var(--color-text); }
 .sf-info-body { display: flex; flex-direction: column; }
 .sf-info-row {
@@ -1530,5 +1556,28 @@ onUnmounted(() => {
   .rate-band-inner { gap: 4px; }
   .rate-chip { padding: 6px 10px; }
   .db-hero-name { font-size: 1.15rem; }
+}
+/* Küçük telefonlar (≤480px) — buton/form çakışmalarını önle, hepsi tek sıra */
+@media (max-width: 480px) {
+  .db { padding: 10px; gap: 10px; }
+  .ok-grid, .qa-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .qa-item, .ok-card { padding: 10px 8px; font-size: 12px; }
+  /* Pozisyon satırı 4 sütundan 2 sütun 2 satıra düşsün */
+  .pos-row {
+    grid-template-columns: 40px 1fr 90px !important;
+    grid-auto-flow: row;
+    gap: 4px 8px;
+    font-size: 12px;
+  }
+  .pos-row > *:nth-child(2) { grid-column: 2 / 4; }
+  /* İşlem/bank/staff satırlarının sağdaki ekstra kolonlarını gizle */
+  .sf-tx-row { grid-template-columns: 48px 1fr 70px; }
+  .sf-tx-user, .sf-tx-time { display: none; }
+  .tx-item { grid-template-columns: 40px 1fr 70px; padding: 6px 8px; font-size: 12px; }
+  .staff-row { grid-template-columns: 40px 1fr 70px !important; }
+  .staff-row > *:nth-child(n+4) { display: none; }
+  /* Modal / genel form için tek sütun (design-tokens.css'te de var ama kesin olsun) */
+  .msb-stats, .msb-stats--bayi { grid-template-columns: 1fr !important; }
+  .msb-grid { grid-template-columns: 1fr !important; }
 }
 </style>

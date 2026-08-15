@@ -228,13 +228,19 @@ const isMultiOffice = computed(() => !selectedOfficeId.value && (reportData.valu
 
 const kpis = computed(() => {
   if (!s.value) return []
+  // Öz sermaye = Fiziksel kasa + cari alacak − cari borç
+  // Kasa fiziksel bakiyesi borç para dahildir; öz sermaye onu düşerek gerçek net varlığımızı gösterir.
+  const kasaFiziksel = s.value.totalValueInBaseCurrency ?? 0
+  const cariAlacak = reportData.value?.partyAccountsSummary?.totalReceivablesInTRY ?? 0
+  const cariBorc = reportData.value?.partyAccountsSummary?.totalDebtsInTRY ?? 0
+  const ozSermaye = kasaFiziksel + cariAlacak - cariBorc
   const items = [
-    { icon: 'trending_up', label: 'Toplam Kar', value: fmt(s.value.totalProfit ?? s.value.totalProfitInTRY ?? 0), unit: '₺', color: '#10b981', bg: 'rgba(16,185,129,0.10)', deltaKey: 'totalProfit' },
+    { icon: 'trending_up', label: 'Toplam Kar', value: fmt(s.value.totalProfit ?? s.value.totalProfitInTRY ?? 0), unit: '₺', color: '#10b981', bg: 'rgba(16,185,129,0.10)', deltaKey: 'totalProfit', tooltip: 'Bu dönemde SATILAN dövizlerden gerçekleşen kâr (satış kuru − o anki ortalama maliyet/WAC). Kasadaki henüz satılmamış dövizin piyasa değer farkını içermez — bkz. Kasalar sayfasında "Anlık Piyasa Farkı".' },
     { icon: 'swap_horiz', label: 'İşlem Sayısı', value: fmt(s.value.totalTransactions ?? 0, 0), unit: 'adet', color: 'var(--color-primary)', bg: 'rgba(99,102,241,0.10)', deltaKey: 'totalTransactions' },
     { icon: 'monitoring', label: 'İşlem Hacmi', value: fmt(s.value.totalForeignCurrencyProcessed ?? 0), unit: '₺', color: '#0ea5e9', bg: 'rgba(14,165,233,0.10)', deltaKey: 'totalForeignCurrencyProcessed' },
     { icon: 'percent', label: 'Kar Marjı', value: fmt(s.value.profitMargin ?? 0, 1), unit: '%', color: '#f59e0b', bg: 'rgba(245,158,11,0.10)', deltaKey: 'profitMargin' },
-    { icon: 'straighten', label: 'Ort. İşlem', value: fmt(s.value.averageTransactionSize ?? 0), unit: '₺', color: '#8b5cf6', bg: 'rgba(139,92,246,0.10)', deltaKey: 'averageTransactionSize' },
-    { icon: 'account_balance', label: 'Kasa Değeri', value: fmt(s.value.totalValueInBaseCurrency ?? 0), unit: '₺', color: 'var(--color-secondary)', bg: 'rgba(59,130,246,0.10)', deltaKey: 'totalValueInBaseCurrency' },
+    { icon: 'account_balance', label: 'Kasa (Fiziksel)', value: fmt(kasaFiziksel), unit: '₺', color: 'var(--color-secondary)', bg: 'rgba(59,130,246,0.10)', deltaKey: 'totalValueInBaseCurrency', tooltip: 'Kasalardaki fiziksel para toplamı (TL karşılığı). Cariden alınan borç PARALARI bu tutara dahildir — gerçek öz kaynağımız için "Öz Sermaye" kartına bakın.' },
+    { icon: 'savings', label: 'Öz Sermaye', value: fmt(ozSermaye), unit: '₺', color: ozSermaye >= 0 ? '#059669' : '#dc2626', bg: ozSermaye >= 0 ? 'rgba(16,185,129,0.10)' : 'rgba(239,68,68,0.10)', tooltip: `Gerçek net varlığımız = Fiziksel Kasa (${fmt(kasaFiziksel)} ₺) + Cari Alacak (${fmt(cariAlacak)} ₺) − Cari Borç (${fmt(cariBorc)} ₺). Borç ödedikçe/alacak topladıkça kasa değişir ama öz sermaye SABİT kalır — çünkü sadece bir kalemden diğerine geçmiş olur.` },
   ]
   return items
 })
@@ -609,7 +615,7 @@ onMounted(async () => {
              class="kpi-slot" :class="{ clickable: k.label === 'Toplam Kar' || (k.label === 'İşlem Sayısı' && hourlyEnabled) }"
              @click="k.label === 'Toplam Kar' ? toggleProfitTrend() : (k.label === 'İşlem Sayısı' && toggleHourlyChart())">
           <AppKpiCard :icon="k.icon" :label="k.label" :value="k.value" :unit="k.unit" :color="k.color" :bg="k.bg"
-                      :delta="kpiDeltas[k.deltaKey]" delta-label="önceki döneme göre" />
+                      :delta="kpiDeltas[k.deltaKey]" delta-label="önceki döneme göre" :tooltip="k.tooltip" />
         </div>
       </div>
 
@@ -885,7 +891,11 @@ onMounted(async () => {
         <div class="vo-item">
           <span class="material-symbols-outlined" aria-hidden="true" style="color: var(--color-primary)">balance</span>
           <div>
-            <p class="vo-label">Kasa Sonrası Kar</p>
+            <p class="vo-label">
+              Kasa Sonrası Kar
+              <span class="material-symbols-outlined" aria-hidden="true" style="font-size:13px; color:#9ca3af; cursor:help; vertical-align:middle"
+                    title="Yukarıdaki 'Toplam Kar' (satış kârı) artı bu dönemdeki kasa hareketlerinin (elle düzeltme, TL girişi/çıkışı vb.) net etkisi. İki rakam farklıysa, aradaki fark kasa hareketlerinden kaynaklanıyor demektir.">info</span>
+            </p>
             <p class="vo-val" :class="(s.profitAfterVaultOperations ?? 0) >= 0 ? 'pos' : 'neg'">{{ fmt(s.profitAfterVaultOperations) }} ₺</p>
           </div>
         </div>

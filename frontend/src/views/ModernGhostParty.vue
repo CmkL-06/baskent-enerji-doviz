@@ -127,7 +127,7 @@ async function createAccount() {
     showCreateAccountModal.value = false
     if (selectedParty.value) await selectParty(selectedParty.value)
   } catch (e: any) {
-    notification.error(e?.response?.data?.message || 'Hesap oluşturulamadı')
+    notification.error((e?.response?.data?.error || e?.response?.data?.message) || 'Hesap oluşturulamadı')
   } finally { saving.value = false }
 }
 
@@ -136,7 +136,9 @@ function openPayment() {
   paymentForm.value = {
     partyId: selectedParty.value.id,
     accountId: selectedAccount.value?.id ?? '',
-    currencyId: selectedAccount.value?.currencyId ?? exchangeStore.currencies[0]?.id ?? '',
+    currencyId: selectedAccount.value?.currencyId
+      ?? exchangeStore.currencies.find((c: any) => c.currencyCode === 'TRY')?.id
+      ?? exchangeStore.currencies[0]?.id ?? '',
     amount: null,
     description: '',
     referenceNumber: '',
@@ -149,7 +151,9 @@ function openCollection() {
   paymentForm.value = {
     partyId: selectedParty.value.id,
     accountId: selectedAccount.value?.id ?? '',
-    currencyId: selectedAccount.value?.currencyId ?? exchangeStore.currencies[0]?.id ?? '',
+    currencyId: selectedAccount.value?.currencyId
+      ?? exchangeStore.currencies.find((c: any) => c.currencyCode === 'TRY')?.id
+      ?? exchangeStore.currencies[0]?.id ?? '',
     amount: null,
     description: '',
     referenceNumber: '',
@@ -172,7 +176,7 @@ async function submitPayment() {
     showPaymentModal.value = false
     if (selectedParty.value) await selectParty(selectedParty.value)
   } catch (e: any) {
-    notification.error(e?.response?.data?.message || 'Ödeme kaydedilemedi')
+    notification.error((e?.response?.data?.error || e?.response?.data?.message) || 'Ödeme kaydedilemedi')
   } finally { saving.value = false }
 }
 
@@ -191,7 +195,7 @@ async function submitCollection() {
     showCollectionModal.value = false
     if (selectedParty.value) await selectParty(selectedParty.value)
   } catch (e: any) {
-    notification.error(e?.response?.data?.message || 'Tahsilat kaydedilemedi')
+    notification.error((e?.response?.data?.error || e?.response?.data?.message) || 'Tahsilat kaydedilemedi')
   } finally { saving.value = false }
 }
 
@@ -202,7 +206,7 @@ async function reverseEntry(entry: any) {
     if (selectedAccount.value) await loadEntries(selectedAccount.value)
     if (selectedParty.value) await selectParty(selectedParty.value)
   } catch (e: any) {
-    notification.error(e?.response?.data?.message || 'İptal başarısız')
+    notification.error((e?.response?.data?.error || e?.response?.data?.message) || 'İptal başarısız')
   }
 }
 
@@ -215,7 +219,7 @@ async function toggleAccountBlock(account: any) {
     }
     if (selectedParty.value) await selectParty(selectedParty.value)
   } catch (e: any) {
-    notification.error(e?.response?.data?.message || 'İşlem başarısız')
+    notification.error((e?.response?.data?.error || e?.response?.data?.message) || 'İşlem başarısız')
   }
 }
 

@@ -66,7 +66,17 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
         {
             // Use locked read when inside a transaction to prevent stale WAC
             var wacEntity = await GetOrCreateWacAsync(vaultId, currencyId);
-            if (wacEntity.Wac == 0) return 0;
+            if (wacEntity.Wac == 0)
+            {
+                // Denetim bulgusu: maliyet tabanı bilinmiyorsa (hiç alış yapılmamış/reversal ile
+                // sıfırlanmış) kâr sessizce 0 gösteriliyordu ve satış yine de gerçekleşiyordu —
+                // personel bunun farkına varamıyordu. Artık en azından log'a düşüyor; Z-Raporunda
+                // beklenmedik düşük kâr görülürse bu logdan kök nedene ulaşılabilir.
+                _logger?.LogWarning(
+                    "Gerçekleşen kâr hesaplanamadı — WAC=0 (maliyet tabanı bilinmiyor), kâr 0 olarak kaydedildi. VaultId={VaultId}, CurrencyId={CurrencyId}, SatışKuru={SellRate}, Miktar={Quantity}",
+                    vaultId, currencyId, sellRate, quantity);
+                return 0;
+            }
             return (sellRate - wacEntity.Wac) * quantity;
         }
 
@@ -74,6 +84,11 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
         {
             var wac = await GetOrCreateWacAsync(vaultId, currencyId);
             var oldQuantity = wac.Quantity;
+            // Miktar tam sıfıra düştüğünde wac.Wac aşağıda 0'a çekiliyor — denetim kaydına
+            // (LogWacHistoryAsync) o satırdan SONRAKİ (mutasyona uğramış) değer değil, satış
+            // anındaki GERÇEK WAC yazılmalı. Aksi halde OldWac=0 olarak loglanır ve bu işlem
+            // silinip geri alınmak istendiğinde yanlış (sıfır) maliyet tabanıyla geri eklenir.
+            var wacBeforeAdjustment = wac.Wac;
 
             if (newQuantity < 0)
             {
@@ -98,10 +113,11 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 WacAdjustReason.DayClosure => WacChangeReason.DayOpening,
                 WacAdjustReason.ManualAdjustment => WacChangeReason.Adjustment,
                 WacAdjustReason.TransactionDelete => WacChangeReason.Adjustment,
+                WacAdjustReason.Transfer => WacChangeReason.Transfer,
                 _ => WacChangeReason.Adjustment
             };
 
-            await LogWacHistoryAsync(vaultId, currencyId, wac.Wac, wac.Wac, oldQuantity, newQuantity, Math.Abs(newQuantity - oldQuantity), 0, transactionId, changeReason);
+            await LogWacHistoryAsync(vaultId, currencyId, wacBeforeAdjustment, wac.Wac, oldQuantity, newQuantity, Math.Abs(newQuantity - oldQuantity), 0, transactionId, changeReason);
             await _context.SaveChangesAsync();
         }
 
@@ -114,7 +130,18 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             var newQuantity = oldQuantity - originalAmount;
             if (newQuantity <= 0)
             {
-                wac.Wac = 0;
+                // Denetim bulgusu: bu alıştan sonra satış yapılmış ve/veya başka alışlarla
+                // karışmış olabilir — miktar sıfırın altına düşüyor demek, kasada hâlâ BAŞKA
+                // alışlardan gelen bakiye olabileceği anlamına gelir. WAC lot bazlı takip
+                // yapmadığından bu alışın payını net olarak geri çıkaramıyoruz; miktarı VE
+                // maliyeti (Wac) sıfırlamak, hâlâ kasada duran diğer alışların maliyet tabanını
+                // da silerdi. Bunun yerine miktar sıfıra kilitlenir ama mevcut WAC korunur —
+                // bir sonraki alışta zaten qty=0 olduğundan doğru şekilde yeniden hesaplanır,
+                // araya bir satış girerse de CalculateRealizedProfitAsync sessizce 0 kâr
+                // göstermek yerine son bilinen (daha doğru) maliyeti kullanır.
+                _logger?.LogWarning(
+                    "Alış iptali miktarı sıfırın altına düşürdü — muhtemelen araya satış girmiş. VaultId={VaultId}, CurrencyId={CurrencyId}, MevcutMiktar={OldQuantity}, İptalEdilenMiktar={OriginalAmount}, TransactionId={TransactionId}. WAC korunarak miktar sıfırlandı, manuel kasa sayımı kontrolü önerilir.",
+                    vaultId, currencyId, oldQuantity, originalAmount, transactionId);
                 wac.Quantity = 0;
             }
             else

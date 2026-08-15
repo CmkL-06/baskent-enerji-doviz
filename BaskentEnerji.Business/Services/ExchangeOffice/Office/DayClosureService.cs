@@ -181,6 +181,20 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 {
                     for (var d = expectedDate; d < businessDate; d = d.AddDays(1))
                     {
+                        // Denetim bulgusu: bu döngü, ara günlerden birinde zaten Owner onayı bekleyen
+                        // (>500 TL sayım farkı olan) bir PendingApproval kaydı varsa bunu görmezden
+                        // gelip AYNI gün için Discrepancy=0 ile ikinci bir AutoClosed kaydı
+                        // oluşturuyordu — bu yeni kayıt "son kapanış" sayıldığından, orijinal
+                        // PendingApproval kaydı hiç çözülmeden (fiilen atlatılarak) sonraki günlere
+                        // geçilebiliyordu. Owner onay mekanizmasını korumak için burada durduruluyor.
+                        var existingForDay = await _context.DayClosures.FirstOrDefaultAsync(dc =>
+                            dc.OfficeId == request.OfficeId && dc.BusinessDate.Date == d.Date);
+                        if (existingForDay != null && existingForDay.Status == DayClosureStatus.PendingApproval)
+                            throw new ApiException(HttpStatusCode.BadRequest,
+                                $"{d:dd.MM.yyyy} tarihli kapanış Owner onayı bekliyor. Sonraki günler için kapanış alınabilmesi için önce bu gün onaylanmalı/reddedilmeli.");
+                        if (existingForDay != null)
+                            continue; // Zaten kapatılmış (Closed/AutoClosed) — mükerrer kayıt oluşturma.
+
                         await AutoCloseDayAsync(request.OfficeId, vault.Id, d, userId);
                     }
                 }

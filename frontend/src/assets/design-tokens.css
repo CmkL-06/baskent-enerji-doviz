@@ -73,3 +73,67 @@
 .material-symbols-outlined {
   user-select: none;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Mobil override'lar (≤640px) — telefondan kullanımdaki sığmazlık sorunları
+   için genel çözüm. Sayfaların kendi mobil kurallarına ek olarak.
+   ───────────────────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  /* Modal'lar tam ekran açılsın — dar telefonda ortalanmış kutu sığmıyor */
+  .modal-overlay .modal-content,
+  .modal-overlay > div[class*="modal"] {
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: none !important;
+    max-height: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+  }
+  .modal-body {
+    max-height: calc(100vh - 130px) !important;
+    overflow-y: auto !important;
+    padding: 12px 14px !important;
+  }
+  .modal-header, .modal-footer {
+    padding: 12px 14px !important;
+  }
+  /* Form grid'leri (2/3 sütun) mobilde tek sütun */
+  .form-grid-2, .form-grid-3, [class*="form-grid"] {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+  /* Modal footer butonları sağa yaslı yerine tam genişlik alt alta */
+  .modal-footer {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+  .modal-footer button {
+    flex: 1 1 100% !important;
+    min-width: 0 !important;
+  }
+  /* Form input/select/textarea: 16px font (iOS zoom önleme) */
+  input[type="text"], input[type="number"], input[type="date"], input[type="tel"],
+  input[type="email"], input[type="password"], select, textarea {
+    font-size: 16px !important;
+  }
+  /* Sayfa ana içeriği: kenar boşluğunu azalt */
+  .party-wrap, .exchange-wrap, .zreport-wrap, .dashboard-wrap {
+    padding: 12px !important;
+  }
+  /* KPI grid'leri: minimum kart genişliğini düşür ki 2 kart yan yana sığsın */
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+  /* Uzun tablolar için scroll kabuk zorla */
+  table {
+    font-size: 13px;
+  }
+}
+
+/* Çok küçük ekranlar (≤400px, eski telefonlar) — KPI grid'i tek sütun */
+@media (max-width: 400px) {
+  .kpi-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

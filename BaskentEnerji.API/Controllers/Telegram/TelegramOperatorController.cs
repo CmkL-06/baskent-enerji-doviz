@@ -80,6 +80,27 @@ namespace BaskentEnerji.API.Controllers.Telegram
             return tgOpId.Value;
         }
 
+        // Admin/Owner her zaman muaf. Staff-rank bir operatörün, başka bir operatöre atanmış
+        // bir işlemin sohbetini görmesi/mesaj yazması/aksiyon alması engellenir — önceden
+        // GetChat/SendChat/VerifyCrypto/TransactionAction bu kontrolü hiç yapmıyordu, herhangi
+        // bir operatör başka bir operatörün işlemine erişebiliyordu. Henüz kimseye atanmamış
+        // (AssignedOperatorId == null) işlemler herkese açıktır — ilk yanıt veren operatör
+        // işlemi doğal olarak üstlenir.
+        private async Task<TgTransaction> RequireOwnTransactionOrAdmin(int txId)
+        {
+            var tx = await _db.TgTransactions.FindAsync(txId);
+            if (tx == null)
+                throw new ApiException(HttpStatusCode.NotFound, "İşlem bulunamadı");
+
+            if (await _validationService.IsAdminAsync())
+                return tx;
+
+            var tgOpId = await RequireAssignedOperator();
+            if (tx.AssignedOperatorId.HasValue && tx.AssignedOperatorId != tgOpId)
+                throw new ApiException(HttpStatusCode.Forbidden, "Bu işlem başka bir operatöre atanmış.");
+            return tx;
+        }
+
         [HttpGet("transactions")]
         public async Task<IActionResult> Transactions()
         {
@@ -133,6 +154,7 @@ namespace BaskentEnerji.API.Controllers.Telegram
         public async Task<IActionResult> GetChat(int txId)
         {
             await RequireStaff();
+            await RequireOwnTransactionOrAdmin(txId);
 
             var messages = await _db.TgMessages
                 .Where(m => m.TransactionId == txId)
@@ -161,6 +183,8 @@ namespace BaskentEnerji.API.Controllers.Telegram
             if (string.IsNullOrWhiteSpace(req.Message))
                 throw new ApiException(HttpStatusCode.BadRequest, "Mesaj boş olamaz");
 
+            var tx = await RequireOwnTransactionOrAdmin(txId);
+
             var isAdmin = await _validationService.IsAdminAsync();
             var tgOpId = isAdmin ? await GetCurrentTelegramOperatorId() : await RequireAssignedOperator();
 
@@ -178,7 +202,6 @@ namespace BaskentEnerji.API.Controllers.Telegram
             _db.TgMessages.Add(msg);
             await _db.SaveChangesAsync();
 
-            var tx = await _db.TgTransactions.FindAsync(txId);
             if (tx?.CustomerId != null)
             {
                 var userIdStr = _validationService.GetUserID();
@@ -223,6 +246,13 @@ namespace BaskentEnerji.API.Controllers.Telegram
 
             var isAdminAction = await _validationService.IsAdminAsync();
             var tgOpId = isAdminAction ? await GetCurrentTelegramOperatorId() : await RequireAssignedOperator();
+
+            // Başka bir operatöre zaten atanmış bir işlem üzerinde aksiyon alınmasını engeller
+            // (hijack koruması) — atanmamış (null) işlemler herkese açık kalır, ilk aksiyonu
+            // alan operatör işlemi doğal olarak üstlenir.
+            if (!isAdminAction && tx.AssignedOperatorId.HasValue && tx.AssignedOperatorId != tgOpId)
+                throw new ApiException(HttpStatusCode.Forbidden, "Bu işlem başka bir operatöre atanmış.");
+
             tx.Status = newStatus;
             tx.AssignedOperatorId = tgOpId;
 
@@ -293,9 +323,7 @@ namespace BaskentEnerji.API.Controllers.Telegram
         {
             await RequireStaff();
 
-            var tx = await _db.TgTransactions.FindAsync(txId);
-            if (tx == null)
-                throw new ApiException(HttpStatusCode.NotFound, "İşlem bulunamadı");
+            var tx = await RequireOwnTransactionOrAdmin(txId);
 
             if (string.IsNullOrEmpty(tx.Txid))
                 throw new ApiException(HttpStatusCode.BadRequest, "Bu işlemde TXID bilgisi yok");

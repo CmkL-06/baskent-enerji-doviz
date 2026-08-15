@@ -38,8 +38,20 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 throw new ApiException(HttpStatusCode.Forbidden, "Bu işlem için Admin veya Owner yetkisi gerekir.");
         }
 
+        // Kullanıcı-ofis atama haritası hassas bir organizasyon bilgisidir (IDOR ile keşif/recon
+        // amaçlı kötüye kullanılabilir) — bu yüzden sadece kendi kaydına bakan kullanıcı veya
+        // Admin/Owner erişebilir.
+        private async Task EnsureSelfOrAdminAsync(Guid userId)
+        {
+            if (await _validationService.IsAdminAsync()) return;
+            if (!Guid.TryParse(_validationService.GetUserID(), out var currentUserId) || currentUserId != userId)
+                throw new ApiException(HttpStatusCode.Forbidden, "Bu bilgiye erişim yetkiniz yok.");
+        }
+
         public async Task<List<vm_useroffice>> GetUserOfficesAsync(Guid userId)
         {
+            await EnsureSelfOrAdminAsync(userId);
+
             var userOffices = await _context.User_Offices
                 .Include(uo => uo.Office)
                 .Include(uo => uo.User)
@@ -51,6 +63,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
         public async Task<vm_useroffice> GetUserOfficeAsync(Guid userId, Guid officeId)
         {
+            await EnsureSelfOrAdminAsync(userId);
+
             var userOffice = await _context.User_Offices
                 .Include(uo => uo.Office)
                 .Include(uo => uo.User)
@@ -61,6 +75,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
         public async Task<List<vm_office>> GetOfficesByUserAsync(Guid userId)
         {
+            await EnsureSelfOrAdminAsync(userId);
+
             var offices = await _context.User_Offices
                 .Include(uo => uo.Office)
                 .Where(uo => uo.UserId == userId && uo.Office.IsActive)
@@ -167,12 +183,16 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
 
         public async Task<bool> HasUserAccessToOfficeAsync(Guid userId, Guid officeId)
         {
+            await EnsureSelfOrAdminAsync(userId);
+
             return await _context.User_Offices
                 .AnyAsync(uo => uo.UserId == userId && uo.OfficeId == officeId);
         }
 
         public async Task<List<BaskentEnerji.Entity.Modals.ViewModals.User.vm_user>> GetUsersByOfficeAsync(Guid officeId)
         {
+            await _validationService.ValidateOfficeAccessAsync(officeId);
+
             var users = await _context.User_Offices
                 .Include(uo => uo.User)
                 .Where(uo => uo.OfficeId == officeId)

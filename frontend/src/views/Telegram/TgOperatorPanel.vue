@@ -18,10 +18,15 @@ const actionLoading = ref(false)
 let eventSource: EventSource | null = null
 let audioCtx: AudioContext | null = null
 
+// Bot tarafı (main_bot.py) 'pending', 'pending_crypto', 'waiting_payment', 'bank_provided',
+// 'in_progress', 'operator_chat', 'payment_sent', 'approved' gibi birçok ara durum üretiyor.
+// Sabit bir "aktif" listesi tutmak yerine terminal durumları hariç her şeyi aktif sayarız —
+// böylece bot tarafına yeni bir ara durum eklendiğinde işlemler panelden sessizce kaybolmaz.
+const TERMINAL_STATUSES = ['completed', 'cancelled', 'rejected']
 const filteredTx = computed(() => {
   if (activeFilter.value === 'active')
-    return transactions.value.filter(t => ['pending', 'processing', 'approved'].includes(t.status))
-  return transactions.value.filter(t => ['completed', 'cancelled', 'rejected'].includes(t.status))
+    return transactions.value.filter(t => !TERMINAL_STATUSES.includes(t.status))
+  return transactions.value.filter(t => TERMINAL_STATUSES.includes(t.status))
 })
 
 const searchQuery = ref('')
@@ -367,7 +372,7 @@ onUnmounted(() => {
           </div>
 
           <!-- Action Buttons -->
-          <div class="action-buttons" v-if="['pending', 'processing', 'approved'].includes(selectedTx.status)">
+          <div class="action-buttons" v-if="!TERMINAL_STATUSES.includes(selectedTx.status)">
             <button class="action-btn approve" @click="doAction('approve')" v-if="selectedTx.status === 'pending'">
               <span class="material-symbols-outlined" aria-hidden="true" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">check_circle</span>
               Kabul Et

@@ -235,7 +235,8 @@
                   <span class="amount in-base">
                     {{ formatCurrency(balance.valueInBaseCurrency || 0, 'TRY') }}
                   </span>
-                  <span v-if="balance.unrealizedProfit" class="amount" :class="balance.unrealizedProfit < 0 ? 'unrealized-neg' : 'unrealized-pos'" style="display:block;font-size:11px">
+                  <span v-if="balance.unrealizedProfit" class="amount" :class="balance.unrealizedProfit < 0 ? 'unrealized-neg' : 'unrealized-pos'" style="display:block;font-size:11px"
+                        title="Kasada duran, henüz SATILMAMIŞ dövizin güncel piyasa kuru ile ortalama maliyeti (WAC) arasındaki fark. Satış yapılmadıkça gerçekleşmiş kâr değildir — Z-Raporu'ndaki 'Toplam Kar' bu rakamı içermez.">
                     {{ balance.unrealizedProfit > 0 ? '+' : '' }}{{ formatCurrency(balance.unrealizedProfit, 'TRY') }} (anlık fark)
                   </span>
                 </td>
@@ -294,7 +295,11 @@
                 <span class="balance-value in-base">{{ formatCurrency(balance.valueInBaseCurrency || 0, 'TRY') }}</span>
               </div>
               <div class="balance-row" v-if="balance.unrealizedProfit">
-                <span class="balance-label">Anlık Piyasa Farkı</span>
+                <span class="balance-label">
+                  Anlık Piyasa Farkı
+                  <span class="material-symbols-outlined" aria-hidden="true" style="font-size:13px; color:#9ca3af; cursor:help; vertical-align:middle"
+                        title="Kasada duran, henüz SATILMAMIŞ dövizin güncel piyasa kuru ile ortalama maliyeti (WAC) arasındaki fark. Satış yapılmadıkça gerçekleşmiş kâr değildir — Z-Raporu'ndaki 'Toplam Kar' bu rakamı içermez.">info</span>
+                </span>
                 <span class="balance-value" :class="balance.unrealizedProfit < 0 ? 'unrealized-neg' : 'unrealized-pos'">
                   {{ balance.unrealizedProfit > 0 ? '+' : '' }}{{ formatCurrency(balance.unrealizedProfit, 'TRY') }}
                 </span>

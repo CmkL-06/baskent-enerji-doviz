@@ -1,11 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Text.Json;
 using System.Threading.Tasks;
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
+using BaskentEnerji.Business.Exceptions;
 using BaskentEnerji.Business.Infrastructure.Site.Page;
+using BaskentEnerji.Business.Services.Permission;
 using BaskentEnerji.Data.Contexts;
 using PageEntity = BaskentEnerji.Entity.Entities.Site.Page.Page;
 using BaskentEnerji.Entity.Entities.Site.Page;
@@ -17,11 +20,13 @@ namespace BaskentEnerji.Business.Services.Site.Page
     {
         private readonly BaskentEnerjiDbContext _dbContext;
         private readonly IMapper _mapper;
+        private readonly ValidationService _validationService;
 
-        public PageService(BaskentEnerjiDbContext dbContext, IMapper mapper)
+        public PageService(BaskentEnerjiDbContext dbContext, IMapper mapper, ValidationService validationService)
         {
             _dbContext = dbContext;
             _mapper = mapper;
+            _validationService = validationService;
         }
 
         // Read operations
@@ -163,6 +168,8 @@ namespace BaskentEnerji.Business.Services.Site.Page
         // Write operations
         public async Task<PageEntity> CreatePageAsync(CreatePageRequest request)
         {
+            if (!await _validationService.IsStaff()) throw new ApiException(HttpStatusCode.Unauthorized, "You have no permission to do this.");
+
             // Check if slug already exists
             var existingPage = await _dbContext.Pages
                 .AnyAsync(p => p.Slug == request.Slug && p.LanguageCode == request.LanguageCode);
@@ -219,6 +226,8 @@ namespace BaskentEnerji.Business.Services.Site.Page
 
         public async Task<bool> UpdatePageAsync(Guid id, UpdatePageRequest request)
         {
+            if (!await _validationService.IsStaff()) throw new ApiException(HttpStatusCode.Unauthorized, "You have no permission to do this.");
+
             try
             {
                 // First check if page exists
@@ -311,6 +320,8 @@ namespace BaskentEnerji.Business.Services.Site.Page
 
         public async Task<bool> DeletePageAsync(Guid id)
         {
+            if (!await _validationService.IsStaff()) throw new ApiException(HttpStatusCode.Unauthorized, "You have no permission to do this.");
+
             var page = await _dbContext.Pages
                 .Include(p => p.Components)
                 .FirstOrDefaultAsync(p => p.Id == id);
@@ -337,6 +348,8 @@ namespace BaskentEnerji.Business.Services.Site.Page
         // Page actions
         public async Task<bool> PublishPageAsync(Guid id)
         {
+            if (!await _validationService.IsStaff()) throw new ApiException(HttpStatusCode.Unauthorized, "You have no permission to do this.");
+
             var page = await _dbContext.Pages.FindAsync(id);
             if (page == null)
                 return false;
@@ -349,6 +362,8 @@ namespace BaskentEnerji.Business.Services.Site.Page
 
         public async Task<bool> UnpublishPageAsync(Guid id)
         {
+            if (!await _validationService.IsStaff()) throw new ApiException(HttpStatusCode.Unauthorized, "You have no permission to do this.");
+
             var page = await _dbContext.Pages.FindAsync(id);
             if (page == null)
                 return false;
@@ -360,6 +375,8 @@ namespace BaskentEnerji.Business.Services.Site.Page
 
         public async Task<PageEntity?> DuplicatePageAsync(Guid id, DuplicatePageRequest? request = null)
         {
+            if (!await _validationService.IsStaff()) throw new ApiException(HttpStatusCode.Unauthorized, "You have no permission to do this.");
+
             var originalPage = await _dbContext.Pages
                 .FirstOrDefaultAsync(p => p.Id == id);
 
@@ -413,6 +430,8 @@ namespace BaskentEnerji.Business.Services.Site.Page
 
         public async Task<bool> SetAsHomePageAsync(Guid id)
         {
+            if (!await _validationService.IsStaff()) throw new ApiException(HttpStatusCode.Unauthorized, "You have no permission to do this.");
+
             var page = await _dbContext.Pages.FindAsync(id);
             if (page == null)
                 return false;

@@ -29,6 +29,10 @@ namespace BaskentEnerji.Data.Contexts
             // HasDefaultSchema kaldirildi — tablolar dbo schemasi altinda
             // modelBuilder.HasDefaultSchema("mtturkey_exchange");
 
+            modelBuilder.Entity<TgOperatorInviteToken>()
+                .HasIndex(t => t.Token)
+                .IsUnique();
+
             // Currency <-> ExchangeRate cok-yonlu iliski
             modelBuilder.Entity<ExchangeRate>(entity =>
             {
@@ -723,5 +727,6 @@ namespace BaskentEnerji.Data.Contexts
         public DbSet<TgDealer> TgDealers { get; set; } = null!;
         public DbSet<TgDealerRate> TgDealerRates { get; set; } = null!;
         public DbSet<TgDealerRateHistory> TgDealerRateHistories { get; set; } = null!;
+        public DbSet<TgOperatorInviteToken> TgOperatorInviteTokens { get; set; } = null!;
     }
 }

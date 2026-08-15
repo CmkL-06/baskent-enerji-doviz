@@ -74,8 +74,8 @@ namespace BaskentEnerji.Business.Tests
             using var ctx2 = TestDbContextFactory.Create();
             var validation1 = TestAuthHelper.CreateValidationService(s.OwnerUserId, ctx1);
             var validation2 = TestAuthHelper.CreateValidationService(s.OwnerUserId, ctx2);
-            var service1 = new OfficeTransferService(ctx1, validation1);
-            var service2 = new OfficeTransferService(ctx2, validation2);
+            var service1 = new OfficeTransferService(ctx1, validation1, new WacService(ctx1));
+            var service2 = new OfficeTransferService(ctx2, validation2, new WacService(ctx2));
 
             var request1 = new rm_create_officetransfer { SourceVaultId = s.SourceVaultId, TargetVaultId = s.TargetVaultId, CurrencyId = s.CurrencyId, Amount = 60m };
             var request2 = new rm_create_officetransfer { SourceVaultId = s.SourceVaultId, TargetVaultId = s.TargetVaultId, CurrencyId = s.CurrencyId, Amount = 60m };
