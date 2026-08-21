@@ -818,8 +818,14 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 {
                     kvp.IsDeleted = true;
 
+                    // UPDLOCK — VaultService.CheckVaultBalanceAsync/GetLockedBalanceAsync'teki aynı
+                    // desen. Bu, kodun geri kalanındaki (transfer/exchange/manuel giriş) her bakiye
+                    // değişikliğinin geçtiği tek kilitli yol dışında kalan tek okuma-değiştir-yaz
+                    // noktasıydı — bir işlem silinirken aynı kasa/para birimine eşzamanlı başka bir
+                    // bakiye değişikliği olursa güncellemelerden biri kaybolabilirdi (klasik race).
                     var dbVaultBalance = _context.VaultBalances
-                        .FirstOrDefault(x => x.VaultId == kvp.VaultId && x.CurrencyId == kvp.CurrencyId);
+                        .FromSqlRaw("SELECT * FROM VaultBalances WITH (UPDLOCK) WHERE VaultId = {0} AND CurrencyId = {1}", kvp.VaultId, kvp.CurrencyId)
+                        .FirstOrDefault();
 
                     if (dbVaultBalance != null)
                     {
@@ -907,9 +913,24 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                     
                 if (partyAccount != null)
                 {
-                    // Reverse the balance change
-                    partyAccount.Balance -= entry.Amount;
-                    
+                    // Bakiye değişikliğini tersine çevir — kaydın oluşturulduğu yöndeki
+                    // (PartyTransactionIntegration.UpdateAccountBalanceAsync) mantığın tam tersi:
+                    // Debit kaydı Balance'ı += ile artırmıştı, geri alırken -= ile düşülmeli;
+                    // Credit kaydı Balance'ı -= ile azaltmıştı, geri alırken += ile eklenmeli.
+                    // Önceden entry.Type'a bakılmaksızın her zaman -= yapılıyordu — bu, Credit
+                    // tipi bir kaydı (örn. partiden alınan/borçlu olunan tutar) geri alırken
+                    // bakiyeyi ters yönde ikinci kez düşürüp gerçek parasal tutarı bozuyordu.
+                    if (entry.Type == BaskentEnerji.Entity.Entities.ExchangeOffice.Party.EntryType.Debit)
+                    {
+                        partyAccount.Balance -= entry.Amount;
+                        partyAccount.TotalDebits -= entry.Amount;
+                    }
+                    else
+                    {
+                        partyAccount.Balance += entry.Amount;
+                        partyAccount.TotalCredits -= entry.Amount;
+                    }
+
                     // Remove the entry from database
                     _context.PartyAccountEntries.Remove(entry);
                 }

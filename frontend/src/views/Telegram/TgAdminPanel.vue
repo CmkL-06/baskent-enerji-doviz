@@ -203,7 +203,7 @@ async function saveRate(rate: any) {
     await apiService.put(`/tg/admin/exchange-rates/${rate.id}`, { buyRate: rate.buyRate, sellRate: rate.sellRate })
     editingRate.value = null
     await loadCryptoDeposits()
-  } catch (e) { console.error('Rate update error:', e) }
+  } catch (e: any) { notification.error(e?.response?.data?.message || 'Kur güncellenemedi') }
 }
 
 async function createRate() {
@@ -214,7 +214,7 @@ async function createRate() {
     showNewRateForm.value = false
     newRate.value = { currency: '', buyRate: 0, sellRate: 0 }
     await loadCryptoDeposits()
-  } catch (e) { console.error('Rate create error:', e) }
+  } catch (e: any) { notification.error(e?.response?.data?.message || 'Kur eklenemedi') }
 }
 
 async function loadApiQueue() {

@@ -191,10 +191,13 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     context.user_data['referral'] = param
     context.user_data['dealer_name'] = dealer.get('dealer_name')
-    # referral, sadece bellek-içi context.user_data'da değil DB-destekli state'e de yazılır —
-    # müşteri gruba katılana kadar geçen sürede bot yeniden başlarsa (deploy/crash) referral
-    # kaybolmasın diye (bkz. handle_callback'teki "check_joined" dalı).
-    set_state(user_id, 'awaiting_group_join', referral=param, dealer_name=dealer.get('dealer_name'))
+    # referral, sadece bellek-içi context.user_data'da değil TgCustomers.ReferralCode'a da
+    # yazılır — müşteri gruba katılana kadar geçen sürede bot yeniden başlarsa (deploy/crash)
+    # referral kaybolmasın diye (bkz. handle_callback'teki "check_joined" dalı). set_state
+    # burada KULLANILAMAZ: TgTransactions'a UPDATE atar ama bu noktada müşterinin henüz
+    # hiçbir işlem kaydı yok (o ancak _handle_amount'ta oluşuyor) — sessizce 0 satır güncelleyip
+    # hiçbir şey kaydetmezdi.
+    db.set_customer_referral(user_id, param)
     await _proceed_after_referral(update.message, context, user_id, lang)
 
 
@@ -380,12 +383,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         referral = context.user_data.get('referral')
         if not referral:
-            # context.user_data bot yeniden başladığında sıfırlanır — DB-destekli state'ten kurtar.
-            saved = get_state(user_id)
-            if saved and saved.get('data', {}).get('referral'):
-                referral = saved['data']['referral']
+            # context.user_data bot yeniden başladığında sıfırlanır — kalıcı olarak
+            # TgCustomers.ReferralCode'a yazılmış olan değerden kurtar (bkz. cmd_start).
+            saved_referral = db.get_customer_referral(user_id)
+            if saved_referral:
+                referral = saved_referral
                 context.user_data['referral'] = referral
-                context.user_data['dealer_name'] = saved['data'].get('dealer_name')
         if not referral:
             await query.edit_message_text(
                 "⚠️ Oturum zaman aşımına uğradı.\nLütfen QR kodu tekrar okutun.",
@@ -560,12 +563,32 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ── TXID Girişi ──
     if state_name == 'waiting_txid':
+        # Durum (state_name) DB'den kurtarılabiliyor ama context.user_data bot yeniden
+        # başladığında sıfırlanır — restart sonrası burada transaction_id/api_key boş
+        # kalıp müşteriyi kalıcı bir hataya düşürmesin diye DB'den yeniden doldurulur.
+        if not context.user_data.get('transaction_id') and not context.user_data.get('pending_transaction_id'):
+            pending = db.get_pending_usdt(user_id)
+            if pending:
+                _restore_pending_usdt(context, pending)
         await _handle_txid(update, context, user_id, text, lang)
         return
 
     # ── Operatör Chat ──
     if state_name == 'in_chat':
         await _handle_chat_message(update, context, user_id, text, lang)
+        return
+
+    # ── Onay bekleniyor (arka planda otomatik takip aktif) ──
+    # Bu dal olmadan, müşterinin bu sırada gönderdiği herhangi bir metin aşağıdaki
+    # "state yok" düşüşüne kayıp set_state(..., 'waiting_txid', ...) çağırarak
+    # 'waiting_confirmations' durumunu sessizce eziyordu — bu da _auto_update_progress'in
+    # (durumu her turda kontrol eder) sessizce durmasına ve ödemenin manuel /status
+    # kontrolü dışında tamamlanamaz hale gelmesine yol açıyordu.
+    if state_name == 'waiting_confirmations':
+        await update.message.reply_text(
+            "⏳ İşleminiz hâlâ onay bekliyor, otomatik olarak takip ediliyor.\n"
+            "Durumu kontrol etmek için /status yazabilirsiniz."
+        )
         return
 
     # ── Ruble bekleyen dekont ──
@@ -971,16 +994,19 @@ async def _handle_txid(update: Update, context: ContextTypes.DEFAULT_TYPE,
 
 
 def _get_dealer_from_transaction(transaction_id: int) -> dict | None:
+    # Önceden yanlış tablo/kolon adları (Transactions/Dealers, küçük harf) kullanıyordu —
+    # gerçek şema TgTransactions/TgDealers, PascalCase kolonlar. Sorgu her zaman
+    # başarısız olup None dönüyordu (bkz. TgDealerCode eşleşmesi get_pending_usdt ile aynı desen).
     try:
         from database import get_conn
         with get_conn() as conn:
             c = conn.cursor()
             c.execute("""
-                SELECT d.dealer_id, d.crypto_network, d.crypto_address,
-                       d.api_key, d.api_secret, t.amount, t.completion_code
-                FROM Transactions t
-                JOIN Dealers d ON d.dealer_code = t.referral_code
-                WHERE t.transaction_id = ?
+                SELECT d.DealerId, d.CryptoNetwork, d.CryptoAddress,
+                       d.ApiKey, d.ApiSecret, t.Amount, t.CompletionCode
+                FROM TgTransactions t
+                JOIN TgDealers d ON d.DealerCode = t.ReferralCode
+                WHERE t.TransactionId = ?
             """, transaction_id)
             row = c.fetchone()
             if row:

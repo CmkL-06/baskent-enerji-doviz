@@ -597,6 +597,43 @@ namespace BaskentEnerji.API.Controllers.Telegram
             return Ok(new { success = true });
         }
 
+        // operator_bot.py artık /start ile pasif kayıt açmıyor — yeni bir operatör adayı
+        // ancak burada üretilen tek kullanımlık, 24 saatlik bir token ile kayıt olabiliyor
+        // (bkz. telegram-bot/database.py: validate_and_consume_invite_token). Bu endpoint
+        // token üretip botun deep-link formatına (t.me/<bot>?start=<token>) sarar.
+        [HttpPost("operator-invite")]
+        public async Task<IActionResult> CreateOperatorInvite()
+        {
+            await RequireAdmin();
+
+            var userIdStr = _validationService.GetUserID();
+            if (!Guid.TryParse(userIdStr, out var adminUserId))
+                throw new ApiException(HttpStatusCode.Unauthorized, "Geçersiz kullanıcı");
+
+            var tokenBytes = new byte[18];
+            System.Security.Cryptography.RandomNumberGenerator.Fill(tokenBytes);
+            var token = Convert.ToBase64String(tokenBytes)
+                .Replace("+", "").Replace("/", "").Replace("=", "");
+
+            var now = DateTime.UtcNow;
+            var invite = new TgOperatorInviteToken
+            {
+                Id = Guid.NewGuid(),
+                Token = token,
+                CreatedByUserId = adminUserId,
+                CreatedAt = now,
+                ExpiresAt = now.AddHours(24)
+            };
+            _db.TgOperatorInviteTokens.Add(invite);
+            await _db.SaveChangesAsync();
+
+            return Ok(new
+            {
+                deepLink = $"https://t.me/MTTOperatorBot?start={token}",
+                expiresAt = invite.ExpiresAt
+            });
+        }
+
         [HttpDelete("operators/{userId}")]
         public async Task<IActionResult> DeleteOperator(Guid userId)
         {

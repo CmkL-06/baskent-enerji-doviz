@@ -787,6 +787,10 @@ async def _complete_transaction(query, context, operator_id: int, tid: int, can_
 
         # Dealer bakiyesini düş
         trans = db.get_transaction(tid)
+        # cid, atomik tamamlama başarılı olsa bile bu ikinci get_transaction çağrısı
+        # (geçici DB gecikmesi vb. yüzden) satır dönmezse tanımsız kalıp aşağıdaki
+        # "if cid:" bloğunda NameError'a yol açmasın diye önceden None olarak ayarlanır.
+        cid = None
         if trans:
             referral_code = trans.get('referral_code')
             amount_try = trans.get('try_amount') or trans.get('amount_try')

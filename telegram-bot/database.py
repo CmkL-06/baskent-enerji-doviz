@@ -189,6 +189,40 @@ def upsert_customer(user):
         return False
 
 
+def set_customer_referral(customer_id, referral_code):
+    """Musterinin henuz islem baslatmadan once secilen bayi/referans kodunu kalici olarak sakla.
+
+    set_user_state/get_user_state TgTransactions tablosuna yazar ve musterinin ZATEN bir
+    islem kaydi olmasini gerektirir -- ama referans kodu tam olarak islem henuz yokken
+    (QR okutuldu, grup katilim bekleniyor) belirleniyor. O yuzden burada TgCustomers'in
+    kendi ReferralCode kolonu kullanilir; bu satir upsert_customer ile zaten olusturulmus
+    olur, boylece bot yeniden baslasa bile (context.user_data sifirlansa bile) kalici kalir.
+    """
+    try:
+        with get_conn() as conn:
+            c = conn.cursor()
+            c.execute("UPDATE TgCustomers SET ReferralCode = ? WHERE CustomerId = ?",
+                      referral_code, customer_id)
+            conn.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Musteri referans kaydetme hatasi: {e}")
+        return False
+
+
+def get_customer_referral(customer_id):
+    """set_customer_referral ile kaydedilen bekleyen referans kodunu getirir."""
+    try:
+        with get_conn() as conn:
+            c = conn.cursor()
+            c.execute("SELECT ReferralCode FROM TgCustomers WHERE CustomerId = ?", customer_id)
+            row = c.fetchone()
+            return row[0] if row and row[0] else None
+    except Exception as e:
+        logger.error(f"Musteri referans getirme hatasi: {e}")
+        return None
+
+
 def get_customer_language(customer_id):
     """Musterinin dil tercihini getir"""
     try:
