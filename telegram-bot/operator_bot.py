@@ -70,6 +70,10 @@ def _can_manage_panel(user_id: int, operator: dict | None) -> bool:
 # YARDIMCI
 # ═══════════════════════════════════════════════
 
+WEB_OWNER_PANEL_URL = "https://baskentenerji.com/ihtiyar/owner-panel"
+WEB_ADMIN_PANEL_URL = "https://baskentenerji.com/ihtiyar/tg-admin"
+
+
 def _main_menu_kb(
     show_owner_panel: bool = False,
     show_admin_panel: bool = False
@@ -79,10 +83,13 @@ def _main_menu_kb(
         [InlineKeyboardButton("📊 İstatistiklerim", callback_data="my_stats")],
         [InlineKeyboardButton("🔄 Yenile", callback_data="refresh")],
     ]
-    if show_owner_panel:
-        kb.append([InlineKeyboardButton("👑 Owner Panel", callback_data="owner_panel")])
+    # "Owner Panel" ismi/butonu artık menüde görünmüyor -- owner /start yazdığında
+    # ayrı, otomatik bir mesajla web panelinin linki gönderiliyor (bkz. cmd_start).
+    # Admin Panel butonu Telegram-içi metin özeti yerine artık doğrudan tarayıcıda
+    # gerçek web admin panelini (tg-admin) açan bir link -- url= parametresi Telegram
+    # istemcisinde tıklandığında tarayıcıyı açar, callback_data gibi botta işlenmez.
     if show_admin_panel:
-        kb.append([InlineKeyboardButton("🛠 Admin Panel", callback_data="admin_panel")])
+        kb.append([InlineKeyboardButton("🌐 Admin Paneline Git", url=WEB_ADMIN_PANEL_URL)])
     return InlineKeyboardMarkup(kb)
 
 
@@ -142,14 +149,22 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_owner = _is_owner(user_id)
     is_admin = _is_admin(operator)
 
+    # Owner /start yazdığında -- operatör tablosunda kaydı olsun ya da olmasın --
+    # menüde ayrı bir "Owner Panel" butonu beklemek yerine, web panelinin linki
+    # otomatik/öncelikli olarak (menüden bağımsız, en üstte) gönderilir; tıklanınca
+    # tarayıcıda açılır. Aşağıdaki normal akış (kayıtsız/kayıtlı operatör menüsü) bu
+    # mesajdan sonra her zamanki gibi devam eder.
+    if is_owner:
+        await update.message.reply_text(
+            f"👑 <b>{html.escape(user.first_name)}</b>\n\nPanelinize gitmek için aşağıya dokunun:",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🌐 Panele Git", url=WEB_OWNER_PANEL_URL)]]),
+            parse_mode="HTML"
+        )
+
     # ── Owner kullanıcısını operatör tablosuna düşürmeden panele al ──
     if is_owner and not operator:
         await update.message.reply_text(
-            (
-                f"👑 <b>{html.escape(user.first_name)}</b>\n\n"
-                "Owner paneli aktif.\n"
-                "👇 Menüden işlem seçin."
-            ),
+            "👇 Botla ilgili işlemler için menü:",
             reply_markup=_main_menu_kb(show_owner_panel=True, show_admin_panel=True),
             parse_mode="HTML"
         )
