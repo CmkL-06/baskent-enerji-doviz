@@ -16,5 +16,9 @@ namespace BaskentEnerji.Entity.Modals.RequestModals.ExchangeService.Office
         public bool  isEntireBalance { get; set; }
       
         public TransactionType? TransactionType { get; set; }
+
+        // Bu bakiye güncellemesi bir ExpensePayment onayından tetiklendiyse, oluşturulacak
+        // VaultBalanceHistory kaydına doğrudan FK olarak yazılır. Boşsa serbest bir kasa hareketidir.
+        public Guid? ExpensePaymentId { get; set; }
     }
 }

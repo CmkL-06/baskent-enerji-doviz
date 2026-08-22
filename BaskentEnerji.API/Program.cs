@@ -202,6 +202,7 @@ builder.Services.AddHostedService<AutoRateUpdateBackgroundService>();
 builder.Services.AddSingleton<UserActivityTracker>();
 builder.Services.AddHostedService<UserActivityFlushBackgroundService>();
 builder.Services.AddHostedService<DailyStaffAnomalyCheckBackgroundService>();
+builder.Services.AddHostedService<ExternalRateCacheCleanupBackgroundService>();
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ValidationService>();

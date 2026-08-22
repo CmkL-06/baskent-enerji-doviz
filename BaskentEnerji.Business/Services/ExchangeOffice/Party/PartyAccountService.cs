@@ -203,25 +203,25 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
             if (tryCurrency == null)
                 throw new InvalidOperationException("TRY currency not found");
 
-            // Denetim raporu düzeltmesi: ödeme her zaman TRY hesabına yazılıyordu (TL karşılığına
-            // çevrilerek), bu da CreateManualEntryAsync'in aynı hesabı KENDİ döviz cinsinden
-            // güncellemesiyle tutarsızdı (çifte muhasebe hatası — müşterinin ayrı bir USD hesabı
-            // varsa, USD ödemesi kasadan gerçek USD düşürür ama USD hesap bakiyesi hiç değişmezdi).
-            // Artık ödemenin yapıldığı para biriminin KENDİ PartyAccount'u güncelleniyor.
+            // Tek net TL pozisyon mantığı: Bir Party'ye farklı döviz cinsinden yapılan ödemeler,
+            // AYRI PartyAccount açmak yerine Party'nin PRİMARY hesabında (TRY) TL karşılığı olarak
+            // birikir. Aksi halde aynı party için "TRY hesap +100k borç" ve "USD hesap -100 alacak"
+            // gibi çelişkili iki hesap oluşur ve borç kapama işlemi bir hesabı diğerine yansıtmaz.
             //
             // UPDLOCK: eşzamanlı iki ödeme/tahsilat kaydının aynı cari hesabı okuyup birbirinin
             // güncellemesini sessizce ezmesini (lost update) engeller.
             var account = await _context.PartyAccounts
-                .FromSqlRaw("SELECT * FROM PartyAccounts WITH (UPDLOCK) WHERE PartyId = {0} AND CurrencyId = {1}", request.PartyId, request.CurrencyId)
+                .FromSqlRaw("SELECT * FROM PartyAccounts WITH (UPDLOCK) WHERE PartyId = {0} AND CurrencyId = {1}", request.PartyId, tryCurrency.Id)
                 .Include(a => a.Currency)
                 .FirstOrDefaultAsync();
 
             if (account == null)
             {
+                // TRY hesabı yoksa oluştur — tüm cari işlemler bu tek TL bazlı hesapta birikecek
                 account = new PartyAccount
                 {
                     PartyId = request.PartyId,
-                    CurrencyId = request.CurrencyId,
+                    CurrencyId = tryCurrency.Id,
                     AccountNumber = GenerateAccountNumber(),
                     Balance = 0,
                     BlockedAmount = 0,
@@ -293,7 +293,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
                     ? DateTime.SpecifyKind(request.PaymentDate, DateTimeKind.Local)
                     : request.PaymentDate,
                 Type = request.Type,
-                Amount = positiveAmount, // Hesabın kendi para birimi cinsinden (TL karşılığı değil — bkz. yukarıdaki düzeltme notu)
+                Amount = positiveAmount, // Orijinal işlem tutarı (ödemenin kendi para biriminde)
+                AmountInTRY = tlAmount,  // TL karşılığı — net pozisyon bu alandan güncellenir
                 Description = request.CurrencyId != tryCurrency.Id
                     ? $"{positiveAmount} {currencyCode} @ {exchangeRate:F4} = {tlAmount:F2} TRY - {request.Notes ?? request.PaymentMethod}"
                     : request.Notes ?? $"Payment - {request.PaymentMethod}",
@@ -313,19 +314,20 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
 
             _context.PartyAccountEntries.Add(entry);
 
-            // Hesap bakiyesini güncelle (TL bazında)
-            // Balance > 0 = Party bize borçlu
-            // Balance < 0 = Biz party'ye borçluyuz
+            // Hesap bakiyesini güncelle — TL karşılığı üzerinden (Party başına tek net pozisyon).
+            // Balance > 0 = Party bize borçlu, Balance < 0 = Biz party'ye borçluyuz.
+            // Farklı döviz cinsinden ödemeler tlAmount ile aynı TRY hesabında birikir; cross-currency
+            // borç kapama otomatik olarak doğru çalışır (100 USD tahsilat → TL karşılığı borçtan düşer).
 
             if (request.Type == EntryType.Credit) // Tahsilat (party'den para alıyoruz)
             {
-                account.Balance -= positiveAmount; // Party'nin borcu azalır (hesabın kendi para biriminde)
-                account.TotalCredits += positiveAmount;
+                account.Balance -= tlAmount; // Party'nin borcu TL karşılığı kadar azalır
+                account.TotalCredits += tlAmount;
             }
             else if (request.Type == EntryType.Debit) // Ödeme (party'ye para veriyoruz)
             {
-                account.Balance += positiveAmount; // Party'nin borcu artar (veya alacağı azalır)
-                account.TotalDebits += positiveAmount;
+                account.Balance += tlAmount; // Party'nin borcu (veya bizim alacağımız) TL karşılığı kadar artar
+                account.TotalDebits += tlAmount;
             }
 
             account.LastActivityDate = DateTime.UtcNow;

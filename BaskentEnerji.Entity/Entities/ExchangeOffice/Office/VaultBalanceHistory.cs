@@ -33,5 +33,11 @@ namespace BaskentEnerji.Entity.Entities.ExchangeOffice.Office
         // mantığı (VaultService.VoidVaultBalanceHistoryAsync) her iki türü de aynı kabul edip mutlak
         // değer gibi atıyor, delta kayıtlarında bakiyeyi yanlışlıkla o küçük delta değerine sıfırlıyor.
         public bool IsAbsoluteBalance { get; set; } = false;
+
+        // Kasa çıkışı bir ExpensePayment onayından tetiklenmişse doğrudan FK ile bağlanır —
+        // eskiden yalnızca Description metniyle eşleşiyordu; reverse-lookup / rapor / iptal
+        // senaryolarında kırılgandı.
+        public Guid? ExpensePaymentId { get; set; }
+        public BaskentEnerji.Entity.Entities.ExchangeOffice.Expense.ExpensePayment? ExpensePayment { get; set; }
     }
 }

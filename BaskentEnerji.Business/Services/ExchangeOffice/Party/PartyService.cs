@@ -80,22 +80,23 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Party
                 _context.Parties.Add(party);
                 await _context.SaveChangesAsync();
 
-                // Auto-create accounts for all active currencies
-                var activeCurrencies = await _context.Currencies
-                    .ToListAsync();
-
-                foreach (var currency in activeCurrencies)
+                // Sadece PRIMARY TRY hesabını aç — diğer para birimleri işlem geldiğinde
+                // RecordPaymentAsync/PartyTransactionIntegration tarafından otomatik açılır.
+                // Eskiden tüm 26 para birimi için hesap açılıyordu (Aleyna/Damat/Murat vb. cari
+                // detayında 25 sıfır bakiyeli boş kart görünmesine yol açıyordu — 08.2026 temizliği).
+                var tryCurrency = await _context.Currencies.FirstOrDefaultAsync(c => c.CurrencyCode == "TRY");
+                if (tryCurrency != null)
                 {
-                    var account = new PartyAccount
+                    var primaryAccount = new PartyAccount
                     {
                         PartyId = party.Id,
-                        CurrencyId = currency.Id,
+                        CurrencyId = tryCurrency.Id,
                         AccountNumber = $"PA{DateTime.UtcNow:yyyyMMdd}{Guid.NewGuid().ToString("N").Substring(0, 6).ToUpper()}",
                         Balance = 0,
                         BlockedAmount = 0,
                         Status = AccountStatus.Active
                     };
-                    _context.PartyAccounts.Add(account);
+                    _context.PartyAccounts.Add(primaryAccount);
                 }
 
                 await _context.SaveChangesAsync();

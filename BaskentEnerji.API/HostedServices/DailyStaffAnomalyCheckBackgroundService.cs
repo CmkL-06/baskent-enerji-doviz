@@ -42,6 +42,7 @@ namespace BaskentEnerji.API.HostedServices
                         using var scope = _serviceProvider.CreateScope();
                         var alertService = scope.ServiceProvider.GetRequiredService<IAlertService>();
                         await alertService.CheckStaffDailyAnomaliesAsync(businessDate);
+                        await alertService.CheckVaultCountOverdueAsync();
 
                         _lastRunDate = nowTr.Date;
                         _logger.LogInformation("Staff daily anomaly check completed for {BusinessDate}", businessDate);

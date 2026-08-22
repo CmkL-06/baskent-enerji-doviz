@@ -116,7 +116,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Expense
                         amount = -request.Amount, // Negative because it's an expense
                         description = GetTurkishExpenseDescription(definition, payment, currency?.CurrencyCode),
                         isEntireBalance = false,
-                        TransactionType = TransactionType.Withdrawal
+                        TransactionType = TransactionType.Withdrawal,
+                        ExpensePaymentId = payment.Id
                     };
 
                     await _vaultService.UpdateVaultBalanceAsync(vaultUpdate);
@@ -217,7 +218,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Expense
                         amount = -payment.Amount,
                         description = GetTurkishExpenseDescription(payment.ExpenseDefinition, payment, payment.Currency?.CurrencyCode),
                         isEntireBalance = false,
-                        TransactionType = TransactionType.Withdrawal
+                        TransactionType = TransactionType.Withdrawal,
+                        ExpensePaymentId = payment.Id
                     };
                     await _vaultService.UpdateVaultBalanceAsync(vaultUpdate);
 

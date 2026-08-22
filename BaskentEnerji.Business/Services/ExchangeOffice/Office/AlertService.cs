@@ -243,6 +243,76 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
             }
         }
 
+        // ShouldCount=true olan aktif kasalarda LastCountDate belirtilen gün sayısından eskiyse
+        // (veya hiç sayılmadıysa) tekil bir Uyarı üretir. Kasa başına en fazla bir aktif uyarı olur —
+        // sayım yapılınca ilgili uyarıyı çözer.
+        public async Task CheckVaultCountOverdueAsync(int overdueDays = 14)
+        {
+            var thresholdDate = DateTime.Now.AddDays(-overdueDays);
+
+            var vaults = await _db.Vaults
+                .AsNoTracking()
+                .Include(v => v.Office)
+                .Where(v => v.IsActive && v.ShouldCount &&
+                            (v.LastCountDate == null || v.LastCountDate < thresholdDate))
+                .ToListAsync();
+
+            foreach (var vault in vaults)
+            {
+                var referenceId = vault.Id.ToString();
+                var exists = await _db.OfficeAlerts.AnyAsync(a =>
+                    a.AlertType == AlertType.VaultCountOverdue &&
+                    a.ReferenceId == referenceId &&
+                    !a.IsResolved);
+                if (exists) continue;
+
+                var daysAgo = vault.LastCountDate.HasValue
+                    ? (int)(DateTime.Now - vault.LastCountDate.Value).TotalDays
+                    : (int?)null;
+
+                var msg = daysAgo.HasValue
+                    ? $"{vault.Name} kasası {daysAgo.Value} gündür sayılmadı (son sayım: {vault.LastCountDate:dd.MM.yyyy})."
+                    : $"{vault.Name} kasası hiç sayılmadı.";
+
+                await CreateAlertAsync(
+                    vault.OfficeId,
+                    AlertType.VaultCountOverdue,
+                    AlertSeverity.Warning,
+                    $"Kasa sayımı gecikti: {vault.Name}",
+                    msg,
+                    referenceId,
+                    "Vault");
+            }
+
+            // Bu arada sayılmış olan kasaların açık uyarısını otomatik çöz — kullanıcı manuel
+            // resolve etmek zorunda kalmasın.
+            var openAlerts = await _db.OfficeAlerts
+                .Where(a => a.AlertType == AlertType.VaultCountOverdue && !a.IsResolved)
+                .ToListAsync();
+
+            if (openAlerts.Count > 0)
+            {
+                var vaultLookup = await _db.Vaults
+                    .AsNoTracking()
+                    .Where(v => openAlerts.Select(a => a.ReferenceId).Contains(v.Id.ToString()))
+                    .ToDictionaryAsync(v => v.Id.ToString(), v => v);
+
+                foreach (var alert in openAlerts)
+                {
+                    if (alert.ReferenceId == null) continue;
+                    if (!vaultLookup.TryGetValue(alert.ReferenceId, out var v)) continue;
+                    // Kasa artık gecikmiş sayılmıyorsa çöz
+                    if (v.LastCountDate.HasValue && v.LastCountDate.Value >= thresholdDate)
+                    {
+                        alert.IsResolved = true;
+                        alert.ResolvedAt = DateTime.UtcNow;
+                        if (!alert.IsRead) { alert.IsRead = true; alert.ReadAt = DateTime.UtcNow; }
+                    }
+                }
+                await _db.SaveChangesAsync();
+            }
+        }
+
         private static vm_alert MapToVm(OfficeAlert a) => new()
         {
             Id = a.Id,

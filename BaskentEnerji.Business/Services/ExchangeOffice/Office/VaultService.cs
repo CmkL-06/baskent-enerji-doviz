@@ -736,7 +736,8 @@ namespace BaskentEnerji.Business.Services.ExchangeOffice.Office
                 Id = Guid.NewGuid(),
                 TransactionType = iType,
                 UserId = Guid.Parse(_validationService.GetUserID()),
-                IsAbsoluteBalance = data.isEntireBalance
+                IsAbsoluteBalance = data.isEntireBalance,
+                ExpensePaymentId = data.ExpensePaymentId
             };
 
             //if (!data.isEntireBalance) _context.VaultBalanceHistories.Add(nHistory);

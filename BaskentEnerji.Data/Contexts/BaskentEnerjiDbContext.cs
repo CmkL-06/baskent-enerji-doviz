@@ -355,6 +355,13 @@ namespace BaskentEnerji.Data.Contexts
             modelBuilder.Entity<VaultBalanceHistory>(entity =>
             {
                 entity.Property(e => e.Balance).HasPrecision(18, 4);
+
+                // ExpensePayment silinemiyor (Restrict), o yüzden burası ClientSetNull yerine
+                // Restrict daha güvenli — history kaydında öksüz FK oluşmasın.
+                entity.HasOne(vh => vh.ExpensePayment)
+                    .WithMany()
+                    .HasForeignKey(vh => vh.ExpensePaymentId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             // --- VaultBalanceSnapshotDetail ---
@@ -413,6 +420,7 @@ namespace BaskentEnerji.Data.Contexts
                 entity.Property(e => e.RunningBalance).HasPrecision(18, 4);
                 entity.Property(e => e.OriginalAmount).HasPrecision(18, 4);
                 entity.Property(e => e.ExchangeRate).HasPrecision(18, 6);
+                entity.Property(e => e.AmountInTRY).HasPrecision(18, 4);
 
                 // Ayni islem (ReferenceNumber = TransactionId) icin ayni cari hesaba iki kez
                 // kayit dusulmesini DB seviyesinde engeller (Telegram bot tarafinin retry/kuyruk

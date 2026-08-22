@@ -80,6 +80,7 @@ namespace BaskentEnerji.Entity
         TransferPending     = 4,
         DayClosureMissing   = 5,
         BulkEntrySuspected  = 6,
+        VaultCountOverdue   = 7,
     }
 
     public enum AlertSeverity
