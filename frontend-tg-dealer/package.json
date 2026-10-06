@@ -12,7 +12,7 @@
   "dependencies": {
     "@types/crypto-js": "^4.2.2",
     "@vueuse/core": "^13.5.0",
-    "axios": "^1.11.0",
+    "axios": "^1.20.0",
     "crypto-js": "^4.2.0",
     "cryptocurrency-icons": "^0.18.1",
     "flag-icons": "^7.5.0",
